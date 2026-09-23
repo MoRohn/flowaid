@@ -115,7 +115,7 @@ describe("CriteriaEditor", () => {
     render(<CriteriaEditor />);
     await user.click(screen.getByRole("radio", { name: "Score" }));
     expect(screen.getAllByRole("textbox", { name: /Level \d description/ })).toHaveLength(2);
-    expect(screen.getAllByRole("button", { name: "Remove level" })[0]).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Remove level 0" })).toBeDisabled();
     await user.click(screen.getByRole("button", { name: "Add level" }));
     expect(screen.getAllByRole("textbox", { name: /Level \d description/ })).toHaveLength(3);
   });

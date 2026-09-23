@@ -227,6 +227,8 @@ export const ExpressionInput = forwardRef<ExpressionEditorHandle, ExpressionInpu
 );
 
 export interface ExpressionTextareaProps extends Omit<ExpressionInputProps, "onSubmit"> {
+  /** Extra CodeMirror extensions (completion sources, external diagnostics). */
+  extensions?: Extension;
   /** Initial visible height in lines. */
   minRows?: number;
   maxRows?: number;
@@ -254,6 +256,7 @@ export const ExpressionTextarea = forwardRef<ExpressionEditorHandle, ExpressionT
       referencePicker = true,
       minRows = 4,
       maxRows = 16,
+      extensions: extra,
       "aria-label": ariaLabel,
       "aria-describedby": ariaDescribedBy,
     },
@@ -289,8 +292,10 @@ export const ExpressionTextarea = forwardRef<ExpressionEditorHandle, ExpressionT
           "aria-multiline": "true",
         }),
         cmPlaceholder(placeholder),
+        extra ?? [],
       ],
       [
+        extra,
         scope,
         handleValidate,
         isDisabled,

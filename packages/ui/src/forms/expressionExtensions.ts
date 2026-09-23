@@ -12,6 +12,7 @@ import {
   type Completion,
   type CompletionContext,
   type CompletionResult,
+  type CompletionSource,
 } from "@codemirror/autocomplete";
 import { EditorState, Facet, type Extension } from "@codemirror/state";
 import {
@@ -37,6 +38,33 @@ export const expressionScope = Facet.define<ExpressionScope, ExpressionScope>({
   combine: (values) => values[0] ?? EMPTY_SCOPE,
 });
 
+/** A problem found outside the editor (e.g. a compiler diagnostic's `location.range`). */
+export interface EditorDiagnostic {
+  from: number;
+  to: number;
+  severity: "error" | "warning" | "info";
+  message: string;
+}
+
+/** Problems to underline in addition to the editor's own checks. */
+export const externalDiagnostics = Facet.define<
+  readonly EditorDiagnostic[],
+  readonly EditorDiagnostic[]
+>({
+  combine: (values) => values.flat(),
+});
+
+/**
+ * Whether references are checked (and completed) against the `ExpressionScope`. Editors that
+ * take their references from somewhere else (TemplateEditor's `refs`) turn it off.
+ */
+export const scopeReferences = Facet.define<boolean, boolean>({
+  combine: (values) => values.at(-1) ?? true,
+});
+
+/** Additional completion sources; the first that answers wins. */
+export const extraCompletionSource = Facet.define<CompletionSource>();
+
 const chipMark = Decoration.mark({ class: "cm-fa-chip" });
 const braceMark = Decoration.mark({ class: "cm-fa-chip cm-fa-chip-brace" });
 const refMark = Decoration.mark({ class: "cm-fa-ref" });
@@ -56,10 +84,19 @@ function buildDecorations(state: EditorState): {
     if (region.closed)
       ranges.push({ from: region.innerTo, to: region.to, deco: braceMark, order: 0 });
   }
-  for (const ref of validation.references) {
-    if (ref.to > ref.from) ranges.push({ from: ref.from, to: ref.to, deco: refMark, order: 1 });
+  const checkScope = state.facet(scopeReferences);
+  if (checkScope) {
+    for (const ref of validation.references) {
+      if (ref.to > ref.from) ranges.push({ from: ref.from, to: ref.to, deco: refMark, order: 1 });
+    }
   }
-  for (const issue of validation.issues) {
+  const external = state.facet(externalDiagnostics).map((d) => ({
+    from: Math.max(0, Math.min(d.from, text.length)),
+    to: Math.max(0, Math.min(d.to, text.length)),
+    severity: d.severity === "error" ? ("error" as const) : ("warning" as const),
+    message: d.message,
+  }));
+  for (const issue of [...(checkScope ? validation.issues : []), ...external]) {
     if (issue.to <= issue.from) continue;
     ranges.push({
       from: issue.from,
@@ -96,7 +133,9 @@ const decorationPlugin = ViewPlugin.fromClass(
     }
     update(update: ViewUpdate) {
       const scopeChanged =
-        update.startState.facet(expressionScope) !== update.state.facet(expressionScope);
+        update.startState.facet(expressionScope) !== update.state.facet(expressionScope) ||
+        update.startState.facet(externalDiagnostics) !== update.state.facet(externalDiagnostics) ||
+        update.startState.facet(scopeReferences) !== update.state.facet(scopeReferences);
       if (!update.docChanged && !scopeChanged) return;
       const built = buildDecorations(update.state);
       this.decorations = built.decorations;
@@ -114,6 +153,7 @@ function regionAt(text: string, pos: number) {
 const PATH_TAIL = /(?:^|[^\w$.])([A-Za-z_$][\w$]*(?:\.[\w$]*)*)$/;
 
 function completionSource(context: CompletionContext): CompletionResult | null {
+  if (!context.state.facet(scopeReferences)) return null;
   const text = context.state.doc.toString();
   const region = regionAt(text, context.pos);
   if (!region) return null;
@@ -158,6 +198,14 @@ function completionSource(context: CompletionContext): CompletionResult | null {
   };
 }
 
+function extraSources(context: CompletionContext) {
+  for (const source of context.state.facet(extraCompletionSource)) {
+    const result = source(context);
+    if (result) return result;
+  }
+  return null;
+}
+
 /** Typing `{{` inserts the closing braces and leaves the caret inside: `{{ | }}`. */
 const autoCloseBraces = EditorView.inputHandler.of((view, from, to, text) => {
   if (text !== "{" || from !== to) return false;
@@ -198,7 +246,7 @@ export function expressionExtensions(): Extension {
     decorationPlugin,
     autoCloseBraces,
     autocompletion({
-      override: [completionSource],
+      override: [completionSource, extraSources],
       activateOnTyping: true,
       icons: true,
       closeOnBlur: true,

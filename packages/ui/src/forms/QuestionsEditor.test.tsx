@@ -117,12 +117,17 @@ describe("SchemaJsonWidget", () => {
     onBlur: () => {},
   };
 
-  it("accepts an object and flags any other JSON value", () => {
-    const { rerender } = render(<SchemaJsonWidget {...props} value={{ type: "string" }} />);
-    expect(screen.queryByRole("alert")).toBeNull();
-    rerender(<SchemaJsonWidget {...props} value={[1, 2]} />);
-    expect(screen.getByRole("alert").textContent).toMatch(/must be an object/);
-    rerender(<SchemaJsonWidget {...props} value="{ nope" />);
-    expect(screen.getByRole("alert").textContent).toMatch(/not valid JSON/);
+  it("edits object schemas as fields and anything else as JSON", () => {
+    const { rerender } = render(
+      <SchemaJsonWidget
+        {...props}
+        value={{ type: "object", properties: { a: { type: "string" } } }}
+      />,
+    );
+    expect(screen.getByRole("textbox", { name: "Name of a" })).toBeTruthy();
+    rerender(
+      <SchemaJsonWidget {...props} value={{ oneOf: [{ type: "string" }, { type: "number" }] }} />,
+    );
+    expect(screen.getByText(/Edited as JSON: the schema uses "oneOf"/)).toBeTruthy();
   });
 });

@@ -209,3 +209,40 @@ export {
   type RetryErrorCodeOption,
 } from "./RetryPolicyEditor";
 export { ReorderableList, moveItem, moveOrder, type ReorderableListProps } from "./ReorderableList";
+export {
+  TemplateEditor,
+  templateCompletions,
+  rangedDiagnostics,
+  type TemplateEditorProps,
+  type TemplateRef,
+} from "./TemplateEditor";
+export {
+  LevelsList,
+  validateLevels,
+  LEVELS_MIN,
+  LEVELS_MAX,
+  type LevelsListProps,
+} from "./LevelsList";
+export {
+  CronEditor,
+  checkCron,
+  describeCron,
+  CRON_PRESETS,
+  type CronEditorProps,
+  type CronPreset,
+  type CronCheck,
+} from "./CronEditor";
+export {
+  JsonSchemaEditor,
+  parseSchemaText,
+  treeUnsupportedReason,
+  FIELD_TYPES,
+  type JsonSchemaEditorProps,
+  type FieldType,
+} from "./JsonSchemaEditor";
+export {
+  externalDiagnostics,
+  scopeReferences,
+  extraCompletionSource,
+  type EditorDiagnostic,
+} from "./expressionExtensions";

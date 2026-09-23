@@ -1,7 +1,17 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { startCompletion } from "@codemirror/autocomplete";
 import { Cloud, KeyRound, Save, Sparkles } from "lucide-react";
-import type { CredentialSlot, SecretDecl, SecretName } from "@flowaid/workflow-core";
+import type {
+  CredentialSlot,
+  Diagnostic,
+  JsonSchema as CoreJsonSchema,
+  SecretDecl,
+  SecretName,
+} from "@flowaid/workflow-core";
+import { CronEditor } from "./CronEditor";
+import { JsonSchemaEditor } from "./JsonSchemaEditor";
+import { LevelsList } from "./LevelsList";
+import { TemplateEditor, type TemplateRef } from "./TemplateEditor";
 import { cn } from "@/lib/cn";
 import type { CredentialView, ExpressionScope, GateConfig, JsonSchema, ModelView } from "@/types";
 import { Badge, Button, FieldRow, Switch } from "@/primitives";
@@ -1482,6 +1492,101 @@ function ReorderDemo() {
   );
 }
 
+const TEMPLATE_REFS: TemplateRef[] = [
+  { ref: { kind: "port", node: "intent", port: "value" }, schema: { type: "string" } },
+  { ref: { kind: "port", node: "intent", port: "confidence" }, schema: { type: "number" } },
+  { ref: { kind: "port", node: "ticket", port: "message" }, schema: { type: "string" } },
+  { ref: { kind: "port", node: "lookup", port: "status" }, schema: { type: "integer" } },
+];
+
+function TemplateEditorDemo() {
+  const [value, setValue] = useState(
+    "Reply to the customer about {{ ticket.message }}.\nTeam: {{ upper(intent.value) }} ({{ intent.confidence }}).\nTone: {{ $vars.tone }} · run {{ $run.id }} · status {{ lookp.status }}",
+  );
+  const start = value.indexOf("lookp.status");
+  const diagnostics = [
+    {
+      code: "E_UNKNOWN_REF",
+      severity: "error",
+      message: "Unknown node 'lookp' (did you mean 'lookup'?)",
+      location: { range: { start, end: start + "lookp".length } },
+    },
+  ] as unknown as Diagnostic[];
+  return (
+    <TemplateEditor
+      aria-label="Prompt template"
+      value={value}
+      onChange={setValue}
+      refs={TEMPLATE_REFS}
+      variables={["tone", "team_channel"]}
+      diagnostics={start >= 0 ? diagnostics : []}
+    />
+  );
+}
+
+function LevelsDemo() {
+  const [levels, setLevels] = useState([
+    "No impact",
+    "Minor inconvenience",
+    "Blocks a workflow",
+    "Outage or data loss",
+  ]);
+  return <LevelsList aria-label="Urgency levels" value={levels} onChange={setLevels} />;
+}
+
+function CronDemo() {
+  const [cron, setCron] = useState("0 9 * * 1-5");
+  const [tz, setTz] = useState("Europe/Berlin");
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex gap-1">
+        {["UTC", "Europe/Berlin", "America/New_York", "Asia/Tokyo"].map((zone) => (
+          <Button
+            key={zone}
+            size="sm"
+            variant={zone === tz ? "secondary" : "ghost"}
+            onClick={() => setTz(zone)}
+          >
+            {zone}
+          </Button>
+        ))}
+      </div>
+      <CronEditor
+        aria-label="Schedule"
+        value={cron}
+        onChange={setCron}
+        timezone={tz}
+        now={new Date("2026-09-23T08:00:00.000Z")}
+      />
+    </div>
+  );
+}
+
+function SchemaEditorDemo() {
+  const [schema, setSchema] = useState<CoreJsonSchema>({
+    type: "object",
+    properties: {
+      team: { type: "string", description: "Queue that owns the ticket" },
+      urgency: { type: "integer" },
+      tags: { type: "array", items: { type: "string" } },
+      customer: {
+        type: "object",
+        properties: { id: { type: "string" }, tier: { type: "string" } },
+        required: ["id"],
+      },
+    },
+    required: ["team", "urgency"],
+  });
+  return (
+    <div className="grid gap-4 lg:grid-cols-2">
+      <JsonSchemaEditor aria-label="Output schema" value={schema} onChange={setSchema} />
+      <pre className="whitespace-pre-wrap break-all rounded-sm bg-surface-2 p-2 font-mono text-2xs text-ink-2">
+        {JSON.stringify(schema, null, 2)}
+      </pre>
+    </div>
+  );
+}
+
 export default function FormsGallery() {
   const [prompt, setPrompt] = useState(
     "Summarise the ticket for the on-call engineer.\n\nCustomer ({{ input.customer.tier }} plan) wrote: {{ input.message }}\nIntent: {{ nodes.intent.output.value }} · urgency {{ nodes.urgency.output.value }}\nOrder lookup returned HTTP {{ nodes.lookup.output.status }} in {{ nodes.lookup.output.durationMs }} ms.",
@@ -1636,6 +1741,38 @@ export default function FormsGallery() {
         caption="Rows for headers, query parameters and environment variables. Secret rows mask their value; pasting multi-line “Key: Value” text into a key field expands into rows."
       >
         <KeyValueDemos />
+      </Section>
+
+      <Section
+        id="template-editor"
+        title="TemplateEditor"
+        caption="The template widget over FlowExpr references: type {{ to complete node ports, $vars, $scope, $run and functions. A compiler diagnostic with a character range is underlined where it points."
+      >
+        <TemplateEditorDemo />
+      </Section>
+
+      <Section
+        id="levels"
+        title="LevelsList"
+        caption="Ordered score levels, lowest first (2–10). Drag the grip or focus it and use the arrow keys, Home and End."
+      >
+        <LevelsDemo />
+      </Section>
+
+      <Section
+        id="cron"
+        title="CronEditor"
+        caption="Five-field cron with presets, a plain-language summary and the next runs in the schedule's time zone, computed by croner like the scheduler."
+      >
+        <CronDemo />
+      </Section>
+
+      <Section
+        id="json-schema"
+        title="JsonSchemaEditor"
+        caption="Edit a schema as fields (names, types, required, descriptions, nested objects, array items) or as JSON validated against the platform's schema rules."
+      >
+        <SchemaEditorDemo />
       </Section>
 
       <Section

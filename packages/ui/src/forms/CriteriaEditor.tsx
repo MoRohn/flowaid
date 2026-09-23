@@ -23,6 +23,7 @@ import {
   useFieldControl,
 } from "@/primitives";
 import { DistributionList, ProbabilityRuler, type DistributionEntry } from "@/decision";
+import { LevelsList } from "./LevelsList";
 import { ReorderableList } from "./ReorderableList";
 
 export interface ChoiceOption {
@@ -460,87 +461,13 @@ export const CriteriaEditor = forwardRef<HTMLDivElement, CriteriaEditorProps>(
         ) : null}
 
         {criteria.kind === "score" ? (
-          <div className="flex flex-col gap-1.5">
-            <ReorderableList
-              items={criteria.levels}
-              keyOf={(_l, i) => rowId(i)}
-              disabled={isDisabled}
-              label="Levels"
-              onReorder={(levels) => {
-                keyIds.current.clear();
-                set({ kind: "score", levels });
-              }}
-              renderItem={(level, index, handle) => {
-                const levelIssue = issueAt(issues, `levels[${index}]`);
-                const showLevelIssue =
-                  showIssues && levelIssue && (touched || Boolean(field["aria-invalid"]));
-                return (
-                  <div className="flex flex-col gap-1">
-                    <div className="grid grid-cols-[20px_24px_minmax(0,1fr)_28px] items-center gap-1.5">
-                      {handle}
-                      <span className="font-mono text-2xs text-ink-3 tabular" aria-hidden="true">
-                        {index}
-                      </span>
-                      <Input
-                        aria-label={`Level ${index} description`}
-                        placeholder={
-                          index === 0
-                            ? "Lowest: no action needed"
-                            : index === criteria.levels.length - 1
-                              ? "Highest: immediate escalation"
-                              : "Describe this level"
-                        }
-                        value={level}
-                        invalid={showLevelIssue ? true : undefined}
-                        disabled={isDisabled}
-                        onChange={(e) =>
-                          set({
-                            kind: "score",
-                            levels: criteria.levels.map((l, i) =>
-                              i === index ? e.target.value : l,
-                            ),
-                          })
-                        }
-                      />
-                      <IconButton
-                        label="Remove level"
-                        size="sm"
-                        variant="ghost"
-                        disabled={isDisabled || criteria.levels.length <= SCORE_MIN_LEVELS}
-                        onClick={() => {
-                          keyIds.current.clear();
-                          set({
-                            kind: "score",
-                            levels: criteria.levels.filter((_, i) => i !== index),
-                          });
-                        }}
-                      >
-                        <X strokeWidth={1.75} />
-                      </IconButton>
-                    </div>
-                    {showLevelIssue ? (
-                      <p className="pl-[56px] text-2xs text-danger-text">{levelIssue}</p>
-                    ) : null}
-                  </div>
-                );
-              }}
-            />
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                variant="ghost"
-                leadingIcon={<Plus />}
-                disabled={isDisabled || criteria.levels.length >= SCORE_MAX_LEVELS}
-                onClick={() => set({ kind: "score", levels: [...criteria.levels, ""] })}
-              >
-                Add level
-              </Button>
-              <span className="ml-auto font-mono text-2xs text-ink-3 tabular">
-                {criteria.levels.length} / {SCORE_MAX_LEVELS} · ordered low → high
-              </span>
-            </div>
-            {showListIssue ? <FieldError>{listIssue}</FieldError> : null}
-          </div>
+          <LevelsList
+            aria-label="Levels"
+            value={criteria.levels}
+            disabled={isDisabled}
+            showIssues={showIssues && (touched || Boolean(field["aria-invalid"]))}
+            onChange={(levels) => set({ kind: "score", levels })}
+          />
         ) : null}
 
         {criteria.kind === "boolean" ? (

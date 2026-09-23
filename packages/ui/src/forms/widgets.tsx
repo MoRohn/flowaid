@@ -33,6 +33,10 @@ import { CodeEditor, type CodeLanguage } from "./CodeEditor";
 import { Combobox, type OptionItem } from "./Combobox";
 import { CredentialPicker } from "./CredentialPicker";
 import { CriteriaEditor, type DecisionCriteria } from "./CriteriaEditor";
+import { CronEditor } from "./CronEditor";
+import { JsonSchemaEditor } from "./JsonSchemaEditor";
+import { LevelsList } from "./LevelsList";
+import { TemplateEditor, type TemplateRef } from "./TemplateEditor";
 import { ExpressionInput, ExpressionTextarea } from "./ExpressionInput";
 import { KeyValueEditor, type KeyValueRow } from "./KeyValueEditor";
 import { ModelPicker } from "./ModelPicker";
@@ -90,6 +94,12 @@ export interface SchemaFormEnvironment {
   loadOptions?: LoadOptions;
   /** Current form values (the node config), sent with option requests. */
   getValues: () => SchemaValues;
+  /** Upstream references for `template` fields (FlowExpr `node.port`); without it they use `scope`. */
+  templateRefs?: readonly TemplateRef[];
+  /** Workflow variable names (`$vars.*`). */
+  variables?: readonly string[];
+  /** The node sits inside a loop or foreach body (`$scope.*` is available). */
+  inContainer?: boolean;
 }
 
 export const DEFAULT_ENVIRONMENT: SchemaFormEnvironment = {
@@ -520,23 +530,40 @@ export function JsonWidget({
  * `x-ui.widget: "schema"`: a JSON Schema, edited as JSON. A schema is always an object, so any
  * other JSON value (or text that does not parse) is flagged instead of being accepted.
  */
-export function SchemaJsonWidget(props: SchemaWidgetProps) {
-  const { value } = props;
-  const problem =
-    value === undefined || isRecord(value)
-      ? null
-      : typeof value === "string"
-        ? "This is not valid JSON."
-        : 'A JSON Schema must be an object, such as { "type": "string" }.';
+export function SchemaJsonWidget({
+  value,
+  onChange,
+  disabled,
+  label,
+  "aria-label": ariaLabel,
+}: SchemaWidgetProps) {
   return (
-    <div className="flex flex-col gap-1">
-      <JsonWidget {...props} invalid={props.invalid === true || problem !== null} />
-      {problem ? (
-        <p className="text-xs text-danger-text" role="alert">
-          {problem}
-        </p>
-      ) : null}
-    </div>
+    <JsonSchemaEditor
+      aria-label={ariaLabel ?? label ?? "Schema"}
+      value={isRecord(value) ? value : undefined}
+      onChange={onChange}
+      disabled={disabled}
+    />
+  );
+}
+
+export function LevelsWidget({
+  value,
+  onChange,
+  disabled,
+  label,
+  "aria-label": ariaLabel,
+}: SchemaWidgetProps) {
+  const levels = Array.isArray(value)
+    ? value.map((l) => (typeof l === "string" ? l : ""))
+    : ["", ""];
+  return (
+    <LevelsList
+      aria-label={ariaLabel ?? label ?? "Levels"}
+      value={levels}
+      onChange={onChange}
+      disabled={disabled}
+    />
   );
 }
 
@@ -934,9 +961,12 @@ export function TemplateWidget({
   const name = ariaLabel ?? label;
   if (isMultilineTemplate(schema)) {
     return (
-      <ExpressionTextarea
+      <TemplateEditor
         aria-label={name}
         scope={env.scope}
+        {...(env.templateRefs ? { refs: env.templateRefs } : {})}
+        variables={env.variables ?? []}
+        inContainer={env.inContainer ?? false}
         value={asString(value)}
         onChange={onChange}
         placeholder={placeholder}
@@ -964,37 +994,27 @@ export function looksLikeCron(text: string): boolean {
   return fields.length === 5 || fields.length === 6;
 }
 
-/**
- * `format: 'cron'` / `x-ui.widget: 'cron'`: a mono input with the field order
- * as a hint. Placeholder until P1-07 registers `CronEditor` (next-run preview)
- * under the same name.
- */
+/** `format: 'cron'` / `x-ui.widget: 'cron'`: CronEditor, previewing runs in the config's `timezone`. */
 export function CronWidget({
   value,
   onChange,
   onBlur,
-  placeholder,
   disabled,
   invalid,
   "aria-label": ariaLabel,
 }: SchemaWidgetProps) {
-  const text = asString(value);
+  const env = useSchemaFormEnvironment();
+  const tz = env.getValues().timezone;
   return (
-    <div className="flex min-w-0 flex-col gap-1" data-widget="cron">
-      <Input
-        aria-label={ariaLabel}
-        mono
-        value={text}
-        onChange={(e) => onChange(e.target.value)}
-        onBlur={onBlur}
-        placeholder={placeholder ?? "0 9 * * 1-5"}
-        invalid={invalid || (text !== "" && !looksLikeCron(text))}
-        disabled={disabled}
-        autoComplete="off"
-        spellCheck={false}
-      />
-      <p className="font-mono text-2xs text-ink-3">minute hour day-of-month month day-of-week</p>
-    </div>
+    <CronEditor
+      aria-label={ariaLabel}
+      value={asString(value)}
+      onChange={onChange}
+      onBlur={onBlur}
+      disabled={disabled}
+      invalid={invalid}
+      timezone={typeof tz === "string" && tz !== "" ? tz : "UTC"}
+    />
   );
 }
 
@@ -1087,6 +1107,7 @@ registerWidget("threshold", ThresholdWidget);
 registerWidget("criteria", CriteriaWidget);
 registerWidget("schema", SchemaJsonWidget);
 registerWidget("questions", QuestionsWidget);
+registerWidget("levels", LevelsWidget);
 registerWidget("ref:RetryPolicy", RetryPolicyWidget);
 registerWidget("retry-policy", RetryPolicyWidget);
 registerWidget("combobox", ComboboxWidget);

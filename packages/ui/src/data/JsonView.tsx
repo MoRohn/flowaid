@@ -10,7 +10,7 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from "react";
-import { ChevronRight, ChevronsDownUp, ChevronsUpDown } from "lucide-react";
+import { ChevronRight, ChevronsDownUp, ChevronsUpDown, Lock } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { CopyButton, IconButton, SearchInput, Tooltip } from "@/primitives";
 
@@ -33,10 +33,35 @@ export function buildJsonPath(segments: readonly JsonPathSegment[], root = "$"):
   return out;
 }
 
-type JsonKind = "object" | "array" | "string" | "number" | "boolean" | "null" | "undefined";
+type JsonKind =
+  "object" | "array" | "string" | "number" | "boolean" | "null" | "undefined" | "redacted";
+
+/** `[REDACTED]`, `[REDACTED:pii]`: a masked value written by the Redactor. */
+const MASKED = /^\[REDACTED(?::([a-z_]+))?\]$/;
+/** `sha256:<16 hex>`: a value the `hash` redaction mode replaced. */
+const HASHED = /^sha256:[0-9a-f]{16}$/;
+
+/** How a redacted value was redacted, or null for ordinary values. */
+export function redactionOf(
+  value: unknown,
+): { mode: "mask" | "hash" | "drop"; dataClass?: string } | null {
+  if (typeof value === "string") {
+    const masked = MASKED.exec(value);
+    if (masked) return masked[1] ? { mode: "mask", dataClass: masked[1] } : { mode: "mask" };
+    if (HASHED.test(value)) return { mode: "hash" };
+    return null;
+  }
+  if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+    const keys = Object.keys(value);
+    if (keys.length === 1 && (value as Record<string, unknown>).$redacted === true)
+      return { mode: "drop" };
+  }
+  return null;
+}
 
 function kindOf(value: unknown): JsonKind {
   if (value === null) return "null";
+  if (redactionOf(value)) return "redacted";
   if (Array.isArray(value)) return "array";
   const t = typeof value;
   if (t === "object") return "object";
@@ -84,6 +109,8 @@ function primitiveText(value: unknown, kind: JsonKind): string {
     case "object":
     case "array":
       return "";
+    case "redacted":
+      return typeof value === "string" ? value : "";
   }
 }
 
@@ -249,6 +276,7 @@ const KIND_CLASS: Record<JsonKind, string> = {
   undefined: "text-ink-3",
   object: "text-ink-3",
   array: "text-ink-3",
+  redacted: "text-ink-3",
 };
 
 interface RowProps {
@@ -311,6 +339,30 @@ const JsonRow = memo(function JsonRow({
         </span>
       );
     }
+  } else if (kind === "redacted") {
+    const r = redactionOf(value);
+    const label =
+      r?.mode === "drop"
+        ? "dropped"
+        : r?.mode === "hash"
+          ? `hashed ${typeof value === "string" ? value.slice(7) : ""}`
+          : `redacted${r?.dataClass ? ` · ${r.dataClass}` : ""}`;
+    valueNode = (
+      <span
+        className="inline-flex items-center gap-1 rounded-xs border border-border bg-surface-2 px-1 font-sans text-2xs leading-4 text-ink-2"
+        data-redaction={r?.mode}
+      >
+        <Lock className="size-3" strokeWidth={1.75} aria-hidden="true" />
+        {label}
+        <span className="sr-only">
+          {r?.mode === "drop"
+            ? ": not stored, the node's redaction rules drop this value"
+            : r?.mode === "hash"
+              ? ": stored as a hash; equal values have equal hashes, the value itself is not kept"
+              : ": masked before it was stored"}
+        </span>
+      </span>
+    );
   } else if (kind === "string") {
     const text = typeof value === "string" ? value : "";
     const long = text.length > maxStringLength && !showAll;

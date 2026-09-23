@@ -1,18 +1,12 @@
 import { forwardRef, useMemo, type HTMLAttributes } from "react";
 import { cn } from "@/lib/cn";
-import { formatProbability } from "@/lib/format";
 import { Badge, badgeVariants } from "@/primitives/Badge";
-import { Popover, PopoverContent, PopoverTrigger } from "@/primitives/Popover";
 import type { DecisionResult } from "@/types";
-import { DistributionList } from "./DistributionList";
+import { DistributionPopover } from "./DistributionPopover";
 import { mergeRefs } from "./mergeRefs";
-import {
-  decisionSummary,
-  noulProbability,
-  normalizeDistribution,
-  scoreLegend,
-  type DistributionEntry,
-} from "./distribution";
+import { decisionSummary } from "./distribution";
+
+export { decisionTooltipRows } from "./DistributionPopover";
 
 export interface DecisionBadgeProps extends Omit<HTMLAttributes<HTMLElement>, "children"> {
   result: DecisionResult;
@@ -26,48 +20,6 @@ export interface DecisionBadgeProps extends Omit<HTMLAttributes<HTMLElement>, "c
   distribution?: boolean;
   /** Tone: accent (default) for the winner, neutral for secondary mentions. */
   tone?: "accent" | "neutral" | "outline";
-}
-
-/** Rows shown in the badge popover: the full distribution for choice/score, yes/no for boolean. */
-export function decisionTooltipRows(result: DecisionResult): DistributionEntry[] {
-  if (result.kind === "boolean") {
-    const pYes = noulProbability(result);
-    return [
-      { key: "yes", label: "yes", probability: pYes },
-      { key: "no", label: "no", probability: 1 - pYes },
-    ].sort((a, b) => b.probability - a.probability);
-  }
-  return normalizeDistribution(
-    result.probabilities,
-    result.kind === "score" ? { labels: scoreLegend(result.levels) } : {},
-  );
-}
-
-/** The popover body: the question, the full distribution, the score scale and the provider. */
-function DistributionPanel({ result, question }: { result: DecisionResult; question?: string }) {
-  const rows = decisionTooltipRows(result);
-  const levels = result.kind === "score" ? result.levels : [];
-  return (
-    <div className="flex flex-col gap-2">
-      {question ? <p className="m-0 text-xs leading-snug text-ink-2">{question}</p> : null}
-      {rows.length ? (
-        <DistributionList
-          distribution={rows}
-          chosen={result.kind === "choice" ? result.value : undefined}
-          density="compact"
-          aria-label="Distribution"
-        />
-      ) : null}
-      {result.kind === "score" && levels.length ? (
-        <p className="m-0 font-mono text-2xs text-ink-3 tabular">
-          {levels.length} levels · conf {formatProbability(result.confidence)}
-        </p>
-      ) : null}
-      <p className="m-0 font-mono text-2xs text-ink-3">
-        {result.provider}:{result.model}
-      </p>
-    </div>
-  );
 }
 
 /**
@@ -111,30 +63,25 @@ export const DecisionBadge = forwardRef<HTMLElement, DecisionBadgeProps>(functio
     );
   }
   return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <button
-          ref={setRef}
-          type="button"
-          data-kind={result.kind}
-          className={cn(
-            badgeVariants({ tone, size, mono: true }),
-            "cursor-pointer gap-1.5 whitespace-nowrap outline-none transition-shadow duration-(--dur-fast)",
-            "hover:shadow-1 focus-visible:shadow-(--focus) data-[state=open]:shadow-1",
-            className,
-          )}
-          {...rest}
-        >
-          {content}
-        </button>
-      </PopoverTrigger>
-      <PopoverContent
-        width="auto"
-        className="min-w-56 max-w-72"
-        aria-label={`Decision distribution: ${value || number}`}
+    <DistributionPopover
+      result={result}
+      question={question}
+      label={`Decision distribution: ${value || number}`}
+    >
+      <button
+        ref={setRef}
+        type="button"
+        data-kind={result.kind}
+        className={cn(
+          badgeVariants({ tone, size, mono: true }),
+          "cursor-pointer gap-1.5 whitespace-nowrap outline-none transition-shadow duration-(--dur-fast)",
+          "hover:shadow-1 focus-visible:shadow-(--focus) data-[state=open]:shadow-1",
+          className,
+        )}
+        {...rest}
       >
-        <DistributionPanel result={result} question={question} />
-      </PopoverContent>
-    </Popover>
+        {content}
+      </button>
+    </DistributionPopover>
   );
 });

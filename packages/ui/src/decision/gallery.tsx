@@ -10,6 +10,7 @@ import {
   makeChoiceDecision,
   makeScoreDecision,
 } from "@/lib/decisionBuilders";
+import { ConfusionMatrix } from "./ConfusionMatrix";
 import { scoreLegend } from "./distribution";
 import {
   CalibrationChart,
@@ -625,6 +626,33 @@ function CalibrationSection() {
   );
 }
 
+const CONFUSION = [
+  ...Array.from({ length: 42 }, () => ({ expected: "billing", actual: "billing" })),
+  ...Array.from({ length: 5 }, () => ({ expected: "billing", actual: "account" })),
+  ...Array.from({ length: 31 }, () => ({ expected: "bug", actual: "bug" })),
+  ...Array.from({ length: 4 }, () => ({ expected: "bug", actual: "feature_request" })),
+  ...Array.from({ length: 18 }, () => ({ expected: "account", actual: "account" })),
+  ...Array.from({ length: 3 }, () => ({ expected: "account", actual: "billing" })),
+  ...Array.from({ length: 12 }, () => ({ expected: "feature_request", actual: "feature_request" })),
+  ...Array.from({ length: 2 }, () => ({ expected: "feature_request", actual: "bug" })),
+];
+
+function ConfusionSection() {
+  return (
+    <Section
+      id="confusion"
+      title="ConfusionMatrix"
+      caption="Evaluation results of a choice node: expected rows against picked columns, shaded by row share, with recall, precision and accuracy."
+    >
+      <ConfusionMatrix
+        title="support.router@4 · intent"
+        labels={["billing", "bug", "account", "feature_request"]}
+        pairs={CONFUSION}
+      />
+    </Section>
+  );
+}
+
 export default function DecisionGallery() {
   return (
     <TooltipProvider>
@@ -649,6 +677,7 @@ export default function DecisionGallery() {
         <BundleSection />
         <GateEditorSection />
         <CalibrationSection />
+        <ConfusionSection />
       </div>
     </TooltipProvider>
   );

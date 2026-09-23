@@ -71,3 +71,15 @@ export {
   type CalibrationChartProps,
   type CalibrationBin,
 } from "./CalibrationChart";
+export {
+  DistributionPopover,
+  DistributionPanel,
+  type DistributionPopoverProps,
+} from "./DistributionPopover";
+export {
+  ConfusionMatrix,
+  confusionModel,
+  type ConfusionMatrixProps,
+  type ConfusionModel,
+  type ConfusionPair,
+} from "./ConfusionMatrix";

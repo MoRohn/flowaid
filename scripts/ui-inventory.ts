@@ -47,11 +47,9 @@ export type UiGroup = (typeof UI_GROUPS)[number];
 
 /** Line items the plan still owes each group (UPGRADE_PLAN.md P0-16 … P4-02); marked *(planned)* in the doc. */
 export const PLANNED: Partial<Record<UiGroup, readonly string[]>> = {
-  decision: ["DistributionPopover", "ConfusionMatrix"],
   canvas: ["ProblemsOverlay"],
   trace: ["NodeRunDetail", "GenerationCard"],
   inspector: ["PortRow", "RefPicker", "DependencyPanel"],
-  forms: ["TemplateEditor", "LevelsList", "JsonSchemaEditor", "CronEditor"],
   shell: ["DraftStatusPill"],
   observability: ["CostBreakdown"],
   human: ["ReviewForm", "ExternalReviewPage"],
