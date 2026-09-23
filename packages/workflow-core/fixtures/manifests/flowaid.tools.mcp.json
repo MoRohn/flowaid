@@ -1,0 +1,81 @@
+{
+  "id": "flowaid.tools.mcp",
+  "version": "1.0.0",
+  "metadata": {
+    "name": "MCP tool",
+    "description": "Calls one tool of a connected MCP server. Input ports are the tool's arguments; `result` is its structured result and `content` its text content.",
+    "category": "tool",
+    "icon": "plug",
+    "tags": ["tool", "mcp"],
+    "summary": "{{ config.tool }}"
+  },
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "serverId": {
+        "type": "string",
+        "minLength": 1,
+        "x-ui": {
+          "widget": "select",
+          "optionsProvider": "mcpServers"
+        }
+      },
+      "tool": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9_-]{1,64}$",
+        "x-ui": {
+          "widget": "select",
+          "optionsProvider": "mcpTools"
+        }
+      },
+      "timeoutMs": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 600000,
+        "default": 60000
+      }
+    },
+    "required": ["serverId", "tool"],
+    "additionalProperties": false
+  },
+  "inputs": [],
+  "outputs": [
+    {
+      "name": "result",
+      "schema": {},
+      "required": true
+    },
+    {
+      "name": "content",
+      "schema": {
+        "type": "string"
+      },
+      "required": true
+    }
+  ],
+  "controlPorts": [],
+  "portRules": [
+    {
+      "kind": "toolSignature",
+      "source": "mcp"
+    }
+  ],
+  "credentials": [
+    {
+      "name": "mcp",
+      "types": ["mcp.headers", "mcp.oauth", "http.bearer"],
+      "required": false,
+      "description": "Credential sent to the MCP server, if it needs one."
+    }
+  ],
+  "capabilities": ["network", "credentials", "tools"],
+  "idempotency": "none",
+  "pool": "general",
+  "generation": false,
+  "streams": false,
+  "optionProviders": ["mcpServers", "mcpTools"],
+  "migrations": [],
+  "defaultPolicy": {
+    "timeoutMs": 60000
+  }
+}

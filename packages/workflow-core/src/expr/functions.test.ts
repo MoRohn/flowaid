@@ -55,7 +55,7 @@ function reasonOf(source: string): ExpressionErrorReason | undefined {
 
 describe("function set", () => {
   it("has a signature for every function and lambda functions are marked", () => {
-    expect(EXPRESSION_FUNCTION_NAMES).toHaveLength(37);
+    expect(EXPRESSION_FUNCTION_NAMES).toHaveLength(38);
     for (const name of EXPRESSION_FUNCTION_NAMES) {
       const sig = FUNCTION_SIGNATURES[name];
       expect(sig.minArgs).toBeLessThanOrEqual(sig.maxArgs);
@@ -314,6 +314,30 @@ describe("number functions", () => {
     ["to_number([1])", "TYPE"],
   ])("%s → %s", (source, reason) => {
     expect(reasonOf(source)).toBe(reason);
+  });
+});
+
+describe("concat (RFC-0018)", () => {
+  it.each<[string, JsonValue]>([
+    ["concat([1, 2], [3])", [1, 2, 3]],
+    ["concat([1], [2], [3, 4])", [1, 2, 3, 4]],
+    ["concat([], [])", []],
+    ["concat(d.nums)", [3, 1, 2]],
+    ["concat(d.nested, [[4]])", [[1, 2], [3], [4]]],
+    ["concat(d.strs, d.empty, ['z'])", ["b", "a", "c", "z"]],
+  ])("%s", (source, expected) => {
+    expect(run(source)).toEqual(expected);
+  });
+
+  it("rejects a non-array argument", () => {
+    expect(reasonOf("concat([1], 2)")).toBe("TYPE");
+    expect(reasonOf("concat('a', [1])")).toBe("TYPE");
+    expect(reasonOf("concat(null)")).toBe("TYPE");
+  });
+
+  it("does not modify its arguments", () => {
+    run("concat(d.nums, [9])");
+    expect(run("d.nums")).toEqual([3, 1, 2]);
   });
 });
 

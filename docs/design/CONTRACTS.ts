@@ -202,7 +202,7 @@ export type ScopeId = z.infer<typeof ScopeIdSchema>;
 export const RESERVED_IDS: ReadonlySet<string> = new Set([
   'true', 'false', 'null', 'in', 'matches', 'len', 'lower', 'upper', 'trim', 'contains', 'starts_with', 'ends_with',
   'split', 'join', 'json', 'parse_json', 'keys', 'values', 'has', 'get', 'coalesce', 'min', 'max', 'abs', 'round',
-  'floor', 'ceil', 'sum', 'avg', 'first', 'last', 'filter', 'map', 'any', 'all', 'sort', 'to_number', 'to_string',
+  'floor', 'ceil', 'sum', 'avg', 'first', 'last', 'concat', 'filter', 'map', 'any', 'all', 'sort', 'to_number', 'to_string',
   'regex_test', 'regex_match', 'now', 'format_date',
 ]);
 

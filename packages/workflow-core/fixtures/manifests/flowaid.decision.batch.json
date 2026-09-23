@@ -1,0 +1,176 @@
+{
+  "id": "flowaid.decision.batch",
+  "version": "1.0.0",
+  "metadata": {
+    "name": "Decision batch",
+    "description": "Asks several typed questions (boolean, choice, score) about one `state` in a single TypeSafe request. Output `answers` holds one DecisionResult per question id.",
+    "category": "decision",
+    "icon": "list-checks",
+    "tags": ["decision", "typesafe", "batch"],
+    "summary": "{{ config.questions | json }}"
+  },
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "questions": {
+        "type": "object",
+        "additionalProperties": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "const": "boolean"
+                },
+                "instructions": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "criteria": {
+                  "type": "object",
+                  "properties": {
+                    "true": {
+                      "type": "string"
+                    },
+                    "false": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["true", "false"],
+                  "additionalProperties": false
+                }
+              },
+              "required": ["kind", "instructions"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "const": "choice"
+                },
+                "instructions": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "options": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "minProperties": 2,
+                  "maxProperties": 255,
+                  "propertyNames": {
+                    "pattern": "^[a-z0-9_]{1,64}$"
+                  }
+                }
+              },
+              "required": ["kind", "instructions", "options"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "const": "score"
+                },
+                "instructions": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "levels": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "minItems": 2,
+                  "maxItems": 10
+                }
+              },
+              "required": ["kind", "instructions", "levels"],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "minProperties": 1,
+        "maxProperties": 32,
+        "propertyNames": {
+          "pattern": "^[a-z][a-z0-9_]{0,63}$"
+        },
+        "x-ui": {
+          "widget": "questions",
+          "help": "Question id → question. Ids become the keys of `answers`."
+        }
+      }
+    },
+    "required": ["questions"],
+    "additionalProperties": false
+  },
+  "inputs": [
+    {
+      "name": "state",
+      "schema": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object"
+          },
+          {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "TypeSafe state: text, an object (sent verbatim) or an array of text."
+      },
+      "required": true
+    }
+  ],
+  "outputs": [
+    {
+      "name": "answers",
+      "schema": {
+        "type": "object",
+        "description": "One DecisionResult per question id (typed per question by the compiler)."
+      },
+      "required": true
+    }
+  ],
+  "controlPorts": [],
+  "portRules": [
+    {
+      "kind": "decisionAnswersFromConfig",
+      "port": "answers",
+      "path": "/questions"
+    }
+  ],
+  "credentials": [
+    {
+      "name": "typesafe",
+      "types": ["typesafe.api_key"],
+      "required": true
+    },
+    {
+      "name": "llm",
+      "types": ["openai.api_key", "anthropic.api_key", "ollama.none"],
+      "required": false,
+      "description": "Optional LLM decision provider used when a failover hop (or the workspace chain) routes decisions to a chat model."
+    }
+  ],
+  "capabilities": ["decision", "credentials"],
+  "idempotency": "safe",
+  "pool": "general",
+  "decision": {
+    "kind": "batch"
+  },
+  "generation": false,
+  "streams": false,
+  "optionProviders": [],
+  "migrations": [],
+  "defaultPolicy": {
+    "timeoutMs": 30000
+  }
+}

@@ -1027,6 +1027,15 @@ class Evaluator {
         if (fn === "sum") return finite("sum", total);
         return items.length === 0 ? null : finite("avg", total / items.length);
       }
+      case "concat": {
+        const out: JsonValue[] = [];
+        args.forEach((arg, i) => {
+          const items = expectArray(`concat: argument ${i + 1}`, arg);
+          this.charge(items.length);
+          out.push(...items);
+        });
+        return out;
+      }
       case "first":
       case "last": {
         const items = expectArray(fn, a0);

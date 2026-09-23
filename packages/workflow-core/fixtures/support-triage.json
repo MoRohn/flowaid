@@ -652,6 +652,16 @@
       }
     },
     {
+      "id": "c9b",
+      "from": {
+        "node": "context",
+        "port": "done"
+      },
+      "to": {
+        "node": "draft"
+      }
+    },
+    {
       "id": "c10",
       "from": {
         "node": "gate",

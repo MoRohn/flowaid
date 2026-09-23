@@ -29,6 +29,8 @@ export {
   KeyValueWidget,
   ThresholdWidget,
   CriteriaWidget,
+  QuestionsWidget,
+  SchemaJsonWidget,
   RetryPolicyWidget,
   ComboboxWidget,
   TemplateWidget,
@@ -189,6 +191,12 @@ export {
   type ChoiceOption,
   type CriteriaIssue,
 } from "./CriteriaEditor";
+export {
+  QuestionsEditor,
+  type BatchQuestion,
+  type BatchQuestions,
+  type QuestionsEditorProps,
+} from "./QuestionsEditor";
 export { ThresholdField, DEFAULT_THRESHOLDS, type ThresholdFieldProps } from "./ThresholdField";
 export {
   RetryPolicyEditor,

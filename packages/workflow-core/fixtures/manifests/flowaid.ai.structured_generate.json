@@ -1,0 +1,123 @@
+{
+  "id": "flowaid.ai.structured_generate",
+  "version": "1.0.0",
+  "metadata": {
+    "name": "Structured generation",
+    "description": "Asks a chat model for a JSON answer that matches `schema` (native structured output where the provider supports it, validated either way).",
+    "category": "generation",
+    "icon": "braces",
+    "tags": ["ai", "generation", "json"],
+    "summary": "{{ config.model.provider }}/{{ config.model.model }}"
+  },
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "model": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string",
+            "minLength": 1
+          },
+          "model": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": ["provider", "model"],
+        "x-ui": {
+          "widget": "model"
+        }
+      },
+      "system": {
+        "type": "string",
+        "maxLength": 32000,
+        "x-ui": {
+          "widget": "template"
+        }
+      },
+      "temperature": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 2,
+        "default": 1
+      },
+      "maxOutputTokens": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 65536,
+        "default": 1024
+      },
+      "schema": {
+        "type": "object",
+        "x-ui": {
+          "widget": "schema",
+          "help": "JSON Schema the model's answer must match; it types the `structured` output."
+        }
+      }
+    },
+    "required": ["model", "schema"],
+    "additionalProperties": false
+  },
+  "inputs": [
+    {
+      "name": "prompt",
+      "schema": {
+        "type": "string"
+      },
+      "required": true
+    }
+  ],
+  "outputs": [
+    {
+      "name": "structured",
+      "schema": {
+        "type": "object"
+      },
+      "required": true
+    },
+    {
+      "name": "usage",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "inputTokens": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "outputTokens": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": ["inputTokens", "outputTokens"]
+      },
+      "required": true
+    }
+  ],
+  "controlPorts": [],
+  "portRules": [
+    {
+      "kind": "outputSchemaFromConfig",
+      "port": "structured",
+      "path": "/schema"
+    }
+  ],
+  "credentials": [
+    {
+      "name": "llm",
+      "types": ["openai.api_key", "anthropic.api_key", "ollama.none"],
+      "required": true
+    }
+  ],
+  "capabilities": ["generation", "credentials"],
+  "idempotency": "safe",
+  "pool": "general",
+  "generation": true,
+  "streams": false,
+  "optionProviders": ["models"],
+  "migrations": [],
+  "defaultPolicy": {
+    "timeoutMs": 120000
+  }
+}

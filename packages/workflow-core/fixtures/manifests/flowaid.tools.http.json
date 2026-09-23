@@ -106,7 +106,7 @@
   "credentials": [
     {
       "name": "auth",
-      "types": ["http.bearer", "http.basic", "http.header"],
+      "types": ["http.bearer", "http.basic", "http.header", "http.api_key"],
       "required": false,
       "description": "Applied as Authorization or a custom header."
     }

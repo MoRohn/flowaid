@@ -36,6 +36,7 @@ import { CriteriaEditor, type DecisionCriteria } from "./CriteriaEditor";
 import { ExpressionInput, ExpressionTextarea } from "./ExpressionInput";
 import { KeyValueEditor, type KeyValueRow } from "./KeyValueEditor";
 import { ModelPicker } from "./ModelPicker";
+import { QuestionsEditor, type BatchQuestions } from "./QuestionsEditor";
 import { RetryPolicyEditor, type RetryPolicy, DEFAULT_RETRY_POLICY } from "./RetryPolicyEditor";
 import { ThresholdField, DEFAULT_THRESHOLDS } from "./ThresholdField";
 import { enumKey, enumOptions, inputModeFor, isRecord, primaryType } from "./schema";
@@ -129,6 +130,8 @@ export const BLOCK_WIDGETS = new Set<string>([
   "json",
   "keyvalue",
   "criteria",
+  "schema",
+  "questions",
   "threshold",
   "retry-policy",
   "ref:RetryPolicy",
@@ -509,6 +512,60 @@ export function JsonWidget({
       placeholder={placeholder ?? "{}"}
       disabled={disabled}
       minRows={4}
+    />
+  );
+}
+
+/**
+ * `x-ui.widget: "schema"`: a JSON Schema, edited as JSON. A schema is always an object, so any
+ * other JSON value (or text that does not parse) is flagged instead of being accepted.
+ */
+export function SchemaJsonWidget(props: SchemaWidgetProps) {
+  const { value } = props;
+  const problem =
+    value === undefined || isRecord(value)
+      ? null
+      : typeof value === "string"
+        ? "This is not valid JSON."
+        : 'A JSON Schema must be an object, such as { "type": "string" }.';
+  return (
+    <div className="flex flex-col gap-1">
+      <JsonWidget {...props} invalid={props.invalid === true || problem !== null} />
+      {problem ? (
+        <p className="text-xs text-danger-text" role="alert">
+          {problem}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function isQuestions(value: unknown): value is BatchQuestions {
+  return (
+    isRecord(value) &&
+    Object.values(value).every(
+      (q) =>
+        isRecord(q) &&
+        (q.kind === "boolean" || q.kind === "choice" || q.kind === "score") &&
+        typeof q.instructions === "string",
+    )
+  );
+}
+
+/** `x-ui.widget: "questions"`: the question set of a decision batch. */
+export function QuestionsWidget({
+  value,
+  onChange,
+  disabled,
+  label,
+  "aria-label": ariaLabel,
+}: SchemaWidgetProps) {
+  return (
+    <QuestionsEditor
+      aria-label={ariaLabel ?? label}
+      value={isQuestions(value) ? value : {}}
+      onChange={onChange}
+      disabled={disabled}
     />
   );
 }
@@ -1028,6 +1085,8 @@ registerWidget("model", ModelWidget);
 registerWidget("keyvalue", KeyValueWidget);
 registerWidget("threshold", ThresholdWidget);
 registerWidget("criteria", CriteriaWidget);
+registerWidget("schema", SchemaJsonWidget);
+registerWidget("questions", QuestionsWidget);
 registerWidget("ref:RetryPolicy", RetryPolicyWidget);
 registerWidget("retry-policy", RetryPolicyWidget);
 registerWidget("combobox", ComboboxWidget);

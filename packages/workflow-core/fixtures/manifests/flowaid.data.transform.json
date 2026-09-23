@@ -1,0 +1,62 @@
+{
+  "id": "flowaid.data.transform",
+  "version": "1.0.0",
+  "metadata": {
+    "name": "Transform",
+    "description": "Computes a value with a FlowExpr expression over other nodes' outputs. `output` optionally declares the result's JSON Schema.",
+    "category": "data",
+    "icon": "function-square",
+    "tags": ["data", "expression"],
+    "summary": "{{ config.expr }}"
+  },
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "expr": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 4000,
+        "x-ui": {
+          "widget": "code",
+          "language": "flowexpr"
+        }
+      },
+      "output": {
+        "type": "object",
+        "x-ui": {
+          "widget": "schema",
+          "help": "JSON Schema of the result; the compiler checks the expression against it."
+        }
+      }
+    },
+    "required": ["expr"],
+    "additionalProperties": false
+  },
+  "inputs": [],
+  "outputs": [
+    {
+      "name": "result",
+      "schema": {},
+      "required": true
+    }
+  ],
+  "controlPorts": [],
+  "portRules": [
+    {
+      "kind": "outputSchemaFromConfig",
+      "port": "result",
+      "path": "/output"
+    }
+  ],
+  "credentials": [],
+  "capabilities": [],
+  "idempotency": "safe",
+  "pool": "general",
+  "generation": false,
+  "streams": false,
+  "optionProviders": [],
+  "migrations": [],
+  "defaultPolicy": {
+    "timeoutMs": 10000
+  }
+}

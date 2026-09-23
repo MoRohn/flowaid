@@ -64,13 +64,17 @@ class FixtureCatalog implements NodeCatalog {
 }
 
 describe("fixtures/manifests", () => {
-  it("ships the two required manifests plus those the example plan needs", () => {
+  it("ships a manifest for every node type the example plan and the three demos use", () => {
     expect([...manifests.keys()]).toEqual([
       "flowaid.ai.generate",
+      "flowaid.ai.structured_generate",
+      "flowaid.data.transform",
+      "flowaid.decision.batch",
       "flowaid.decision.boolean",
       "flowaid.decision.choice",
       "flowaid.decision.confidence_gate",
       "flowaid.tools.http",
+      "flowaid.tools.mcp",
     ]);
   });
 
@@ -119,7 +123,7 @@ describe("fixtures/manifests", () => {
         ).toBeDefined();
     }
     expect(catalog.get("flowaid.decision.choice", "9.9.9")).toBeUndefined();
-    expect(catalog.list()).toHaveLength(5);
+    expect(catalog.list()).toHaveLength(manifests.size);
   });
 });
 

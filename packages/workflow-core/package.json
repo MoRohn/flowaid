@@ -1,6 +1,6 @@
 {
   "name": "@flowaid/workflow-core",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "description": "Portable flowaid contracts: workflow definition, bindings, FlowExpr, events, errors, DecisionResult, NodeManifest, ExecutionPlan, diagnostics and store interfaces. Browser-safe; depends only on zod, recheck (pure-JS build) and @flowaid/shared.",
   "license": "Apache-2.0",

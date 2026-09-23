@@ -912,6 +912,14 @@ class Typer {
         }
         return fn === "sum" ? NUMBER : unionOf(NUMBER, NULL);
       }
+      case "concat": {
+        const items = args.map((t, i) =>
+          check(t, ["array"], paths[i] ?? path, `argument ${i + 1} of concat`)
+            ? unionOf(...membersOf(t).map((m) => (m.kind === "array" ? m.items : UNKNOWN)))
+            : UNKNOWN,
+        );
+        return arrayOf(unionOf(...items));
+      }
       case "first":
       case "last": {
         if (!check(a0, ["array"], p0, `argument of ${fn}`)) return UNKNOWN;

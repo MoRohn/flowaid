@@ -669,6 +669,20 @@ describe("inferExprType: contradictions (E_EXPR_TYPE)", () => {
   });
 });
 
+describe("concat (RFC-0018)", () => {
+  it("types the result as an array of the union of the item types", () => {
+    expect(typeOf("concat([1, 2], [3])")).toEqual(arrayOf(INTEGER));
+    expect(typeOf("concat(['a'], [1.5])")).toEqual(arrayOf(unionOf(STRING, NUMBER)));
+    expect(issues("concat([1], ['x'])")).toEqual([]);
+  });
+
+  it("reports a non-array argument as a contradiction", () => {
+    const found = issues("concat([1], 2)");
+    expect(found.map((i) => i.code)).toEqual(["type"]);
+    expect(found[0]?.message).toContain("argument 2 of concat");
+  });
+});
+
 describe("inferExprType: untyped operands (W_EXPR_UNTYPED)", () => {
   it.each<[string, ExprType, string[]]>([
     ["a.nope", UNKNOWN, []],

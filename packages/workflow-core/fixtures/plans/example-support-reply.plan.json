@@ -2,112 +2,111 @@
   "planVersion": 1,
   "workflowId": "5b1c2b60-6e0f-4a1a-9b0e-1b1a2c3d4e5f",
   "definitionHash": "d86f40190bb139f3aca03f12fcb59cfe8c327db928c410e772bf949e701d9228",
-  "planHash": "32dca1d49d86d6d00423c662d55ed2fc1cde9b97a6daa20a41564e9cc9a46d5f",
   "compilerVersion": "0.1.0",
   "inputs": {
-    "type": "object",
+    "additionalProperties": false,
     "properties": {
+      "customer_id": {
+        "type": "string"
+      },
       "message": {
         "type": "string",
         "x-dataClass": "pii"
       },
-      "customer_id": {
-        "type": "string"
-      },
       "tier": {
-        "type": "string",
-        "enum": ["free", "gold"]
+        "enum": ["free", "gold"],
+        "type": "string"
       }
     },
     "required": ["message", "customer_id"],
-    "additionalProperties": false
+    "type": "object"
   },
   "outputs": {
-    "type": "object",
     "properties": {
+      "approved_by": {
+        "type": ["string", "null"]
+      },
+      "auto_sent": {
+        "type": "boolean"
+      },
       "reply": {
         "type": "string"
       },
       "team": {
         "type": "string"
-      },
-      "auto_sent": {
-        "type": "boolean"
-      },
-      "approved_by": {
-        "type": ["string", "null"]
       }
     },
-    "required": ["reply", "team", "auto_sent"]
+    "required": ["reply", "team", "auto_sent"],
+    "type": "object"
   },
   "execution": {
-    "timeoutMs": 180000,
+    "concurrency": 8,
+    "decisions": {
+      "batching": true,
+      "failover": [],
+      "primary": {
+        "model": "jev-latest",
+        "provider": "typesafe"
+      }
+    },
+    "defaultNodeTimeoutMs": 120000,
+    "defaultRetry": {
+      "allowOnIrreversible": false,
+      "backoff": {
+        "factor": 2,
+        "initialMs": 500,
+        "jitter": true,
+        "maxMs": 30000,
+        "type": "exponential"
+      },
+      "maxAttempts": 1
+    },
     "maxCostUsd": 0.5,
     "maxNodeRuns": 2000,
     "maxSubflowDepth": 4,
-    "concurrency": 8,
-    "defaultRetry": {
-      "maxAttempts": 1,
-      "backoff": {
-        "type": "exponential",
-        "initialMs": 500,
-        "maxMs": 30000,
-        "factor": 2,
-        "jitter": true
-      },
-      "allowOnIrreversible": false
-    },
-    "defaultNodeTimeoutMs": 120000,
-    "decisions": {
-      "primary": {
-        "provider": "typesafe",
-        "model": "jev-latest"
-      },
-      "failover": [],
-      "batching": true
-    },
     "privacy": {
-      "sensitive": false,
       "containsPII": false,
       "doNotPersist": false,
-      "redactFields": []
+      "redactFields": [],
+      "sensitive": false
     },
-    "retention": "standard"
+    "retention": "standard",
+    "timeoutMs": 180000
   },
   "variables": [
     {
+      "default": "https://crm.example.com",
       "name": "crmBaseUrl",
       "schema": {
         "type": "string"
       },
-      "default": "https://crm.example.com",
       "source": "environment"
     },
     {
+      "default": 0.85,
       "name": "autoSendThreshold",
       "schema": {
-        "type": "number",
+        "maximum": 1,
         "minimum": 0,
-        "maximum": 1
+        "type": "number"
       },
-      "default": 0.85,
       "source": "definition"
     }
   ],
   "secrets": [
     {
-      "name": "TYPESAFE_API_KEY",
       "credentialType": "typesafe.api_key",
+      "name": "TYPESAFE_API_KEY",
       "required": true
     },
     {
-      "name": "OPENAI_API_KEY",
       "credentialType": "openai.api_key",
+      "name": "OPENAI_API_KEY",
       "required": true
     },
     {
-      "name": "CRM_TOKEN",
       "credentialType": "http.bearer",
+      "name": "CRM_TOKEN",
       "required": false
     }
   ],
@@ -122,16 +121,16 @@
       "dataIn": [],
       "controlOut": ["done"],
       "outputs": {
+        "customer_id": {
+          "type": "string"
+        },
         "message": {
           "type": "string",
           "x-dataClass": "pii"
         },
-        "customer_id": {
-          "type": "string"
-        },
         "tier": {
-          "type": "string",
-          "enum": ["free", "gold"]
+          "enum": ["free", "gold"],
+          "type": "string"
         }
       },
       "successors": ["approve", "draft", "fetch_account", "intent", "safe"],
@@ -139,24 +138,24 @@
       "policy": {
         "timeoutMs": 120000,
         "retry": {
-          "maxAttempts": 1,
+          "allowOnIrreversible": false,
           "backoff": {
-            "type": "exponential",
-            "initialMs": 500,
-            "maxMs": 30000,
             "factor": 2,
-            "jitter": true
+            "initialMs": 500,
+            "jitter": true,
+            "maxMs": 30000,
+            "type": "exponential"
           },
-          "allowOnIrreversible": false
+          "maxAttempts": 1
         },
         "onError": "fail",
         "maxCostUsd": null,
         "maxTokens": null,
         "privacy": {
-          "sensitive": false,
           "containsPII": false,
           "doNotPersist": false,
-          "redactFields": []
+          "redactFields": [],
+          "sensitive": false
         }
       },
       "idempotency": "safe",
@@ -205,7 +204,7 @@
           "via": "ref"
         }
       ],
-      "controlOut": ["done", "billing", "technical", "security", "general"],
+      "controlOut": ["done", "billing", "general", "security", "technical"],
       "outputs": {
         "decision": {
           "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -395,24 +394,24 @@
       "policy": {
         "timeoutMs": 30000,
         "retry": {
-          "maxAttempts": 1,
+          "allowOnIrreversible": false,
           "backoff": {
-            "type": "exponential",
-            "initialMs": 500,
-            "maxMs": 30000,
             "factor": 2,
-            "jitter": true
+            "initialMs": 500,
+            "jitter": true,
+            "maxMs": 30000,
+            "type": "exponential"
           },
-          "allowOnIrreversible": false
+          "maxAttempts": 1
         },
         "onError": "fail",
         "maxCostUsd": null,
         "maxTokens": null,
         "privacy": {
-          "sensitive": false,
           "containsPII": false,
           "doNotPersist": false,
-          "redactFields": []
+          "redactFields": [],
+          "sensitive": false
         }
       },
       "idempotency": "safe",
@@ -426,9 +425,9 @@
           "instructions": "Which team should handle this support request?",
           "options": {
             "billing": "Invoices, charges, refunds",
-            "technical": "Bugs, outages, integrations",
+            "general": "Anything else",
             "security": "Fraud, stolen cards, account takeover",
-            "general": "Anything else"
+            "technical": "Bugs, outages, integrations"
           }
         },
         "configTemplates": {},
@@ -458,11 +457,11 @@
                   "port": "tier"
                 },
                 "optional": true,
-                "default": "free",
                 "schema": {
-                  "type": "string",
-                  "enum": ["free", "gold"]
-                }
+                  "enum": ["free", "gold"],
+                  "type": "string"
+                },
+                "default": "free"
               }
             },
             "schema": {
@@ -473,8 +472,8 @@
                   "x-dataClass": "pii"
                 },
                 "tier": {
-                  "type": "string",
-                  "enum": ["free", "gold"]
+                  "enum": ["free", "gold"],
+                  "type": "string"
                 }
               },
               "required": ["message", "tier"],
@@ -795,9 +794,9 @@
             "node": "route",
             "port": "billing"
           },
-          "path": "/value",
           "optional": false,
-          "via": "expr"
+          "via": "expr",
+          "path": "/value"
         }
       ],
       "controlOut": ["billing", "other"],
@@ -814,24 +813,24 @@
       "policy": {
         "timeoutMs": 120000,
         "retry": {
-          "maxAttempts": 1,
+          "allowOnIrreversible": false,
           "backoff": {
-            "type": "exponential",
-            "initialMs": 500,
-            "maxMs": 30000,
             "factor": 2,
-            "jitter": true
+            "initialMs": 500,
+            "jitter": true,
+            "maxMs": 30000,
+            "type": "exponential"
           },
-          "allowOnIrreversible": false
+          "maxAttempts": 1
         },
         "onError": "fail",
         "maxCostUsd": null,
         "maxTokens": null,
         "privacy": {
-          "sensitive": false,
           "containsPII": false,
           "doNotPersist": false,
-          "redactFields": []
+          "redactFields": [],
+          "sensitive": false
         }
       },
       "idempotency": "safe",
@@ -923,24 +922,24 @@
       "policy": {
         "timeoutMs": 30000,
         "retry": {
-          "maxAttempts": 3,
+          "allowOnIrreversible": false,
           "backoff": {
-            "type": "exponential",
-            "initialMs": 500,
-            "maxMs": 30000,
             "factor": 2,
-            "jitter": true
+            "initialMs": 500,
+            "jitter": true,
+            "maxMs": 30000,
+            "type": "exponential"
           },
-          "allowOnIrreversible": false
+          "maxAttempts": 3
         },
         "onError": "ignore",
         "maxCostUsd": null,
         "maxTokens": null,
         "privacy": {
-          "sensitive": false,
           "containsPII": false,
           "doNotPersist": false,
-          "redactFields": []
+          "redactFields": [],
+          "sensitive": false
         }
       },
       "idempotency": "safe",
@@ -1109,7 +1108,7 @@
           "credentials": [
             {
               "name": "auth",
-              "types": ["http.bearer", "http.basic", "http.header"],
+              "types": ["http.bearer", "http.basic", "http.header", "http.api_key"],
               "required": false,
               "description": "Applied as Authorization or a custom header."
             }
@@ -1157,9 +1156,9 @@
             "node": "draft",
             "port": "prompt"
           },
-          "path": "/value",
           "optional": false,
-          "via": "template"
+          "via": "template",
+          "path": "/value"
         },
         {
           "from": {
@@ -1170,9 +1169,9 @@
             "node": "draft",
             "port": "prompt"
           },
-          "path": "/confidence",
           "optional": false,
-          "via": "template"
+          "via": "template",
+          "path": "/confidence"
         },
         {
           "from": {
@@ -1227,24 +1226,24 @@
       "policy": {
         "timeoutMs": 120000,
         "retry": {
-          "maxAttempts": 1,
+          "allowOnIrreversible": false,
           "backoff": {
-            "type": "exponential",
-            "initialMs": 500,
-            "maxMs": 30000,
             "factor": 2,
-            "jitter": true
+            "initialMs": 500,
+            "jitter": true,
+            "maxMs": 30000,
+            "type": "exponential"
           },
-          "allowOnIrreversible": false
+          "maxAttempts": 1
         },
         "onError": "fail",
         "maxCostUsd": null,
         "maxTokens": null,
         "privacy": {
-          "sensitive": false,
           "containsPII": false,
           "doNotPersist": false,
-          "redactFields": []
+          "redactFields": [],
+          "sensitive": false
         }
       },
       "idempotency": "safe",
@@ -1255,14 +1254,14 @@
         "type": "flowaid.ai.generate",
         "typeVersion": "1.0.0",
         "config": {
-          "model": {
-            "provider": "openai",
-            "model": "gpt-4.1-mini"
-          },
-          "temperature": 0.3,
           "maxOutputTokens": 600,
+          "model": {
+            "model": "gpt-4.1-mini",
+            "provider": "openai"
+          },
           "stream": true,
-          "system": "You are a concise, friendly support agent. Never promise refunds or credits."
+          "system": "You are a concise, friendly support agent. Never promise refunds or credits.",
+          "temperature": 0.3
         },
         "configTemplates": {},
         "configBindings": {},
@@ -1527,8 +1526,8 @@
       "dataIn": [
         {
           "from": {
-            "node": "draft",
-            "port": "text"
+            "node": "start",
+            "port": "message"
           },
           "to": {
             "node": "safe",
@@ -1539,8 +1538,8 @@
         },
         {
           "from": {
-            "node": "start",
-            "port": "message"
+            "node": "draft",
+            "port": "text"
           },
           "to": {
             "node": "safe",
@@ -1558,9 +1557,9 @@
             "node": "safe",
             "port": "state"
           },
-          "path": "/value",
           "optional": false,
-          "via": "ref"
+          "via": "ref",
+          "path": "/value"
         }
       ],
       "controlOut": ["done"],
@@ -1765,24 +1764,24 @@
       "policy": {
         "timeoutMs": 30000,
         "retry": {
-          "maxAttempts": 1,
+          "allowOnIrreversible": false,
           "backoff": {
-            "type": "exponential",
-            "initialMs": 500,
-            "maxMs": 30000,
             "factor": 2,
-            "jitter": true
+            "initialMs": 500,
+            "jitter": true,
+            "maxMs": 30000,
+            "type": "exponential"
           },
-          "allowOnIrreversible": false
+          "maxAttempts": 1
         },
         "onError": "fail",
         "maxCostUsd": null,
         "maxTokens": null,
         "privacy": {
-          "sensitive": false,
           "containsPII": false,
           "doNotPersist": false,
-          "redactFields": []
+          "redactFields": [],
+          "sensitive": false
         }
       },
       "idempotency": "safe",
@@ -1793,11 +1792,11 @@
         "type": "flowaid.decision.boolean",
         "typeVersion": "1.0.0",
         "config": {
-          "instructions": "Is this reply safe to send without human review?",
           "criteria": {
-            "true": "Polite, accurate, makes no financial or legal commitment",
-            "false": "Speculates, promises refunds, discloses internal data, or is rude"
-          }
+            "false": "Speculates, promises refunds, discloses internal data, or is rude",
+            "true": "Polite, accurate, makes no financial or legal commitment"
+          },
+          "instructions": "Is this reply safe to send without human review?"
         },
         "configTemplates": {},
         "configBindings": {},
@@ -1805,18 +1804,6 @@
           "state": {
             "kind": "object",
             "fields": {
-              "reply": {
-                "kind": "ref",
-                "ref": {
-                  "kind": "port",
-                  "node": "draft",
-                  "port": "text"
-                },
-                "optional": false,
-                "schema": {
-                  "type": "string"
-                }
-              },
               "message": {
                 "kind": "ref",
                 "ref": {
@@ -1830,13 +1817,25 @@
                   "x-dataClass": "pii"
                 }
               },
+              "reply": {
+                "kind": "ref",
+                "ref": {
+                  "kind": "port",
+                  "node": "draft",
+                  "port": "text"
+                },
+                "optional": false,
+                "schema": {
+                  "type": "string"
+                }
+              },
               "team": {
                 "kind": "ref",
                 "ref": {
                   "kind": "port",
                   "node": "intent",
-                  "port": "decision",
-                  "path": "/value"
+                  "path": "/value",
+                  "port": "decision"
                 },
                 "optional": false,
                 "schema": {
@@ -1847,18 +1846,18 @@
             "schema": {
               "type": "object",
               "properties": {
-                "reply": {
-                  "type": "string"
-                },
                 "message": {
                   "type": "string",
                   "x-dataClass": "pii"
+                },
+                "reply": {
+                  "type": "string"
                 },
                 "team": {
                   "type": "string"
                 }
               },
-              "required": ["reply", "message", "team"],
+              "required": ["message", "reply", "team"],
               "additionalProperties": false
             }
           }
@@ -2215,24 +2214,24 @@
       "policy": {
         "timeoutMs": 120000,
         "retry": {
-          "maxAttempts": 1,
+          "allowOnIrreversible": false,
           "backoff": {
-            "type": "exponential",
-            "initialMs": 500,
-            "maxMs": 30000,
             "factor": 2,
-            "jitter": true
+            "initialMs": 500,
+            "jitter": true,
+            "maxMs": 30000,
+            "type": "exponential"
           },
-          "allowOnIrreversible": false
+          "maxAttempts": 1
         },
         "onError": "fail",
         "maxCostUsd": null,
         "maxTokens": null,
         "privacy": {
-          "sensitive": false,
           "containsPII": false,
           "doNotPersist": false,
-          "redactFields": []
+          "redactFields": [],
+          "sensitive": false
         }
       },
       "idempotency": "safe",
@@ -2255,9 +2254,9 @@
             },
             "optional": false,
             "schema": {
-              "type": "number",
+              "maximum": 1,
               "minimum": 0,
-              "maximum": 1
+              "type": "number"
             }
           }
         },
@@ -2480,7 +2479,6 @@
           },
           "configSchema": {
             "type": "object",
-            "description": "`pass` iff `confidence ≥ threshold` and (`requireValue` is false or the decision is boolean with `value === true`); otherwise `fail` iff `reviewBand` is set and `confidence < threshold − reviewBand`; otherwise `review`. Without `reviewBand` the gate is two-way (`pass`/`review`, as in §2.9); with it the band `[threshold − reviewBand, threshold)` goes to review and everything below to `fail`; a `requireValue` failure routes `fail` when `reviewBand` is set, else `review`. The UI's two-threshold model maps onto this as `auto := threshold`, `review := threshold − (reviewBand ?? threshold)`, with outcome names `pass | review | fail`.",
             "properties": {
               "threshold": {
                 "type": "number",
@@ -2508,15 +2506,16 @@
                 "maximum": 1,
                 "x-ui": {
                   "widget": "slider",
+                  "help": "Optional. Width of the review band below the threshold: confidences in [threshold − reviewBand, threshold) go to review, lower ones to fail. Unset, the gate is two-way (pass/review).",
                   "min": 0,
                   "max": 1,
-                  "step": 0.01,
-                  "help": "Optional. Width of the review band below the threshold: confidences in [threshold − reviewBand, threshold) go to review, lower ones to fail. Unset, the gate is two-way (pass/review)."
+                  "step": 0.01
                 }
               }
             },
             "required": ["threshold"],
-            "additionalProperties": false
+            "additionalProperties": false,
+            "description": "`pass` iff `confidence ≥ threshold` and (`requireValue` is false or the decision is boolean with `value === true`); otherwise `fail` iff `reviewBand` is set and `confidence < threshold − reviewBand`; otherwise `review`. Without `reviewBand` the gate is two-way (`pass`/`review`, as in §2.9); with it the band `[threshold − reviewBand, threshold)` goes to review and everything below to `fail`; a `requireValue` failure routes `fail` when `reviewBand` is set, else `review`. The UI's two-threshold model maps onto this as `auto := threshold`, `review := threshold − (reviewBand ?? threshold)`, with outcome names `pass | review | fail`."
           },
           "inputs": [
             {
@@ -2662,9 +2661,9 @@
             "node": "approve",
             "port": "title"
           },
-          "path": "/value",
           "optional": false,
-          "via": "template"
+          "via": "template",
+          "path": "/value"
         },
         {
           "from": {
@@ -2717,8 +2716,8 @@
             },
             "at": {
               "type": "string",
-              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
-              "format": "date-time"
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
             },
             "comment": {
               "type": ["string", "null"]
@@ -2728,8 +2727,8 @@
           "additionalProperties": false
         },
         "value": {
-          "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "type": "string"
         }
       },
       "successors": ["out_human", "out_rejected"],
@@ -2744,24 +2743,24 @@
       "policy": {
         "timeoutMs": 120000,
         "retry": {
-          "maxAttempts": 1,
+          "allowOnIrreversible": false,
           "backoff": {
-            "type": "exponential",
-            "initialMs": 500,
-            "maxMs": 30000,
             "factor": 2,
-            "jitter": true
+            "initialMs": 500,
+            "jitter": true,
+            "maxMs": 30000,
+            "type": "exponential"
           },
-          "allowOnIrreversible": false
+          "maxAttempts": 1
         },
         "onError": "fail",
         "maxCostUsd": null,
         "maxTokens": null,
         "privacy": {
-          "sensitive": false,
           "containsPII": false,
           "doNotPersist": false,
-          "redactFields": []
+          "redactFields": [],
+          "sensitive": false
         }
       },
       "idempotency": "safe",
@@ -2784,8 +2783,8 @@
             }
           },
           "schema": {
-            "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "type": "string"
           }
         },
         "title": {
@@ -3112,9 +3111,9 @@
             "node": "out_auto",
             "port": "value"
           },
-          "path": "/value",
           "optional": false,
-          "via": "ref"
+          "via": "ref",
+          "path": "/value"
         }
       ],
       "controlOut": [],
@@ -3131,24 +3130,24 @@
       "policy": {
         "timeoutMs": 120000,
         "retry": {
-          "maxAttempts": 1,
+          "allowOnIrreversible": false,
           "backoff": {
-            "type": "exponential",
-            "initialMs": 500,
-            "maxMs": 30000,
             "factor": 2,
-            "jitter": true
+            "initialMs": 500,
+            "jitter": true,
+            "maxMs": 30000,
+            "type": "exponential"
           },
-          "allowOnIrreversible": false
+          "maxAttempts": 1
         },
         "onError": "fail",
         "maxCostUsd": null,
         "maxTokens": null,
         "privacy": {
-          "sensitive": false,
           "containsPII": false,
           "doNotPersist": false,
-          "redactFields": []
+          "redactFields": [],
+          "sensitive": false
         }
       },
       "idempotency": "safe",
@@ -3159,6 +3158,21 @@
         "value": {
           "kind": "object",
           "fields": {
+            "approved_by": {
+              "kind": "literal",
+              "value": null,
+              "schema": {
+                "type": "null"
+              }
+            },
+            "auto_sent": {
+              "kind": "literal",
+              "value": true,
+              "schema": {
+                "type": "boolean",
+                "const": true
+              }
+            },
             "reply": {
               "kind": "ref",
               "ref": {
@@ -3176,48 +3190,33 @@
               "ref": {
                 "kind": "port",
                 "node": "intent",
-                "port": "decision",
-                "path": "/value"
+                "path": "/value",
+                "port": "decision"
               },
               "optional": false,
               "schema": {
                 "type": "string"
-              }
-            },
-            "auto_sent": {
-              "kind": "literal",
-              "value": true,
-              "schema": {
-                "type": "boolean",
-                "const": true
-              }
-            },
-            "approved_by": {
-              "kind": "literal",
-              "value": null,
-              "schema": {
-                "type": "null"
               }
             }
           },
           "schema": {
             "type": "object",
             "properties": {
-              "reply": {
-                "type": "string"
-              },
-              "team": {
-                "type": "string"
+              "approved_by": {
+                "type": "null"
               },
               "auto_sent": {
                 "type": "boolean",
                 "const": true
               },
-              "approved_by": {
-                "type": "null"
+              "reply": {
+                "type": "string"
+              },
+              "team": {
+                "type": "string"
               }
             },
-            "required": ["reply", "team", "auto_sent", "approved_by"],
+            "required": ["approved_by", "auto_sent", "reply", "team"],
             "additionalProperties": false
           }
         },
@@ -3245,6 +3244,19 @@
         {
           "from": {
             "node": "approve",
+            "port": "decision"
+          },
+          "to": {
+            "node": "out_human",
+            "port": "value"
+          },
+          "optional": false,
+          "via": "ref",
+          "path": "/by"
+        },
+        {
+          "from": {
+            "node": "approve",
             "port": "value"
           },
           "to": {
@@ -3263,22 +3275,9 @@
             "node": "out_human",
             "port": "value"
           },
-          "path": "/value",
           "optional": false,
-          "via": "ref"
-        },
-        {
-          "from": {
-            "node": "approve",
-            "port": "decision"
-          },
-          "to": {
-            "node": "out_human",
-            "port": "value"
-          },
-          "path": "/by",
-          "optional": false,
-          "via": "ref"
+          "via": "ref",
+          "path": "/value"
         }
       ],
       "controlOut": [],
@@ -3299,24 +3298,24 @@
       "policy": {
         "timeoutMs": 120000,
         "retry": {
-          "maxAttempts": 1,
+          "allowOnIrreversible": false,
           "backoff": {
-            "type": "exponential",
-            "initialMs": 500,
-            "maxMs": 30000,
             "factor": 2,
-            "jitter": true
+            "initialMs": 500,
+            "jitter": true,
+            "maxMs": 30000,
+            "type": "exponential"
           },
-          "allowOnIrreversible": false
+          "maxAttempts": 1
         },
         "onError": "fail",
         "maxCostUsd": null,
         "maxTokens": null,
         "privacy": {
-          "sensitive": false,
           "containsPII": false,
           "doNotPersist": false,
-          "redactFields": []
+          "redactFields": [],
+          "sensitive": false
         }
       },
       "idempotency": "safe",
@@ -3327,26 +3326,13 @@
         "value": {
           "kind": "object",
           "fields": {
-            "reply": {
+            "approved_by": {
               "kind": "ref",
               "ref": {
                 "kind": "port",
                 "node": "approve",
-                "port": "value"
-              },
-              "optional": false,
-              "schema": {
-                "type": "string",
-                "minLength": 1
-              }
-            },
-            "team": {
-              "kind": "ref",
-              "ref": {
-                "kind": "port",
-                "node": "intent",
-                "port": "decision",
-                "path": "/value"
+                "path": "/by",
+                "port": "decision"
               },
               "optional": false,
               "schema": {
@@ -3361,13 +3347,26 @@
                 "const": false
               }
             },
-            "approved_by": {
+            "reply": {
               "kind": "ref",
               "ref": {
                 "kind": "port",
                 "node": "approve",
-                "port": "decision",
-                "path": "/by"
+                "port": "value"
+              },
+              "optional": false,
+              "schema": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "team": {
+              "kind": "ref",
+              "ref": {
+                "kind": "port",
+                "node": "intent",
+                "path": "/value",
+                "port": "decision"
               },
               "optional": false,
               "schema": {
@@ -3378,22 +3377,22 @@
           "schema": {
             "type": "object",
             "properties": {
-              "reply": {
-                "type": "string",
-                "minLength": 1
-              },
-              "team": {
+              "approved_by": {
                 "type": "string"
               },
               "auto_sent": {
                 "type": "boolean",
                 "const": false
               },
-              "approved_by": {
+              "reply": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "team": {
                 "type": "string"
               }
             },
-            "required": ["reply", "team", "auto_sent", "approved_by"],
+            "required": ["approved_by", "auto_sent", "reply", "team"],
             "additionalProperties": false
           }
         },
@@ -3435,9 +3434,9 @@
             "node": "out_rejected",
             "port": "value"
           },
-          "path": "/value",
           "optional": false,
-          "via": "ref"
+          "via": "ref",
+          "path": "/value"
         }
       ],
       "controlOut": [],
@@ -3468,24 +3467,24 @@
       "policy": {
         "timeoutMs": 120000,
         "retry": {
-          "maxAttempts": 1,
+          "allowOnIrreversible": false,
           "backoff": {
-            "type": "exponential",
-            "initialMs": 500,
-            "maxMs": 30000,
             "factor": 2,
-            "jitter": true
+            "initialMs": 500,
+            "jitter": true,
+            "maxMs": 30000,
+            "type": "exponential"
           },
-          "allowOnIrreversible": false
+          "maxAttempts": 1
         },
         "onError": "fail",
         "maxCostUsd": null,
         "maxTokens": null,
         "privacy": {
-          "sensitive": false,
           "containsPII": false,
           "doNotPersist": false,
-          "redactFields": []
+          "redactFields": [],
+          "sensitive": false
         }
       },
       "idempotency": "safe",
@@ -3496,6 +3495,21 @@
         "value": {
           "kind": "object",
           "fields": {
+            "approved_by": {
+              "kind": "literal",
+              "value": null,
+              "schema": {
+                "type": "null"
+              }
+            },
+            "auto_sent": {
+              "kind": "literal",
+              "value": false,
+              "schema": {
+                "type": "boolean",
+                "const": false
+              }
+            },
             "reply": {
               "kind": "literal",
               "value": "",
@@ -3509,49 +3523,34 @@
               "ref": {
                 "kind": "port",
                 "node": "intent",
-                "port": "decision",
-                "path": "/value"
+                "path": "/value",
+                "port": "decision"
               },
               "optional": false,
               "schema": {
                 "type": "string"
-              }
-            },
-            "auto_sent": {
-              "kind": "literal",
-              "value": false,
-              "schema": {
-                "type": "boolean",
-                "const": false
-              }
-            },
-            "approved_by": {
-              "kind": "literal",
-              "value": null,
-              "schema": {
-                "type": "null"
               }
             }
           },
           "schema": {
             "type": "object",
             "properties": {
+              "approved_by": {
+                "type": "null"
+              },
+              "auto_sent": {
+                "type": "boolean",
+                "const": false
+              },
               "reply": {
                 "type": "string",
                 "const": ""
               },
               "team": {
                 "type": "string"
-              },
-              "auto_sent": {
-                "type": "boolean",
-                "const": false
-              },
-              "approved_by": {
-                "type": "null"
               }
             },
-            "required": ["reply", "team", "auto_sent", "approved_by"],
+            "required": ["approved_by", "auto_sent", "reply", "team"],
             "additionalProperties": false
           }
         },
@@ -3631,9 +3630,9 @@
         "node": "route",
         "port": "billing"
       },
-      "path": "/value",
       "optional": false,
-      "via": "expr"
+      "via": "expr",
+      "path": "/value"
     },
     {
       "from": {
@@ -3656,9 +3655,9 @@
         "node": "draft",
         "port": "prompt"
       },
-      "path": "/value",
       "optional": false,
-      "via": "template"
+      "via": "template",
+      "path": "/value"
     },
     {
       "from": {
@@ -3669,9 +3668,9 @@
         "node": "draft",
         "port": "prompt"
       },
-      "path": "/confidence",
       "optional": false,
-      "via": "template"
+      "via": "template",
+      "path": "/confidence"
     },
     {
       "from": {
@@ -3699,8 +3698,8 @@
     },
     {
       "from": {
-        "node": "draft",
-        "port": "text"
+        "node": "start",
+        "port": "message"
       },
       "to": {
         "node": "safe",
@@ -3711,8 +3710,8 @@
     },
     {
       "from": {
-        "node": "start",
-        "port": "message"
+        "node": "draft",
+        "port": "text"
       },
       "to": {
         "node": "safe",
@@ -3730,9 +3729,9 @@
         "node": "safe",
         "port": "state"
       },
-      "path": "/value",
       "optional": false,
-      "via": "ref"
+      "via": "ref",
+      "path": "/value"
     },
     {
       "from": {
@@ -3779,9 +3778,9 @@
         "node": "approve",
         "port": "title"
       },
-      "path": "/value",
       "optional": false,
-      "via": "template"
+      "via": "template",
+      "path": "/value"
     },
     {
       "from": {
@@ -3828,9 +3827,22 @@
         "node": "out_auto",
         "port": "value"
       },
-      "path": "/value",
       "optional": false,
-      "via": "ref"
+      "via": "ref",
+      "path": "/value"
+    },
+    {
+      "from": {
+        "node": "approve",
+        "port": "decision"
+      },
+      "to": {
+        "node": "out_human",
+        "port": "value"
+      },
+      "optional": false,
+      "via": "ref",
+      "path": "/by"
     },
     {
       "from": {
@@ -3853,22 +3865,9 @@
         "node": "out_human",
         "port": "value"
       },
-      "path": "/value",
       "optional": false,
-      "via": "ref"
-    },
-    {
-      "from": {
-        "node": "approve",
-        "port": "decision"
-      },
-      "to": {
-        "node": "out_human",
-        "port": "value"
-      },
-      "path": "/by",
-      "optional": false,
-      "via": "ref"
+      "via": "ref",
+      "path": "/value"
     },
     {
       "from": {
@@ -3879,9 +3878,9 @@
         "node": "out_rejected",
         "port": "value"
       },
-      "path": "/value",
       "optional": false,
-      "via": "ref"
+      "via": "ref",
+      "path": "/value"
     }
   ],
   "batchGroups": {},
@@ -3905,5 +3904,6 @@
   "estimate": {
     "maxCostUsd": 0.5,
     "nodeCount": 11
-  }
+  },
+  "planHash": "52c9de2de3ea974af9bafcc62490856a9f9e9c650d850f9ba90db23ed456faf5"
 }

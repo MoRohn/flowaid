@@ -32,9 +32,9 @@ const FIXTURE_FILES = readdirSync(FIXTURES_DIR)
  */
 const GOLDEN_HASHES: Readonly<Record<string, string>> = {
   "example-support-reply.json": "d86f40190bb139f3aca03f12fcb59cfe8c327db928c410e772bf949e701d9228",
-  "github-issue-triage.json": "fbb3c9129da615fb78f8b88d272493f476ffd0ca131cb526452b74bb39623ca6",
-  "research-agent.json": "964543cefb52c83bf1f3488d572740357396aa67d5318dbb57297d6f123076cd",
-  "support-triage.json": "a844a4cba93f9706ef4bdfd2bb897131ad0b18a207c5048457fc291aa4606a4f",
+  "github-issue-triage.json": "3f175e94242d7d49a352641988098e0e75ce22d1df61e055c069bf3cbe92baa9",
+  "research-agent.json": "45e437d3a1eb08aa544993bc42e88daff3119a5224c3eaaf5a8d81fd21254562",
+  "support-triage.json": "9de3c758aa2e1ce58d8f887c7ebf0a0163aee29382b95c9443a7ed3f3718188f",
 };
 
 function readRaw(file: string): unknown {

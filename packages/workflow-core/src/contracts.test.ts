@@ -62,9 +62,9 @@ describe("identifier schemas", () => {
   it("RESERVED_IDS equals keywords ∪ function names", () => {
     const expected = new Set<string>([...EXPRESSION_KEYWORDS, ...EXPRESSION_FUNCTION_NAMES]);
     expect(new Set(RESERVED_IDS)).toEqual(expected);
-    expect(EXPRESSION_FUNCTION_NAMES).toHaveLength(37);
+    expect(EXPRESSION_FUNCTION_NAMES).toHaveLength(38);
     expect(EXPRESSION_KEYWORDS).toHaveLength(5);
-    expect(RESERVED_IDS.size).toBe(42);
+    expect(RESERVED_IDS.size).toBe(43);
     for (const fn of EXPRESSION_FUNCTION_NAMES) expect(isExpressionFunction(fn)).toBe(true);
     expect(isExpressionFunction("eval")).toBe(false);
     for (const fn of LAMBDA_FUNCTIONS) expect(isExpressionFunction(fn)).toBe(true);

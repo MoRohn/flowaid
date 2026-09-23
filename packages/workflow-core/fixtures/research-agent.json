@@ -308,7 +308,7 @@
             "type": "object"
           }
         },
-        "expr": "$scope.carry.evidence + filter(search_all.results, r => r.judgment.relevant.value >= 2 && r.judgment.reliable.value >= 2)"
+        "expr": "concat($scope.carry.evidence, filter(search_all.results, r => r.judgment.relevant.value >= 2 && r.judgment.reliable.value >= 2))"
       }
     },
     {

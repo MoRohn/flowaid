@@ -51,7 +51,7 @@ export const PLANNED: Partial<Record<UiGroup, readonly string[]>> = {
   canvas: ["ProblemsOverlay"],
   trace: ["NodeRunDetail", "GenerationCard"],
   inspector: ["PortRow", "RefPicker", "DependencyPanel"],
-  forms: ["TemplateEditor", "LevelsList", "QuestionsEditor", "JsonSchemaEditor", "CronEditor"],
+  forms: ["TemplateEditor", "LevelsList", "JsonSchemaEditor", "CronEditor"],
   shell: ["DraftStatusPill"],
   observability: ["CostBreakdown"],
   human: ["ReviewForm", "ExternalReviewPage"],

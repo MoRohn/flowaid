@@ -45,13 +45,17 @@ function manifest(id: string): NodeManifest {
 }
 
 describe("workflow-core fixture manifests through SchemaForm", () => {
-  it("has the five fixture manifests", () => {
+  it("has every fixture manifest", () => {
     expect(MANIFESTS.map((m) => m.id)).toEqual([
       "flowaid.ai.generate",
+      "flowaid.ai.structured_generate",
+      "flowaid.data.transform",
+      "flowaid.decision.batch",
       "flowaid.decision.boolean",
       "flowaid.decision.choice",
       "flowaid.decision.confidence_gate",
       "flowaid.tools.http",
+      "flowaid.tools.mcp",
     ]);
   });
 

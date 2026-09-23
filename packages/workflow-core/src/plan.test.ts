@@ -281,12 +281,14 @@ describe("fixtures/plans/example-support-reply.plan.json", () => {
     }
     expect(node("intent").outputs.decision).toEqual(DecisionResultJsonSchema.choice);
     expect(node("safe").outputs.decision).toEqual(DecisionResultJsonSchema.boolean);
+    // Rule-derived ports follow the canonical (code-point) order of the option keys: storage
+    // such as jsonb does not keep key order, so the compiler never depends on it.
     expect(node("intent").controlOut).toEqual([
       "done",
       "billing",
-      "technical",
-      "security",
       "general",
+      "security",
+      "technical",
     ]);
     expect(Object.keys(plan.catalogSnapshot).sort()).toEqual([
       "flowaid.ai.generate",
