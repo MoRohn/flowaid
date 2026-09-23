@@ -81,3 +81,38 @@ jobs:
       # packages at once starved CPU-heavy property tests past their timeouts.
       - name: Unit and component tests
         run: pnpm turbo run test --concurrency=3
+
+  database:
+    name: database
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # The image the compose stack runs (docker/compose.yml), pinned by digest.
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.6-pg16@sha256:ccc6e83d6e35e931dc7c5def2022729d5a6c370318d099181995567ff1fb4d6b
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      # Superuser connection; every suite creates and drops its own database.
+      FLOWAID_TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Migrations, RLS, run store, queue and repositories against PostgreSQL 16
+        run: pnpm --filter @flowaid/database test

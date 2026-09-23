@@ -38,7 +38,7 @@ Conventions for every package: TypeScript strict via `@flowaid/config` presets, 
 
 ### WP-03 `@flowaid/database`
 
-- **Files**: `src/schema.ts` (DATABASE.md verbatim, one file), `migrations/0001_init.sql`…`0004`, `src/{db,migrate,stores/{PgRunStore,PgQueueDriver,PgEventBus,PgArtifactIndex,PgCredentialRepository},repositories/*,projections,reproject,rls}.ts`, `scripts/seed-*.ts`; the shared `RunStore`/`QueueDriver`/`EventBus` contract suite is imported from `@flowaid/workflow-runtime/testing`.
+- **Files**: `src/schema.ts` (DATABASE.md verbatim, one file), `migrations/0000_init.sql`…`0003`, `src/{db,migrate,stores/{PgRunStore,PgQueueDriver,PgEventBus,PgArtifactIndex,PgCredentialRepository},repositories/*,projections,reproject,rls}.ts`, `scripts/seed-*.ts`; the shared `RunStore`/`QueueDriver`/`EventBus` contract suite is imported from `@flowaid/workflow-runtime/testing`.
 - **Done**: `drizzle-kit generate` produces no diff against the checked-in migrations; `PgRunStore.appendEvents` implements fenced append + projections + `NOTIFY` in one transaction (DATABASE.md §Projections); `PgQueueDriver` (`SKIP LOCKED`, `LISTEN/NOTIFY`, timers polling) and `PgEventBus` pass the shared contract suite; `flowaid db reproject`; retention sweep queries; RLS migration.
 - **Tests**: integration tests against a real Postgres (testcontainers or the compose db): fencing (two writers, second fails), projection equivalence (`project(events) ≡ rows`) on golden event logs, timer CAS, queue claim under concurrency (10 consumers, no double delivery), partial indexes, credential uniqueness with null environment.
 

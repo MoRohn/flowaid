@@ -389,3 +389,14 @@ describe("secret-safe serialisation", () => {
     expect(secretEnvValues(loadEnv(MINIMAL))).toEqual([MINIMAL.DATABASE_URL, "flowaid"]);
   });
 });
+
+describe("testDatabaseUrl", () => {
+  it("reads FLOWAID_TEST_DATABASE_URL and ignores blanks", async () => {
+    const { testDatabaseUrl } = await import("./testing.js");
+    expect(testDatabaseUrl({ FLOWAID_TEST_DATABASE_URL: " postgres://x@h/db " })).toBe(
+      "postgres://x@h/db",
+    );
+    expect(testDatabaseUrl({ FLOWAID_TEST_DATABASE_URL: "  " })).toBeUndefined();
+    expect(testDatabaseUrl({})).toBeUndefined();
+  });
+});

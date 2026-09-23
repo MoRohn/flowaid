@@ -1,0 +1,45 @@
+{
+  "name": "@flowaid/database",
+  "version": "0.1.0",
+  "private": true,
+  "description": "flowaid persistence on PostgreSQL 16: the Drizzle schema (DATABASE.md), migrations with forced row-level security, the fenced event-sourced RunStore with projections, the SKIP LOCKED queue, LISTEN/NOTIFY event bus, credential and artifact repositories, reprojection and the retention sweep.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./schema": "./src/schema.ts"
+  },
+  "files": [
+    "src",
+    "dist",
+    "migrations",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src scripts",
+    "test": "vitest run",
+    "db:generate": "drizzle-kit generate",
+    "clean": "rm -rf dist .turbo *.tsbuildinfo",
+    "seed:templates": "tsx scripts/seed-templates.ts",
+    "seed:environments": "tsx scripts/seed-environments.ts"
+  },
+  "dependencies": {
+    "@flowaid/env": "workspace:*",
+    "@flowaid/shared": "workspace:*",
+    "@flowaid/workflow-core": "workspace:*",
+    "drizzle-orm": "0.45.3",
+    "postgres": "3.4.9"
+  },
+  "devDependencies": {
+    "@flowaid/config": "workspace:*",
+    "@types/node": "24.13.6",
+    "drizzle-kit": "0.31.11",
+    "eslint": "9.39.5",
+    "typescript": "5.9.3",
+    "vitest": "4.1.11",
+    "tsx": "4.23.15"
+  }
+}

@@ -1,20 +1,8 @@
-# flowaid — Database (`@flowaid/database`)
-
-Authoritative schema for PostgreSQL 16 (+ `pgvector`), expressed as Drizzle `pg-core` definitions. The code lives in **one file**, `packages/database/src/schema.ts`, ordered by the section headers below (WP-03). Names here are the names used by `ARCHITECTURE.md`, `API.md` and `CONTRACTS.ts`. Additions since v1.0 (jobs, user_tokens, human_task_review_tokens, event_subscriptions, credential storage, webhook/schedule hardening columns) are marked `// v1.1` and ship in `0000_init.sql` — nothing is deployed yet, so there is no second migration for them.
-
-## Conventions
-
-- Ids are `uuid` v7 generated in the application (`@flowaid/shared` `uuidv7()`), never by the database, so ids exist before the insert (events reference `nodeRunId`s minted by the scheduler).
-- Every tenant-owned table has `workspace_id uuid NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE` and an index starting with `workspace_id`. `migrations/0001_rls.sql` runs `ENABLE` **and** `FORCE ROW LEVEL SECURITY` on every such table (table owners would otherwise bypass RLS) with the policy `USING (workspace_id = NULLIF(current_setting('app.workspace_id', true), '')::uuid OR current_setting('app.bypass_rls', true) = 'on')` — an unset GUC yields zero rows (fail closed); the sweep and `db reproject` set the bypass GUC. It also creates the roles `flowaid_app` (api/worker) and `flowaid_code` (`worker-code`: `queue_jobs`, `node_runs`, `run_events` insert only); migrations run as the owner through `DATABASE_ADMIN_URL` (defaults to `DATABASE_URL`). Policies are active when `DB_RLS=true`, which is the compose default; the API runs `SET LOCAL app.workspace_id` per request.
-- Timestamps are `timestamptz`. JSON columns are `jsonb` and are validated with the Zod schema named in the `$type<>` at the repository boundary (never raw writes).
-- Enums that are open-ended in the product (`origin`, `purpose`, `kind`) are `text` with a `$type<>`; enums that gate indexes and state machines (`run_status`, `node_run_status`) are Postgres enums.
-- Migrations: `drizzle-kit generate` → `packages/database/migrations/*.sql`, applied by `flowaid db migrate` and by the api container entrypoint (fail-fast, never at request time). Postgres only (D26).
-- Money is `numeric(12,6)`; probabilities/confidence are `numeric(6,5)`.
-
-## Schema (Drizzle)
-
-```ts
-// packages/database/src/schema.ts
+/**
+ * The flowaid schema for PostgreSQL 16 + pgvector: DATABASE.md, verbatim, in one file. Change the
+ * document and this file together; `drizzle-kit generate` must produce no diff against
+ * `migrations/` (a test checks it).
+ */
 import { sql } from "drizzle-orm";
 import {
   pgTable,
@@ -1353,66 +1341,3 @@ export const auditEvents = pgTable(
     index("audit_resource_idx").on(t.resourceType, t.resourceId),
   ],
 );
-```
-
-## Projections: how `run_events` drives the other run tables
-
-`PgRunStore.appendEvents(runId, events, { leaseOwner, expectedSeq })` runs in one transaction:
-
-1. `UPDATE runs SET last_seq = last_seq + $n WHERE id = $runId AND lease_owner = $leaseOwner AND last_seq = $expectedSeq RETURNING last_seq` — zero rows ⇒ rollback + `WorkerLostError`.
-2. Insert `run_events` rows with `seq = expectedSeq + 1 … + n` (payload redacted by the caller's `Redactor` and `PlanNode.redact`).
-3. Apply projections in event order:
-
-| event                                                              | projection                                                                                                                                                                               |
-| ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `RUN_STARTED`                                                      | `runs.status='starting'`, `started_at`, `lease_owner/lease_until`                                                                                                                        |
-| `RUN_WAITING` / `RUN_RESUMED`                                      | `runs.status` = `waiting                                                                                                                                                                 | waiting_for_human                                                                                                          | retrying`/`running` |
-| `RUN_CANCEL_REQUESTED`                                             | (flag columns already set by the API)                                                                                                                                                    |
-| `RUN_OUTPUT`                                                       | no row change (merged at completion)                                                                                                                                                     |
-| `RUN_COMPLETED` / `RUN_FAILED` / `RUN_CANCELLED` / `RUN_TIMED_OUT` | `runs.status`, `output`, `outcome`, `error`, `usage`, `cost_usd`, `ended_at`, `expires_at` (from retention class), `lease_owner = NULL`; open `human_tasks` → `cancelled` on cancel/fail |
-| `NODE_SCHEDULED`                                                   | insert `node_runs` (`status='pending'`, `scheduled_seq`, `input_hash`, `idempotency_key`, `reused_from_node_run_id`); `runs.node_run_count += 1`                                         |
-| `NODE_STARTED`                                                     | `status='running'`, `started_at`, `input`, `pool`, `worker_id`, `queue_latency_ms`                                                                                                       |
-| `NODE_COMPLETED`                                                   | `status='completed'                                                                                                                                                                      | 'reused'`, `output`, `fired_ports`, `usage`, `cost_usd`, `latency_ms`, `ended_at`, `ended_seq`; `runs.usage/cost_usd += …` |
-| `NODE_FAILED`                                                      | `status='failed'` (terminal) or unchanged (retry follows), `error`, `fired_ports`, `latency_ms`, `ended_seq` when terminal                                                               |
-| `NODE_RETRIED`                                                     | `status='retry_wait'`; insert `run_timers` (purpose `retry`)                                                                                                                             |
-| `NODE_SKIPPED` / `NODE_CANCELLED`                                  | `status='skipped'                                                                                                                                                                        | 'cancelled'`, `ended_at`, `ended_seq`                                                                                      |
-| `NODE_WAITING`                                                     | `status='waiting'`, `wait_state`                                                                                                                                                         |
-| `DECISION_COMPLETED`                                               | `decision`, `decision_kind`, `decision_value`, `decision_confidence`, `decision_provider`                                                                                                |
-| `GENERATION_COMPLETED` / `TOOL_RETURNED`                           | usage/cost roll-up into `node_runs`                                                                                                                                                      |
-| `TIMER_SET` / `TIMER_FIRED`                                        | insert `run_timers` / `fired_at`                                                                                                                                                         |
-| `HUMAN_APPROVAL_REQUESTED`                                         | insert `human_tasks` (`status='open'`)                                                                                                                                                   |
-| `HUMAN_APPROVAL_RECEIVED`                                          | (row already `responded` via CAS by the API)                                                                                                                                             |
-| `HUMAN_TASK_ESCALATED` / `HUMAN_TASK_EXPIRED`                      | `assignees`/`escalated_at` / `status='expired'`                                                                                                                                          |
-| `CHECKPOINT_CREATED`                                               | (checkpoint row written by the orchestrator in the same transaction)                                                                                                                     |
-
-4. `NOTIFY run_events, '{"runId":…,"fromSeq":…,"toSeq":…}'` (payload ≤ 8 KB, ids only).
-
-`flowaid db reproject <runId>` truncates the run's projections and replays its events through the same `applyProjection`; the integration suite asserts `project(events) ≡ rows` after every golden scenario.
-
-## Retention
-
-| Data class / table                                           | Default                                                                     | Mechanism                                                                                                                                                                                                                                                                       |
-| ------------------------------------------------------------ | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `runs` (`retention_class`)                                   | `standard` 90 d, `short` 7 d, `long` 400 d, `none` = purge on completion    | `expires_at` computed at completion; nightly `retention.sweep` deletes `run_events`, `node_runs`, `run_checkpoints`, `run_timers`, `human_tasks`, `artifacts` (+ S3 objects) for expired runs and **keeps the `runs` row** with I/O nulled and metrics columns intact for 400 d |
-| `node_runs.input/output` with `x-dataClass: pii`/`sensitive` | 7 d (unless `workspaces.settings.privacy.persistPII`)                       | columns nulled by the sweep, `decision_*`/usage/latency kept                                                                                                                                                                                                                    |
-| `run_events` partitions                                      | dropped when older than the workspace's max retention (partitioned mode)    | `DROP TABLE run_events_YYYY_MM`                                                                                                                                                                                                                                                 |
-| `run_checkpoints`                                            | last 2 per run while active; final one for the run's retention              | sweep                                                                                                                                                                                                                                                                           |
-| `human_tasks.request` context                                | responded + 30 d                                                            | context nulled                                                                                                                                                                                                                                                                  |
-| `workflow_versions` (`kind='draft'`)                         | 7 d when unreferenced by any run                                            | sweep                                                                                                                                                                                                                                                                           |
-| `webhook_deliveries`                                         | 30 d                                                                        | sweep                                                                                                                                                                                                                                                                           |
-| `state_entries`                                              | `expires_at` (session TTL default 24 h; run namespace deleted with the run) | sweep                                                                                                                                                                                                                                                                           |
-| `audit_events`                                               | 400 d (configurable, never below 90 d)                                      | yearly partitions dropped                                                                                                                                                                                                                                                       |
-| `evaluation_results`                                         | with their evaluation run                                                   | cascade                                                                                                                                                                                                                                                                         |
-| `doNotPersist` outputs                                       | never written                                                               | `{ "$redacted": true }` stub                                                                                                                                                                                                                                                    |
-| `runs.idempotency_key`                                       | 24 h                                                                        | nulled by the sweep so `runs_idem_uq` matches the API's 24 h window (v1.1)                                                                                                                                                                                                      |
-| `jobs` (+ `artifacts.kind='export'`)                         | 7 d (the export zip itself 24 h)                                            | sweep; artifact cascade (v1.1)                                                                                                                                                                                                                                                  |
-| `user_tokens`, `human_task_review_tokens`                    | 7 d after expiry                                                            | sweep (v1.1)                                                                                                                                                                                                                                                                    |
-| `event_subscriptions`                                        | with the run                                                                | cascade (v1.1)                                                                                                                                                                                                                                                                  |
-
-The sweep is the `retention.sweep` job on the `maintenance` queue (`RETENTION_SWEEP_CRON`, default `0 3 * * *`; RFC-0001), together with `partition.ensure` and `draft_versions.gc`.
-
-Workspace deletion cascades everything through foreign keys; S3 objects are removed by prefix `ws/<workspaceId>/`.
-
-## Migration set for the first slice
-
-`0000_init.sql` (the pgvector extension, all tables, enums, indexes), `0001_rls.sql` (`ENABLE` + `FORCE` RLS policies, roles and grants; policies active when `DB_RLS=true`, the compose default), `0002_partition_run_events.sql` (conditional on `RUN_EVENTS_PARTITIONED`, plus `flowaid_ensure_run_events_partitions()`), `0003_chunks_generated_tsv.sql` (generated `tsv` column); numbered by drizzle-kit's journal, seeds: `seed_environments.sql` is applied per workspace by the API on workspace creation (`dev`, `staging`, `prod` with `prod.protected = true`), `seed_templates.ts` loads the three demo templates with their `required_resources`. First boot (`apps/api` bootstrap): owner user, default workspace `default`, environments, templates (ARCHITECTURE.md §8).
