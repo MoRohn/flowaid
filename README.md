@@ -15,7 +15,7 @@
   <img alt="Status: pre-alpha" src="https://img.shields.io/badge/status-pre--alpha-c98a12">
   <img alt="TypeScript 5.9 strict" src="https://img.shields.io/badge/TypeScript-5.9%20strict-17171c">
   <img alt="Node.js 24+" src="https://img.shields.io/badge/node-%E2%89%A524-17171c">
-  <img alt="Tests: 4,076 passing" src="https://img.shields.io/badge/tests-4%2C076%20passing-1f9d64">
+  <img alt="Tests: 4,132 passing" src="https://img.shields.io/badge/tests-4%2C132%20passing-1f9d64">
 </p>
 
 ---
@@ -114,18 +114,19 @@ deployments by environment, and how its decisions were routed.
 
 ## Project status
 
-| Area                                                 | State                                                                                                                                                                       |
-| ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Architecture and contracts                           | **Designed.** Architecture, contracts, database, API, UI, code export, LangChain, Jev engineering and Lean verification are all specified in [`docs/design/`](docs/design/) |
-| `@flowaid/workflow-core`                             | **Built.** Workflow contracts, the FlowExpr expression language, templates and a JSON Schema compatibility checker. 2,665 tests                                             |
-| `@flowaid/jev`                                       | **Built (library core).** Decision contracts, state packets, bundles, confidence × consequence routing, live menus, receipts, calibration and shadow comparison. 183 tests  |
-| `@flowaid/ui`                                        | **Built (components).** 13 groups of React components: canvas, nodes, trace viewer, inspector, forms, decision visuals, dashboards. 829 tests, with a playground            |
-| `@flowaid/workflow-compiler`                         | **Built.** Definition → content-hashed execution plan: 8 passes, 94 diagnostics, guard analysis, batching, redaction, diff and migrate. 160 tests                           |
-| `@flowaid/node-sdk`                                  | **Built.** `defineNode`, `toManifest` (reproduces the fixture manifests exactly), capability-scoped context and a runtime-faithful test harness. 23 tests                   |
-| `@flowaid/providers`                                 | **Built.** Registry, sourced model catalog and pricing, failover with circuit breaking, LLM and rule decision providers, OpenAI-compatible client, record/replay. 80 tests  |
-| `@flowaid/shared`, `@flowaid/env`, `@flowaid/config` | **Built.** Primitives, environment schema and tooling presets. 136 tests                                                                                                    |
-| Runtime, database, API, worker, web app              | **Not started.** Planned in [`docs/UPGRADE_PLAN.md`](docs/UPGRADE_PLAN.md), phases P1–P5                                                                                    |
-| CI                                                   | **Running.** GitHub Actions runs the audit, boundary, format, lint, typecheck, build and test gates on every push and pull request                                          |
+| Area                                                 | State                                                                                                                                                                                                   |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Architecture and contracts                           | **Designed.** Architecture, contracts, database, API, UI, code export, LangChain, Jev engineering and Lean verification are all specified in [`docs/design/`](docs/design/)                             |
+| `@flowaid/workflow-core`                             | **Built.** Workflow contracts, the FlowExpr expression language, templates and a JSON Schema compatibility checker. 2,665 tests                                                                         |
+| `@flowaid/jev`                                       | **Built (library core).** Decision contracts, state packets, bundles, confidence × consequence routing, live menus, receipts, calibration and shadow comparison. 183 tests                              |
+| `@flowaid/ui`                                        | **Built (components).** 13 groups of React components: canvas, nodes, trace viewer, inspector, forms, decision visuals, dashboards. 829 tests, with a playground                                        |
+| `@flowaid/workflow-compiler`                         | **Built.** Definition → content-hashed execution plan: 8 passes, 94 diagnostics, guard analysis, batching, redaction, diff and migrate. 160 tests                                                       |
+| `@flowaid/node-sdk`                                  | **Built.** `defineNode`, `toManifest` (reproduces the fixture manifests exactly), capability-scoped context and a runtime-faithful test harness. 23 tests                                               |
+| `@flowaid/providers`                                 | **Built.** Registry, sourced model catalog and pricing, failover with circuit breaking, LLM and rule decision providers, OpenAI-compatible client, record/replay. 80 tests                              |
+| `@flowaid/credentials`                               | **Built.** AES-256-GCM envelope with per-credential keys, KEK versions under env/file/KMS/Vault master keys with KCV and rotation, external references, the Redactor and the credential types. 56 tests |
+| `@flowaid/shared`, `@flowaid/env`, `@flowaid/config` | **Built.** Primitives, environment schema and tooling presets. 136 tests                                                                                                                                |
+| Runtime, database, API, worker, web app              | **Not started.** Planned in [`docs/UPGRADE_PLAN.md`](docs/UPGRADE_PLAN.md), phases P1–P5                                                                                                                |
+| CI                                                   | **Running.** GitHub Actions runs the audit, boundary, format, lint, typecheck, build and test gates on every push and pull request                                                                      |
 
 The live snapshot is always [`docs/STATUS.md`](docs/STATUS.md).
 
@@ -339,6 +340,7 @@ packages/
   workflow-compiler/    Definition → content-hashed execution plan, with diagnostics
   node-sdk/             Write nodes: schemas, manifests, scoped context, test harness
   providers/            Provider registry, pricing catalog, failover, health, LLM client
+  credentials/          Envelope encryption, master keys, external secrets, redaction
   jev/                  Jev engineering library and harness templates
   ui/                   React component library and playground
 scripts/                Repository checks: boundaries, browser bundle, compose, env, UI inventory
