@@ -1,0 +1,200 @@
+{
+  "$comment": "OpenAI standard-tier prices per million tokens. gpt-6-* long-context rates exist but the switch-over size is not published, so they are billed at the standard rate here.",
+  "retrievedAt": "2026-09-23",
+  "sources": [
+    "https://developers.openai.com/api/docs/pricing",
+    "https://developers.openai.com/api/docs/models"
+  ],
+  "models": [
+    {
+      "provider": "openai",
+      "model": "gpt-6-astra",
+      "kind": "chat",
+      "capabilities": {
+        "tools": true,
+        "jsonSchema": true,
+        "vision": true,
+        "streaming": true,
+        "thinking": true
+      },
+      "contextTokens": 1050000,
+      "maxOutputTokens": 128000,
+      "pricing": {
+        "inputPerMTok": 10,
+        "outputPerMTok": 50,
+        "cacheReadPerMTok": 1,
+        "cacheWritePerMTok": 12.5
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-6-sol",
+      "kind": "chat",
+      "capabilities": {
+        "tools": true,
+        "jsonSchema": true,
+        "vision": true,
+        "streaming": true,
+        "thinking": true
+      },
+      "contextTokens": 1050000,
+      "maxOutputTokens": 128000,
+      "pricing": {
+        "inputPerMTok": 2,
+        "outputPerMTok": 10,
+        "cacheReadPerMTok": 0.2,
+        "cacheWritePerMTok": 2.5
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-6-luna",
+      "kind": "chat",
+      "capabilities": {
+        "tools": true,
+        "jsonSchema": true,
+        "vision": true,
+        "streaming": true,
+        "thinking": true
+      },
+      "contextTokens": 1050000,
+      "maxOutputTokens": 128000,
+      "pricing": {
+        "inputPerMTok": 0.1,
+        "outputPerMTok": 0.5,
+        "cacheReadPerMTok": 0.01,
+        "cacheWritePerMTok": 0.125
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-5.5",
+      "kind": "chat",
+      "capabilities": {
+        "tools": true,
+        "jsonSchema": true,
+        "vision": true,
+        "streaming": true,
+        "thinking": true
+      },
+      "aliases": ["gpt-5.5-2026-04-23"],
+      "contextTokens": 1050000,
+      "maxOutputTokens": 128000,
+      "pricing": {
+        "inputPerMTok": 5,
+        "outputPerMTok": 30,
+        "cacheReadPerMTok": 0.5
+      },
+      "longContext": {
+        "thresholdTokens": 272000,
+        "inputPerMTok": 10,
+        "outputPerMTok": 45,
+        "cacheReadPerMTok": 1
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-5.4-mini",
+      "kind": "chat",
+      "capabilities": {
+        "tools": true,
+        "jsonSchema": true,
+        "vision": true,
+        "streaming": true,
+        "thinking": true
+      },
+      "aliases": ["gpt-5.4-mini-2026-03-17"],
+      "contextTokens": 400000,
+      "maxOutputTokens": 128000,
+      "pricing": {
+        "inputPerMTok": 0.75,
+        "outputPerMTok": 4.5,
+        "cacheReadPerMTok": 0.075
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-4.1",
+      "kind": "chat",
+      "capabilities": {
+        "tools": true,
+        "jsonSchema": true,
+        "vision": true,
+        "streaming": true,
+        "thinking": false
+      },
+      "aliases": ["gpt-4.1-2025-04-14"],
+      "contextTokens": 1047576,
+      "maxOutputTokens": 32768,
+      "pricing": {
+        "inputPerMTok": 2,
+        "outputPerMTok": 8,
+        "cacheReadPerMTok": 0.5
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-4.1-mini",
+      "kind": "chat",
+      "capabilities": {
+        "tools": true,
+        "jsonSchema": true,
+        "vision": true,
+        "streaming": true,
+        "thinking": false
+      },
+      "aliases": ["gpt-4.1-mini-2025-04-14"],
+      "contextTokens": 1047576,
+      "maxOutputTokens": 32768,
+      "pricing": {
+        "inputPerMTok": 0.4,
+        "outputPerMTok": 1.6,
+        "cacheReadPerMTok": 0.1
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-4o-mini",
+      "kind": "chat",
+      "capabilities": {
+        "tools": true,
+        "jsonSchema": true,
+        "vision": true,
+        "streaming": true,
+        "thinking": false
+      },
+      "aliases": ["gpt-4o-mini-2024-07-18"],
+      "contextTokens": 128000,
+      "maxOutputTokens": 16384,
+      "pricing": {
+        "inputPerMTok": 0.15,
+        "outputPerMTok": 0.6,
+        "cacheReadPerMTok": 0.075
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "text-embedding-3-small",
+      "kind": "embedding",
+      "capabilities": {
+        "dimensions1536": true
+      },
+      "pricing": {
+        "inputPerMTok": 0.02,
+        "outputPerMTok": 0
+      }
+    },
+    {
+      "provider": "openai",
+      "model": "text-embedding-3-large",
+      "kind": "embedding",
+      "capabilities": {
+        "dimensions3072": true
+      },
+      "pricing": {
+        "inputPerMTok": 0.13,
+        "outputPerMTok": 0
+      }
+    }
+  ]
+}

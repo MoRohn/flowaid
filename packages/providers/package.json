@@ -1,0 +1,39 @@
+{
+  "name": "@flowaid/providers",
+  "version": "0.1.0",
+  "private": true,
+  "description": "flowaid provider infrastructure: the provider registry, model catalog and pricing, failover chains, health tracking with a circuit breaker, rate limiting, the LLM and rule decision providers, an OpenAI-compatible client and a record/replay provider for deterministic runs (ARCHITECTURE.md §6).",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./recording-fs": "./src/recording-fs.ts"
+  },
+  "files": [
+    "src",
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src",
+    "test": "vitest run",
+    "clean": "rm -rf dist .turbo *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@flowaid/shared": "workspace:*",
+    "@flowaid/workflow-core": "workspace:*",
+    "eventsource-parser": "4.1.1",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@flowaid/config": "workspace:*",
+    "@types/node": "24.13.6",
+    "eslint": "9.39.5",
+    "fast-check": "4.10.2",
+    "typescript": "5.9.3",
+    "vitest": "4.1.11"
+  }
+}

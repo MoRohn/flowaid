@@ -1,0 +1,26 @@
+{
+  "$comment": "OpenAI-compatible endpoints. Models and prices come from each endpoint's /models discovery and the workspace's models table; none are assumed here.",
+  "retrievedAt": "2026-09-23",
+  "presets": [
+    { "id": "openai-compatible:groq", "name": "Groq", "baseUrl": "https://api.groq.com/openai/v1" },
+    {
+      "id": "openai-compatible:mistral",
+      "name": "Mistral",
+      "baseUrl": "https://api.mistral.ai/v1"
+    },
+    { "id": "openai-compatible:xai", "name": "xAI", "baseUrl": "https://api.x.ai/v1" },
+    {
+      "id": "openai-compatible:openrouter",
+      "name": "OpenRouter",
+      "baseUrl": "https://openrouter.ai/api/v1"
+    },
+    {
+      "id": "openai-compatible:together",
+      "name": "Together",
+      "baseUrl": "https://api.together.xyz/v1"
+    },
+    { "id": "openai-compatible:vllm", "name": "vLLM (self-hosted)", "baseUrl": null },
+    { "id": "openai-compatible:custom", "name": "Custom endpoint", "baseUrl": null }
+  ],
+  "models": []
+}

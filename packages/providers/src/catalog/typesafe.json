@@ -1,0 +1,51 @@
+{
+  "$comment": "TypeSafe (Jev) decision models. jev-latest resolves to the model the API reports; results always carry the resolved id, never the alias.",
+  "retrievedAt": "2026-09-23",
+  "sources": [
+    "https://docs.typesafe.ai/api",
+    "docs/design/TYPESAFE_API.md (verified against the live API on 2026-09-22)"
+  ],
+  "models": [
+    {
+      "provider": "typesafe",
+      "model": "jev-1.13.0",
+      "kind": "decision",
+      "capabilities": {
+        "batch": true,
+        "text": true,
+        "images": false
+      },
+      "aliases": ["jev-latest"],
+      "contextTokens": 64000,
+      "pricing": {
+        "inputPerMTok": 0.042,
+        "outputPerMTok": 0
+      },
+      "limits": {
+        "rpm": 1200,
+        "maxRequestTokens": 64000,
+        "maxStateTokens": 32000
+      }
+    },
+    {
+      "provider": "typesafe",
+      "model": "jev-preview",
+      "kind": "decision",
+      "capabilities": {
+        "batch": true,
+        "text": true,
+        "images": false
+      },
+      "contextTokens": 64000,
+      "pricing": {
+        "inputPerMTok": 0.042,
+        "outputPerMTok": 0
+      },
+      "limits": {
+        "rpm": 1200,
+        "maxRequestTokens": 64000,
+        "maxStateTokens": 32000
+      }
+    }
+  ]
+}

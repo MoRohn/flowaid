@@ -1,0 +1,178 @@
+{
+  "$comment": "Google Gemini API standard prices per million tokens (text). gemini-3.8-flash and gemini-3.7-flash rise to 1.50/7.50 on 2027-01-01.",
+  "retrievedAt": "2026-09-23",
+  "sources": [
+    "https://ai.google.dev/gemini-api/docs/pricing",
+    "https://ai.google.dev/gemini-api/docs/models",
+    "https://ai.google.dev/gemini-api/docs/deprecations"
+  ],
+  "models": [
+    {
+      "provider": "google",
+      "model": "gemini-3.8-flash",
+      "kind": "chat",
+      "capabilities": {
+        "tools": true,
+        "jsonSchema": true,
+        "vision": true,
+        "streaming": true,
+        "thinking": true
+      },
+      "contextTokens": 1048576,
+      "maxOutputTokens": 65536,
+      "pricing": {
+        "inputPerMTok": 0.75,
+        "outputPerMTok": 3.75,
+        "cacheReadPerMTok": 0.075
+      }
+    },
+    {
+      "provider": "google",
+      "model": "gemini-3.7-flash",
+      "kind": "chat",
+      "capabilities": {
+        "tools": true,
+        "jsonSchema": true,
+        "vision": true,
+        "streaming": true,
+        "thinking": true
+      },
+      "contextTokens": 1048576,
+      "maxOutputTokens": 65536,
+      "pricing": {
+        "inputPerMTok": 0.75,
+        "outputPerMTok": 3.75,
+        "cacheReadPerMTok": 0.075
+      }
+    },
+    {
+      "provider": "google",
+      "model": "gemini-3.5-flash",
+      "kind": "chat",
+      "capabilities": {
+        "tools": true,
+        "jsonSchema": true,
+        "vision": true,
+        "streaming": true,
+        "thinking": true
+      },
+      "contextTokens": 1048576,
+      "maxOutputTokens": 65536,
+      "pricing": {
+        "inputPerMTok": 1.5,
+        "outputPerMTok": 9,
+        "cacheReadPerMTok": 0.15
+      }
+    },
+    {
+      "provider": "google",
+      "model": "gemini-3.5-flash-lite",
+      "kind": "chat",
+      "capabilities": {
+        "tools": true,
+        "jsonSchema": true,
+        "vision": true,
+        "streaming": true,
+        "thinking": true
+      },
+      "contextTokens": 1048576,
+      "maxOutputTokens": 65536,
+      "pricing": {
+        "inputPerMTok": 0.3,
+        "outputPerMTok": 2.5,
+        "cacheReadPerMTok": 0.03
+      }
+    },
+    {
+      "provider": "google",
+      "model": "gemini-3.1-pro-preview",
+      "kind": "chat",
+      "capabilities": {
+        "tools": true,
+        "jsonSchema": true,
+        "vision": true,
+        "streaming": true,
+        "thinking": true
+      },
+      "aliases": ["gemini-3.1-pro-preview-customtools"],
+      "contextTokens": 1048576,
+      "maxOutputTokens": 65536,
+      "pricing": {
+        "inputPerMTok": 2,
+        "outputPerMTok": 12,
+        "cacheReadPerMTok": 0.2
+      },
+      "longContext": {
+        "thresholdTokens": 200000,
+        "inputPerMTok": 4,
+        "outputPerMTok": 18,
+        "cacheReadPerMTok": 0.4
+      }
+    },
+    {
+      "provider": "google",
+      "model": "gemini-2.5-flash",
+      "kind": "chat",
+      "capabilities": {
+        "tools": true,
+        "jsonSchema": true,
+        "vision": true,
+        "streaming": true,
+        "thinking": true
+      },
+      "contextTokens": 1048576,
+      "maxOutputTokens": 65536,
+      "pricing": {
+        "inputPerMTok": 0.3,
+        "outputPerMTok": 2.5,
+        "cacheReadPerMTok": 0.03
+      },
+      "deprecated": "Limited to existing users; use gemini-3.5-flash-lite or gemini-3.8-flash"
+    },
+    {
+      "provider": "google",
+      "model": "gemini-2.5-pro",
+      "kind": "chat",
+      "capabilities": {
+        "tools": true,
+        "jsonSchema": true,
+        "vision": true,
+        "streaming": true,
+        "thinking": true
+      },
+      "pricing": {
+        "inputPerMTok": 1.25,
+        "outputPerMTok": 10,
+        "cacheReadPerMTok": 0.125
+      },
+      "deprecated": "Limited to existing users",
+      "longContext": {
+        "thresholdTokens": 200000,
+        "inputPerMTok": 2.5,
+        "outputPerMTok": 15,
+        "cacheReadPerMTok": 0.25
+      }
+    },
+    {
+      "provider": "google",
+      "model": "gemini-embedding-2",
+      "kind": "embedding",
+      "capabilities": {
+        "vision": true
+      },
+      "contextTokens": 8192,
+      "pricing": {
+        "inputPerMTok": 0.2,
+        "outputPerMTok": 0
+      }
+    },
+    {
+      "provider": "google",
+      "model": "gemini-embedding-001",
+      "kind": "embedding",
+      "capabilities": {},
+      "contextTokens": 2048,
+      "deprecated": "Shuts down 2028-05-14; use gemini-embedding-2 (embedding spaces are incompatible)"
+    }
+  ]
+}

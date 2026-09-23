@@ -34,7 +34,7 @@ restart from a known state. The repository is published at
 
 - **Phase 0 done:** P0-01, P0-02, P0-04 (formatting part), P0-06, P0-07, P0-09 to P0-19.
 - **Phase 0 not done:** P0-20 (UI visual/axe regression suite; state unverified), P0-03 (dist exports; partly present), P0-05 (partly done: `ci.yml` with the `check` and `test` jobs and Dependabot are in; release, e2e and Docker workflows, git hooks, changesets and coverage thresholds remain), P0-08 (repo docs), P0-04 (version pins and supply-chain part).
-- **Phase 1:** P1-01 (workflow compiler) and P1-03 (node SDK) done. P1-02, P1-04 to P1-07 not started.
+- **Phase 1:** P1-01 (workflow compiler), P1-03 (node SDK) and P1-04 (providers) done. P1-02, P1-05, P1-06, P1-07 not started.
 - **Phases 2 to 6:** not started.
 - **Track J (Jev):** J-01 to J-07 library core built in `@flowaid/jev`. Still to come in the library: tool-proposal normalizer and tool policy, receipt reconstruction and replay planning, workflow analyzers, incident review. J-08 onward needs RFC acceptance and platform packages.
 - **Track L (Lean verification):** designed in `docs/design/LEAN_VERIFICATION.md`, RFC-0017 proposed, items L-01 to L-15 added. L-01 to L-09 and L-13 are buildable now.
@@ -54,4 +54,4 @@ restart from a known state. The repository is published at
 
 ## Loose ends
 
-None open from the 2026-09-23 list. Next on the critical path: P1-04 (providers), then P2-01 (runtime); the rest of Phase 1 (database, credentials, observability, UI widgets) runs alongside, as do tracks J and L where they are buildable.
+None open from the 2026-09-23 list. Next on the critical path: P2-01 (runtime), with the rest of Phase 1; the rest of Phase 1 (database, credentials, observability, UI widgets) runs alongside, as do tracks J and L where they are buildable.
