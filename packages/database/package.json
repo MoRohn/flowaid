@@ -38,7 +38,7 @@
     "@types/node": "24.13.6",
     "drizzle-kit": "0.31.11",
     "eslint": "9.39.5",
-    "typescript": "5.9.3",
+    "typescript": "6.0.3",
     "vitest": "4.1.11",
     "tsx": "4.23.15"
   }

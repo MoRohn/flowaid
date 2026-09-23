@@ -33,7 +33,7 @@
     "@flowaid/config": "workspace:*",
     "@types/node": "24.13.6",
     "eslint": "9.39.5",
-    "typescript": "5.9.3",
+    "typescript": "6.0.3",
     "vite": "8.3.0",
     "vitest": "4.1.11"
   }
