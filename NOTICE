@@ -1,0 +1,24 @@
+FlowAId
+Copyright 2026 Rohn Springfield and the FlowAId contributors
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+Third-party material distributed in this repository
+---------------------------------------------------
+
+Instrument Sans (brand/fonts/InstrumentSans-*.ttf)
+  Copyright 2022 The Instrument Sans Project Authors
+  Licensed under the SIL Open Font License, Version 1.1 (brand/fonts/OFL-InstrumentSans.txt)
+
+JetBrains Mono (brand/fonts/JetBrainsMono-*.ttf)
+  Copyright 2020 The JetBrains Mono Project Authors
+  Licensed under the SIL Open Font License, Version 1.1 (brand/fonts/OFL-JetBrainsMono.txt)
+
+Research sources (docs/research/)
+  docs/research/jev/ contains "Jev Engineering for Production Agents", an independent study
+  handbook supplied by the project owner, and derived study notes. It is not affiliated with or
+  endorsed by TypeSafe AI.
+  docs/research/lean4/lambdaclass-lean4-article.md is an excerpt of a LambdaClass article on
+  Lean 4, supplied by the project owner for reference.
+
+TypeSafe, Jev, LangChain and Lean are trademarks of their respective owners.

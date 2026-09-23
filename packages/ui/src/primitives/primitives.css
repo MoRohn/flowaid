@@ -1,0 +1,219 @@
+/*
+ * @flowaid/ui primitives — enter/exit animations keyed on Radix data-state
+ * attributes. Durations come from the motion tokens, which collapse to 0ms
+ * under prefers-reduced-motion; the media query below also stops the looping
+ * animations (pulse, indeterminate) which would otherwise keep running.
+ */
+
+@keyframes fa-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes fa-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+@keyframes fa-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes fa-pop-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+@keyframes fa-slide-in-right {
+  from {
+    transform: translateX(16px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+@keyframes fa-slide-out-right {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(16px);
+    opacity: 0;
+  }
+}
+@keyframes fa-slide-in-left {
+  from {
+    transform: translateX(-16px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+@keyframes fa-slide-out-left {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(-16px);
+    opacity: 0;
+  }
+}
+@keyframes fa-collapsible-down {
+  from {
+    height: 0;
+    opacity: 0;
+  }
+  to {
+    height: var(--radix-collapsible-content-height);
+    opacity: 1;
+  }
+}
+@keyframes fa-collapsible-up {
+  from {
+    height: var(--radix-collapsible-content-height);
+    opacity: 1;
+  }
+  to {
+    height: 0;
+    opacity: 0;
+  }
+}
+@keyframes fa-accordion-down {
+  from {
+    height: 0;
+    opacity: 0;
+  }
+  to {
+    height: var(--radix-accordion-content-height);
+    opacity: 1;
+  }
+}
+@keyframes fa-accordion-up {
+  from {
+    height: var(--radix-accordion-content-height);
+    opacity: 1;
+  }
+  to {
+    height: 0;
+    opacity: 0;
+  }
+}
+@keyframes fa-pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 55%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 5px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+@keyframes fa-indeterminate {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(250%);
+  }
+}
+@keyframes fa-shimmer {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.fa-overlay[data-state="open"] {
+  animation: fa-fade-in var(--dur-base) var(--ease-out);
+}
+.fa-overlay[data-state="closed"] {
+  animation: fa-fade-out var(--dur-fast) var(--ease-out);
+}
+
+.fa-pop[data-state="open"],
+.fa-pop[data-state="delayed-open"],
+.fa-pop[data-state="instant-open"] {
+  animation: fa-pop-in var(--dur-base) var(--ease-out);
+}
+.fa-pop[data-state="closed"] {
+  animation: fa-pop-out var(--dur-fast) var(--ease-out);
+}
+
+.fa-sheet-right[data-state="open"] {
+  animation: fa-slide-in-right var(--dur-base) var(--ease-out);
+}
+.fa-sheet-right[data-state="closed"] {
+  animation: fa-slide-out-right var(--dur-fast) var(--ease-out);
+}
+.fa-sheet-left[data-state="open"] {
+  animation: fa-slide-in-left var(--dur-base) var(--ease-out);
+}
+.fa-sheet-left[data-state="closed"] {
+  animation: fa-slide-out-left var(--dur-fast) var(--ease-out);
+}
+
+.fa-collapsible[data-state="open"] {
+  animation: fa-collapsible-down var(--dur-base) var(--ease-out);
+}
+.fa-collapsible[data-state="closed"] {
+  animation: fa-collapsible-up var(--dur-base) var(--ease-out);
+}
+.fa-accordion[data-state="open"] {
+  animation: fa-accordion-down var(--dur-base) var(--ease-out);
+}
+.fa-accordion[data-state="closed"] {
+  animation: fa-accordion-up var(--dur-base) var(--ease-out);
+}
+
+.fa-pulse {
+  animation: fa-pulse-ring 1.6s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+}
+.fa-indeterminate {
+  animation: fa-indeterminate 1.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+.fa-shimmer {
+  animation: fa-shimmer 1.8s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fa-pulse,
+  .fa-indeterminate,
+  .fa-shimmer,
+  .fa-overlay,
+  .fa-pop,
+  .fa-sheet-right,
+  .fa-sheet-left,
+  .fa-collapsible,
+  .fa-accordion {
+    animation: none !important;
+  }
+}

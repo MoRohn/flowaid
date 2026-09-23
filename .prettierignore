@@ -1,0 +1,14 @@
+node_modules
+dist
+.next
+.turbo
+coverage
+pnpm-lock.yaml
+brand/fonts
+
+# generated table (pnpm env:example); prettier would re-pad it
+packages/env/README.md
+
+# frozen contract text (changes only through RFCs) and verbatim research sources
+docs/design/CONTRACTS.ts
+docs/research

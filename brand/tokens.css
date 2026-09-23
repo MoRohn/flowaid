@@ -1,0 +1,242 @@
+/*
+ * FlowAId design tokens.
+ * Source of truth for the web app (apps/web) and the docs site.
+ * Light is the default; dark is applied by `:root[data-theme="dark"]` or by
+ * the OS preference when no explicit theme is set.
+ */
+
+:root {
+  /* ---- type ---- */
+  --font-sans: "Instrument Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --text-2xs: 0.6875rem; /* 11px  node meta, trace timestamps */
+  --text-xs: 0.75rem; /* 12px  labels, table cells */
+  --text-sm: 0.8125rem; /* 13px  default UI text */
+  --text-base: 0.875rem; /* 14px  inspector body */
+  --text-md: 1rem; /* 16px  page titles */
+  --text-lg: 1.25rem; /* 20px  section titles */
+  --text-xl: 1.75rem; /* 28px  page headings */
+  --text-2xl: 2.5rem; /* 40px  marketing / empty states */
+
+  --leading-tight: 1.2;
+  --leading-normal: 1.45;
+  --tracking-tight: -0.02em;
+  --tracking-display: -0.035em;
+  --tracking-caps: 0.06em;
+
+  /* ---- shape ---- */
+  --radius-xs: 3px;
+  --radius-sm: 5px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-full: 999px;
+
+  /* ---- spacing (4px grid) ---- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* ---- layout ---- */
+  --topbar-h: 44px;
+  --nav-w: 208px;
+  --inspector-w: 320px;
+  --panel-h: 280px;
+
+  /* ---- motion ---- */
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+
+  /* ---- neutrals (cool graphite) ---- */
+  --canvas: #f5f5f7; /* app background, canvas */
+  --surface: #ffffff; /* panels, nodes, cards */
+  --surface-2: #f8f8fa; /* inset areas, table stripes */
+  --surface-3: #ededf0; /* hover fills */
+  --border: #e3e3e8;
+  --border-strong: #cfcfd6;
+  --ink: #17171c; /* primary text */
+  --ink-2: #4b4b55; /* secondary text */
+  --ink-3: #5f5f69; /* tertiary text, placeholders (AA on every surface) */
+  --ink-4: #a9a9b3; /* disabled, decorative: never body text */
+  --grid: #dcdce2; /* canvas dot grid */
+
+  /* ---- accent: cobalt ---- */
+  --accent: #2f5be8;
+  --accent-hover: #244ccc;
+  --accent-ink: #ffffff;
+  --accent-soft: #e8eefd;
+  --accent-soft-2: #d2ddfa;
+  --accent-text: #2450d6;
+
+  /* ---- status ---- */
+  --ok: #1f9d64;
+  --ok-soft: #e3f6ec;
+  --warn: #c98a12;
+  --warn-soft: #fbf1da;
+  --danger: #dc4444;
+  --danger-soft: #fce8e8;
+  --info: #2f5be8;
+  --info-soft: #e8eefd;
+  /* status as text: AA (4.5:1) on every surface and on its own soft fill */
+  --ok-text: #1d7951;
+  --warn-text: #8c6215;
+  --danger-text: #bc3d3e;
+  --info-text: #2f5be8;
+
+  /* ---- node categories ---- */
+  --cat-flow: #5c5c68; /* start, end, branch, join, loop */
+  --cat-decision: #2f5be8; /* TypeSafe decisions: the accent */
+  --cat-generation: #c9581f; /* generative models */
+  --cat-agent: #24408f;
+  --cat-tool: #4a7196; /* http, mcp, openapi, code */
+  --cat-data: #2f7a4e; /* transform, json, template */
+  --cat-retrieval: #7d8a1e; /* loaders, vector stores */
+  --cat-state: #8a6f3c; /* memory, kv, checkpoint */
+  --cat-human: #d18a0b; /* approval, review */
+  --cat-safety: #b8322f; /* guard, policy, pii */
+  --cat-developer: #8a8a94; /* log, assert, mock */
+
+  /* ---- probability ramp (single hue, for distributions) ---- */
+  --p-1: #2f5be8; /* chosen */
+  --p-2: #8aa6f4;
+  --p-3: #c6d4fa;
+  --p-4: #e6ecfb;
+
+  /* ---- shadows ---- */
+  --shadow-1: 0 1px 2px rgba(23, 23, 28, 0.06), 0 0 0 1px rgba(23, 23, 28, 0.04);
+  --shadow-2: 0 4px 12px rgba(23, 23, 28, 0.08), 0 0 0 1px rgba(23, 23, 28, 0.05);
+  --shadow-3: 0 12px 32px rgba(23, 23, 28, 0.14), 0 0 0 1px rgba(23, 23, 28, 0.06);
+  --focus: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent);
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --canvas: #0e0e11;
+    --surface: #151519;
+    --surface-2: #19191e;
+    --surface-3: #222228;
+    --border: #26262d;
+    --border-strong: #35353d;
+    --ink: #ededf0;
+    --ink-2: #b1b1bb;
+    --ink-3: #9e9ea7;
+    --ink-4: #55555f;
+    --grid: #1d1d22;
+
+    --accent: #6b93ff;
+    --accent-hover: #83a6ff;
+    --accent-ink: #0e0e11;
+    --accent-soft: #182548;
+    --accent-soft-2: #213264;
+    --accent-text: #8fb0ff;
+
+    --ok: #3ccf85;
+    --ok-soft: #12291e;
+    --warn: #f0b33c;
+    --warn-soft: #2d2312;
+    --danger: #f06262;
+    --danger-soft: #331717;
+    --info: #6b93ff;
+    --info-soft: #182548;
+    --ok-text: #3ccf85;
+    --warn-text: #f0b33c;
+    --danger-text: #f06262;
+    --info-text: #6b93ff;
+
+    --cat-flow: #9a9aa6;
+    --cat-decision: #6b93ff;
+    --cat-generation: #ee8a4f;
+    --cat-agent: #5b7ccf;
+    --cat-tool: #8aa9c6;
+    --cat-data: #5fb886;
+    --cat-retrieval: #b5c43a;
+    --cat-state: #c4a06a;
+    --cat-human: #f0a83d;
+    --cat-safety: #f0665f;
+    --cat-developer: #8f8f9a;
+
+    --p-1: #6b93ff;
+    --p-2: #3f5fb8;
+    --p-3: #2a3c6e;
+    --p-4: #1e2740;
+
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.04);
+    --shadow-2: 0 4px 12px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.05);
+    --shadow-3: 0 12px 32px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.06);
+
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --canvas: #0e0e11;
+  --surface: #151519;
+  --surface-2: #19191e;
+  --surface-3: #222228;
+  --border: #26262d;
+  --border-strong: #35353d;
+  --ink: #ededf0;
+  --ink-2: #b1b1bb;
+  --ink-3: #9e9ea7;
+  --ink-4: #55555f;
+  --grid: #1d1d22;
+
+  --accent: #6b93ff;
+  --accent-hover: #83a6ff;
+  --accent-ink: #0e0e11;
+  --accent-soft: #182548;
+  --accent-soft-2: #213264;
+  --accent-text: #8fb0ff;
+
+  --ok: #3ccf85;
+  --ok-soft: #12291e;
+  --warn: #f0b33c;
+  --warn-soft: #2d2312;
+  --danger: #f06262;
+  --danger-soft: #331717;
+  --info: #6b93ff;
+  --info-soft: #182548;
+  --ok-text: #3ccf85;
+  --warn-text: #f0b33c;
+  --danger-text: #f06262;
+  --info-text: #6b93ff;
+
+  --cat-flow: #9a9aa6;
+  --cat-decision: #6b93ff;
+  --cat-generation: #ee8a4f;
+  --cat-agent: #5b7ccf;
+  --cat-tool: #8aa9c6;
+  --cat-data: #5fb886;
+  --cat-retrieval: #b5c43a;
+  --cat-state: #c4a06a;
+  --cat-human: #f0a83d;
+  --cat-safety: #f0665f;
+  --cat-developer: #8f8f9a;
+
+  --p-1: #6b93ff;
+  --p-2: #3f5fb8;
+  --p-3: #2a3c6e;
+  --p-4: #1e2740;
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  --shadow-2: 0 4px 12px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  --shadow-3: 0 12px 32px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.06);
+
+  color-scheme: dark;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 0ms;
+    --dur-base: 0ms;
+  }
+}

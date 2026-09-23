@@ -1,0 +1,17 @@
+{
+  "type": "PROVIDER_FAILOVER",
+  "runId": "0192f0a1-5b3c-7d4e-8f60-1a2b3c4d5e6f",
+  "seq": 15,
+  "at": "2026-09-22T10:00:04.000Z",
+  "nodeRunId": "0192f0a1-5b3c-7d4e-8f60-0000000000a6",
+  "nodeId": "safe",
+  "scope": "",
+  "attempt": 1,
+  "from": "typesafe",
+  "to": "llm:openai/gpt-4.1-mini",
+  "error": {
+    "code": "PROVIDER_OVERLOADED",
+    "message": "typesafe overloaded",
+    "retryable": true
+  }
+}

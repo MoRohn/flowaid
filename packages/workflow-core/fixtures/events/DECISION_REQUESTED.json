@@ -1,0 +1,16 @@
+{
+  "type": "DECISION_REQUESTED",
+  "runId": "0192f0a1-5b3c-7d4e-8f60-1a2b3c4d5e6f",
+  "seq": 4,
+  "at": "2026-09-22T10:00:01.000Z",
+  "nodeRunId": "0192f0a1-5b3c-7d4e-8f60-0000000000a2",
+  "nodeId": "intent",
+  "scope": "",
+  "attempt": 1,
+  "batchId": "batch_intent_01",
+  "questionCount": 1,
+  "provider": "typesafe",
+  "model": "jev-1.13.0",
+  "stateHash": "71194cb3591feb81d6e2ca6a28dc4821982f1ceeeaece565b99b0398b50a5f31",
+  "questions": ["Which team should handle this support request?"]
+}

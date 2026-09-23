@@ -1,0 +1,21 @@
+{
+  "type": "NODE_FAILED",
+  "runId": "0192f0a1-5b3c-7d4e-8f60-1a2b3c4d5e6f",
+  "seq": 10,
+  "at": "2026-09-22T10:00:02.500Z",
+  "nodeRunId": "0192f0a1-5b3c-7d4e-8f60-0000000000a4",
+  "nodeId": "fetch_account",
+  "scope": "",
+  "attempt": 3,
+  "error": {
+    "code": "TIMEOUT_ERROR",
+    "message": "fetch_account exceeded 5000 ms",
+    "retryable": true,
+    "runId": "0192f0a1-5b3c-7d4e-8f60-1a2b3c4d5e6f",
+    "nodeId": "fetch_account",
+    "nodeRunId": "0192f0a1-5b3c-7d4e-8f60-0000000000a4"
+  },
+  "firedPorts": ["done"],
+  "latencyMs": 5002,
+  "terminal": true
+}

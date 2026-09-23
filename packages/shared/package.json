@@ -1,0 +1,29 @@
+{
+  "name": "@flowaid/shared",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Primitives shared by every flowaid package: JSON helpers, Result, uuidv7, hashing, stable stringify, time and bounded async utilities. Browser-safe; its only runtime dependency is @noble/hashes (pure-JS SHA-256).",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src",
+    "test": "vitest run",
+    "clean": "rm -rf dist .turbo *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@noble/hashes": "2.4.0"
+  },
+  "devDependencies": {
+    "@flowaid/config": "workspace:*",
+    "@types/node": "24.13.6",
+    "eslint": "9.39.5",
+    "typescript": "5.9.3",
+    "vitest": "4.1.11"
+  }
+}

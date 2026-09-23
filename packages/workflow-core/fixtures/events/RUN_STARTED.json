@@ -1,0 +1,9 @@
+{
+  "type": "RUN_STARTED",
+  "runId": "0192f0a1-5b3c-7d4e-8f60-1a2b3c4d5e6f",
+  "seq": 1,
+  "at": "2026-09-22T10:00:00.250Z",
+  "workerId": "worker-general-01",
+  "leaseUntil": "2026-09-22T10:00:30.000Z",
+  "deadlineAt": "2026-09-22T10:03:00.000Z"
+}

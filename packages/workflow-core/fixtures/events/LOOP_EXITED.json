@@ -1,0 +1,12 @@
+{
+  "type": "LOOP_EXITED",
+  "runId": "0192f0a1-5b3c-7d4e-8f60-1a2b3c4d5e6f",
+  "seq": 44,
+  "at": "2026-09-22T10:00:11.000Z",
+  "nodeRunId": "0192f0a1-5b3c-7d4e-8f60-0000000000b3",
+  "nodeId": "research",
+  "scope": "",
+  "attempt": 1,
+  "iterations": 3,
+  "reason": "exit_condition"
+}

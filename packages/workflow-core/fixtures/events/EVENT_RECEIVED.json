@@ -1,0 +1,15 @@
+{
+  "type": "EVENT_RECEIVED",
+  "runId": "0192f0a1-5b3c-7d4e-8f60-1a2b3c4d5e6f",
+  "seq": 47,
+  "at": "2026-09-22T10:00:11.750Z",
+  "nodeRunId": "0192f0a1-5b3c-7d4e-8f60-0000000000c3",
+  "nodeId": "await_payment",
+  "scope": "",
+  "attempt": 1,
+  "eventName": "payment.settled",
+  "payload": {
+    "invoiceId": "inv_2201",
+    "amount": 4900
+  }
+}

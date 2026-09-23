@@ -1,0 +1,599 @@
+{
+  "$schema": "https://flowaid.dev/schemas/workflow/v1",
+  "id": "5fdae6a8-85b3-41b3-a6bb-5b10301e5aa9",
+  "name": "Retrieval relevance filter with a live source menu (Jev)",
+  "description": "Each round rebuilds the source menu from the live registry (code removes unavailable, forbidden, already searched and over-budget sources), Jev chooses the next source or stops, the search applies exact filters and an embedding shortlist, and Jev scores each shortlisted item for decision relevance; only partial and direct support survive into a small evidence packet with ids and support relations for generation. Handbook §VII.E Around Retrieval, §VIII.A–§VIII.C, §VIII.E, §VIII.G Stop as an Action, §IV.D.",
+  "inputs": {
+    "type": "object",
+    "required": ["question", "collection"],
+    "properties": {
+      "question": {
+        "type": "string",
+        "maxLength": 2000
+      },
+      "collection": {
+        "type": "string",
+        "description": "Document collection; access control is applied by the search API with the run credential."
+      }
+    }
+  },
+  "outputs": {
+    "type": "object",
+    "required": ["answer", "citations", "evidence", "status"],
+    "properties": {
+      "answer": {
+        "type": "string"
+      },
+      "citations": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "evidence": {
+        "type": "array",
+        "items": {
+          "type": "object"
+        }
+      },
+      "status": {
+        "type": "string",
+        "enum": ["answered", "insufficient_evidence"]
+      },
+      "funnel": {
+        "type": "array",
+        "items": {
+          "type": "object"
+        }
+      }
+    }
+  },
+  "secrets": [
+    {
+      "name": "TYPESAFE_API_KEY",
+      "credentialType": "typesafe.api_key",
+      "description": "TypeSafe System One key for Jev. Without it the contract model chain falls back to its failover hops, which are uncalibrated and cannot route auto."
+    },
+    {
+      "name": "ANTHROPIC_API_KEY",
+      "credentialType": "anthropic.api_key"
+    },
+    {
+      "name": "SEARCH_API",
+      "credentialType": "http.api_key"
+    }
+  ],
+  "variables": [
+    {
+      "name": "searchBase",
+      "schema": {
+        "type": "string"
+      },
+      "source": "environment",
+      "description": "Base URL of the search API (sources and search)."
+    },
+    {
+      "name": "minEvidence",
+      "schema": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 20
+      },
+      "default": 4,
+      "description": "Surviving evidence items after which gathering stops (an exact rule, kept in code)."
+    }
+  ],
+  "execution": {
+    "timeoutMs": 600000,
+    "maxCostUsd": 1,
+    "decisions": {
+      "primary": {
+        "provider": "typesafe",
+        "model": "jev-latest"
+      },
+      "failover": []
+    }
+  },
+  "nodes": [
+    {
+      "id": "start",
+      "kind": "input",
+      "name": "Question"
+    },
+    {
+      "id": "gather",
+      "kind": "loop",
+      "name": "Gather evidence",
+      "description": "Each round must add evidence or change the menu; a round that searched nothing ends the loop.",
+      "carrySchema": {
+        "type": "object",
+        "required": ["evidence", "searched", "funnel"],
+        "properties": {
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "searched": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "funnel": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
+        }
+      },
+      "carry": {
+        "initial": {
+          "evidence": [],
+          "searched": [],
+          "funnel": []
+        },
+        "next": {
+          "evidence": {
+            "kind": "expr",
+            "source": "$scope.carry.evidence + coalesce(relevance.evidence, [])"
+          },
+          "searched": {
+            "kind": "expr",
+            "source": "$scope.carry.searched + [coalesce(pick_source.selection.sourceId, 'none')]"
+          },
+          "funnel": {
+            "kind": "expr",
+            "source": "$scope.carry.funnel + [{source: coalesce(pick_source.selection.sourceId, 'none'), menu: source_menu.counts, relevance: coalesce(relevance.counts, {})}]"
+          }
+        }
+      },
+      "result": {
+        "last_decision": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "pick_source",
+            "port": "receipt"
+          }
+        }
+      },
+      "exitWhen": "coalesce(search.status, 0) == 0 || len($scope.carry.evidence) + len(coalesce(relevance.evidence, [])) >= $vars.minEvidence",
+      "bounds": {
+        "maxIterations": 4,
+        "maxCostUsd": 0.4
+      },
+      "onExhausted": "route"
+    },
+    {
+      "id": "registry",
+      "kind": "task",
+      "parent": "gather",
+      "type": "flowaid.tools.http",
+      "typeVersion": "1.0.0",
+      "name": "Read source registry",
+      "description": "Live state, read in the same round as the decision (Table VII: Worker/Source).",
+      "config": {
+        "method": "GET",
+        "url": "{{ $vars.searchBase }}/v1/sources?collection={{ start.collection }}",
+        "responseType": "json"
+      },
+      "credentials": {
+        "auth": "SEARCH_API"
+      },
+      "policy": {
+        "retry": {
+          "maxAttempts": 2
+        }
+      }
+    },
+    {
+      "id": "source_menu",
+      "kind": "task",
+      "parent": "gather",
+      "type": "flowaid.jev.menu",
+      "typeVersion": "1.0.0",
+      "name": "Live source menu",
+      "description": "Deterministic exclusion and budget in code; escapes stop and review are always appended; counts are recorded.",
+      "config": {
+        "contract": {
+          "key": "research.next_source",
+          "version": "deployed"
+        },
+        "source": {
+          "kind": "binding"
+        },
+        "keep": "s => s.available && s.acl_ok && !(s.id in $scope.carry.searched)",
+        "id": "s => s.id",
+        "label": "s => s.name",
+        "description": "s => s.description",
+        "observedAt": "s => s.last_indexed_at",
+        "cost": {
+          "by": "s => s.cost_usd",
+          "respectBudget": true
+        }
+      },
+      "inputs": {
+        "candidates": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "registry",
+            "port": "body",
+            "path": "/sources"
+          }
+        }
+      }
+    },
+    {
+      "id": "pick_source",
+      "kind": "task",
+      "parent": "gather",
+      "type": "flowaid.jev.decide",
+      "typeVersion": "1.0.0",
+      "name": "Choose next source",
+      "config": {
+        "contract": {
+          "key": "research.next_source",
+          "version": "deployed"
+        },
+        "routing": "inline",
+        "escalation": "inline",
+        "legacyPort": false
+      },
+      "inputs": {
+        "state": {
+          "kind": "object",
+          "fields": {
+            "question": {
+              "kind": "ref",
+              "ref": {
+                "kind": "port",
+                "node": "start",
+                "port": "question"
+              }
+            },
+            "evidence": {
+              "kind": "ref",
+              "ref": {
+                "kind": "scope",
+                "field": "carry",
+                "path": "/evidence"
+              }
+            },
+            "searched": {
+              "kind": "ref",
+              "ref": {
+                "kind": "scope",
+                "field": "carry",
+                "path": "/searched"
+              }
+            }
+          }
+        },
+        "options": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "source_menu",
+            "port": "option_set"
+          }
+        }
+      },
+      "credentials": {
+        "typesafe": "TYPESAFE_API_KEY"
+      }
+    },
+    {
+      "id": "search",
+      "kind": "task",
+      "parent": "gather",
+      "type": "flowaid.tools.http",
+      "typeVersion": "1.0.0",
+      "name": "Search source",
+      "description": "Exact filters (collection, access control) and the embedding shortlist (top_k) run in the search API, before any Jev call.",
+      "config": {
+        "method": "GET",
+        "url": "{{ $vars.searchBase }}/v1/search?source={{ pick_source.selection.sourceId }}&collection={{ start.collection }}&q={{ start.question }}&top_k=16&shape=evidence",
+        "responseType": "json"
+      },
+      "credentials": {
+        "auth": "SEARCH_API"
+      },
+      "policy": {
+        "retry": {
+          "maxAttempts": 2
+        }
+      }
+    },
+    {
+      "id": "relevance",
+      "kind": "task",
+      "parent": "gather",
+      "type": "flowaid.jev.relevance",
+      "typeVersion": "1.0.0",
+      "name": "Score relevance",
+      "description": "One banded score question per candidate over one packet per group; survivors keep ids and support relations.",
+      "config": {
+        "contract": {
+          "key": "research.source_relevance",
+          "version": "deployed"
+        },
+        "keepBands": ["partial", "direct"],
+        "maxEvidence": 8,
+        "groupSize": 16
+      },
+      "inputs": {
+        "question": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "start",
+            "port": "question"
+          }
+        },
+        "candidates": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "search",
+            "port": "body",
+            "path": "/results"
+          }
+        }
+      },
+      "credentials": {
+        "typesafe": "TYPESAFE_API_KEY"
+      }
+    },
+    {
+      "id": "enough",
+      "kind": "branch",
+      "name": "Any evidence?",
+      "mode": "first",
+      "description": "An exact rule stays in code (§X.H).",
+      "cases": [
+        {
+          "port": "answer",
+          "when": "len(gather.carry.evidence) > 0"
+        }
+      ],
+      "defaultPort": "insufficient"
+    },
+    {
+      "id": "answer",
+      "kind": "task",
+      "type": "flowaid.ai.structured_generate",
+      "typeVersion": "1.0.0",
+      "name": "Answer from evidence",
+      "config": {
+        "model": {
+          "provider": "anthropic",
+          "model": "claude-sonnet-4-5"
+        },
+        "schema": {
+          "type": "object",
+          "required": ["answer", "citations"],
+          "properties": {
+            "answer": {
+              "type": "string"
+            },
+            "citations": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "inputs": {
+        "prompt": {
+          "kind": "template",
+          "source": "Question: {{ start.question }}\n\nEvidence (each item survived a relevance check; cite by id):\n{{ gather.carry.evidence | json }}\n\nAnswer only from this evidence and cite every claim with an id."
+        }
+      },
+      "credentials": {
+        "llm": "ANTHROPIC_API_KEY"
+      }
+    },
+    {
+      "id": "out_answer",
+      "kind": "output",
+      "name": "Answer",
+      "outcome": "answered",
+      "value": {
+        "kind": "object",
+        "fields": {
+          "answer": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "answer",
+              "port": "structured",
+              "path": "/answer"
+            }
+          },
+          "citations": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "answer",
+              "port": "structured",
+              "path": "/citations"
+            }
+          },
+          "evidence": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "gather",
+              "port": "carry",
+              "path": "/evidence"
+            }
+          },
+          "status": {
+            "kind": "literal",
+            "value": "answered"
+          },
+          "funnel": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "gather",
+              "port": "carry",
+              "path": "/funnel"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "out_insufficient",
+      "kind": "output",
+      "name": "Insufficient evidence",
+      "outcome": "insufficient_evidence",
+      "value": {
+        "kind": "object",
+        "fields": {
+          "answer": {
+            "kind": "literal",
+            "value": ""
+          },
+          "citations": {
+            "kind": "literal",
+            "value": []
+          },
+          "evidence": {
+            "kind": "literal",
+            "value": []
+          },
+          "status": {
+            "kind": "literal",
+            "value": "insufficient_evidence"
+          },
+          "funnel": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "gather",
+              "port": "carry",
+              "path": "/funnel"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "c1",
+      "from": {
+        "node": "pick_source",
+        "port": "selected"
+      },
+      "to": {
+        "node": "search"
+      }
+    },
+    {
+      "id": "c2",
+      "from": {
+        "node": "enough",
+        "port": "answer"
+      },
+      "to": {
+        "node": "answer"
+      }
+    },
+    {
+      "id": "c3",
+      "from": {
+        "node": "answer",
+        "port": "done"
+      },
+      "to": {
+        "node": "out_answer"
+      }
+    },
+    {
+      "id": "c4",
+      "from": {
+        "node": "enough",
+        "port": "insufficient"
+      },
+      "to": {
+        "node": "out_insufficient"
+      }
+    }
+  ],
+  "metadata": {
+    "template": {
+      "key": "jev-retrieval-relevance",
+      "pattern": "E — retrieval relevance, with F — live menu and stop",
+      "contracts": ["research.next_source", "research.source_relevance"],
+      "handbook": [
+        "§VII.E Around Retrieval",
+        "§VIII.A Menus Are Runtime State",
+        "§VIII.B Large Option Sets",
+        "§VIII.C Dynamic Worker Routing",
+        "§VIII.E Retrieval as Decision Support",
+        "§VIII.G Stop as an Action",
+        "§IV.D Freshness and Invalidation",
+        "Table VII"
+      ],
+      "design": "docs/design/JEV_ENGINEERING.md §9.6, §9.7, §10",
+      "docs": "docs/jev/live-menus.md"
+    }
+  },
+  "layout": {
+    "nodes": {
+      "start": {
+        "x": 0,
+        "y": 0
+      },
+      "gather": {
+        "x": 1400,
+        "y": 0
+      },
+      "registry": {
+        "x": 0,
+        "y": 160
+      },
+      "source_menu": {
+        "x": 280,
+        "y": 0
+      },
+      "pick_source": {
+        "x": 560,
+        "y": 0
+      },
+      "search": {
+        "x": 840,
+        "y": 0
+      },
+      "relevance": {
+        "x": 1120,
+        "y": 0
+      },
+      "enough": {
+        "x": 1680,
+        "y": 0
+      },
+      "answer": {
+        "x": 1960,
+        "y": 0
+      },
+      "out_answer": {
+        "x": 2240,
+        "y": 0
+      },
+      "out_insufficient": {
+        "x": 1960,
+        "y": 160
+      }
+    }
+  }
+}

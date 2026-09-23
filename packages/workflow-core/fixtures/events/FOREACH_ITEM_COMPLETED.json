@@ -1,0 +1,18 @@
+{
+  "type": "FOREACH_ITEM_COMPLETED",
+  "runId": "0192f0a1-5b3c-7d4e-8f60-1a2b3c4d5e6f",
+  "seq": 40,
+  "at": "2026-09-22T10:00:10.000Z",
+  "nodeRunId": "0192f0a1-5b3c-7d4e-8f60-0000000000b4",
+  "nodeId": "search_all",
+  "scope": "research#0",
+  "attempt": 1,
+  "index": 1,
+  "childScope": "research#0/search_all#1",
+  "status": "completed",
+  "result": {
+    "query": "gold plan double charge refund policy",
+    "evidence": 2
+  },
+  "error": null
+}

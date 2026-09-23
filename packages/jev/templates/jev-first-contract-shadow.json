@@ -1,0 +1,294 @@
+{
+  "$schema": "https://flowaid.dev/schemas/workflow/v1",
+  "id": "1786bf2f-3c37-496c-bf91-8ba43acf135c",
+  "name": "First contract in shadow mode (Jev)",
+  "description": "The existing LLM ticket classifier stays authoritative and nothing it does changes. A shadow node evaluates support.ticket_router on the same message, records the full distribution, the route it would take and the production answer, and cannot act: its only control-out is done, nothing consumes its outputs, it times out after 5 s and ignores errors. The shadow receipts and comparisons are the calibration data for the rollout (see jev-classifier-rollout). Handbook §IX.A, §IX.D Run in Shadow Mode, §V.F, §XI suggested agent prompt.",
+  "inputs": {
+    "type": "object",
+    "required": ["ticket_id", "message"],
+    "properties": {
+      "ticket_id": {
+        "type": "string"
+      },
+      "message": {
+        "type": "string",
+        "maxLength": 12000,
+        "x-dataClass": "pii"
+      },
+      "channel": {
+        "type": "string",
+        "enum": ["email", "chat", "api"],
+        "default": "api"
+      }
+    }
+  },
+  "outputs": {
+    "type": "object",
+    "required": ["ticket_id", "queue"],
+    "properties": {
+      "ticket_id": {
+        "type": "string"
+      },
+      "queue": {
+        "type": "string"
+      }
+    }
+  },
+  "secrets": [
+    {
+      "name": "TYPESAFE_API_KEY",
+      "credentialType": "typesafe.api_key",
+      "description": "TypeSafe System One key for Jev. Without it the contract model chain falls back to its failover hops, which are uncalibrated and cannot route auto."
+    },
+    {
+      "name": "OPENAI_API_KEY",
+      "credentialType": "openai.api_key"
+    }
+  ],
+  "execution": {
+    "timeoutMs": 120000,
+    "maxCostUsd": 0.05,
+    "decisions": {
+      "primary": {
+        "provider": "typesafe",
+        "model": "jev-latest"
+      },
+      "failover": []
+    }
+  },
+  "nodes": [
+    {
+      "id": "start",
+      "kind": "input",
+      "name": "Ticket"
+    },
+    {
+      "id": "classify",
+      "kind": "task",
+      "type": "flowaid.ai.structured_generate",
+      "typeVersion": "1.0.0",
+      "name": "LLM classifier (authoritative)",
+      "description": "The production path. Its self-reported confidence is not requested: a confidence read from generated text is not a calibrated signal (§I.B).",
+      "config": {
+        "model": {
+          "provider": "openai",
+          "model": "gpt-4.1-mini"
+        },
+        "schema": {
+          "type": "object",
+          "required": ["team"],
+          "properties": {
+            "team": {
+              "type": "string",
+              "enum": ["billing", "account_access", "technical", "general", "other"]
+            }
+          }
+        }
+      },
+      "inputs": {
+        "prompt": {
+          "kind": "template",
+          "source": "Classify this support ticket into one team: billing, account_access, technical, general, or other.\nChannel: {{ start.channel }}\n\nMessage:\n{{ start.message }}"
+        }
+      },
+      "credentials": {
+        "llm": "OPENAI_API_KEY"
+      }
+    },
+    {
+      "id": "assign",
+      "kind": "task",
+      "type": "flowaid.tools.mcp",
+      "typeVersion": "1.0.0",
+      "name": "Assign ticket",
+      "config": {
+        "serverId": "$template.mcp.tracker",
+        "tool": "assign_ticket"
+      },
+      "inputs": {
+        "ticket_id": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "start",
+            "port": "ticket_id"
+          }
+        },
+        "queue": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "classify",
+            "port": "structured",
+            "path": "/team"
+          }
+        }
+      }
+    },
+    {
+      "id": "shadow",
+      "kind": "task",
+      "type": "flowaid.jev.shadow",
+      "typeVersion": "1.0.0",
+      "name": "Jev router (shadow)",
+      "description": "Evaluates the contract beside the production answer; writes a shadow receipt and a SHADOW_COMPARED record; never acts.",
+      "config": {
+        "contract": {
+          "key": "support.ticket_router",
+          "version": "deployed"
+        },
+        "production": {
+          "source": "llm",
+          "answerMap": {
+            "billing": "billing",
+            "account_access": "account_access",
+            "technical": "technical",
+            "general": "general",
+            "other": "none"
+          }
+        },
+        "mode": "inline"
+      },
+      "inputs": {
+        "state": {
+          "kind": "object",
+          "fields": {
+            "message": {
+              "kind": "array",
+              "items": [
+                {
+                  "kind": "object",
+                  "fields": {
+                    "id": {
+                      "kind": "literal",
+                      "value": "msg"
+                    },
+                    "kind": {
+                      "kind": "literal",
+                      "value": "customer_message"
+                    },
+                    "summary": {
+                      "kind": "ref",
+                      "ref": {
+                        "kind": "port",
+                        "node": "start",
+                        "port": "message"
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            "channel": {
+              "kind": "ref",
+              "ref": {
+                "kind": "port",
+                "node": "start",
+                "port": "channel"
+              },
+              "default": "api"
+            }
+          }
+        },
+        "production_answer": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "classify",
+            "port": "structured",
+            "path": "/team"
+          }
+        }
+      },
+      "credentials": {
+        "typesafe": "TYPESAFE_API_KEY"
+      },
+      "policy": {
+        "timeoutMs": 5000,
+        "onError": "ignore"
+      }
+    },
+    {
+      "id": "out_assigned",
+      "kind": "output",
+      "name": "Assigned",
+      "outcome": "assigned",
+      "value": {
+        "kind": "object",
+        "fields": {
+          "ticket_id": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "start",
+              "port": "ticket_id"
+            }
+          },
+          "queue": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "classify",
+              "port": "structured",
+              "path": "/team"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "c1",
+      "from": {
+        "node": "assign",
+        "port": "done"
+      },
+      "to": {
+        "node": "out_assigned"
+      }
+    }
+  ],
+  "metadata": {
+    "template": {
+      "key": "jev-first-contract-shadow",
+      "pattern": "Shadow beside an existing path",
+      "contracts": ["support.ticket_router"],
+      "handbook": [
+        "§IX.A Begin with One Decision",
+        "§IX.B Define Before Integrating",
+        "§IX.D Run in Shadow Mode",
+        "§V.F Calibration Rollout",
+        "§XI.A steps 3 and 8",
+        "§XI suggested agent prompt"
+      ],
+      "design": "docs/design/JEV_ENGINEERING.md §9.8, §11.1–§11.2",
+      "docs": "docs/jev/shadow-mode-and-rollout.md",
+      "next": "jev-classifier-rollout"
+    }
+  },
+  "layout": {
+    "nodes": {
+      "start": {
+        "x": 0,
+        "y": 0
+      },
+      "classify": {
+        "x": 280,
+        "y": 0
+      },
+      "assign": {
+        "x": 560,
+        "y": 0
+      },
+      "shadow": {
+        "x": 560,
+        "y": 160
+      },
+      "out_assigned": {
+        "x": 840,
+        "y": 0
+      }
+    }
+  }
+}

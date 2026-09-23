@@ -1,0 +1,3909 @@
+{
+  "planVersion": 1,
+  "workflowId": "5b1c2b60-6e0f-4a1a-9b0e-1b1a2c3d4e5f",
+  "definitionHash": "d86f40190bb139f3aca03f12fcb59cfe8c327db928c410e772bf949e701d9228",
+  "planHash": "32dca1d49d86d6d00423c662d55ed2fc1cde9b97a6daa20a41564e9cc9a46d5f",
+  "compilerVersion": "0.1.0",
+  "inputs": {
+    "type": "object",
+    "properties": {
+      "message": {
+        "type": "string",
+        "x-dataClass": "pii"
+      },
+      "customer_id": {
+        "type": "string"
+      },
+      "tier": {
+        "type": "string",
+        "enum": ["free", "gold"]
+      }
+    },
+    "required": ["message", "customer_id"],
+    "additionalProperties": false
+  },
+  "outputs": {
+    "type": "object",
+    "properties": {
+      "reply": {
+        "type": "string"
+      },
+      "team": {
+        "type": "string"
+      },
+      "auto_sent": {
+        "type": "boolean"
+      },
+      "approved_by": {
+        "type": ["string", "null"]
+      }
+    },
+    "required": ["reply", "team", "auto_sent"]
+  },
+  "execution": {
+    "timeoutMs": 180000,
+    "maxCostUsd": 0.5,
+    "maxNodeRuns": 2000,
+    "maxSubflowDepth": 4,
+    "concurrency": 8,
+    "defaultRetry": {
+      "maxAttempts": 1,
+      "backoff": {
+        "type": "exponential",
+        "initialMs": 500,
+        "maxMs": 30000,
+        "factor": 2,
+        "jitter": true
+      },
+      "allowOnIrreversible": false
+    },
+    "defaultNodeTimeoutMs": 120000,
+    "decisions": {
+      "primary": {
+        "provider": "typesafe",
+        "model": "jev-latest"
+      },
+      "failover": [],
+      "batching": true
+    },
+    "privacy": {
+      "sensitive": false,
+      "containsPII": false,
+      "doNotPersist": false,
+      "redactFields": []
+    },
+    "retention": "standard"
+  },
+  "variables": [
+    {
+      "name": "crmBaseUrl",
+      "schema": {
+        "type": "string"
+      },
+      "default": "https://crm.example.com",
+      "source": "environment"
+    },
+    {
+      "name": "autoSendThreshold",
+      "schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "default": 0.85,
+      "source": "definition"
+    }
+  ],
+  "secrets": [
+    {
+      "name": "TYPESAFE_API_KEY",
+      "credentialType": "typesafe.api_key",
+      "required": true
+    },
+    {
+      "name": "OPENAI_API_KEY",
+      "credentialType": "openai.api_key",
+      "required": true
+    },
+    {
+      "name": "CRM_TOKEN",
+      "credentialType": "http.bearer",
+      "required": false
+    }
+  ],
+  "triggers": [],
+  "nodes": {
+    "start": {
+      "id": "start",
+      "name": "Ticket",
+      "kind": "input",
+      "scope": "",
+      "controlIn": [],
+      "dataIn": [],
+      "controlOut": ["done"],
+      "outputs": {
+        "message": {
+          "type": "string",
+          "x-dataClass": "pii"
+        },
+        "customer_id": {
+          "type": "string"
+        },
+        "tier": {
+          "type": "string",
+          "enum": ["free", "gold"]
+        }
+      },
+      "successors": ["approve", "draft", "fetch_account", "intent", "safe"],
+      "guard": [[]],
+      "policy": {
+        "timeoutMs": 120000,
+        "retry": {
+          "maxAttempts": 1,
+          "backoff": {
+            "type": "exponential",
+            "initialMs": 500,
+            "maxMs": 30000,
+            "factor": 2,
+            "jitter": true
+          },
+          "allowOnIrreversible": false
+        },
+        "onError": "fail",
+        "maxCostUsd": null,
+        "maxTokens": null,
+        "privacy": {
+          "sensitive": false,
+          "containsPII": false,
+          "doNotPersist": false,
+          "redactFields": []
+        }
+      },
+      "idempotency": "safe",
+      "pool": "general",
+      "batchGroup": null,
+      "op": {
+        "kind": "input"
+      },
+      "redact": [
+        {
+          "pointer": "/out/message",
+          "dataClass": "pii",
+          "mode": "mask"
+        }
+      ]
+    },
+    "intent": {
+      "id": "intent",
+      "name": "Intent",
+      "kind": "task",
+      "scope": "",
+      "controlIn": [],
+      "dataIn": [
+        {
+          "from": {
+            "node": "start",
+            "port": "message"
+          },
+          "to": {
+            "node": "intent",
+            "port": "state"
+          },
+          "optional": false,
+          "via": "ref"
+        },
+        {
+          "from": {
+            "node": "start",
+            "port": "tier"
+          },
+          "to": {
+            "node": "intent",
+            "port": "state"
+          },
+          "optional": true,
+          "via": "ref"
+        }
+      ],
+      "controlOut": ["done", "billing", "technical", "security", "general"],
+      "outputs": {
+        "decision": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$defs": {
+            "__schema0": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/__schema0"
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": {
+                    "$ref": "#/$defs/__schema0"
+                  },
+                  "propertyNames": {
+                    "type": "string"
+                  }
+                }
+              ]
+            }
+          },
+          "type": "object",
+          "properties": {
+            "confidence": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "provider": {
+              "type": "string"
+            },
+            "model": {
+              "type": "string"
+            },
+            "latencyMs": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "usage": {
+              "type": "object",
+              "properties": {
+                "inputTokens": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "outputTokens": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "cacheReadTokens": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "cacheWriteTokens": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": ["inputTokens", "outputTokens"],
+              "additionalProperties": false
+            },
+            "costUsd": {
+              "type": "number",
+              "minimum": 0
+            },
+            "requestId": {
+              "type": "string"
+            },
+            "raw": {
+              "$ref": "#/$defs/__schema0"
+            },
+            "attempts": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "provider": {
+                    "type": "string"
+                  },
+                  "model": {
+                    "type": "string"
+                  },
+                  "outcome": {
+                    "type": "string",
+                    "enum": ["ok", "error", "skipped_unhealthy"]
+                  },
+                  "errorCode": {
+                    "type": "string",
+                    "enum": [
+                      "WORKFLOW_VALIDATION_ERROR",
+                      "SCHEMA_VALIDATION_ERROR",
+                      "NODE_EXECUTION_ERROR",
+                      "TOOL_EXECUTION_ERROR",
+                      "PROVIDER_ERROR",
+                      "PROVIDER_RATE_LIMITED",
+                      "PROVIDER_OVERLOADED",
+                      "CREDENTIAL_ERROR",
+                      "TIMEOUT_ERROR",
+                      "RATE_LIMIT_ERROR",
+                      "CANCELLED_ERROR",
+                      "BOUNDS_EXCEEDED",
+                      "INPUT_MISSING",
+                      "OUTPUT_SCHEMA_MISMATCH",
+                      "EXPRESSION_ERROR",
+                      "SANDBOX_ERROR",
+                      "WORKER_LOST",
+                      "NONIDEMPOTENT_INTERRUPTED",
+                      "HUMAN_APPROVAL_REQUIRED",
+                      "HUMAN_TASK_EXPIRED",
+                      "SUBFLOW_ERROR",
+                      "NO_OUTPUT",
+                      "NETWORK_ERROR",
+                      "NOT_FOUND",
+                      "CONFLICT",
+                      "UNAUTHORIZED",
+                      "FORBIDDEN",
+                      "BAD_REQUEST",
+                      "PAYLOAD_TOO_LARGE",
+                      "INTERNAL"
+                    ]
+                  },
+                  "latencyMs": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": ["provider", "model", "outcome", "latencyMs"],
+                "additionalProperties": false
+              }
+            },
+            "kind": {
+              "type": "string",
+              "const": "choice"
+            },
+            "value": {
+              "type": "string"
+            },
+            "probabilities": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "propertyNames": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "confidence",
+            "provider",
+            "model",
+            "latencyMs",
+            "costUsd",
+            "attempts",
+            "kind",
+            "value",
+            "probabilities"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "successors": ["approve", "draft", "out_auto", "out_human", "out_rejected", "route", "safe"],
+      "guard": [[]],
+      "policy": {
+        "timeoutMs": 30000,
+        "retry": {
+          "maxAttempts": 1,
+          "backoff": {
+            "type": "exponential",
+            "initialMs": 500,
+            "maxMs": 30000,
+            "factor": 2,
+            "jitter": true
+          },
+          "allowOnIrreversible": false
+        },
+        "onError": "fail",
+        "maxCostUsd": null,
+        "maxTokens": null,
+        "privacy": {
+          "sensitive": false,
+          "containsPII": false,
+          "doNotPersist": false,
+          "redactFields": []
+        }
+      },
+      "idempotency": "safe",
+      "pool": "general",
+      "batchGroup": null,
+      "op": {
+        "kind": "task",
+        "type": "flowaid.decision.choice",
+        "typeVersion": "1.0.0",
+        "config": {
+          "instructions": "Which team should handle this support request?",
+          "options": {
+            "billing": "Invoices, charges, refunds",
+            "technical": "Bugs, outages, integrations",
+            "security": "Fraud, stolen cards, account takeover",
+            "general": "Anything else"
+          }
+        },
+        "configTemplates": {},
+        "configBindings": {},
+        "inputs": {
+          "state": {
+            "kind": "object",
+            "fields": {
+              "message": {
+                "kind": "ref",
+                "ref": {
+                  "kind": "port",
+                  "node": "start",
+                  "port": "message"
+                },
+                "optional": false,
+                "schema": {
+                  "type": "string",
+                  "x-dataClass": "pii"
+                }
+              },
+              "tier": {
+                "kind": "ref",
+                "ref": {
+                  "kind": "port",
+                  "node": "start",
+                  "port": "tier"
+                },
+                "optional": true,
+                "default": "free",
+                "schema": {
+                  "type": "string",
+                  "enum": ["free", "gold"]
+                }
+              }
+            },
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": {
+                  "type": "string",
+                  "x-dataClass": "pii"
+                },
+                "tier": {
+                  "type": "string",
+                  "enum": ["free", "gold"]
+                }
+              },
+              "required": ["message", "tier"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "credentials": {
+          "typesafe": "TYPESAFE_API_KEY"
+        },
+        "manifest": {
+          "id": "flowaid.decision.choice",
+          "version": "1.0.0",
+          "metadata": {
+            "name": "Choice",
+            "description": "Classifies `state` into one of the configured options and returns a probability per option (TypeSafe choice decision). Every option id is also a control-out port.",
+            "category": "decision",
+            "icon": "list-checks",
+            "tags": ["decision", "typesafe", "classification"],
+            "summary": "{{ config.instructions }}"
+          },
+          "configSchema": {
+            "type": "object",
+            "properties": {
+              "instructions": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4000,
+                "x-ui": {
+                  "widget": "textarea",
+                  "help": "The question the model answers about `state`."
+                }
+              },
+              "options": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "x-ui": {
+                  "widget": "keyvalue",
+                  "help": "Option id → description. Each id becomes a control-out port."
+                },
+                "minProperties": 2,
+                "maxProperties": 255,
+                "propertyNames": {
+                  "pattern": "^[a-z0-9_]{1,64}$"
+                }
+              }
+            },
+            "required": ["instructions", "options"],
+            "additionalProperties": false
+          },
+          "inputs": [
+            {
+              "name": "state",
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "object"
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                ],
+                "description": "TypeSafe state: text, an object (sent verbatim) or an array of text."
+              },
+              "required": true,
+              "description": "What the decision is about."
+            }
+          ],
+          "outputs": [
+            {
+              "name": "decision",
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "$defs": {
+                  "__schema0": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "null"
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/$defs/__schema0"
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": {
+                          "$ref": "#/$defs/__schema0"
+                        },
+                        "propertyNames": {
+                          "type": "string"
+                        }
+                      }
+                    ]
+                  }
+                },
+                "type": "object",
+                "properties": {
+                  "confidence": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "provider": {
+                    "type": "string"
+                  },
+                  "model": {
+                    "type": "string"
+                  },
+                  "latencyMs": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "usage": {
+                    "type": "object",
+                    "properties": {
+                      "inputTokens": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "outputTokens": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "cacheReadTokens": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "cacheWriteTokens": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": ["inputTokens", "outputTokens"],
+                    "additionalProperties": false
+                  },
+                  "costUsd": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "requestId": {
+                    "type": "string"
+                  },
+                  "raw": {
+                    "$ref": "#/$defs/__schema0"
+                  },
+                  "attempts": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string"
+                        },
+                        "model": {
+                          "type": "string"
+                        },
+                        "outcome": {
+                          "type": "string",
+                          "enum": ["ok", "error", "skipped_unhealthy"]
+                        },
+                        "errorCode": {
+                          "type": "string",
+                          "enum": [
+                            "WORKFLOW_VALIDATION_ERROR",
+                            "SCHEMA_VALIDATION_ERROR",
+                            "NODE_EXECUTION_ERROR",
+                            "TOOL_EXECUTION_ERROR",
+                            "PROVIDER_ERROR",
+                            "PROVIDER_RATE_LIMITED",
+                            "PROVIDER_OVERLOADED",
+                            "CREDENTIAL_ERROR",
+                            "TIMEOUT_ERROR",
+                            "RATE_LIMIT_ERROR",
+                            "CANCELLED_ERROR",
+                            "BOUNDS_EXCEEDED",
+                            "INPUT_MISSING",
+                            "OUTPUT_SCHEMA_MISMATCH",
+                            "EXPRESSION_ERROR",
+                            "SANDBOX_ERROR",
+                            "WORKER_LOST",
+                            "NONIDEMPOTENT_INTERRUPTED",
+                            "HUMAN_APPROVAL_REQUIRED",
+                            "HUMAN_TASK_EXPIRED",
+                            "SUBFLOW_ERROR",
+                            "NO_OUTPUT",
+                            "NETWORK_ERROR",
+                            "NOT_FOUND",
+                            "CONFLICT",
+                            "UNAUTHORIZED",
+                            "FORBIDDEN",
+                            "BAD_REQUEST",
+                            "PAYLOAD_TOO_LARGE",
+                            "INTERNAL"
+                          ]
+                        },
+                        "latencyMs": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "required": ["provider", "model", "outcome", "latencyMs"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "choice"
+                  },
+                  "value": {
+                    "type": "string"
+                  },
+                  "probabilities": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "propertyNames": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "confidence",
+                  "provider",
+                  "model",
+                  "latencyMs",
+                  "costUsd",
+                  "attempts",
+                  "kind",
+                  "value",
+                  "probabilities"
+                ],
+                "additionalProperties": false
+              },
+              "required": true,
+              "description": "The full DecisionResult (kind = choice)."
+            }
+          ],
+          "controlPorts": [],
+          "portRules": [
+            {
+              "kind": "controlPortsFromConfig",
+              "path": "/options"
+            }
+          ],
+          "credentials": [
+            {
+              "name": "typesafe",
+              "types": ["typesafe.api_key"],
+              "required": true,
+              "description": "TypeSafe API key used by the primary hop."
+            }
+          ],
+          "capabilities": ["decision", "credentials"],
+          "idempotency": "safe",
+          "pool": "general",
+          "decision": {
+            "kind": "choice"
+          },
+          "generation": false,
+          "streams": false,
+          "optionProviders": [],
+          "migrations": [],
+          "defaultPolicy": {
+            "timeoutMs": 30000
+          }
+        },
+        "tool": null
+      },
+      "redact": [
+        {
+          "pointer": "/in/state/message",
+          "dataClass": "pii",
+          "mode": "mask"
+        }
+      ]
+    },
+    "route": {
+      "id": "route",
+      "name": "Billing?",
+      "kind": "branch",
+      "scope": "",
+      "controlIn": [],
+      "dataIn": [
+        {
+          "from": {
+            "node": "intent",
+            "port": "decision"
+          },
+          "to": {
+            "node": "route",
+            "port": "billing"
+          },
+          "path": "/value",
+          "optional": false,
+          "via": "expr"
+        }
+      ],
+      "controlOut": ["billing", "other"],
+      "outputs": {
+        "taken": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "successors": ["fetch_account"],
+      "guard": [[]],
+      "policy": {
+        "timeoutMs": 120000,
+        "retry": {
+          "maxAttempts": 1,
+          "backoff": {
+            "type": "exponential",
+            "initialMs": 500,
+            "maxMs": 30000,
+            "factor": 2,
+            "jitter": true
+          },
+          "allowOnIrreversible": false
+        },
+        "onError": "fail",
+        "maxCostUsd": null,
+        "maxTokens": null,
+        "privacy": {
+          "sensitive": false,
+          "containsPII": false,
+          "doNotPersist": false,
+          "redactFields": []
+        }
+      },
+      "idempotency": "safe",
+      "pool": "general",
+      "batchGroup": null,
+      "op": {
+        "kind": "branch",
+        "mode": "first",
+        "cases": [
+          {
+            "port": "billing",
+            "when": {
+              "kind": "binary",
+              "op": "==",
+              "left": {
+                "kind": "ref",
+                "ref": {
+                  "kind": "port",
+                  "node": "intent",
+                  "port": "decision",
+                  "path": "/value"
+                }
+              },
+              "right": {
+                "kind": "literal",
+                "value": "billing"
+              }
+            },
+            "source": "intent.decision.value == 'billing'"
+          }
+        ],
+        "defaultPort": "other"
+      },
+      "redact": []
+    },
+    "fetch_account": {
+      "id": "fetch_account",
+      "name": "Fetch account",
+      "kind": "task",
+      "scope": "",
+      "controlIn": [
+        {
+          "edgeId": "c1",
+          "from": {
+            "node": "route",
+            "port": "billing"
+          },
+          "group": 0
+        }
+      ],
+      "dataIn": [
+        {
+          "from": {
+            "node": "start",
+            "port": "customer_id"
+          },
+          "to": {
+            "node": "fetch_account",
+            "port": "url"
+          },
+          "optional": false,
+          "via": "template"
+        }
+      ],
+      "controlOut": ["done"],
+      "outputs": {
+        "status": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 599
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "body": {}
+      },
+      "successors": ["draft"],
+      "guard": [
+        [
+          {
+            "node": "route",
+            "port": "billing"
+          }
+        ]
+      ],
+      "policy": {
+        "timeoutMs": 30000,
+        "retry": {
+          "maxAttempts": 3,
+          "backoff": {
+            "type": "exponential",
+            "initialMs": 500,
+            "maxMs": 30000,
+            "factor": 2,
+            "jitter": true
+          },
+          "allowOnIrreversible": false
+        },
+        "onError": "ignore",
+        "maxCostUsd": null,
+        "maxTokens": null,
+        "privacy": {
+          "sensitive": false,
+          "containsPII": false,
+          "doNotPersist": false,
+          "redactFields": []
+        }
+      },
+      "idempotency": "safe",
+      "pool": "general",
+      "batchGroup": null,
+      "op": {
+        "kind": "task",
+        "type": "flowaid.tools.http",
+        "typeVersion": "1.0.0",
+        "config": {
+          "method": "GET",
+          "responseType": "json",
+          "timeoutMs": 5000
+        },
+        "configTemplates": {
+          "/url": {
+            "parts": [
+              {
+                "kind": "hole",
+                "expr": {
+                  "kind": "ref",
+                  "ref": {
+                    "kind": "var",
+                    "name": "crmBaseUrl"
+                  }
+                },
+                "filter": "string",
+                "range": {
+                  "start": 0,
+                  "end": 22
+                }
+              },
+              {
+                "kind": "text",
+                "text": "/customers/"
+              },
+              {
+                "kind": "hole",
+                "expr": {
+                  "kind": "ref",
+                  "ref": {
+                    "kind": "port",
+                    "node": "start",
+                    "port": "customer_id"
+                  }
+                },
+                "filter": "string",
+                "range": {
+                  "start": 33,
+                  "end": 56
+                }
+              }
+            ]
+          }
+        },
+        "configBindings": {},
+        "inputs": {},
+        "credentials": {
+          "auth": "CRM_TOKEN"
+        },
+        "manifest": {
+          "id": "flowaid.tools.http",
+          "version": "1.0.0",
+          "metadata": {
+            "name": "HTTP request",
+            "description": "Calls an HTTP endpoint through the safe fetch (private-network, redirect and size limits) and returns status, headers and the parsed body.",
+            "category": "tool",
+            "icon": "globe",
+            "tags": ["http", "tool", "network"],
+            "summary": "{{ config.method }} {{ config.url }}"
+          },
+          "configSchema": {
+            "type": "object",
+            "properties": {
+              "method": {
+                "type": "string",
+                "enum": ["GET", "HEAD", "OPTIONS", "POST", "PUT", "PATCH", "DELETE"],
+                "default": "GET",
+                "x-ui": {
+                  "widget": "select"
+                }
+              },
+              "url": {
+                "type": "string",
+                "minLength": 1,
+                "x-ui": {
+                  "widget": "template",
+                  "placeholder": "https://api.example.com/items/{{ start.id }}"
+                }
+              },
+              "headers": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "default": {},
+                "x-ui": {
+                  "widget": "keyvalue"
+                }
+              },
+              "query": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "default": {},
+                "x-ui": {
+                  "widget": "keyvalue"
+                }
+              },
+              "body": {
+                "x-ui": {
+                  "widget": "json",
+                  "showWhen": {
+                    "path": "/method",
+                    "oneOf": ["POST", "PUT", "PATCH"]
+                  },
+                  "bindable": true
+                }
+              },
+              "responseType": {
+                "type": "string",
+                "enum": ["json", "text", "binary"],
+                "default": "json"
+              },
+              "timeoutMs": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 120000,
+                "default": 30000
+              }
+            },
+            "required": ["method", "url"],
+            "additionalProperties": false
+          },
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "status",
+              "schema": {
+                "type": "integer",
+                "minimum": 100,
+                "maximum": 599
+              },
+              "required": true
+            },
+            {
+              "name": "headers",
+              "schema": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "required": true
+            },
+            {
+              "name": "body",
+              "schema": {},
+              "required": false,
+              "description": "Parsed JSON or text; { \"$artifact\": id } for binary responses; null for empty bodies."
+            }
+          ],
+          "controlPorts": [],
+          "portRules": [],
+          "credentials": [
+            {
+              "name": "auth",
+              "types": ["http.bearer", "http.basic", "http.header"],
+              "required": false,
+              "description": "Applied as Authorization or a custom header."
+            }
+          ],
+          "capabilities": ["network", "credentials", "artifacts"],
+          "idempotency": {
+            "byConfig": "/method",
+            "cases": {
+              "GET": "safe",
+              "HEAD": "safe",
+              "OPTIONS": "safe",
+              "PUT": "keyed",
+              "DELETE": "keyed",
+              "POST": "none",
+              "PATCH": "none"
+            },
+            "default": "none"
+          },
+          "pool": "general",
+          "generation": false,
+          "streams": false,
+          "optionProviders": [],
+          "migrations": [],
+          "defaultPolicy": {
+            "timeoutMs": 30000
+          }
+        },
+        "tool": null
+      },
+      "redact": []
+    },
+    "draft": {
+      "id": "draft",
+      "name": "Draft reply",
+      "kind": "task",
+      "scope": "",
+      "controlIn": [],
+      "dataIn": [
+        {
+          "from": {
+            "node": "intent",
+            "port": "decision"
+          },
+          "to": {
+            "node": "draft",
+            "port": "prompt"
+          },
+          "path": "/value",
+          "optional": false,
+          "via": "template"
+        },
+        {
+          "from": {
+            "node": "intent",
+            "port": "decision"
+          },
+          "to": {
+            "node": "draft",
+            "port": "prompt"
+          },
+          "path": "/confidence",
+          "optional": false,
+          "via": "template"
+        },
+        {
+          "from": {
+            "node": "fetch_account",
+            "port": "body"
+          },
+          "to": {
+            "node": "draft",
+            "port": "prompt"
+          },
+          "optional": true,
+          "via": "template"
+        },
+        {
+          "from": {
+            "node": "start",
+            "port": "message"
+          },
+          "to": {
+            "node": "draft",
+            "port": "prompt"
+          },
+          "optional": false,
+          "via": "template"
+        }
+      ],
+      "controlOut": ["done"],
+      "outputs": {
+        "text": {
+          "type": "string"
+        },
+        "finish_reason": {
+          "type": "string"
+        },
+        "usage": {
+          "type": "object",
+          "properties": {
+            "inputTokens": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "outputTokens": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": ["inputTokens", "outputTokens"]
+        }
+      },
+      "successors": ["approve", "out_auto", "safe"],
+      "guard": [[]],
+      "policy": {
+        "timeoutMs": 120000,
+        "retry": {
+          "maxAttempts": 1,
+          "backoff": {
+            "type": "exponential",
+            "initialMs": 500,
+            "maxMs": 30000,
+            "factor": 2,
+            "jitter": true
+          },
+          "allowOnIrreversible": false
+        },
+        "onError": "fail",
+        "maxCostUsd": null,
+        "maxTokens": null,
+        "privacy": {
+          "sensitive": false,
+          "containsPII": false,
+          "doNotPersist": false,
+          "redactFields": []
+        }
+      },
+      "idempotency": "safe",
+      "pool": "general",
+      "batchGroup": null,
+      "op": {
+        "kind": "task",
+        "type": "flowaid.ai.generate",
+        "typeVersion": "1.0.0",
+        "config": {
+          "model": {
+            "provider": "openai",
+            "model": "gpt-4.1-mini"
+          },
+          "temperature": 0.3,
+          "maxOutputTokens": 600,
+          "stream": true,
+          "system": "You are a concise, friendly support agent. Never promise refunds or credits."
+        },
+        "configTemplates": {},
+        "configBindings": {},
+        "inputs": {
+          "prompt": {
+            "kind": "template",
+            "template": {
+              "parts": [
+                {
+                  "kind": "text",
+                  "text": "Team: "
+                },
+                {
+                  "kind": "hole",
+                  "expr": {
+                    "kind": "ref",
+                    "ref": {
+                      "kind": "port",
+                      "node": "intent",
+                      "port": "decision",
+                      "path": "/value"
+                    }
+                  },
+                  "filter": "string",
+                  "range": {
+                    "start": 6,
+                    "end": 33
+                  }
+                },
+                {
+                  "kind": "text",
+                  "text": " (confidence "
+                },
+                {
+                  "kind": "hole",
+                  "expr": {
+                    "kind": "call",
+                    "fn": "round",
+                    "args": [
+                      {
+                        "kind": "ref",
+                        "ref": {
+                          "kind": "port",
+                          "node": "intent",
+                          "port": "decision",
+                          "path": "/confidence"
+                        }
+                      },
+                      {
+                        "kind": "literal",
+                        "value": 2
+                      }
+                    ]
+                  },
+                  "filter": "string",
+                  "range": {
+                    "start": 46,
+                    "end": 88
+                  }
+                },
+                {
+                  "kind": "text",
+                  "text": ")\nAccount: "
+                },
+                {
+                  "kind": "hole",
+                  "expr": {
+                    "kind": "call",
+                    "fn": "coalesce",
+                    "args": [
+                      {
+                        "kind": "ref",
+                        "ref": {
+                          "kind": "port",
+                          "node": "fetch_account",
+                          "port": "body"
+                        }
+                      },
+                      {
+                        "kind": "object",
+                        "entries": []
+                      }
+                    ]
+                  },
+                  "filter": "json",
+                  "range": {
+                    "start": 99,
+                    "end": 144
+                  }
+                },
+                {
+                  "kind": "text",
+                  "text": "\n\nCustomer message:\n"
+                },
+                {
+                  "kind": "hole",
+                  "expr": {
+                    "kind": "ref",
+                    "ref": {
+                      "kind": "port",
+                      "node": "start",
+                      "port": "message"
+                    }
+                  },
+                  "filter": "string",
+                  "range": {
+                    "start": 164,
+                    "end": 183
+                  }
+                },
+                {
+                  "kind": "text",
+                  "text": "\n\nWrite the reply."
+                }
+              ]
+            },
+            "schema": {
+              "type": "string"
+            }
+          }
+        },
+        "credentials": {
+          "llm": "OPENAI_API_KEY"
+        },
+        "manifest": {
+          "id": "flowaid.ai.generate",
+          "version": "1.0.0",
+          "metadata": {
+            "name": "Generate text",
+            "description": "Generates text from a prompt with a chat model; streams deltas when `stream` is on.",
+            "category": "generation",
+            "icon": "sparkles",
+            "tags": ["llm", "generation"],
+            "summary": "{{ config.model.provider }}/{{ config.model.model }}"
+          },
+          "configSchema": {
+            "type": "object",
+            "properties": {
+              "model": {
+                "type": "object",
+                "properties": {
+                  "provider": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "model": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": ["provider", "model"],
+                "x-ui": {
+                  "widget": "model"
+                }
+              },
+              "system": {
+                "type": "string",
+                "maxLength": 32000,
+                "x-ui": {
+                  "widget": "template"
+                }
+              },
+              "temperature": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 2,
+                "default": 1
+              },
+              "maxOutputTokens": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65536,
+                "default": 1024
+              },
+              "stream": {
+                "type": "boolean",
+                "default": true
+              }
+            },
+            "required": ["model"],
+            "additionalProperties": false
+          },
+          "inputs": [
+            {
+              "name": "prompt",
+              "schema": {
+                "type": "string"
+              },
+              "required": true
+            }
+          ],
+          "outputs": [
+            {
+              "name": "text",
+              "schema": {
+                "type": "string"
+              },
+              "required": true
+            },
+            {
+              "name": "finish_reason",
+              "schema": {
+                "type": "string"
+              },
+              "required": true
+            },
+            {
+              "name": "usage",
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "inputTokens": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "outputTokens": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": ["inputTokens", "outputTokens"]
+              },
+              "required": true
+            }
+          ],
+          "controlPorts": [],
+          "portRules": [],
+          "credentials": [
+            {
+              "name": "llm",
+              "types": ["openai.api_key", "anthropic.api_key", "ollama.none"],
+              "required": true
+            }
+          ],
+          "capabilities": ["generation", "credentials", "streaming"],
+          "idempotency": "safe",
+          "pool": "general",
+          "generation": true,
+          "streams": true,
+          "optionProviders": ["models"],
+          "migrations": [],
+          "defaultPolicy": {
+            "timeoutMs": 120000
+          }
+        },
+        "tool": null
+      },
+      "redact": [
+        {
+          "pointer": "/in/prompt",
+          "dataClass": "pii",
+          "mode": "mask"
+        }
+      ]
+    },
+    "safe": {
+      "id": "safe",
+      "name": "Safe to send?",
+      "kind": "task",
+      "scope": "",
+      "controlIn": [],
+      "dataIn": [
+        {
+          "from": {
+            "node": "draft",
+            "port": "text"
+          },
+          "to": {
+            "node": "safe",
+            "port": "state"
+          },
+          "optional": false,
+          "via": "ref"
+        },
+        {
+          "from": {
+            "node": "start",
+            "port": "message"
+          },
+          "to": {
+            "node": "safe",
+            "port": "state"
+          },
+          "optional": false,
+          "via": "ref"
+        },
+        {
+          "from": {
+            "node": "intent",
+            "port": "decision"
+          },
+          "to": {
+            "node": "safe",
+            "port": "state"
+          },
+          "path": "/value",
+          "optional": false,
+          "via": "ref"
+        }
+      ],
+      "controlOut": ["done"],
+      "outputs": {
+        "decision": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$defs": {
+            "__schema0": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/__schema0"
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": {
+                    "$ref": "#/$defs/__schema0"
+                  },
+                  "propertyNames": {
+                    "type": "string"
+                  }
+                }
+              ]
+            }
+          },
+          "type": "object",
+          "properties": {
+            "confidence": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "provider": {
+              "type": "string"
+            },
+            "model": {
+              "type": "string"
+            },
+            "latencyMs": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "usage": {
+              "type": "object",
+              "properties": {
+                "inputTokens": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "outputTokens": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "cacheReadTokens": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "cacheWriteTokens": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": ["inputTokens", "outputTokens"],
+              "additionalProperties": false
+            },
+            "costUsd": {
+              "type": "number",
+              "minimum": 0
+            },
+            "requestId": {
+              "type": "string"
+            },
+            "raw": {
+              "$ref": "#/$defs/__schema0"
+            },
+            "attempts": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "provider": {
+                    "type": "string"
+                  },
+                  "model": {
+                    "type": "string"
+                  },
+                  "outcome": {
+                    "type": "string",
+                    "enum": ["ok", "error", "skipped_unhealthy"]
+                  },
+                  "errorCode": {
+                    "type": "string",
+                    "enum": [
+                      "WORKFLOW_VALIDATION_ERROR",
+                      "SCHEMA_VALIDATION_ERROR",
+                      "NODE_EXECUTION_ERROR",
+                      "TOOL_EXECUTION_ERROR",
+                      "PROVIDER_ERROR",
+                      "PROVIDER_RATE_LIMITED",
+                      "PROVIDER_OVERLOADED",
+                      "CREDENTIAL_ERROR",
+                      "TIMEOUT_ERROR",
+                      "RATE_LIMIT_ERROR",
+                      "CANCELLED_ERROR",
+                      "BOUNDS_EXCEEDED",
+                      "INPUT_MISSING",
+                      "OUTPUT_SCHEMA_MISMATCH",
+                      "EXPRESSION_ERROR",
+                      "SANDBOX_ERROR",
+                      "WORKER_LOST",
+                      "NONIDEMPOTENT_INTERRUPTED",
+                      "HUMAN_APPROVAL_REQUIRED",
+                      "HUMAN_TASK_EXPIRED",
+                      "SUBFLOW_ERROR",
+                      "NO_OUTPUT",
+                      "NETWORK_ERROR",
+                      "NOT_FOUND",
+                      "CONFLICT",
+                      "UNAUTHORIZED",
+                      "FORBIDDEN",
+                      "BAD_REQUEST",
+                      "PAYLOAD_TOO_LARGE",
+                      "INTERNAL"
+                    ]
+                  },
+                  "latencyMs": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": ["provider", "model", "outcome", "latencyMs"],
+                "additionalProperties": false
+              }
+            },
+            "kind": {
+              "type": "string",
+              "const": "boolean"
+            },
+            "value": {
+              "type": "boolean"
+            },
+            "pYes": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "probabilities": {
+              "type": "object",
+              "properties": {
+                "true": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "false": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": ["true", "false"],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "confidence",
+            "provider",
+            "model",
+            "latencyMs",
+            "costUsd",
+            "attempts",
+            "kind",
+            "value",
+            "pYes",
+            "probabilities"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "successors": ["approve", "gate"],
+      "guard": [[]],
+      "policy": {
+        "timeoutMs": 30000,
+        "retry": {
+          "maxAttempts": 1,
+          "backoff": {
+            "type": "exponential",
+            "initialMs": 500,
+            "maxMs": 30000,
+            "factor": 2,
+            "jitter": true
+          },
+          "allowOnIrreversible": false
+        },
+        "onError": "fail",
+        "maxCostUsd": null,
+        "maxTokens": null,
+        "privacy": {
+          "sensitive": false,
+          "containsPII": false,
+          "doNotPersist": false,
+          "redactFields": []
+        }
+      },
+      "idempotency": "safe",
+      "pool": "general",
+      "batchGroup": null,
+      "op": {
+        "kind": "task",
+        "type": "flowaid.decision.boolean",
+        "typeVersion": "1.0.0",
+        "config": {
+          "instructions": "Is this reply safe to send without human review?",
+          "criteria": {
+            "true": "Polite, accurate, makes no financial or legal commitment",
+            "false": "Speculates, promises refunds, discloses internal data, or is rude"
+          }
+        },
+        "configTemplates": {},
+        "configBindings": {},
+        "inputs": {
+          "state": {
+            "kind": "object",
+            "fields": {
+              "reply": {
+                "kind": "ref",
+                "ref": {
+                  "kind": "port",
+                  "node": "draft",
+                  "port": "text"
+                },
+                "optional": false,
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "message": {
+                "kind": "ref",
+                "ref": {
+                  "kind": "port",
+                  "node": "start",
+                  "port": "message"
+                },
+                "optional": false,
+                "schema": {
+                  "type": "string",
+                  "x-dataClass": "pii"
+                }
+              },
+              "team": {
+                "kind": "ref",
+                "ref": {
+                  "kind": "port",
+                  "node": "intent",
+                  "port": "decision",
+                  "path": "/value"
+                },
+                "optional": false,
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "schema": {
+              "type": "object",
+              "properties": {
+                "reply": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string",
+                  "x-dataClass": "pii"
+                },
+                "team": {
+                  "type": "string"
+                }
+              },
+              "required": ["reply", "message", "team"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "credentials": {
+          "typesafe": "TYPESAFE_API_KEY"
+        },
+        "manifest": {
+          "id": "flowaid.decision.boolean",
+          "version": "1.0.0",
+          "metadata": {
+            "name": "Boolean",
+            "description": "Answers a yes/no question about `state` with `pYes` and `confidence = max(pYes, 1 - pYes)` (TypeSafe boolean decision).",
+            "category": "decision",
+            "icon": "toggle-left",
+            "tags": ["decision", "typesafe"],
+            "summary": "{{ config.instructions }}"
+          },
+          "configSchema": {
+            "type": "object",
+            "properties": {
+              "instructions": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4000,
+                "x-ui": {
+                  "widget": "textarea"
+                }
+              },
+              "criteria": {
+                "type": "object",
+                "properties": {
+                  "true": {
+                    "type": "string"
+                  },
+                  "false": {
+                    "type": "string"
+                  }
+                },
+                "required": ["true", "false"],
+                "additionalProperties": false,
+                "x-ui": {
+                  "widget": "criteria",
+                  "help": "Optional descriptions of what makes the answer true or false (both or none)."
+                }
+              }
+            },
+            "required": ["instructions"],
+            "additionalProperties": false
+          },
+          "inputs": [
+            {
+              "name": "state",
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "object"
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                ],
+                "description": "TypeSafe state: text, an object (sent verbatim) or an array of text."
+              },
+              "required": true
+            }
+          ],
+          "outputs": [
+            {
+              "name": "decision",
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "$defs": {
+                  "__schema0": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "null"
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/$defs/__schema0"
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": {
+                          "$ref": "#/$defs/__schema0"
+                        },
+                        "propertyNames": {
+                          "type": "string"
+                        }
+                      }
+                    ]
+                  }
+                },
+                "type": "object",
+                "properties": {
+                  "confidence": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "provider": {
+                    "type": "string"
+                  },
+                  "model": {
+                    "type": "string"
+                  },
+                  "latencyMs": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "usage": {
+                    "type": "object",
+                    "properties": {
+                      "inputTokens": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "outputTokens": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "cacheReadTokens": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "cacheWriteTokens": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": ["inputTokens", "outputTokens"],
+                    "additionalProperties": false
+                  },
+                  "costUsd": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "requestId": {
+                    "type": "string"
+                  },
+                  "raw": {
+                    "$ref": "#/$defs/__schema0"
+                  },
+                  "attempts": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string"
+                        },
+                        "model": {
+                          "type": "string"
+                        },
+                        "outcome": {
+                          "type": "string",
+                          "enum": ["ok", "error", "skipped_unhealthy"]
+                        },
+                        "errorCode": {
+                          "type": "string",
+                          "enum": [
+                            "WORKFLOW_VALIDATION_ERROR",
+                            "SCHEMA_VALIDATION_ERROR",
+                            "NODE_EXECUTION_ERROR",
+                            "TOOL_EXECUTION_ERROR",
+                            "PROVIDER_ERROR",
+                            "PROVIDER_RATE_LIMITED",
+                            "PROVIDER_OVERLOADED",
+                            "CREDENTIAL_ERROR",
+                            "TIMEOUT_ERROR",
+                            "RATE_LIMIT_ERROR",
+                            "CANCELLED_ERROR",
+                            "BOUNDS_EXCEEDED",
+                            "INPUT_MISSING",
+                            "OUTPUT_SCHEMA_MISMATCH",
+                            "EXPRESSION_ERROR",
+                            "SANDBOX_ERROR",
+                            "WORKER_LOST",
+                            "NONIDEMPOTENT_INTERRUPTED",
+                            "HUMAN_APPROVAL_REQUIRED",
+                            "HUMAN_TASK_EXPIRED",
+                            "SUBFLOW_ERROR",
+                            "NO_OUTPUT",
+                            "NETWORK_ERROR",
+                            "NOT_FOUND",
+                            "CONFLICT",
+                            "UNAUTHORIZED",
+                            "FORBIDDEN",
+                            "BAD_REQUEST",
+                            "PAYLOAD_TOO_LARGE",
+                            "INTERNAL"
+                          ]
+                        },
+                        "latencyMs": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "required": ["provider", "model", "outcome", "latencyMs"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "boolean"
+                  },
+                  "value": {
+                    "type": "boolean"
+                  },
+                  "pYes": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "probabilities": {
+                    "type": "object",
+                    "properties": {
+                      "true": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "false": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      }
+                    },
+                    "required": ["true", "false"],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "confidence",
+                  "provider",
+                  "model",
+                  "latencyMs",
+                  "costUsd",
+                  "attempts",
+                  "kind",
+                  "value",
+                  "pYes",
+                  "probabilities"
+                ],
+                "additionalProperties": false
+              },
+              "required": true
+            }
+          ],
+          "controlPorts": [],
+          "portRules": [],
+          "credentials": [
+            {
+              "name": "typesafe",
+              "types": ["typesafe.api_key"],
+              "required": true
+            }
+          ],
+          "capabilities": ["decision", "credentials"],
+          "idempotency": "safe",
+          "pool": "general",
+          "decision": {
+            "kind": "boolean"
+          },
+          "generation": false,
+          "streams": false,
+          "optionProviders": [],
+          "migrations": [],
+          "defaultPolicy": {
+            "timeoutMs": 30000
+          }
+        },
+        "tool": null
+      },
+      "redact": [
+        {
+          "pointer": "/in/state/message",
+          "dataClass": "pii",
+          "mode": "mask"
+        }
+      ]
+    },
+    "gate": {
+      "id": "gate",
+      "name": "Confidence gate",
+      "kind": "task",
+      "scope": "",
+      "controlIn": [],
+      "dataIn": [
+        {
+          "from": {
+            "node": "safe",
+            "port": "decision"
+          },
+          "to": {
+            "node": "gate",
+            "port": "decision"
+          },
+          "optional": false,
+          "via": "ref"
+        }
+      ],
+      "controlOut": ["done", "pass", "review", "fail"],
+      "outputs": {
+        "decision": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": ["boolean", "choice", "score"]
+            },
+            "confidence": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "required": ["kind", "value", "confidence"]
+        },
+        "passed": {
+          "type": "boolean"
+        },
+        "outcome": {
+          "type": "string",
+          "enum": ["pass", "review", "fail"]
+        }
+      },
+      "successors": ["approve", "out_auto"],
+      "guard": [[]],
+      "policy": {
+        "timeoutMs": 120000,
+        "retry": {
+          "maxAttempts": 1,
+          "backoff": {
+            "type": "exponential",
+            "initialMs": 500,
+            "maxMs": 30000,
+            "factor": 2,
+            "jitter": true
+          },
+          "allowOnIrreversible": false
+        },
+        "onError": "fail",
+        "maxCostUsd": null,
+        "maxTokens": null,
+        "privacy": {
+          "sensitive": false,
+          "containsPII": false,
+          "doNotPersist": false,
+          "redactFields": []
+        }
+      },
+      "idempotency": "safe",
+      "pool": "general",
+      "batchGroup": null,
+      "op": {
+        "kind": "task",
+        "type": "flowaid.decision.confidence_gate",
+        "typeVersion": "1.0.0",
+        "config": {
+          "requireValue": true
+        },
+        "configTemplates": {},
+        "configBindings": {
+          "/threshold": {
+            "kind": "ref",
+            "ref": {
+              "kind": "var",
+              "name": "autoSendThreshold"
+            },
+            "optional": false,
+            "schema": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        },
+        "inputs": {
+          "decision": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "safe",
+              "port": "decision"
+            },
+            "optional": false,
+            "schema": {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "$defs": {
+                "__schema0": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/$defs/__schema0"
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": {
+                        "$ref": "#/$defs/__schema0"
+                      },
+                      "propertyNames": {
+                        "type": "string"
+                      }
+                    }
+                  ]
+                }
+              },
+              "type": "object",
+              "properties": {
+                "confidence": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "provider": {
+                  "type": "string"
+                },
+                "model": {
+                  "type": "string"
+                },
+                "latencyMs": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "usage": {
+                  "type": "object",
+                  "properties": {
+                    "inputTokens": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "outputTokens": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "cacheReadTokens": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "cacheWriteTokens": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": ["inputTokens", "outputTokens"],
+                  "additionalProperties": false
+                },
+                "costUsd": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "requestId": {
+                  "type": "string"
+                },
+                "raw": {
+                  "$ref": "#/$defs/__schema0"
+                },
+                "attempts": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "provider": {
+                        "type": "string"
+                      },
+                      "model": {
+                        "type": "string"
+                      },
+                      "outcome": {
+                        "type": "string",
+                        "enum": ["ok", "error", "skipped_unhealthy"]
+                      },
+                      "errorCode": {
+                        "type": "string",
+                        "enum": [
+                          "WORKFLOW_VALIDATION_ERROR",
+                          "SCHEMA_VALIDATION_ERROR",
+                          "NODE_EXECUTION_ERROR",
+                          "TOOL_EXECUTION_ERROR",
+                          "PROVIDER_ERROR",
+                          "PROVIDER_RATE_LIMITED",
+                          "PROVIDER_OVERLOADED",
+                          "CREDENTIAL_ERROR",
+                          "TIMEOUT_ERROR",
+                          "RATE_LIMIT_ERROR",
+                          "CANCELLED_ERROR",
+                          "BOUNDS_EXCEEDED",
+                          "INPUT_MISSING",
+                          "OUTPUT_SCHEMA_MISMATCH",
+                          "EXPRESSION_ERROR",
+                          "SANDBOX_ERROR",
+                          "WORKER_LOST",
+                          "NONIDEMPOTENT_INTERRUPTED",
+                          "HUMAN_APPROVAL_REQUIRED",
+                          "HUMAN_TASK_EXPIRED",
+                          "SUBFLOW_ERROR",
+                          "NO_OUTPUT",
+                          "NETWORK_ERROR",
+                          "NOT_FOUND",
+                          "CONFLICT",
+                          "UNAUTHORIZED",
+                          "FORBIDDEN",
+                          "BAD_REQUEST",
+                          "PAYLOAD_TOO_LARGE",
+                          "INTERNAL"
+                        ]
+                      },
+                      "latencyMs": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": ["provider", "model", "outcome", "latencyMs"],
+                    "additionalProperties": false
+                  }
+                },
+                "kind": {
+                  "type": "string",
+                  "const": "boolean"
+                },
+                "value": {
+                  "type": "boolean"
+                },
+                "pYes": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "probabilities": {
+                  "type": "object",
+                  "properties": {
+                    "true": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "false": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    }
+                  },
+                  "required": ["true", "false"],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "confidence",
+                "provider",
+                "model",
+                "latencyMs",
+                "costUsd",
+                "attempts",
+                "kind",
+                "value",
+                "pYes",
+                "probabilities"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "credentials": {},
+        "manifest": {
+          "id": "flowaid.decision.confidence_gate",
+          "version": "1.0.0",
+          "metadata": {
+            "name": "Confidence gate",
+            "description": "Routes a decision by confidence: `pass` when it reaches `threshold` (and, with `requireValue`, a boolean value is true); otherwise `review` — or, with `reviewBand`, `review` only inside `[threshold − reviewBand, threshold)` and `fail` below it. Passes the decision through and reports `passed` and `outcome`.",
+            "category": "safety",
+            "icon": "shield-check",
+            "tags": ["decision", "safety", "routing"],
+            "summary": "threshold {{ config.threshold }}"
+          },
+          "configSchema": {
+            "type": "object",
+            "description": "`pass` iff `confidence ≥ threshold` and (`requireValue` is false or the decision is boolean with `value === true`); otherwise `fail` iff `reviewBand` is set and `confidence < threshold − reviewBand`; otherwise `review`. Without `reviewBand` the gate is two-way (`pass`/`review`, as in §2.9); with it the band `[threshold − reviewBand, threshold)` goes to review and everything below to `fail`; a `requireValue` failure routes `fail` when `reviewBand` is set, else `review`. The UI's two-threshold model maps onto this as `auto := threshold`, `review := threshold − (reviewBand ?? threshold)`, with outcome names `pass | review | fail`.",
+            "properties": {
+              "threshold": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "x-ui": {
+                  "widget": "slider",
+                  "bindable": true,
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.01
+                }
+              },
+              "requireValue": {
+                "type": "boolean",
+                "default": false,
+                "x-ui": {
+                  "widget": "switch",
+                  "help": "Also require a boolean decision value of true to pass."
+                }
+              },
+              "reviewBand": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "x-ui": {
+                  "widget": "slider",
+                  "min": 0,
+                  "max": 1,
+                  "step": 0.01,
+                  "help": "Optional. Width of the review band below the threshold: confidences in [threshold − reviewBand, threshold) go to review, lower ones to fail. Unset, the gate is two-way (pass/review)."
+                }
+              }
+            },
+            "required": ["threshold"],
+            "additionalProperties": false
+          },
+          "inputs": [
+            {
+              "name": "decision",
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": ["boolean", "choice", "score"]
+                  },
+                  "confidence": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                },
+                "required": ["kind", "value", "confidence"]
+              },
+              "required": true
+            }
+          ],
+          "outputs": [
+            {
+              "name": "decision",
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": ["boolean", "choice", "score"]
+                  },
+                  "confidence": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                },
+                "required": ["kind", "value", "confidence"]
+              },
+              "required": true,
+              "description": "The input decision, unchanged."
+            },
+            {
+              "name": "passed",
+              "schema": {
+                "type": "boolean"
+              },
+              "required": true,
+              "description": "`true` iff `outcome` is `pass`."
+            },
+            {
+              "name": "outcome",
+              "schema": {
+                "type": "string",
+                "enum": ["pass", "review", "fail"]
+              },
+              "required": true,
+              "description": "The control port the gate fired: `pass`, `review` or `fail` (§6.3 gate semantics)."
+            }
+          ],
+          "controlPorts": [
+            {
+              "name": "pass",
+              "label": "Pass",
+              "description": "confidence ≥ threshold (and, with requireValue, a boolean value of true)."
+            },
+            {
+              "name": "review",
+              "label": "Needs review",
+              "description": "Below threshold; with reviewBand only within [threshold − reviewBand, threshold)."
+            },
+            {
+              "name": "fail",
+              "label": "Fail",
+              "description": "Only with reviewBand: confidence < threshold − reviewBand, or a requireValue failure."
+            }
+          ],
+          "portRules": [],
+          "credentials": [],
+          "capabilities": [],
+          "idempotency": "safe",
+          "pool": "general",
+          "decision": {
+            "kind": "gate"
+          },
+          "generation": false,
+          "streams": false,
+          "optionProviders": [],
+          "migrations": [],
+          "defaultPolicy": {}
+        },
+        "tool": null
+      },
+      "redact": []
+    },
+    "approve": {
+      "id": "approve",
+      "name": "Approve reply",
+      "kind": "human",
+      "scope": "",
+      "controlIn": [
+        {
+          "edgeId": "c3",
+          "from": {
+            "node": "gate",
+            "port": "review"
+          },
+          "group": 0
+        }
+      ],
+      "dataIn": [
+        {
+          "from": {
+            "node": "draft",
+            "port": "text"
+          },
+          "to": {
+            "node": "approve",
+            "port": "value"
+          },
+          "optional": false,
+          "via": "ref"
+        },
+        {
+          "from": {
+            "node": "start",
+            "port": "customer_id"
+          },
+          "to": {
+            "node": "approve",
+            "port": "title"
+          },
+          "optional": false,
+          "via": "template"
+        },
+        {
+          "from": {
+            "node": "intent",
+            "port": "decision"
+          },
+          "to": {
+            "node": "approve",
+            "port": "title"
+          },
+          "path": "/value",
+          "optional": false,
+          "via": "template"
+        },
+        {
+          "from": {
+            "node": "start",
+            "port": "message"
+          },
+          "to": {
+            "node": "approve",
+            "port": "context"
+          },
+          "optional": false,
+          "via": "ref"
+        },
+        {
+          "from": {
+            "node": "safe",
+            "port": "decision"
+          },
+          "to": {
+            "node": "approve",
+            "port": "context"
+          },
+          "optional": false,
+          "via": "ref"
+        }
+      ],
+      "controlOut": ["approved", "rejected", "expired"],
+      "outputs": {
+        "decision": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "properties": {
+            "action": {
+              "type": "string",
+              "enum": ["approve", "reject", "choose", "submit", "expire"]
+            },
+            "option": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]{0,63}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "by": {
+              "type": "string"
+            },
+            "at": {
+              "type": "string",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+              "format": "date-time"
+            },
+            "comment": {
+              "type": ["string", "null"]
+            }
+          },
+          "required": ["action", "option", "by", "at", "comment"],
+          "additionalProperties": false
+        },
+        "value": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "successors": ["out_human", "out_rejected"],
+      "guard": [
+        [
+          {
+            "node": "gate",
+            "port": "review"
+          }
+        ]
+      ],
+      "policy": {
+        "timeoutMs": 120000,
+        "retry": {
+          "maxAttempts": 1,
+          "backoff": {
+            "type": "exponential",
+            "initialMs": 500,
+            "maxMs": 30000,
+            "factor": 2,
+            "jitter": true
+          },
+          "allowOnIrreversible": false
+        },
+        "onError": "fail",
+        "maxCostUsd": null,
+        "maxTokens": null,
+        "privacy": {
+          "sensitive": false,
+          "containsPII": false,
+          "doNotPersist": false,
+          "redactFields": []
+        }
+      },
+      "idempotency": "safe",
+      "pool": "general",
+      "batchGroup": null,
+      "op": {
+        "kind": "human",
+        "mode": {
+          "type": "review",
+          "value": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "draft",
+              "port": "text"
+            },
+            "optional": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          "schema": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "title": {
+          "kind": "template",
+          "template": {
+            "parts": [
+              {
+                "kind": "text",
+                "text": "Review reply for "
+              },
+              {
+                "kind": "hole",
+                "expr": {
+                  "kind": "ref",
+                  "ref": {
+                    "kind": "port",
+                    "node": "start",
+                    "port": "customer_id"
+                  }
+                },
+                "filter": "string",
+                "range": {
+                  "start": 17,
+                  "end": 40
+                }
+              },
+              {
+                "kind": "text",
+                "text": " ("
+              },
+              {
+                "kind": "hole",
+                "expr": {
+                  "kind": "ref",
+                  "ref": {
+                    "kind": "port",
+                    "node": "intent",
+                    "port": "decision",
+                    "path": "/value"
+                  }
+                },
+                "filter": "string",
+                "range": {
+                  "start": 42,
+                  "end": 69
+                }
+              },
+              {
+                "kind": "text",
+                "text": ")"
+              }
+            ]
+          },
+          "schema": {
+            "type": "string"
+          }
+        },
+        "context": {
+          "message": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "start",
+              "port": "message"
+            },
+            "optional": false,
+            "schema": {
+              "type": "string",
+              "x-dataClass": "pii"
+            }
+          },
+          "safety": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "safe",
+              "port": "decision"
+            },
+            "optional": false,
+            "schema": {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "$defs": {
+                "__schema0": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/$defs/__schema0"
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": {
+                        "$ref": "#/$defs/__schema0"
+                      },
+                      "propertyNames": {
+                        "type": "string"
+                      }
+                    }
+                  ]
+                }
+              },
+              "type": "object",
+              "properties": {
+                "confidence": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "provider": {
+                  "type": "string"
+                },
+                "model": {
+                  "type": "string"
+                },
+                "latencyMs": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "usage": {
+                  "type": "object",
+                  "properties": {
+                    "inputTokens": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "outputTokens": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "cacheReadTokens": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "cacheWriteTokens": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": ["inputTokens", "outputTokens"],
+                  "additionalProperties": false
+                },
+                "costUsd": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "requestId": {
+                  "type": "string"
+                },
+                "raw": {
+                  "$ref": "#/$defs/__schema0"
+                },
+                "attempts": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "provider": {
+                        "type": "string"
+                      },
+                      "model": {
+                        "type": "string"
+                      },
+                      "outcome": {
+                        "type": "string",
+                        "enum": ["ok", "error", "skipped_unhealthy"]
+                      },
+                      "errorCode": {
+                        "type": "string",
+                        "enum": [
+                          "WORKFLOW_VALIDATION_ERROR",
+                          "SCHEMA_VALIDATION_ERROR",
+                          "NODE_EXECUTION_ERROR",
+                          "TOOL_EXECUTION_ERROR",
+                          "PROVIDER_ERROR",
+                          "PROVIDER_RATE_LIMITED",
+                          "PROVIDER_OVERLOADED",
+                          "CREDENTIAL_ERROR",
+                          "TIMEOUT_ERROR",
+                          "RATE_LIMIT_ERROR",
+                          "CANCELLED_ERROR",
+                          "BOUNDS_EXCEEDED",
+                          "INPUT_MISSING",
+                          "OUTPUT_SCHEMA_MISMATCH",
+                          "EXPRESSION_ERROR",
+                          "SANDBOX_ERROR",
+                          "WORKER_LOST",
+                          "NONIDEMPOTENT_INTERRUPTED",
+                          "HUMAN_APPROVAL_REQUIRED",
+                          "HUMAN_TASK_EXPIRED",
+                          "SUBFLOW_ERROR",
+                          "NO_OUTPUT",
+                          "NETWORK_ERROR",
+                          "NOT_FOUND",
+                          "CONFLICT",
+                          "UNAUTHORIZED",
+                          "FORBIDDEN",
+                          "BAD_REQUEST",
+                          "PAYLOAD_TOO_LARGE",
+                          "INTERNAL"
+                        ]
+                      },
+                      "latencyMs": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": ["provider", "model", "outcome", "latencyMs"],
+                    "additionalProperties": false
+                  }
+                },
+                "kind": {
+                  "type": "string",
+                  "const": "boolean"
+                },
+                "value": {
+                  "type": "boolean"
+                },
+                "pYes": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "probabilities": {
+                  "type": "object",
+                  "properties": {
+                    "true": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "false": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    }
+                  },
+                  "required": ["true", "false"],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "confidence",
+                "provider",
+                "model",
+                "latencyMs",
+                "costUsd",
+                "attempts",
+                "kind",
+                "value",
+                "pYes",
+                "probabilities"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "assignees": ["role:support_lead"],
+        "expiresInMs": 86400000,
+        "onExpire": "route",
+        "escalation": null,
+        "externalReview": true
+      },
+      "redact": [
+        {
+          "pointer": "/in/context/message",
+          "dataClass": "pii",
+          "mode": "mask"
+        }
+      ]
+    },
+    "out_auto": {
+      "id": "out_auto",
+      "name": "Auto reply",
+      "kind": "output",
+      "scope": "",
+      "controlIn": [
+        {
+          "edgeId": "c2",
+          "from": {
+            "node": "gate",
+            "port": "pass"
+          },
+          "group": 0
+        }
+      ],
+      "dataIn": [
+        {
+          "from": {
+            "node": "draft",
+            "port": "text"
+          },
+          "to": {
+            "node": "out_auto",
+            "port": "value"
+          },
+          "optional": false,
+          "via": "ref"
+        },
+        {
+          "from": {
+            "node": "intent",
+            "port": "decision"
+          },
+          "to": {
+            "node": "out_auto",
+            "port": "value"
+          },
+          "path": "/value",
+          "optional": false,
+          "via": "ref"
+        }
+      ],
+      "controlOut": [],
+      "outputs": {},
+      "successors": [],
+      "guard": [
+        [
+          {
+            "node": "gate",
+            "port": "pass"
+          }
+        ]
+      ],
+      "policy": {
+        "timeoutMs": 120000,
+        "retry": {
+          "maxAttempts": 1,
+          "backoff": {
+            "type": "exponential",
+            "initialMs": 500,
+            "maxMs": 30000,
+            "factor": 2,
+            "jitter": true
+          },
+          "allowOnIrreversible": false
+        },
+        "onError": "fail",
+        "maxCostUsd": null,
+        "maxTokens": null,
+        "privacy": {
+          "sensitive": false,
+          "containsPII": false,
+          "doNotPersist": false,
+          "redactFields": []
+        }
+      },
+      "idempotency": "safe",
+      "pool": "general",
+      "batchGroup": null,
+      "op": {
+        "kind": "output",
+        "value": {
+          "kind": "object",
+          "fields": {
+            "reply": {
+              "kind": "ref",
+              "ref": {
+                "kind": "port",
+                "node": "draft",
+                "port": "text"
+              },
+              "optional": false,
+              "schema": {
+                "type": "string"
+              }
+            },
+            "team": {
+              "kind": "ref",
+              "ref": {
+                "kind": "port",
+                "node": "intent",
+                "port": "decision",
+                "path": "/value"
+              },
+              "optional": false,
+              "schema": {
+                "type": "string"
+              }
+            },
+            "auto_sent": {
+              "kind": "literal",
+              "value": true,
+              "schema": {
+                "type": "boolean",
+                "const": true
+              }
+            },
+            "approved_by": {
+              "kind": "literal",
+              "value": null,
+              "schema": {
+                "type": "null"
+              }
+            }
+          },
+          "schema": {
+            "type": "object",
+            "properties": {
+              "reply": {
+                "type": "string"
+              },
+              "team": {
+                "type": "string"
+              },
+              "auto_sent": {
+                "type": "boolean",
+                "const": true
+              },
+              "approved_by": {
+                "type": "null"
+              }
+            },
+            "required": ["reply", "team", "auto_sent", "approved_by"],
+            "additionalProperties": false
+          }
+        },
+        "outcome": "auto",
+        "earlyExit": false
+      },
+      "redact": []
+    },
+    "out_human": {
+      "id": "out_human",
+      "name": "Reviewed reply",
+      "kind": "output",
+      "scope": "",
+      "controlIn": [
+        {
+          "edgeId": "c4",
+          "from": {
+            "node": "approve",
+            "port": "approved"
+          },
+          "group": 0
+        }
+      ],
+      "dataIn": [
+        {
+          "from": {
+            "node": "approve",
+            "port": "value"
+          },
+          "to": {
+            "node": "out_human",
+            "port": "value"
+          },
+          "optional": false,
+          "via": "ref"
+        },
+        {
+          "from": {
+            "node": "intent",
+            "port": "decision"
+          },
+          "to": {
+            "node": "out_human",
+            "port": "value"
+          },
+          "path": "/value",
+          "optional": false,
+          "via": "ref"
+        },
+        {
+          "from": {
+            "node": "approve",
+            "port": "decision"
+          },
+          "to": {
+            "node": "out_human",
+            "port": "value"
+          },
+          "path": "/by",
+          "optional": false,
+          "via": "ref"
+        }
+      ],
+      "controlOut": [],
+      "outputs": {},
+      "successors": [],
+      "guard": [
+        [
+          {
+            "node": "gate",
+            "port": "review"
+          },
+          {
+            "node": "approve",
+            "port": "approved"
+          }
+        ]
+      ],
+      "policy": {
+        "timeoutMs": 120000,
+        "retry": {
+          "maxAttempts": 1,
+          "backoff": {
+            "type": "exponential",
+            "initialMs": 500,
+            "maxMs": 30000,
+            "factor": 2,
+            "jitter": true
+          },
+          "allowOnIrreversible": false
+        },
+        "onError": "fail",
+        "maxCostUsd": null,
+        "maxTokens": null,
+        "privacy": {
+          "sensitive": false,
+          "containsPII": false,
+          "doNotPersist": false,
+          "redactFields": []
+        }
+      },
+      "idempotency": "safe",
+      "pool": "general",
+      "batchGroup": null,
+      "op": {
+        "kind": "output",
+        "value": {
+          "kind": "object",
+          "fields": {
+            "reply": {
+              "kind": "ref",
+              "ref": {
+                "kind": "port",
+                "node": "approve",
+                "port": "value"
+              },
+              "optional": false,
+              "schema": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "team": {
+              "kind": "ref",
+              "ref": {
+                "kind": "port",
+                "node": "intent",
+                "port": "decision",
+                "path": "/value"
+              },
+              "optional": false,
+              "schema": {
+                "type": "string"
+              }
+            },
+            "auto_sent": {
+              "kind": "literal",
+              "value": false,
+              "schema": {
+                "type": "boolean",
+                "const": false
+              }
+            },
+            "approved_by": {
+              "kind": "ref",
+              "ref": {
+                "kind": "port",
+                "node": "approve",
+                "port": "decision",
+                "path": "/by"
+              },
+              "optional": false,
+              "schema": {
+                "type": "string"
+              }
+            }
+          },
+          "schema": {
+            "type": "object",
+            "properties": {
+              "reply": {
+                "type": "string",
+                "minLength": 1
+              },
+              "team": {
+                "type": "string"
+              },
+              "auto_sent": {
+                "type": "boolean",
+                "const": false
+              },
+              "approved_by": {
+                "type": "string"
+              }
+            },
+            "required": ["reply", "team", "auto_sent", "approved_by"],
+            "additionalProperties": false
+          }
+        },
+        "outcome": "human_approved",
+        "earlyExit": false
+      },
+      "redact": []
+    },
+    "out_rejected": {
+      "id": "out_rejected",
+      "name": "Rejected",
+      "kind": "output",
+      "scope": "",
+      "controlIn": [
+        {
+          "edgeId": "c5",
+          "from": {
+            "node": "approve",
+            "port": "rejected"
+          },
+          "group": 0
+        },
+        {
+          "edgeId": "c6",
+          "from": {
+            "node": "approve",
+            "port": "expired"
+          },
+          "group": 0
+        }
+      ],
+      "dataIn": [
+        {
+          "from": {
+            "node": "intent",
+            "port": "decision"
+          },
+          "to": {
+            "node": "out_rejected",
+            "port": "value"
+          },
+          "path": "/value",
+          "optional": false,
+          "via": "ref"
+        }
+      ],
+      "controlOut": [],
+      "outputs": {},
+      "successors": [],
+      "guard": [
+        [
+          {
+            "node": "gate",
+            "port": "review"
+          },
+          {
+            "node": "approve",
+            "port": "rejected"
+          }
+        ],
+        [
+          {
+            "node": "gate",
+            "port": "review"
+          },
+          {
+            "node": "approve",
+            "port": "expired"
+          }
+        ]
+      ],
+      "policy": {
+        "timeoutMs": 120000,
+        "retry": {
+          "maxAttempts": 1,
+          "backoff": {
+            "type": "exponential",
+            "initialMs": 500,
+            "maxMs": 30000,
+            "factor": 2,
+            "jitter": true
+          },
+          "allowOnIrreversible": false
+        },
+        "onError": "fail",
+        "maxCostUsd": null,
+        "maxTokens": null,
+        "privacy": {
+          "sensitive": false,
+          "containsPII": false,
+          "doNotPersist": false,
+          "redactFields": []
+        }
+      },
+      "idempotency": "safe",
+      "pool": "general",
+      "batchGroup": null,
+      "op": {
+        "kind": "output",
+        "value": {
+          "kind": "object",
+          "fields": {
+            "reply": {
+              "kind": "literal",
+              "value": "",
+              "schema": {
+                "type": "string",
+                "const": ""
+              }
+            },
+            "team": {
+              "kind": "ref",
+              "ref": {
+                "kind": "port",
+                "node": "intent",
+                "port": "decision",
+                "path": "/value"
+              },
+              "optional": false,
+              "schema": {
+                "type": "string"
+              }
+            },
+            "auto_sent": {
+              "kind": "literal",
+              "value": false,
+              "schema": {
+                "type": "boolean",
+                "const": false
+              }
+            },
+            "approved_by": {
+              "kind": "literal",
+              "value": null,
+              "schema": {
+                "type": "null"
+              }
+            }
+          },
+          "schema": {
+            "type": "object",
+            "properties": {
+              "reply": {
+                "type": "string",
+                "const": ""
+              },
+              "team": {
+                "type": "string"
+              },
+              "auto_sent": {
+                "type": "boolean",
+                "const": false
+              },
+              "approved_by": {
+                "type": "null"
+              }
+            },
+            "required": ["reply", "team", "auto_sent", "approved_by"],
+            "additionalProperties": false
+          }
+        },
+        "outcome": "rejected",
+        "earlyExit": false
+      },
+      "redact": []
+    }
+  },
+  "scopes": {
+    "": {
+      "id": "",
+      "parent": null,
+      "kind": "root",
+      "container": null,
+      "nodes": [
+        "start",
+        "intent",
+        "route",
+        "fetch_account",
+        "draft",
+        "safe",
+        "gate",
+        "approve",
+        "out_auto",
+        "out_human",
+        "out_rejected"
+      ],
+      "order": [
+        "start",
+        "intent",
+        "route",
+        "fetch_account",
+        "draft",
+        "safe",
+        "gate",
+        "approve",
+        "out_auto",
+        "out_human",
+        "out_rejected"
+      ],
+      "entries": ["start"],
+      "outputs": ["out_auto", "out_human", "out_rejected"]
+    }
+  },
+  "dataEdges": [
+    {
+      "from": {
+        "node": "start",
+        "port": "message"
+      },
+      "to": {
+        "node": "intent",
+        "port": "state"
+      },
+      "optional": false,
+      "via": "ref"
+    },
+    {
+      "from": {
+        "node": "start",
+        "port": "tier"
+      },
+      "to": {
+        "node": "intent",
+        "port": "state"
+      },
+      "optional": true,
+      "via": "ref"
+    },
+    {
+      "from": {
+        "node": "intent",
+        "port": "decision"
+      },
+      "to": {
+        "node": "route",
+        "port": "billing"
+      },
+      "path": "/value",
+      "optional": false,
+      "via": "expr"
+    },
+    {
+      "from": {
+        "node": "start",
+        "port": "customer_id"
+      },
+      "to": {
+        "node": "fetch_account",
+        "port": "url"
+      },
+      "optional": false,
+      "via": "template"
+    },
+    {
+      "from": {
+        "node": "intent",
+        "port": "decision"
+      },
+      "to": {
+        "node": "draft",
+        "port": "prompt"
+      },
+      "path": "/value",
+      "optional": false,
+      "via": "template"
+    },
+    {
+      "from": {
+        "node": "intent",
+        "port": "decision"
+      },
+      "to": {
+        "node": "draft",
+        "port": "prompt"
+      },
+      "path": "/confidence",
+      "optional": false,
+      "via": "template"
+    },
+    {
+      "from": {
+        "node": "fetch_account",
+        "port": "body"
+      },
+      "to": {
+        "node": "draft",
+        "port": "prompt"
+      },
+      "optional": true,
+      "via": "template"
+    },
+    {
+      "from": {
+        "node": "start",
+        "port": "message"
+      },
+      "to": {
+        "node": "draft",
+        "port": "prompt"
+      },
+      "optional": false,
+      "via": "template"
+    },
+    {
+      "from": {
+        "node": "draft",
+        "port": "text"
+      },
+      "to": {
+        "node": "safe",
+        "port": "state"
+      },
+      "optional": false,
+      "via": "ref"
+    },
+    {
+      "from": {
+        "node": "start",
+        "port": "message"
+      },
+      "to": {
+        "node": "safe",
+        "port": "state"
+      },
+      "optional": false,
+      "via": "ref"
+    },
+    {
+      "from": {
+        "node": "intent",
+        "port": "decision"
+      },
+      "to": {
+        "node": "safe",
+        "port": "state"
+      },
+      "path": "/value",
+      "optional": false,
+      "via": "ref"
+    },
+    {
+      "from": {
+        "node": "safe",
+        "port": "decision"
+      },
+      "to": {
+        "node": "gate",
+        "port": "decision"
+      },
+      "optional": false,
+      "via": "ref"
+    },
+    {
+      "from": {
+        "node": "draft",
+        "port": "text"
+      },
+      "to": {
+        "node": "approve",
+        "port": "value"
+      },
+      "optional": false,
+      "via": "ref"
+    },
+    {
+      "from": {
+        "node": "start",
+        "port": "customer_id"
+      },
+      "to": {
+        "node": "approve",
+        "port": "title"
+      },
+      "optional": false,
+      "via": "template"
+    },
+    {
+      "from": {
+        "node": "intent",
+        "port": "decision"
+      },
+      "to": {
+        "node": "approve",
+        "port": "title"
+      },
+      "path": "/value",
+      "optional": false,
+      "via": "template"
+    },
+    {
+      "from": {
+        "node": "start",
+        "port": "message"
+      },
+      "to": {
+        "node": "approve",
+        "port": "context"
+      },
+      "optional": false,
+      "via": "ref"
+    },
+    {
+      "from": {
+        "node": "safe",
+        "port": "decision"
+      },
+      "to": {
+        "node": "approve",
+        "port": "context"
+      },
+      "optional": false,
+      "via": "ref"
+    },
+    {
+      "from": {
+        "node": "draft",
+        "port": "text"
+      },
+      "to": {
+        "node": "out_auto",
+        "port": "value"
+      },
+      "optional": false,
+      "via": "ref"
+    },
+    {
+      "from": {
+        "node": "intent",
+        "port": "decision"
+      },
+      "to": {
+        "node": "out_auto",
+        "port": "value"
+      },
+      "path": "/value",
+      "optional": false,
+      "via": "ref"
+    },
+    {
+      "from": {
+        "node": "approve",
+        "port": "value"
+      },
+      "to": {
+        "node": "out_human",
+        "port": "value"
+      },
+      "optional": false,
+      "via": "ref"
+    },
+    {
+      "from": {
+        "node": "intent",
+        "port": "decision"
+      },
+      "to": {
+        "node": "out_human",
+        "port": "value"
+      },
+      "path": "/value",
+      "optional": false,
+      "via": "ref"
+    },
+    {
+      "from": {
+        "node": "approve",
+        "port": "decision"
+      },
+      "to": {
+        "node": "out_human",
+        "port": "value"
+      },
+      "path": "/by",
+      "optional": false,
+      "via": "ref"
+    },
+    {
+      "from": {
+        "node": "intent",
+        "port": "decision"
+      },
+      "to": {
+        "node": "out_rejected",
+        "port": "value"
+      },
+      "path": "/value",
+      "optional": false,
+      "via": "ref"
+    }
+  ],
+  "batchGroups": {},
+  "subflows": [],
+  "requiredCapabilities": [
+    "artifacts",
+    "credentials",
+    "decision",
+    "generation",
+    "network",
+    "streaming"
+  ],
+  "pools": ["general"],
+  "catalogSnapshot": {
+    "flowaid.ai.generate": "1.0.0",
+    "flowaid.decision.boolean": "1.0.0",
+    "flowaid.decision.choice": "1.0.0",
+    "flowaid.decision.confidence_gate": "1.0.0",
+    "flowaid.tools.http": "1.0.0"
+  },
+  "estimate": {
+    "maxCostUsd": 0.5,
+    "nodeCount": 11
+  }
+}

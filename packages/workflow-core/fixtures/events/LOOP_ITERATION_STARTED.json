@@ -1,0 +1,17 @@
+{
+  "type": "LOOP_ITERATION_STARTED",
+  "runId": "0192f0a1-5b3c-7d4e-8f60-1a2b3c4d5e6f",
+  "seq": 34,
+  "at": "2026-09-22T10:00:08.500Z",
+  "nodeRunId": "0192f0a1-5b3c-7d4e-8f60-0000000000b3",
+  "nodeId": "research",
+  "scope": "",
+  "attempt": 1,
+  "iteration": 0,
+  "childScope": "research#0",
+  "carry": {
+    "queries": [],
+    "evidence": [],
+    "gaps": ["pricing history"]
+  }
+}

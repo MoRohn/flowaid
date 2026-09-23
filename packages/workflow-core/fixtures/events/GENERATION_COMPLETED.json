@@ -1,0 +1,25 @@
+{
+  "type": "GENERATION_COMPLETED",
+  "runId": "0192f0a1-5b3c-7d4e-8f60-1a2b3c4d5e6f",
+  "seq": 13,
+  "at": "2026-09-22T10:00:03.500Z",
+  "nodeRunId": "0192f0a1-5b3c-7d4e-8f60-0000000000a5",
+  "nodeId": "draft",
+  "scope": "",
+  "attempt": 1,
+  "provider": "openai",
+  "model": "gpt-4.1-mini",
+  "usage": {
+    "inputTokens": 640,
+    "outputTokens": 118
+  },
+  "costUsd": 0.000445,
+  "priceSnapshot": {
+    "inputPerMTok": 0.4,
+    "outputPerMTok": 1.6,
+    "cacheReadPerMTok": 0.1
+  },
+  "finishReason": "stop",
+  "outputChars": 412,
+  "latencyMs": 1840
+}

@@ -1,0 +1,301 @@
+{
+  "$schema": "https://flowaid.dev/schemas/workflow/v1",
+  "id": "5b1c2b60-6e0f-4a1a-9b0e-1b1a2c3d4e5f",
+  "name": "Support reply with safety gate",
+  "description": "Classify a support message, fetch account context for billing, draft a reply, verify it is safe, gate on confidence.",
+  "inputs": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["message", "customer_id"],
+    "properties": {
+      "message": { "type": "string", "x-dataClass": "pii" },
+      "customer_id": { "type": "string" },
+      "tier": { "type": "string", "enum": ["free", "gold"] }
+    }
+  },
+  "outputs": {
+    "type": "object",
+    "required": ["reply", "team", "auto_sent"],
+    "properties": {
+      "reply": { "type": "string" },
+      "team": { "type": "string" },
+      "auto_sent": { "type": "boolean" },
+      "approved_by": { "type": ["string", "null"] }
+    }
+  },
+  "secrets": [
+    { "name": "TYPESAFE_API_KEY", "credentialType": "typesafe.api_key" },
+    { "name": "OPENAI_API_KEY", "credentialType": "openai.api_key" },
+    { "name": "CRM_TOKEN", "credentialType": "http.bearer", "required": false }
+  ],
+  "variables": [
+    {
+      "name": "crmBaseUrl",
+      "schema": { "type": "string" },
+      "default": "https://crm.example.com",
+      "source": "environment"
+    },
+    {
+      "name": "autoSendThreshold",
+      "schema": { "type": "number", "minimum": 0, "maximum": 1 },
+      "default": 0.85
+    }
+  ],
+  "execution": {
+    "timeoutMs": 180000,
+    "maxCostUsd": 0.5,
+    "decisions": { "primary": { "provider": "typesafe", "model": "jev-latest" } }
+  },
+  "nodes": [
+    { "id": "start", "kind": "input", "name": "Ticket" },
+
+    {
+      "id": "intent",
+      "kind": "task",
+      "name": "Intent",
+      "type": "flowaid.decision.choice",
+      "typeVersion": "1.0.0",
+      "config": {
+        "instructions": "Which team should handle this support request?",
+        "options": {
+          "billing": "Invoices, charges, refunds",
+          "technical": "Bugs, outages, integrations",
+          "security": "Fraud, stolen cards, account takeover",
+          "general": "Anything else"
+        }
+      },
+      "inputs": {
+        "state": {
+          "kind": "object",
+          "fields": {
+            "message": {
+              "kind": "ref",
+              "ref": { "kind": "port", "node": "start", "port": "message" }
+            },
+            "tier": {
+              "kind": "ref",
+              "ref": { "kind": "port", "node": "start", "port": "tier" },
+              "default": "free"
+            }
+          }
+        }
+      },
+      "credentials": { "typesafe": "TYPESAFE_API_KEY" }
+    },
+
+    {
+      "id": "route",
+      "kind": "branch",
+      "name": "Billing?",
+      "cases": [{ "port": "billing", "when": "intent.decision.value == 'billing'" }],
+      "defaultPort": "other"
+    },
+
+    {
+      "id": "fetch_account",
+      "kind": "task",
+      "name": "Fetch account",
+      "type": "flowaid.tools.http",
+      "typeVersion": "1.0.0",
+      "config": {
+        "method": "GET",
+        "url": "{{ $vars.crmBaseUrl }}/customers/{{ start.customer_id }}",
+        "responseType": "json",
+        "timeoutMs": 5000
+      },
+      "credentials": { "auth": "CRM_TOKEN" },
+      "policy": { "retry": { "maxAttempts": 3 }, "onError": "ignore" }
+    },
+
+    {
+      "id": "draft",
+      "kind": "task",
+      "name": "Draft reply",
+      "type": "flowaid.ai.generate",
+      "typeVersion": "1.0.0",
+      "config": {
+        "model": { "provider": "openai", "model": "gpt-4.1-mini" },
+        "temperature": 0.3,
+        "maxOutputTokens": 600,
+        "stream": true,
+        "system": "You are a concise, friendly support agent. Never promise refunds or credits."
+      },
+      "inputs": {
+        "prompt": {
+          "kind": "template",
+          "source": "Team: {{ intent.decision.value }} (confidence {{ round(intent.decision.confidence, 2) }})\nAccount: {{ coalesce(fetch_account.body, {}) | json }}\n\nCustomer message:\n{{ start.message }}\n\nWrite the reply."
+        }
+      },
+      "credentials": { "llm": "OPENAI_API_KEY" }
+    },
+
+    {
+      "id": "safe",
+      "kind": "task",
+      "name": "Safe to send?",
+      "type": "flowaid.decision.boolean",
+      "typeVersion": "1.0.0",
+      "config": {
+        "instructions": "Is this reply safe to send without human review?",
+        "criteria": {
+          "true": "Polite, accurate, makes no financial or legal commitment",
+          "false": "Speculates, promises refunds, discloses internal data, or is rude"
+        }
+      },
+      "inputs": {
+        "state": {
+          "kind": "object",
+          "fields": {
+            "reply": { "kind": "ref", "ref": { "kind": "port", "node": "draft", "port": "text" } },
+            "message": {
+              "kind": "ref",
+              "ref": { "kind": "port", "node": "start", "port": "message" }
+            },
+            "team": {
+              "kind": "ref",
+              "ref": { "kind": "port", "node": "intent", "port": "decision", "path": "/value" }
+            }
+          }
+        }
+      },
+      "credentials": { "typesafe": "TYPESAFE_API_KEY" }
+    },
+
+    {
+      "id": "gate",
+      "kind": "task",
+      "name": "Confidence gate",
+      "type": "flowaid.decision.confidence_gate",
+      "typeVersion": "1.0.0",
+      "config": {
+        "threshold": { "kind": "ref", "ref": { "kind": "var", "name": "autoSendThreshold" } },
+        "requireValue": true
+      },
+      "inputs": {
+        "decision": { "kind": "ref", "ref": { "kind": "port", "node": "safe", "port": "decision" } }
+      }
+    },
+
+    {
+      "id": "approve",
+      "kind": "human",
+      "name": "Approve reply",
+      "mode": {
+        "type": "review",
+        "value": { "kind": "ref", "ref": { "kind": "port", "node": "draft", "port": "text" } },
+        "schema": { "type": "string", "minLength": 1 }
+      },
+      "title": {
+        "kind": "template",
+        "source": "Review reply for {{ start.customer_id }} ({{ intent.decision.value }})"
+      },
+      "context": {
+        "message": { "kind": "ref", "ref": { "kind": "port", "node": "start", "port": "message" } },
+        "safety": { "kind": "ref", "ref": { "kind": "port", "node": "safe", "port": "decision" } }
+      },
+      "assignees": ["role:support_lead"],
+      "expiresInMs": 86400000,
+      "onExpire": "route",
+      "externalReview": true
+    },
+
+    {
+      "id": "out_auto",
+      "kind": "output",
+      "name": "Auto reply",
+      "outcome": "auto",
+      "value": {
+        "kind": "object",
+        "fields": {
+          "reply": { "kind": "ref", "ref": { "kind": "port", "node": "draft", "port": "text" } },
+          "team": {
+            "kind": "ref",
+            "ref": { "kind": "port", "node": "intent", "port": "decision", "path": "/value" }
+          },
+          "auto_sent": { "kind": "literal", "value": true },
+          "approved_by": { "kind": "literal", "value": null }
+        }
+      }
+    },
+
+    {
+      "id": "out_human",
+      "kind": "output",
+      "name": "Reviewed reply",
+      "outcome": "human_approved",
+      "value": {
+        "kind": "object",
+        "fields": {
+          "reply": { "kind": "ref", "ref": { "kind": "port", "node": "approve", "port": "value" } },
+          "team": {
+            "kind": "ref",
+            "ref": { "kind": "port", "node": "intent", "port": "decision", "path": "/value" }
+          },
+          "auto_sent": { "kind": "literal", "value": false },
+          "approved_by": {
+            "kind": "ref",
+            "ref": { "kind": "port", "node": "approve", "port": "decision", "path": "/by" }
+          }
+        }
+      }
+    },
+
+    {
+      "id": "out_rejected",
+      "kind": "output",
+      "name": "Rejected",
+      "outcome": "rejected",
+      "value": {
+        "kind": "object",
+        "fields": {
+          "reply": { "kind": "literal", "value": "" },
+          "team": {
+            "kind": "ref",
+            "ref": { "kind": "port", "node": "intent", "port": "decision", "path": "/value" }
+          },
+          "auto_sent": { "kind": "literal", "value": false },
+          "approved_by": { "kind": "literal", "value": null }
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "c1",
+      "from": { "node": "route", "port": "billing" },
+      "to": { "node": "fetch_account" }
+    },
+    { "id": "c2", "from": { "node": "gate", "port": "pass" }, "to": { "node": "out_auto" } },
+    { "id": "c3", "from": { "node": "gate", "port": "review" }, "to": { "node": "approve" } },
+    {
+      "id": "c4",
+      "from": { "node": "approve", "port": "approved" },
+      "to": { "node": "out_human" }
+    },
+    {
+      "id": "c5",
+      "from": { "node": "approve", "port": "rejected" },
+      "to": { "node": "out_rejected" }
+    },
+    {
+      "id": "c6",
+      "from": { "node": "approve", "port": "expired" },
+      "to": { "node": "out_rejected" }
+    }
+  ],
+  "layout": {
+    "nodes": {
+      "start": { "x": 0, "y": 220 },
+      "intent": { "x": 260, "y": 220 },
+      "route": { "x": 520, "y": 220 },
+      "fetch_account": { "x": 780, "y": 80 },
+      "draft": { "x": 1040, "y": 220 },
+      "safe": { "x": 1300, "y": 220 },
+      "gate": { "x": 1560, "y": 220 },
+      "approve": { "x": 1820, "y": 360 },
+      "out_auto": { "x": 1820, "y": 80 },
+      "out_human": { "x": 2080, "y": 300 },
+      "out_rejected": { "x": 2080, "y": 480 }
+    }
+  }
+}

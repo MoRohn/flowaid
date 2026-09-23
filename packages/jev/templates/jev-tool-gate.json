@@ -1,0 +1,483 @@
+{
+  "$schema": "https://flowaid.dev/schemas/workflow/v1",
+  "id": "c8edfbfc-e56b-442d-a598-15b5d63a6dcf",
+  "name": "Pre-tool authorization check (Jev)",
+  "description": "The LLM proposes a tool call; code normalizes it and applies hard policy; Jev rates the semantic risk of what the call would actually do; the deterministic verdict allows, sends it to a person, or denies it. Jev judges, code checks policy, the tool executes, the receipt records. Handbook §VII.B Before the Tool, §VII.D Tool Semantics, §I.E, §X.G, §X.N.",
+  "inputs": {
+    "type": "object",
+    "required": ["request"],
+    "properties": {
+      "request": {
+        "type": "string",
+        "maxLength": 4000,
+        "description": "What the operator asked the assistant to do."
+      },
+      "workspace": {
+        "type": "string",
+        "description": "Working directory the command may touch.",
+        "default": "."
+      }
+    }
+  },
+  "outputs": {
+    "type": "object",
+    "required": ["status", "receipt_id"],
+    "properties": {
+      "status": {
+        "type": "string",
+        "enum": ["executed", "rejected", "blocked"]
+      },
+      "proposal": {
+        "type": "string"
+      },
+      "result": {},
+      "receipt_id": {
+        "type": ["string", "null"]
+      }
+    }
+  },
+  "secrets": [
+    {
+      "name": "TYPESAFE_API_KEY",
+      "credentialType": "typesafe.api_key",
+      "description": "TypeSafe System One key for Jev. Without it the contract model chain falls back to its failover hops, which are uncalibrated and cannot route auto."
+    },
+    {
+      "name": "ANTHROPIC_API_KEY",
+      "credentialType": "anthropic.api_key"
+    }
+  ],
+  "execution": {
+    "timeoutMs": 3900000,
+    "maxCostUsd": 0.2,
+    "decisions": {
+      "primary": {
+        "provider": "typesafe",
+        "model": "jev-latest"
+      },
+      "failover": []
+    }
+  },
+  "nodes": [
+    {
+      "id": "start",
+      "kind": "input",
+      "name": "Request"
+    },
+    {
+      "id": "propose",
+      "kind": "task",
+      "type": "flowaid.ai.structured_generate",
+      "typeVersion": "1.0.0",
+      "name": "Propose tool call",
+      "description": "Generation owns authoring the call (§I.D). It never decides whether the call may run.",
+      "config": {
+        "model": {
+          "provider": "anthropic",
+          "model": "claude-sonnet-4-5"
+        },
+        "schema": {
+          "type": "object",
+          "required": ["tool", "args"],
+          "properties": {
+            "tool": {
+              "type": "string"
+            },
+            "args": {
+              "type": "object",
+              "required": ["command"],
+              "properties": {
+                "command": {
+                  "type": "string",
+                  "maxLength": 2000
+                },
+                "cwd": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "inputs": {
+        "prompt": {
+          "kind": "template",
+          "source": "You operate a build host through one tool, ops.run_command.\nRequest: {{ start.request }}\nWorking directory: {{ start.workspace }}\nPropose exactly one call that fulfils the request and nothing more."
+        }
+      },
+      "credentials": {
+        "llm": "ANTHROPIC_API_KEY"
+      }
+    },
+    {
+      "id": "gate",
+      "kind": "task",
+      "type": "flowaid.jev.tool_gate",
+      "typeVersion": "1.0.0",
+      "name": "Tool gate",
+      "description": "normalize (code) → hard policy (code) → judge (Jev, ops.tool_risk) → route (consequence before confidence) → verdict (most restrictive wins; deny never becomes allow).",
+      "config": {
+        "contract": {
+          "key": "ops.tool_risk",
+          "version": "deployed"
+        },
+        "policy": {
+          "allowTools": ["ops.run_command"],
+          "denyDestinations": ["*.prod.internal", "169.254.169.254"],
+          "maxDataClass": "internal",
+          "requireApprovalFor": [
+            "publish",
+            "purchase",
+            "delete",
+            "permission_change",
+            "money_movement",
+            "represent_user"
+          ],
+          "irreversible": "review",
+          "maxCostUsd": 0.05
+        }
+      },
+      "inputs": {
+        "proposal": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "propose",
+            "port": "structured"
+          }
+        },
+        "context": {
+          "kind": "object",
+          "fields": {
+            "request": {
+              "kind": "ref",
+              "ref": {
+                "kind": "port",
+                "node": "start",
+                "port": "request"
+              }
+            }
+          }
+        }
+      },
+      "credentials": {
+        "typesafe": "TYPESAFE_API_KEY"
+      }
+    },
+    {
+      "id": "run_tool",
+      "kind": "task",
+      "type": "flowaid.tools.mcp",
+      "typeVersion": "1.0.0",
+      "name": "Run command",
+      "description": "Executes only through a port the verdict authorised: gate.allow or a human approval.",
+      "config": {
+        "serverId": "$template.mcp.ops",
+        "tool": "run_command"
+      },
+      "inputs": {
+        "command": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "gate",
+            "port": "args",
+            "path": "/command"
+          }
+        },
+        "cwd": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "gate",
+            "port": "args",
+            "path": "/cwd"
+          },
+          "default": "."
+        }
+      }
+    },
+    {
+      "id": "approve",
+      "kind": "human",
+      "name": "Approve tool call",
+      "mode": {
+        "type": "approval"
+      },
+      "title": {
+        "kind": "template",
+        "source": "Approve: {{ gate.normalized.summary }}"
+      },
+      "context": {
+        "request": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "start",
+            "port": "request"
+          }
+        },
+        "proposal": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "gate",
+            "port": "normalized"
+          }
+        },
+        "verdict": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "gate",
+            "port": "verdict"
+          }
+        },
+        "receipt": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "gate",
+            "port": "receipt"
+          }
+        }
+      },
+      "assignees": ["role:ops_oncall"],
+      "expiresInMs": 3600000,
+      "onExpire": "route"
+    },
+    {
+      "id": "out_done",
+      "kind": "output",
+      "name": "Executed",
+      "outcome": "executed",
+      "value": {
+        "kind": "object",
+        "fields": {
+          "status": {
+            "kind": "literal",
+            "value": "executed"
+          },
+          "proposal": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "gate",
+              "port": "normalized",
+              "path": "/summary"
+            }
+          },
+          "result": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "run_tool",
+              "port": "result"
+            }
+          },
+          "receipt_id": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "gate",
+              "port": "receipt",
+              "path": "/receiptId"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "out_rejected",
+      "kind": "output",
+      "name": "Rejected by reviewer",
+      "outcome": "rejected",
+      "value": {
+        "kind": "object",
+        "fields": {
+          "status": {
+            "kind": "literal",
+            "value": "rejected"
+          },
+          "proposal": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "gate",
+              "port": "normalized",
+              "path": "/summary"
+            }
+          },
+          "receipt_id": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "gate",
+              "port": "receipt",
+              "path": "/receiptId"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "out_blocked",
+      "kind": "output",
+      "name": "Blocked by policy",
+      "outcome": "blocked",
+      "value": {
+        "kind": "object",
+        "fields": {
+          "status": {
+            "kind": "literal",
+            "value": "blocked"
+          },
+          "proposal": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "gate",
+              "port": "normalized",
+              "path": "/summary"
+            }
+          },
+          "receipt_id": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "gate",
+              "port": "receipt",
+              "path": "/receiptId"
+            },
+            "default": null
+          }
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "c1",
+      "from": {
+        "node": "gate",
+        "port": "allow"
+      },
+      "to": {
+        "node": "run_tool"
+      }
+    },
+    {
+      "id": "c2",
+      "from": {
+        "node": "gate",
+        "port": "review"
+      },
+      "to": {
+        "node": "approve"
+      }
+    },
+    {
+      "id": "c3",
+      "from": {
+        "node": "approve",
+        "port": "approved"
+      },
+      "to": {
+        "node": "run_tool"
+      }
+    },
+    {
+      "id": "c4",
+      "from": {
+        "node": "approve",
+        "port": "rejected"
+      },
+      "to": {
+        "node": "out_rejected"
+      }
+    },
+    {
+      "id": "c5",
+      "from": {
+        "node": "approve",
+        "port": "expired"
+      },
+      "to": {
+        "node": "out_rejected"
+      }
+    },
+    {
+      "id": "c6",
+      "from": {
+        "node": "gate",
+        "port": "deny"
+      },
+      "to": {
+        "node": "out_blocked"
+      }
+    },
+    {
+      "id": "c7",
+      "from": {
+        "node": "run_tool",
+        "port": "done"
+      },
+      "to": {
+        "node": "out_done"
+      }
+    }
+  ],
+  "metadata": {
+    "template": {
+      "key": "jev-tool-gate",
+      "pattern": "B — before the tool",
+      "contracts": ["ops.tool_risk"],
+      "handbook": [
+        "§VII.B Before the Tool",
+        "§VII.D Tool Semantics",
+        "§I.E Authority Remains Outside the Model",
+        "§X.G Policy Inside the Classifier",
+        "§X.N Safe Operating Order",
+        "Table VI"
+      ],
+      "design": "docs/design/JEV_ENGINEERING.md §9.3",
+      "docs": "docs/jev/harness-patterns.md"
+    }
+  },
+  "layout": {
+    "nodes": {
+      "start": {
+        "x": 0,
+        "y": 0
+      },
+      "propose": {
+        "x": 280,
+        "y": 0
+      },
+      "gate": {
+        "x": 560,
+        "y": 0
+      },
+      "run_tool": {
+        "x": 1120,
+        "y": 0
+      },
+      "approve": {
+        "x": 840,
+        "y": 0
+      },
+      "out_done": {
+        "x": 1400,
+        "y": 0
+      },
+      "out_rejected": {
+        "x": 1120,
+        "y": 160
+      },
+      "out_blocked": {
+        "x": 840,
+        "y": 160
+      }
+    }
+  }
+}

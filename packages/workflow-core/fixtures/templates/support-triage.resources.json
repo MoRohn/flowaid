@@ -1,0 +1,10 @@
+{
+  "mcpServers": [
+    {
+      "key": "security_kb",
+      "description": "MCP server exposing the security playbook knowledge base (tool search_playbooks); used on the security route.",
+      "requiredTools": ["search_playbooks"]
+    }
+  ],
+  "knowledgeSources": []
+}

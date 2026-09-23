@@ -1,0 +1,13 @@
+{
+  "type": "HUMAN_TASK_ESCALATED",
+  "runId": "0192f0a1-5b3c-7d4e-8f60-1a2b3c4d5e6f",
+  "seq": 23,
+  "at": "2026-09-22T10:00:05.750Z",
+  "nodeRunId": "0192f0a1-5b3c-7d4e-8f60-0000000000a8",
+  "nodeId": "approve",
+  "scope": "",
+  "attempt": 1,
+  "humanTaskId": "0192f0a1-5b3c-7d4e-8f60-0000000000c1",
+  "to": ["role:support_manager"],
+  "reason": "timer"
+}

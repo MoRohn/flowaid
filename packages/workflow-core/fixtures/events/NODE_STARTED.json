@@ -1,0 +1,18 @@
+{
+  "type": "NODE_STARTED",
+  "runId": "0192f0a1-5b3c-7d4e-8f60-1a2b3c4d5e6f",
+  "seq": 3,
+  "at": "2026-09-22T10:00:00.750Z",
+  "nodeRunId": "0192f0a1-5b3c-7d4e-8f60-0000000000a2",
+  "nodeId": "intent",
+  "scope": "",
+  "attempt": 1,
+  "input": {
+    "state": {
+      "message": "I was charged twice for my gold plan this month. Please fix this.",
+      "tier": "gold"
+    }
+  },
+  "pool": "general",
+  "workerId": "worker-general-01"
+}

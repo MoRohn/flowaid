@@ -1,0 +1,772 @@
+{
+  "$schema": "https://flowaid.dev/schemas/workflow/v1",
+  "id": "d3a1002a-8862-4f0b-a26d-df7c483ace0a",
+  "name": "LLM classifier rollout: shadow, canary, active (Jev)",
+  "description": "The same graph serves every rollout stage; only the contract deployment changes. The router evaluates support.ticket_router; its legacy port keeps the old LLM classifier path as the fallback. With a shadow candidate (or no deployment in a protected environment) every decision is recorded and the legacy path carries all traffic; a canary automates one outcome for a small, deterministic traffic share with a rollback trigger defined before launch; active hands the contract its governed outcomes. Uncertain, escaped or out-of-scope tickets go to a person who picks the queue. Handbook §IX.D, §IX.F, §IX.G, §IX.I, §V.F.",
+  "inputs": {
+    "type": "object",
+    "required": ["ticket_id", "message"],
+    "properties": {
+      "ticket_id": {
+        "type": "string"
+      },
+      "message": {
+        "type": "string",
+        "maxLength": 12000,
+        "x-dataClass": "pii"
+      },
+      "channel": {
+        "type": "string",
+        "enum": ["email", "chat", "api"],
+        "default": "api"
+      }
+    }
+  },
+  "outputs": {
+    "type": "object",
+    "required": ["ticket_id", "queue", "decided_by"],
+    "properties": {
+      "ticket_id": {
+        "type": "string"
+      },
+      "queue": {
+        "type": ["string", "null"]
+      },
+      "decided_by": {
+        "type": "string",
+        "enum": ["jev", "legacy_llm", "human", "expired"]
+      },
+      "receipt_id": {
+        "type": ["string", "null"]
+      },
+      "disposition": {
+        "type": ["string", "null"]
+      }
+    }
+  },
+  "secrets": [
+    {
+      "name": "TYPESAFE_API_KEY",
+      "credentialType": "typesafe.api_key",
+      "description": "TypeSafe System One key for Jev. Without it the contract model chain falls back to its failover hops, which are uncalibrated and cannot route auto."
+    },
+    {
+      "name": "OPENAI_API_KEY",
+      "credentialType": "openai.api_key"
+    }
+  ],
+  "execution": {
+    "timeoutMs": 14700000,
+    "maxCostUsd": 0.05,
+    "decisions": {
+      "primary": {
+        "provider": "typesafe",
+        "model": "jev-latest"
+      },
+      "failover": []
+    }
+  },
+  "nodes": [
+    {
+      "id": "start",
+      "kind": "input",
+      "name": "Ticket"
+    },
+    {
+      "id": "router",
+      "kind": "task",
+      "type": "flowaid.jev.decide",
+      "typeVersion": "1.0.0",
+      "name": "Jev router",
+      "description": "Inline routing: one port per queue (auto zone), human, and legacy (fires whenever the rollout disposition gives Jev no authority).",
+      "config": {
+        "contract": {
+          "key": "support.ticket_router",
+          "version": "deployed"
+        },
+        "routing": "inline",
+        "escalation": "wired",
+        "legacyPort": true
+      },
+      "inputs": {
+        "state": {
+          "kind": "object",
+          "fields": {
+            "message": {
+              "kind": "array",
+              "items": [
+                {
+                  "kind": "object",
+                  "fields": {
+                    "id": {
+                      "kind": "literal",
+                      "value": "msg"
+                    },
+                    "kind": {
+                      "kind": "literal",
+                      "value": "customer_message"
+                    },
+                    "summary": {
+                      "kind": "ref",
+                      "ref": {
+                        "kind": "port",
+                        "node": "start",
+                        "port": "message"
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            "channel": {
+              "kind": "ref",
+              "ref": {
+                "kind": "port",
+                "node": "start",
+                "port": "channel"
+              },
+              "default": "api"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "typesafe": "TYPESAFE_API_KEY"
+      }
+    },
+    {
+      "id": "classify",
+      "kind": "task",
+      "type": "flowaid.ai.structured_generate",
+      "typeVersion": "1.0.0",
+      "name": "Legacy LLM classifier",
+      "description": "The old path, retained as the fallback until the rollout is complete (§IX.I Rollout Guardrails).",
+      "config": {
+        "model": {
+          "provider": "openai",
+          "model": "gpt-4.1-mini"
+        },
+        "schema": {
+          "type": "object",
+          "required": ["team"],
+          "properties": {
+            "team": {
+              "type": "string",
+              "enum": ["billing", "account_access", "technical", "general", "other"]
+            }
+          }
+        }
+      },
+      "inputs": {
+        "prompt": {
+          "kind": "template",
+          "source": "Classify this support ticket into one team: billing, account_access, technical, general, or other.\nChannel: {{ start.channel }}\n\nMessage:\n{{ start.message }}"
+        }
+      },
+      "credentials": {
+        "llm": "OPENAI_API_KEY"
+      }
+    },
+    {
+      "id": "legacy_route",
+      "kind": "branch",
+      "name": "Legacy route",
+      "mode": "first",
+      "cases": [
+        {
+          "port": "billing",
+          "when": "classify.structured.team == 'billing'"
+        },
+        {
+          "port": "account_access",
+          "when": "classify.structured.team == 'account_access'"
+        },
+        {
+          "port": "technical",
+          "when": "classify.structured.team == 'technical'"
+        },
+        {
+          "port": "general",
+          "when": "classify.structured.team == 'general'"
+        }
+      ],
+      "defaultPort": "unclassified"
+    },
+    {
+      "id": "review",
+      "kind": "human",
+      "name": "Support lead picks the queue",
+      "mode": {
+        "type": "choice",
+        "options": [
+          {
+            "id": "billing",
+            "label": "Billing"
+          },
+          {
+            "id": "account_access",
+            "label": "Account access"
+          },
+          {
+            "id": "technical",
+            "label": "Technical"
+          },
+          {
+            "id": "general",
+            "label": "General"
+          }
+        ]
+      },
+      "title": {
+        "kind": "template",
+        "source": "Route ticket {{ start.ticket_id }}"
+      },
+      "context": {
+        "message": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "start",
+            "port": "message"
+          }
+        },
+        "receipt": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "router",
+            "port": "receipt"
+          }
+        },
+        "packet": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "router",
+            "port": "packet"
+          }
+        }
+      },
+      "assignees": ["role:support_lead"],
+      "expiresInMs": 14400000,
+      "onExpire": "route"
+    },
+    {
+      "id": "assign_billing",
+      "kind": "task",
+      "type": "flowaid.tools.mcp",
+      "typeVersion": "1.0.0",
+      "name": "Assign: billing",
+      "config": {
+        "serverId": "$template.mcp.tracker",
+        "tool": "assign_ticket"
+      },
+      "inputs": {
+        "ticket_id": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "start",
+            "port": "ticket_id"
+          }
+        },
+        "queue": {
+          "kind": "literal",
+          "value": "billing"
+        }
+      }
+    },
+    {
+      "id": "assign_account_access",
+      "kind": "task",
+      "type": "flowaid.tools.mcp",
+      "typeVersion": "1.0.0",
+      "name": "Assign: account access",
+      "config": {
+        "serverId": "$template.mcp.tracker",
+        "tool": "assign_ticket"
+      },
+      "inputs": {
+        "ticket_id": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "start",
+            "port": "ticket_id"
+          }
+        },
+        "queue": {
+          "kind": "literal",
+          "value": "account_access"
+        }
+      }
+    },
+    {
+      "id": "assign_technical",
+      "kind": "task",
+      "type": "flowaid.tools.mcp",
+      "typeVersion": "1.0.0",
+      "name": "Assign: technical",
+      "config": {
+        "serverId": "$template.mcp.tracker",
+        "tool": "assign_ticket"
+      },
+      "inputs": {
+        "ticket_id": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "start",
+            "port": "ticket_id"
+          }
+        },
+        "queue": {
+          "kind": "literal",
+          "value": "technical"
+        }
+      }
+    },
+    {
+      "id": "assign_general",
+      "kind": "task",
+      "type": "flowaid.tools.mcp",
+      "typeVersion": "1.0.0",
+      "name": "Assign: general",
+      "config": {
+        "serverId": "$template.mcp.tracker",
+        "tool": "assign_ticket"
+      },
+      "inputs": {
+        "ticket_id": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "start",
+            "port": "ticket_id"
+          }
+        },
+        "queue": {
+          "kind": "literal",
+          "value": "general"
+        }
+      }
+    },
+    {
+      "id": "out_assigned",
+      "kind": "output",
+      "name": "Assigned",
+      "outcome": "assigned",
+      "value": {
+        "kind": "object",
+        "fields": {
+          "ticket_id": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "start",
+              "port": "ticket_id"
+            }
+          },
+          "queue": {
+            "kind": "expr",
+            "source": "coalesce(review.decision.option, classify.structured.team, router.decision.value)"
+          },
+          "decided_by": {
+            "kind": "expr",
+            "source": "coalesce(review.decision.option, '') != '' ? 'human' : (coalesce(classify.structured.team, '') != '' ? 'legacy_llm' : 'jev')"
+          },
+          "receipt_id": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "router",
+              "port": "receipt",
+              "path": "/receiptId"
+            }
+          },
+          "disposition": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "router",
+              "port": "receipt",
+              "path": "/disposition"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "out_unassigned",
+      "kind": "output",
+      "name": "Review expired",
+      "outcome": "unassigned",
+      "value": {
+        "kind": "object",
+        "fields": {
+          "ticket_id": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "start",
+              "port": "ticket_id"
+            }
+          },
+          "queue": {
+            "kind": "literal",
+            "value": null
+          },
+          "decided_by": {
+            "kind": "literal",
+            "value": "expired"
+          },
+          "receipt_id": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "router",
+              "port": "receipt",
+              "path": "/receiptId"
+            }
+          },
+          "disposition": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "router",
+              "port": "receipt",
+              "path": "/disposition"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "c1",
+      "from": {
+        "node": "router",
+        "port": "billing"
+      },
+      "to": {
+        "node": "assign_billing"
+      }
+    },
+    {
+      "id": "c2",
+      "from": {
+        "node": "router",
+        "port": "account_access"
+      },
+      "to": {
+        "node": "assign_account_access"
+      }
+    },
+    {
+      "id": "c3",
+      "from": {
+        "node": "router",
+        "port": "technical"
+      },
+      "to": {
+        "node": "assign_technical"
+      }
+    },
+    {
+      "id": "c4",
+      "from": {
+        "node": "router",
+        "port": "general"
+      },
+      "to": {
+        "node": "assign_general"
+      }
+    },
+    {
+      "id": "c5",
+      "from": {
+        "node": "router",
+        "port": "human"
+      },
+      "to": {
+        "node": "review"
+      }
+    },
+    {
+      "id": "c6",
+      "from": {
+        "node": "router",
+        "port": "legacy"
+      },
+      "to": {
+        "node": "classify"
+      }
+    },
+    {
+      "id": "c7",
+      "from": {
+        "node": "legacy_route",
+        "port": "billing"
+      },
+      "to": {
+        "node": "assign_billing"
+      }
+    },
+    {
+      "id": "c8",
+      "from": {
+        "node": "legacy_route",
+        "port": "account_access"
+      },
+      "to": {
+        "node": "assign_account_access"
+      }
+    },
+    {
+      "id": "c9",
+      "from": {
+        "node": "legacy_route",
+        "port": "technical"
+      },
+      "to": {
+        "node": "assign_technical"
+      }
+    },
+    {
+      "id": "c10",
+      "from": {
+        "node": "legacy_route",
+        "port": "general"
+      },
+      "to": {
+        "node": "assign_general"
+      }
+    },
+    {
+      "id": "c11",
+      "from": {
+        "node": "legacy_route",
+        "port": "unclassified"
+      },
+      "to": {
+        "node": "review"
+      }
+    },
+    {
+      "id": "c12",
+      "from": {
+        "node": "review",
+        "port": "billing"
+      },
+      "to": {
+        "node": "assign_billing"
+      }
+    },
+    {
+      "id": "c13",
+      "from": {
+        "node": "review",
+        "port": "account_access"
+      },
+      "to": {
+        "node": "assign_account_access"
+      }
+    },
+    {
+      "id": "c14",
+      "from": {
+        "node": "review",
+        "port": "technical"
+      },
+      "to": {
+        "node": "assign_technical"
+      }
+    },
+    {
+      "id": "c15",
+      "from": {
+        "node": "review",
+        "port": "general"
+      },
+      "to": {
+        "node": "assign_general"
+      }
+    },
+    {
+      "id": "c16",
+      "from": {
+        "node": "review",
+        "port": "expired"
+      },
+      "to": {
+        "node": "out_unassigned"
+      }
+    },
+    {
+      "id": "c17",
+      "from": {
+        "node": "assign_billing",
+        "port": "done"
+      },
+      "to": {
+        "node": "out_assigned"
+      }
+    },
+    {
+      "id": "c18",
+      "from": {
+        "node": "assign_account_access",
+        "port": "done"
+      },
+      "to": {
+        "node": "out_assigned"
+      }
+    },
+    {
+      "id": "c19",
+      "from": {
+        "node": "assign_technical",
+        "port": "done"
+      },
+      "to": {
+        "node": "out_assigned"
+      }
+    },
+    {
+      "id": "c20",
+      "from": {
+        "node": "assign_general",
+        "port": "done"
+      },
+      "to": {
+        "node": "out_assigned"
+      }
+    }
+  ],
+  "metadata": {
+    "template": {
+      "key": "jev-classifier-rollout",
+      "pattern": "Staged rollout by contract deployment",
+      "contracts": ["support.ticket_router"],
+      "handbook": [
+        "§IX.D Run in Shadow Mode",
+        "§IX.F Automate the Safest Branch",
+        "§IX.G Expand One Boundary at a Time",
+        "§IX.H Monitor Drift",
+        "§IX.I Rollout Guardrails",
+        "§V.F Calibration Rollout",
+        "§III.C Contract Versioning"
+      ],
+      "design": "docs/design/JEV_ENGINEERING.md §6.7, §11.3–§11.4",
+      "docs": "docs/jev/shadow-mode-and-rollout.md",
+      "rolloutStages": [
+        {
+          "stage": "shadow",
+          "deployment": {
+            "active": null,
+            "candidate": {
+              "version": 1,
+              "stage": "shadow"
+            }
+          },
+          "effect": "Every decision is evaluated and receipted; the legacy port carries all traffic."
+        },
+        {
+          "stage": "canary",
+          "deployment": {
+            "active": null,
+            "candidate": {
+              "version": 1,
+              "stage": "canary"
+            }
+          },
+          "guardrails": {
+            "trafficShare": 0.05,
+            "maxConsequence": "low",
+            "outcomes": ["technical"],
+            "reviewSampleRate": 0.05,
+            "sampleSalt": "ticket-router-canary-1"
+          },
+          "rollbackTriggers": [
+            {
+              "metric": "override_rate",
+              "op": ">",
+              "value": 0.05,
+              "window": "24h",
+              "minSamples": 100,
+              "action": "pause_candidate"
+            }
+          ],
+          "effect": "Five percent of eligible tickets whose outcome is technical are automated by Jev; everything else takes the legacy port."
+        },
+        {
+          "stage": "active",
+          "deployment": {
+            "active": {
+              "version": 1,
+              "stage": "active"
+            },
+            "candidate": null
+          },
+          "guardrails": {
+            "trafficShare": 0,
+            "maxConsequence": "low",
+            "outcomes": ["technical", "billing", "general"],
+            "reviewSampleRate": 0.05,
+            "sampleSalt": ""
+          },
+          "effect": "Jev routes the governed outcomes; account_access stays behind review until its own shadow numbers qualify."
+        }
+      ]
+    }
+  },
+  "layout": {
+    "nodes": {
+      "start": {
+        "x": 0,
+        "y": 0
+      },
+      "router": {
+        "x": 280,
+        "y": 0
+      },
+      "classify": {
+        "x": 560,
+        "y": 0
+      },
+      "legacy_route": {
+        "x": 840,
+        "y": 0
+      },
+      "review": {
+        "x": 1120,
+        "y": 0
+      },
+      "assign_billing": {
+        "x": 1400,
+        "y": 0
+      },
+      "assign_account_access": {
+        "x": 1400,
+        "y": 160
+      },
+      "assign_technical": {
+        "x": 1400,
+        "y": 320
+      },
+      "assign_general": {
+        "x": 1400,
+        "y": 480
+      },
+      "out_assigned": {
+        "x": 1680,
+        "y": 0
+      },
+      "out_unassigned": {
+        "x": 1400,
+        "y": 640
+      }
+    }
+  }
+}

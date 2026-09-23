@@ -1,0 +1,566 @@
+{
+  "$schema": "https://flowaid.dev/schemas/workflow/v1",
+  "id": "b4d6f8a0-2c4e-4a6b-8d0f-1e3a5c7b9d2f",
+  "description": "Bounded research loop: plan searches, run them in parallel, judge each result, accumulate scored evidence in the loop carry, synthesise and decide whether the answer is complete.",
+  "name": "Research Agent",
+  "inputs": {
+    "type": "object",
+    "required": ["question"],
+    "properties": {
+      "question": {
+        "type": "string"
+      },
+      "max_rounds": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 5,
+        "default": 3
+      }
+    }
+  },
+  "outputs": {
+    "type": "object",
+    "required": ["answer", "evidence", "complete"],
+    "properties": {
+      "answer": {
+        "type": "string"
+      },
+      "evidence": {
+        "type": "array",
+        "items": {
+          "type": "object"
+        }
+      },
+      "complete": {
+        "type": "boolean"
+      },
+      "rounds": {
+        "type": "integer"
+      }
+    }
+  },
+  "secrets": [
+    {
+      "name": "TYPESAFE_API_KEY",
+      "credentialType": "typesafe.api_key"
+    },
+    {
+      "name": "ANTHROPIC_API_KEY",
+      "credentialType": "anthropic.api_key"
+    },
+    {
+      "name": "SEARCH_API",
+      "credentialType": "http.api_key"
+    }
+  ],
+  "execution": {
+    "timeoutMs": 600000,
+    "maxCostUsd": 2,
+    "maxTokens": 400000,
+    "concurrency": 6
+  },
+  "nodes": [
+    {
+      "id": "start",
+      "kind": "input",
+      "name": "Question"
+    },
+    {
+      "id": "research",
+      "kind": "loop",
+      "name": "Research rounds",
+      "carrySchema": {
+        "type": "object",
+        "required": ["evidence", "gap"],
+        "properties": {
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "gap": {
+            "type": "string"
+          }
+        }
+      },
+      "carry": {
+        "initial": {
+          "evidence": [],
+          "gap": "none"
+        },
+        "next": {
+          "evidence": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "store",
+              "port": "result"
+            }
+          },
+          "gap": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "completeness",
+              "port": "answers",
+              "path": "/gap/value"
+            }
+          }
+        }
+      },
+      "result": {
+        "answer": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "synthesis",
+            "port": "structured",
+            "path": "/answer"
+          }
+        },
+        "complete": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "completeness",
+            "port": "answers",
+            "path": "/complete/value"
+          }
+        }
+      },
+      "exitWhen": "completeness.answers.complete.value && completeness.answers.complete.confidence >= 0.8 || $scope.iteration + 1 >= start.max_rounds",
+      "bounds": {
+        "maxIterations": 5,
+        "maxCostUsd": 1.5,
+        "timeoutMs": 480000
+      },
+      "onExhausted": "route"
+    },
+    {
+      "id": "planner",
+      "kind": "task",
+      "parent": "research",
+      "type": "flowaid.ai.structured_generate",
+      "typeVersion": "1.0.0",
+      "name": "Plan queries",
+      "config": {
+        "model": {
+          "provider": "anthropic",
+          "model": "claude-sonnet-4-5"
+        },
+        "schema": {
+          "type": "object",
+          "required": ["queries"],
+          "properties": {
+            "queries": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 4,
+              "items": {
+                "type": "object",
+                "required": ["query", "source"],
+                "properties": {
+                  "query": {
+                    "type": "string"
+                  },
+                  "source": {
+                    "type": "string",
+                    "enum": ["web", "papers"]
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "inputs": {
+        "prompt": {
+          "kind": "template",
+          "source": "Question: {{ start.question }}\nRound {{ $scope.iteration + 1 }}. Known gap: {{ $scope.carry.gap }}\nEvidence so far: {{ $scope.carry.evidence | json }}\nPropose up to 4 targeted searches."
+        }
+      },
+      "credentials": {
+        "llm": "ANTHROPIC_API_KEY"
+      }
+    },
+    {
+      "id": "search_all",
+      "kind": "foreach",
+      "parent": "research",
+      "name": "Run searches",
+      "items": {
+        "kind": "ref",
+        "ref": {
+          "kind": "port",
+          "node": "planner",
+          "port": "structured",
+          "path": "/queries"
+        }
+      },
+      "concurrency": 4,
+      "failurePolicy": "collect",
+      "bounds": {
+        "maxIterations": 4
+      },
+      "collect": {
+        "kind": "object",
+        "fields": {
+          "query": {
+            "kind": "ref",
+            "ref": {
+              "kind": "scope",
+              "field": "item",
+              "path": "/query"
+            }
+          },
+          "result": {
+            "kind": "expr",
+            "source": "first(web.body.results)"
+          },
+          "judgment": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "judge",
+              "port": "answers"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "web",
+      "kind": "task",
+      "parent": "search_all",
+      "type": "flowaid.tools.http",
+      "typeVersion": "1.0.0",
+      "name": "Search",
+      "config": {
+        "method": "GET",
+        "url": "https://search.example.com/v1?q={{ $scope.item.query }}&source={{ $scope.item.source }}",
+        "responseType": "json"
+      },
+      "credentials": {
+        "auth": "SEARCH_API"
+      },
+      "policy": {
+        "retry": {
+          "maxAttempts": 2
+        }
+      }
+    },
+    {
+      "id": "judge",
+      "kind": "task",
+      "parent": "search_all",
+      "type": "flowaid.decision.batch",
+      "typeVersion": "1.0.0",
+      "name": "Judge result",
+      "config": {
+        "questions": {
+          "relevant": {
+            "kind": "score",
+            "instructions": "How relevant is this result to the question?",
+            "levels": ["Irrelevant", "Weak", "Partial", "Strong", "Direct answer"]
+          },
+          "reliable": {
+            "kind": "score",
+            "instructions": "How reliable is the source?",
+            "levels": ["Unreliable", "Questionable", "Mixed", "Reliable", "Authoritative"]
+          }
+        }
+      },
+      "inputs": {
+        "state": {
+          "kind": "object",
+          "fields": {
+            "question": {
+              "kind": "ref",
+              "ref": {
+                "kind": "port",
+                "node": "start",
+                "port": "question"
+              }
+            },
+            "result": {
+              "kind": "expr",
+              "source": "first(web.body.results)"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "typesafe": "TYPESAFE_API_KEY"
+      }
+    },
+    {
+      "id": "store",
+      "kind": "task",
+      "parent": "research",
+      "type": "flowaid.data.transform",
+      "typeVersion": "1.0.0",
+      "name": "Accumulate evidence",
+      "config": {
+        "output": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "expr": "$scope.carry.evidence + filter(search_all.results, r => r.judgment.relevant.value >= 2 && r.judgment.reliable.value >= 2)"
+      }
+    },
+    {
+      "id": "synthesis",
+      "kind": "task",
+      "parent": "research",
+      "type": "flowaid.ai.structured_generate",
+      "typeVersion": "1.0.0",
+      "name": "Synthesize",
+      "config": {
+        "model": {
+          "provider": "anthropic",
+          "model": "claude-sonnet-4-5"
+        },
+        "schema": {
+          "type": "object",
+          "required": ["answer", "citations"],
+          "properties": {
+            "answer": {
+              "type": "string"
+            },
+            "citations": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "inputs": {
+        "prompt": {
+          "kind": "template",
+          "source": "Question: {{ start.question }}\nEvidence (scored): {{ store.result | json }}\nWrite a sourced answer; cite by url."
+        }
+      },
+      "credentials": {
+        "llm": "ANTHROPIC_API_KEY"
+      }
+    },
+    {
+      "id": "completeness",
+      "kind": "task",
+      "parent": "research",
+      "type": "flowaid.decision.batch",
+      "typeVersion": "1.0.0",
+      "name": "Complete?",
+      "config": {
+        "questions": {
+          "complete": {
+            "kind": "boolean",
+            "instructions": "Does the answer fully address the question with adequate evidence?",
+            "criteria": {
+              "true": "Complete and well-supported",
+              "false": "Missing aspects or weak evidence"
+            }
+          },
+          "gap": {
+            "kind": "choice",
+            "instructions": "What is the main gap, if any?",
+            "options": {
+              "none": "No gap",
+              "missing_data": "Key facts missing",
+              "conflicting": "Sources conflict",
+              "outdated": "Evidence may be stale"
+            }
+          }
+        }
+      },
+      "inputs": {
+        "state": {
+          "kind": "object",
+          "fields": {
+            "question": {
+              "kind": "ref",
+              "ref": {
+                "kind": "port",
+                "node": "start",
+                "port": "question"
+              }
+            },
+            "answer": {
+              "kind": "ref",
+              "ref": {
+                "kind": "port",
+                "node": "synthesis",
+                "port": "structured",
+                "path": "/answer"
+              }
+            },
+            "evidence_count": {
+              "kind": "expr",
+              "source": "len(store.result)"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "typesafe": "TYPESAFE_API_KEY"
+      }
+    },
+    {
+      "id": "out_done",
+      "kind": "output",
+      "name": "Answer",
+      "outcome": "complete",
+      "value": {
+        "kind": "object",
+        "fields": {
+          "answer": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "research",
+              "port": "result",
+              "path": "/answer"
+            }
+          },
+          "evidence": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "research",
+              "port": "carry",
+              "path": "/evidence"
+            }
+          },
+          "complete": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "research",
+              "port": "result",
+              "path": "/complete"
+            }
+          },
+          "rounds": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "research",
+              "port": "iterations"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "out_partial",
+      "kind": "output",
+      "name": "Best effort",
+      "outcome": "partial",
+      "value": {
+        "kind": "object",
+        "fields": {
+          "answer": {
+            "kind": "expr",
+            "source": "coalesce(research.result.answer, '')"
+          },
+          "evidence": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "research",
+              "port": "carry",
+              "path": "/evidence"
+            }
+          },
+          "complete": {
+            "kind": "literal",
+            "value": false
+          },
+          "rounds": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "research",
+              "port": "iterations"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "c1",
+      "from": {
+        "node": "research",
+        "port": "done"
+      },
+      "to": {
+        "node": "out_done"
+      }
+    },
+    {
+      "id": "c2",
+      "from": {
+        "node": "research",
+        "port": "exhausted"
+      },
+      "to": {
+        "node": "out_partial"
+      }
+    }
+  ],
+  "layout": {
+    "nodes": {
+      "start": {
+        "x": 0,
+        "y": 220
+      },
+      "research": {
+        "x": 260,
+        "y": 220
+      },
+      "planner": {
+        "x": 300,
+        "y": 360
+      },
+      "search_all": {
+        "x": 540,
+        "y": 360
+      },
+      "web": {
+        "x": 580,
+        "y": 500
+      },
+      "judge": {
+        "x": 820,
+        "y": 500
+      },
+      "store": {
+        "x": 780,
+        "y": 360
+      },
+      "synthesis": {
+        "x": 1020,
+        "y": 360
+      },
+      "completeness": {
+        "x": 1260,
+        "y": 360
+      },
+      "out_done": {
+        "x": 520,
+        "y": 220
+      },
+      "out_partial": {
+        "x": 780,
+        "y": 220
+      }
+    }
+  }
+}

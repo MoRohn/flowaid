@@ -1,0 +1,284 @@
+{
+  "id": "flowaid.decision.choice",
+  "version": "1.0.0",
+  "metadata": {
+    "name": "Choice",
+    "description": "Classifies `state` into one of the configured options and returns a probability per option (TypeSafe choice decision). Every option id is also a control-out port.",
+    "category": "decision",
+    "icon": "list-checks",
+    "tags": ["decision", "typesafe", "classification"],
+    "summary": "{{ config.instructions }}"
+  },
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "instructions": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 4000,
+        "x-ui": {
+          "widget": "textarea",
+          "help": "The question the model answers about `state`."
+        }
+      },
+      "options": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "string"
+        },
+        "x-ui": {
+          "widget": "keyvalue",
+          "help": "Option id → description. Each id becomes a control-out port."
+        },
+        "minProperties": 2,
+        "maxProperties": 255,
+        "propertyNames": {
+          "pattern": "^[a-z0-9_]{1,64}$"
+        }
+      }
+    },
+    "required": ["instructions", "options"],
+    "additionalProperties": false
+  },
+  "inputs": [
+    {
+      "name": "state",
+      "schema": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object"
+          },
+          {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "TypeSafe state: text, an object (sent verbatim) or an array of text."
+      },
+      "required": true,
+      "description": "What the decision is about."
+    }
+  ],
+  "outputs": [
+    {
+      "name": "decision",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$defs": {
+          "__schema0": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/__schema0"
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "$ref": "#/$defs/__schema0"
+                },
+                "propertyNames": {
+                  "type": "string"
+                }
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "properties": {
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "provider": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "latencyMs": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "usage": {
+            "type": "object",
+            "properties": {
+              "inputTokens": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "outputTokens": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "cacheReadTokens": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "cacheWriteTokens": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": ["inputTokens", "outputTokens"],
+            "additionalProperties": false
+          },
+          "costUsd": {
+            "type": "number",
+            "minimum": 0
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "raw": {
+            "$ref": "#/$defs/__schema0"
+          },
+          "attempts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "provider": {
+                  "type": "string"
+                },
+                "model": {
+                  "type": "string"
+                },
+                "outcome": {
+                  "type": "string",
+                  "enum": ["ok", "error", "skipped_unhealthy"]
+                },
+                "errorCode": {
+                  "type": "string",
+                  "enum": [
+                    "WORKFLOW_VALIDATION_ERROR",
+                    "SCHEMA_VALIDATION_ERROR",
+                    "NODE_EXECUTION_ERROR",
+                    "TOOL_EXECUTION_ERROR",
+                    "PROVIDER_ERROR",
+                    "PROVIDER_RATE_LIMITED",
+                    "PROVIDER_OVERLOADED",
+                    "CREDENTIAL_ERROR",
+                    "TIMEOUT_ERROR",
+                    "RATE_LIMIT_ERROR",
+                    "CANCELLED_ERROR",
+                    "BOUNDS_EXCEEDED",
+                    "INPUT_MISSING",
+                    "OUTPUT_SCHEMA_MISMATCH",
+                    "EXPRESSION_ERROR",
+                    "SANDBOX_ERROR",
+                    "WORKER_LOST",
+                    "NONIDEMPOTENT_INTERRUPTED",
+                    "HUMAN_APPROVAL_REQUIRED",
+                    "HUMAN_TASK_EXPIRED",
+                    "SUBFLOW_ERROR",
+                    "NO_OUTPUT",
+                    "NETWORK_ERROR",
+                    "NOT_FOUND",
+                    "CONFLICT",
+                    "UNAUTHORIZED",
+                    "FORBIDDEN",
+                    "BAD_REQUEST",
+                    "PAYLOAD_TOO_LARGE",
+                    "INTERNAL"
+                  ]
+                },
+                "latencyMs": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": ["provider", "model", "outcome", "latencyMs"],
+              "additionalProperties": false
+            }
+          },
+          "kind": {
+            "type": "string",
+            "const": "choice"
+          },
+          "value": {
+            "type": "string"
+          },
+          "probabilities": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "confidence",
+          "provider",
+          "model",
+          "latencyMs",
+          "costUsd",
+          "attempts",
+          "kind",
+          "value",
+          "probabilities"
+        ],
+        "additionalProperties": false
+      },
+      "required": true,
+      "description": "The full DecisionResult (kind = choice)."
+    }
+  ],
+  "controlPorts": [],
+  "portRules": [
+    {
+      "kind": "controlPortsFromConfig",
+      "path": "/options"
+    }
+  ],
+  "credentials": [
+    {
+      "name": "typesafe",
+      "types": ["typesafe.api_key"],
+      "required": true,
+      "description": "TypeSafe API key used by the primary hop."
+    }
+  ],
+  "capabilities": ["decision", "credentials"],
+  "idempotency": "safe",
+  "pool": "general",
+  "decision": {
+    "kind": "choice"
+  },
+  "generation": false,
+  "streams": false,
+  "optionProviders": [],
+  "migrations": [],
+  "defaultPolicy": {
+    "timeoutMs": 30000
+  }
+}

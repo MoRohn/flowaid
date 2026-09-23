@@ -1,0 +1,10 @@
+{
+  "mcpServers": [
+    {
+      "key": "github",
+      "description": "GitHub MCP server for the repository being triaged: searches similar issues, comments on duplicates and applies labels.",
+      "requiredTools": ["search_issues", "add_issue_comment", "add_issue_labels"]
+    }
+  ],
+  "knowledgeSources": []
+}

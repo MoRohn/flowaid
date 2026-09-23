@@ -1,0 +1,18 @@
+{
+  "type": "TOOL_CALLED",
+  "runId": "0192f0a1-5b3c-7d4e-8f60-1a2b3c4d5e6f",
+  "seq": 37,
+  "at": "2026-09-22T10:00:09.250Z",
+  "nodeRunId": "0192f0a1-5b3c-7d4e-8f60-0000000000b6",
+  "nodeId": "web",
+  "scope": "research#0/search_all#1",
+  "attempt": 1,
+  "toolCallId": "call_01",
+  "tool": "web_search",
+  "source": "mcp",
+  "args": {
+    "query": "gold plan double charge refund policy"
+  },
+  "capability": "search.read",
+  "coerced": false
+}

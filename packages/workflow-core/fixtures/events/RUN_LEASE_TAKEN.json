@@ -1,0 +1,9 @@
+{
+  "type": "RUN_LEASE_TAKEN",
+  "runId": "0192f0a1-5b3c-7d4e-8f60-1a2b3c4d5e6f",
+  "seq": 22,
+  "at": "2026-09-22T10:00:05.500Z",
+  "workerId": "worker-general-02",
+  "previousWorkerId": "worker-general-01",
+  "reason": "resume"
+}

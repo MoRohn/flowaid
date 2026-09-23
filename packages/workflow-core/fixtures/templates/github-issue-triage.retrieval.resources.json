@@ -1,0 +1,15 @@
+{
+  "mcpServers": [
+    {
+      "key": "github",
+      "description": "GitHub MCP server for the repository being triaged: comments on duplicates and applies labels.",
+      "requiredTools": ["add_issue_comment", "add_issue_labels"]
+    }
+  ],
+  "knowledgeSources": [
+    {
+      "key": "github_issues",
+      "description": "Knowledge source indexing the repository's existing issues (title, body, metadata.number, metadata.repo) for hybrid duplicate search."
+    }
+  ]
+}

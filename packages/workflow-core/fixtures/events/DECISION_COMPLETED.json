@@ -1,0 +1,44 @@
+{
+  "type": "DECISION_COMPLETED",
+  "runId": "0192f0a1-5b3c-7d4e-8f60-1a2b3c4d5e6f",
+  "seq": 5,
+  "at": "2026-09-22T10:00:01.250Z",
+  "nodeRunId": "0192f0a1-5b3c-7d4e-8f60-0000000000a2",
+  "nodeId": "intent",
+  "scope": "",
+  "attempt": 1,
+  "batchId": "batch_intent_01",
+  "question": "Which team should handle this support request?",
+  "decision": {
+    "confidence": 0.91,
+    "provider": "typesafe",
+    "model": "jev-1.13.0",
+    "latencyMs": 310,
+    "usage": {
+      "inputTokens": 412,
+      "outputTokens": 0
+    },
+    "costUsd": 0.000206,
+    "requestId": "ts_req_01J8Z0X1",
+    "attempts": [
+      {
+        "provider": "typesafe",
+        "model": "jev-1.13.0",
+        "outcome": "ok",
+        "latencyMs": 310
+      }
+    ],
+    "kind": "choice",
+    "value": "billing",
+    "probabilities": {
+      "billing": 0.91,
+      "technical": 0.05,
+      "security": 0.01,
+      "general": 0.03
+    }
+  },
+  "priceSnapshot": {
+    "inputPerMTok": 0.5,
+    "outputPerMTok": 0
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "type": "SUBFLOW_COMPLETED",
+  "runId": "0192f0a1-5b3c-7d4e-8f60-1a2b3c4d5e6f",
+  "seq": 46,
+  "at": "2026-09-22T10:00:11.500Z",
+  "nodeRunId": "0192f0a1-5b3c-7d4e-8f60-0000000000c2",
+  "nodeId": "enrich",
+  "scope": "",
+  "attempt": 1,
+  "childRunId": "0192f0a1-5b3c-7d4e-8f60-0000000000d1",
+  "status": "completed",
+  "output": {
+    "segment": "enterprise"
+  },
+  "error": null
+}

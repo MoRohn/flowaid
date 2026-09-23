@@ -1,0 +1,15 @@
+{
+  "type": "ARTIFACT_CREATED",
+  "runId": "0192f0a1-5b3c-7d4e-8f60-1a2b3c4d5e6f",
+  "seq": 39,
+  "at": "2026-09-22T10:00:09.750Z",
+  "nodeRunId": "0192f0a1-5b3c-7d4e-8f60-0000000000b6",
+  "nodeId": "web",
+  "scope": "research#0/search_all#1",
+  "attempt": 1,
+  "artifactId": "0192f0a1-5b3c-7d4e-8f60-0000000000e1",
+  "name": "response.html",
+  "mimeType": "text/html",
+  "bytes": 48213,
+  "dataClass": "internal"
+}

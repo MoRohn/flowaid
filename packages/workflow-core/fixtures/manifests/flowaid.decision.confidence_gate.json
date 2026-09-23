@@ -1,0 +1,142 @@
+{
+  "id": "flowaid.decision.confidence_gate",
+  "version": "1.0.0",
+  "metadata": {
+    "name": "Confidence gate",
+    "description": "Routes a decision by confidence: `pass` when it reaches `threshold` (and, with `requireValue`, a boolean value is true); otherwise `review` — or, with `reviewBand`, `review` only inside `[threshold − reviewBand, threshold)` and `fail` below it. Passes the decision through and reports `passed` and `outcome`.",
+    "category": "safety",
+    "icon": "shield-check",
+    "tags": ["decision", "safety", "routing"],
+    "summary": "threshold {{ config.threshold }}"
+  },
+  "configSchema": {
+    "type": "object",
+    "description": "`pass` iff `confidence ≥ threshold` and (`requireValue` is false or the decision is boolean with `value === true`); otherwise `fail` iff `reviewBand` is set and `confidence < threshold − reviewBand`; otherwise `review`. Without `reviewBand` the gate is two-way (`pass`/`review`, as in §2.9); with it the band `[threshold − reviewBand, threshold)` goes to review and everything below to `fail`; a `requireValue` failure routes `fail` when `reviewBand` is set, else `review`. The UI's two-threshold model maps onto this as `auto := threshold`, `review := threshold − (reviewBand ?? threshold)`, with outcome names `pass | review | fail`.",
+    "properties": {
+      "threshold": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1,
+        "x-ui": {
+          "widget": "slider",
+          "bindable": true,
+          "min": 0,
+          "max": 1,
+          "step": 0.01
+        }
+      },
+      "requireValue": {
+        "type": "boolean",
+        "default": false,
+        "x-ui": {
+          "widget": "switch",
+          "help": "Also require a boolean decision value of true to pass."
+        }
+      },
+      "reviewBand": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1,
+        "x-ui": {
+          "widget": "slider",
+          "min": 0,
+          "max": 1,
+          "step": 0.01,
+          "help": "Optional. Width of the review band below the threshold: confidences in [threshold − reviewBand, threshold) go to review, lower ones to fail. Unset, the gate is two-way (pass/review)."
+        }
+      }
+    },
+    "required": ["threshold"],
+    "additionalProperties": false
+  },
+  "inputs": [
+    {
+      "name": "decision",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["boolean", "choice", "score"]
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        },
+        "required": ["kind", "value", "confidence"]
+      },
+      "required": true
+    }
+  ],
+  "outputs": [
+    {
+      "name": "decision",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["boolean", "choice", "score"]
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        },
+        "required": ["kind", "value", "confidence"]
+      },
+      "required": true,
+      "description": "The input decision, unchanged."
+    },
+    {
+      "name": "passed",
+      "schema": {
+        "type": "boolean"
+      },
+      "required": true,
+      "description": "`true` iff `outcome` is `pass`."
+    },
+    {
+      "name": "outcome",
+      "schema": {
+        "type": "string",
+        "enum": ["pass", "review", "fail"]
+      },
+      "required": true,
+      "description": "The control port the gate fired: `pass`, `review` or `fail` (§6.3 gate semantics)."
+    }
+  ],
+  "controlPorts": [
+    {
+      "name": "pass",
+      "label": "Pass",
+      "description": "confidence ≥ threshold (and, with requireValue, a boolean value of true)."
+    },
+    {
+      "name": "review",
+      "label": "Needs review",
+      "description": "Below threshold; with reviewBand only within [threshold − reviewBand, threshold)."
+    },
+    {
+      "name": "fail",
+      "label": "Fail",
+      "description": "Only with reviewBand: confidence < threshold − reviewBand, or a requireValue failure."
+    }
+  ],
+  "portRules": [],
+  "credentials": [],
+  "capabilities": [],
+  "idempotency": "safe",
+  "pool": "general",
+  "decision": {
+    "kind": "gate"
+  },
+  "generation": false,
+  "streams": false,
+  "optionProviders": [],
+  "migrations": [],
+  "defaultPolicy": {}
+}

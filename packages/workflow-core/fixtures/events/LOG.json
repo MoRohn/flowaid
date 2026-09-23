@@ -1,0 +1,16 @@
+{
+  "type": "LOG",
+  "runId": "0192f0a1-5b3c-7d4e-8f60-1a2b3c4d5e6f",
+  "seq": 11,
+  "at": "2026-09-22T10:00:02.750Z",
+  "nodeRunId": "0192f0a1-5b3c-7d4e-8f60-0000000000a5",
+  "nodeId": "draft",
+  "scope": "",
+  "attempt": 1,
+  "level": "info",
+  "message": "Prompt assembled",
+  "data": {
+    "chars": 812,
+    "account": "unavailable"
+  }
+}

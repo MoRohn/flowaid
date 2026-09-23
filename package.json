@@ -1,0 +1,46 @@
+{
+  "name": "flowaid",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Open-source, backend-first AI agent and workflow platform with typed decision intelligence.",
+  "license": "Apache-2.0",
+  "packageManager": "pnpm@12.5.1",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev --parallel",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "test:e2e": "turbo run test:e2e",
+    "db:migrate": "pnpm --filter @flowaid/database migrate",
+    "db:generate": "pnpm --filter @flowaid/database generate",
+    "format": "prettier --write \"**/*.{ts,tsx,md,json,yaml,yml,css}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,md,json,yaml,yml,css}\"",
+    "clean": "turbo run clean && rm -rf node_modules",
+    "boundaries": "vitest run --project root",
+    "env:example": "tsx scripts/gen-env-example.ts",
+    "env:check": "tsx scripts/gen-env-example.ts --check",
+    "ui:inventory": "tsx scripts/ui-inventory.ts",
+    "ui:inventory:check": "tsx scripts/ui-inventory.ts --check",
+    "lint:root": "eslint scripts docker eslint.boundaries.js packages/config",
+    "typecheck:root": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "@flowaid/config": "workspace:*",
+    "@types/node": "24.13.6",
+    "esbuild": "0.28.2",
+    "eslint": "9.39.5",
+    "happy-dom": "20.14.5",
+    "prettier": "3.9.8",
+    "tsx": "4.23.15",
+    "turbo": "2.11.2",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.70.1",
+    "vitest": "4.1.11",
+    "yaml": "2.9.1"
+  }
+}

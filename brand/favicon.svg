@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <title>FlowAId</title>
+  <rect width="32" height="32" rx="7" fill="#17171C"/>
+  <g fill="none" stroke="#FFFFFF" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round" transform="translate(0.5 0)">
+    <path d="M5 16h6"/>
+    <path d="M11 16c5.5 0 5.5-8 11-8"/>
+    <path d="M11 16h11" opacity="0.42"/>
+    <path d="M11 16c5.5 0 5.5 8 11 8" opacity="0.18"/>
+  </g>
+  <circle cx="23.5" cy="8" r="2.75" fill="#6b93ff"/>
+</svg>

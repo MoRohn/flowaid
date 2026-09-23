@@ -1,0 +1,13 @@
+{
+  "type": "RUN_TIMED_OUT",
+  "runId": "0192f0a1-5b3c-7d4e-8f60-1a2b3c4d5e6f",
+  "seq": 32,
+  "at": "2026-09-22T10:00:08.000Z",
+  "timeoutMs": 180000,
+  "usage": {
+    "inputTokens": 1842,
+    "outputTokens": 296
+  },
+  "costUsd": 0.00087,
+  "durationMs": 180000
+}

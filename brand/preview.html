@@ -1,0 +1,431 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FlowAId identity</title>
+<meta name="description" content="Logo, color, type and component identity for FlowAId, the open-source AI workflow platform.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="tokens.css">
+<style>
+  @font-face { font-family: "Instrument Sans"; font-weight: 400; src: url(fonts/InstrumentSans-Regular.ttf) format("truetype"); }
+  @font-face { font-family: "Instrument Sans"; font-weight: 500; src: url(fonts/InstrumentSans-Medium.ttf) format("truetype"); }
+  @font-face { font-family: "Instrument Sans"; font-weight: 600; src: url(fonts/InstrumentSans-SemiBold.ttf) format("truetype"); }
+  @font-face { font-family: "Instrument Sans"; font-weight: 700; src: url(fonts/InstrumentSans-Bold.ttf) format("truetype"); }
+  @font-face { font-family: "JetBrains Mono"; font-weight: 400; src: url(fonts/JetBrainsMono-Regular.ttf) format("truetype"); }
+  @font-face { font-family: "JetBrains Mono"; font-weight: 500; src: url(fonts/JetBrainsMono-Medium.ttf) format("truetype"); }
+  @font-face { font-family: "JetBrains Mono"; font-weight: 600; src: url(fonts/JetBrainsMono-SemiBold.ttf) format("truetype"); }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  html { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+  body {
+    margin: 0; background: var(--canvas); color: var(--ink);
+    font-family: var(--font-sans); font-size: var(--text-sm); line-height: var(--leading-normal);
+  }
+  a { color: inherit; }
+  code, .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+  .page { max-width: 1120px; margin: 0 auto; padding: 0 16px 96px; }
+
+  /* top bar mirrors the app chrome */
+  .bar {
+    position: sticky; top: 0; z-index: 5; height: var(--topbar-h);
+    display: flex; align-items: center; gap: 12px; padding: 0 16px;
+    background: color-mix(in srgb, var(--surface) 88%, transparent); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+  .bar .wm { height: 14px; width: auto; display: block; }
+  .bar .crumb { color: var(--ink-3); }
+  .bar .crumb b { color: var(--ink); font-weight: 500; }
+  .bar .spacer { flex: 1; }
+  .btn {
+    appearance: none; border: 1px solid var(--border); background: var(--surface); color: var(--ink);
+    height: 28px; padding: 0 10px; border-radius: var(--radius-sm); font: inherit; font-weight: 500; font-size: var(--text-xs);
+    display: inline-flex; align-items: center; gap: 6px; cursor: pointer; box-shadow: var(--shadow-1);
+    transition: background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+  }
+  .btn:hover { background: var(--surface-3); }
+  .btn:focus-visible { outline: none; box-shadow: var(--focus); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); box-shadow: none; }
+  .btn.primary:hover { background: var(--accent-hover); }
+  .btn kbd { font-family: var(--font-mono); font-size: 10px; color: var(--ink-3); border: 1px solid var(--border); border-radius: 3px; padding: 0 4px; line-height: 16px; }
+  .btn.primary kbd { color: var(--accent-ink); border-color: color-mix(in srgb, var(--accent-ink) 35%, transparent); }
+
+  /* hero */
+  .hero { padding: 88px 0 56px; display: grid; grid-template-columns: 1fr; gap: 40px; }
+  .hero .mark { width: 64px; height: 64px; color: var(--ink); }
+  .hero h1 { margin: 20px 0 0; font-size: clamp(2rem, 5vw, 3.5rem); font-weight: 600; letter-spacing: var(--tracking-display); line-height: 1.02; max-width: 15ch; }
+  .hero p { margin: 18px 0 0; font-size: var(--text-md); color: var(--ink-2); max-width: 54ch; }
+  .hero .wm-lg { height: 40px; width: auto; display: block; margin-top: 28px; color: var(--ink); }
+
+  /* signature: the probability ruler */
+  .ruler { display: flex; gap: 3px; height: 8px; width: 100%; max-width: 560px; margin-top: 36px; }
+  .ruler i { display: block; border-radius: 2px; background: var(--p-1); }
+  .ruler i:nth-child(2) { background: var(--p-2); }
+  .ruler i:nth-child(3) { background: var(--p-3); }
+  .ruler i:nth-child(4) { background: var(--p-4); }
+  .ruler-legend { display: flex; gap: 3px; max-width: 560px; margin-top: 6px; font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--ink-3); }
+  .ruler-legend span { overflow: hidden; white-space: nowrap; }
+  .ruler-legend span:first-child { color: var(--accent-text); }
+
+  h2 { font-size: var(--text-lg); font-weight: 600; letter-spacing: var(--tracking-tight); margin: 72px 0 8px; }
+  h2 + p { margin: 0 0 24px; color: var(--ink-2); max-width: 64ch; }
+  .eyebrow { font-family: var(--font-mono); font-size: var(--text-2xs); letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--ink-3); }
+
+  .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px; box-shadow: var(--shadow-1); }
+
+  /* logo lockups */
+  .lockups { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+  .lockup { display: grid; place-items: center; min-height: 168px; position: relative; }
+  .lockup .lbl { position: absolute; left: 12px; top: 10px; }
+  .lockup.dark { background: #0e0e11; color: #ededf0; border-color: #26262d; }
+  .lockup.light { background: #ffffff; color: #17171c; border-color: #e3e3e8; }
+  .lockup.tint { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .lockup .l-mark { width: 40px; height: 40px; }
+  .lockup .l-wm { height: 22px; width: auto; }
+  .lockup .row { display: flex; align-items: center; gap: 12px; }
+  .sizes { display: flex; align-items: flex-end; gap: 28px; }
+  .sizes figure { margin: 0; display: grid; justify-items: center; gap: 8px; }
+  .sizes figcaption { font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--ink-3); }
+
+  /* swatches */
+  .sw { display: grid; gap: 8px; }
+  .sw i { display: block; height: 44px; border-radius: var(--radius-sm); border: 1px solid var(--border); }
+  .sw b { font-weight: 500; font-size: var(--text-xs); display: block; }
+  .sw code { font-size: var(--text-2xs); color: var(--ink-3); }
+
+  /* type */
+  .type dl { margin: 0; display: grid; grid-template-columns: 96px 1fr; row-gap: 18px; column-gap: 20px; align-items: baseline; }
+  .type dt { font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--ink-3); }
+  .type dd { margin: 0; }
+
+  /* node cards (the compact node design) */
+  .nodes { display: grid; grid-template-columns: repeat(auto-fill, minmax(232px, 1fr)); gap: 16px; align-items: start; }
+  .node {
+    width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md);
+    box-shadow: var(--shadow-1); position: relative; --c: var(--cat-flow);
+    transition: box-shadow var(--dur-base) var(--ease-out), border-color var(--dur-base) var(--ease-out);
+  }
+  .node:hover { box-shadow: var(--shadow-2); }
+  .node.selected { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft), var(--shadow-1); }
+  .node.running { border-color: var(--info); }
+  .node.failed { border-color: var(--danger); }
+  .node.waiting { border-color: var(--cat-human); }
+  .node .head { display: flex; align-items: center; gap: 8px; padding: 9px 10px 0; }
+  .node .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c); flex: none; }
+  .node .name { font-weight: 600; font-size: var(--text-sm); letter-spacing: -0.01em; }
+  .node .kind { margin-left: auto; font-family: var(--font-mono); font-size: 10px; color: var(--ink-3); letter-spacing: 0.02em; }
+  .node .sub { padding: 2px 10px 0 26px; color: var(--ink-2); font-size: var(--text-xs); }
+  .node .meta { padding: 8px 10px 0 26px; font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--ink-3); display: flex; gap: 10px; flex-wrap: wrap; }
+  .node .foot { display: flex; align-items: center; gap: 8px; padding: 8px 10px 9px; margin-top: 6px; border-top: 1px solid var(--border); font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--ink-3); }
+  .node .foot .st { display: inline-flex; align-items: center; gap: 5px; }
+  .node .foot .st::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--ok); }
+  .node .foot .st.run::before { background: var(--info); animation: pulse 1.2s ease-in-out infinite; }
+  .node .foot .st.fail::before { background: var(--danger); }
+  .node .foot .st.wait::before { background: var(--cat-human); }
+  .node .foot .r { margin-left: auto; }
+  .node .dist { padding: 8px 10px 0 26px; display: grid; gap: 4px; }
+  .node .dist .opt { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--ink-3); }
+  .node .dist .opt.win { color: var(--ink); }
+  .node .dist .bar { grid-column: 1 / -1; height: 3px; border-radius: 2px; background: var(--surface-3); overflow: hidden; }
+  .node .dist .bar i { display: block; height: 100%; background: var(--p-2); width: var(--w); border-radius: 2px; }
+  .node .dist .opt.win + .bar i { background: var(--p-1); }
+  .port { position: absolute; width: 8px; height: 8px; border-radius: 50%; background: var(--surface); border: 1.5px solid var(--border-strong); top: 15px; }
+  .port.in { left: -5px; } .port.out { right: -5px; }
+  .port.typed { border-color: var(--c); }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+  /* status chips */
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 8px; border-radius: var(--radius-full); font-size: var(--text-xs); font-weight: 500; border: 1px solid transparent; }
+  .chip::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .chip.ok { background: var(--ok-soft); color: var(--ok); }
+  .chip.run { background: var(--info-soft); color: var(--info); }
+  .chip.wait { background: var(--warn-soft); color: var(--warn); }
+  .chip.fail { background: var(--danger-soft); color: var(--danger); }
+  .chip.neutral { background: var(--surface-3); color: var(--ink-2); }
+  .chip.queued { background: var(--surface-3); color: var(--ink-3); }
+
+  /* trace timeline */
+  .trace { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; box-shadow: var(--shadow-1); font-family: var(--font-mono); font-size: var(--text-xs); }
+  .trace .row { display: grid; grid-template-columns: 64px 18px 1fr 200px 64px; align-items: center; gap: 10px; padding: 0 12px; height: 30px; border-top: 1px solid var(--border); }
+  .trace .row:first-child { border-top: 0; }
+  .trace .row.sel { background: var(--accent-soft); }
+  .trace .t { color: var(--ink-3); text-align: right; }
+  .trace .k { width: 8px; height: 8px; border-radius: 50%; background: var(--c, var(--cat-flow)); justify-self: center; }
+  .trace .n { font-family: var(--font-sans); font-weight: 500; }
+  .trace .n small { font-weight: 400; color: var(--ink-3); margin-left: 6px; font-family: var(--font-mono); }
+  .trace .span { height: 6px; border-radius: 3px; background: var(--c, var(--cat-flow)); opacity: 0.85; margin-left: var(--off); width: var(--w); }
+  .trace .d { color: var(--ink-3); text-align: right; }
+  .trace .sub { grid-column: 3 / -1; display: flex; gap: 14px; padding: 2px 0 8px; color: var(--ink-3); }
+  .trace .sub b { color: var(--accent-text); font-weight: 500; }
+  .trace .row.detail { height: auto; padding-top: 0; border-top: 0; }
+
+  /* inputs */
+  .field { display: grid; gap: 6px; }
+  .field label { font-size: var(--text-xs); font-weight: 500; color: var(--ink-2); }
+  .field input, .field select { height: 30px; border: 1px solid var(--border); background: var(--surface); color: var(--ink); border-radius: var(--radius-sm); padding: 0 8px; font: inherit; font-size: var(--text-sm); }
+  .field input:focus-visible { outline: none; box-shadow: var(--focus); border-color: var(--accent); }
+  .field .hint { font-size: var(--text-2xs); color: var(--ink-3); }
+
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  @media (max-width: 720px) { .two { grid-template-columns: 1fr; } .trace .row { grid-template-columns: 52px 14px 1fr 48px; } .trace .span { display: none; } }
+
+  .toggle { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
+  .toggle button { appearance: none; border: 0; background: var(--surface); color: var(--ink-2); height: 26px; padding: 0 10px; font: inherit; font-size: var(--text-xs); cursor: pointer; }
+  .toggle button[aria-pressed="true"] { background: var(--surface-3); color: var(--ink); font-weight: 500; }
+  .toggle button:focus-visible { outline: none; box-shadow: inset var(--focus); }
+
+  .principles { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+  .principles .card b { display: block; font-weight: 600; margin-bottom: 4px; }
+  .principles .card span { color: var(--ink-2); }
+</style>
+</head>
+<body>
+  <div class="bar">
+    <svg class="wm" viewBox="0 0 357 80" aria-label="FlowAId"><use href="#wordmark"/></svg>
+    <span class="crumb">/ <b>Identity</b></span>
+    <span class="spacer"></span>
+    <div class="toggle" role="group" aria-label="Theme">
+      <button type="button" data-theme-set="light" aria-pressed="true">Light</button>
+      <button type="button" data-theme-set="dark" aria-pressed="false">Dark</button>
+    </div>
+    <button class="btn" type="button">Run <kbd>⌘↵</kbd></button>
+    <button class="btn primary" type="button">Publish</button>
+  </div>
+
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="mark" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 16h8"/>
+        <path d="M12 16c6 0 6-9 12-9"/>
+        <path d="M12 16h12" opacity="0.42"/>
+        <path d="M12 16c6 0 6 9 12 9" opacity="0.18"/>
+        <circle cx="26" cy="7" r="2.6" fill="var(--accent)" stroke="none"/>
+      </symbol>
+      <symbol id="mark-mono" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 16h8"/>
+        <path d="M12 16c6 0 6-9 12-9"/>
+        <path d="M12 16h12" opacity="0.42"/>
+        <path d="M12 16c6 0 6 9 12 9" opacity="0.18"/>
+        <circle cx="26" cy="7" r="2.6" fill="currentColor" stroke="none"/>
+      </symbol>
+      <symbol id="wordmark" viewBox="4.20 -74.00 348.20 77.00">
+<path class="ink" fill="currentColor" d="M6.2 0.0V-72.0H19.200000000000003V0.0ZM12.4 -28.900000000000002V-39.2H52.900000000000006V-28.900000000000002ZM12.4 -61.7V-72.0H55.300000000000004V-61.7Z"/>
+<path class="ink" fill="currentColor" d="M62.60000000000001 0.0V-72.0H75.2V0.0Z"/>
+<path class="ink" fill="currentColor" d="M108.30000000000001 1.0Q100.2 1.0 94.05000000000001 -2.4000000000000004Q87.9 -5.800000000000001 84.5 -11.850000000000001Q81.10000000000001 -17.900000000000002 81.10000000000001 -25.700000000000003Q81.10000000000001 -33.5 84.5 -39.400000000000006Q87.9 -45.300000000000004 94.05000000000001 -48.650000000000006Q100.2 -52.0 108.30000000000001 -52.0Q116.5 -52.0 122.60000000000001 -48.650000000000006Q128.70000000000002 -45.300000000000004 132.10000000000002 -39.400000000000006Q135.5 -33.5 135.5 -25.700000000000003Q135.5 -17.900000000000002 132.05 -11.850000000000001Q128.60000000000002 -5.800000000000001 122.50000000000001 -2.4000000000000004Q116.4 1.0 108.30000000000001 1.0ZM108.30000000000001 -9.1Q112.30000000000001 -9.1 115.50000000000001 -11.15Q118.70000000000002 -13.200000000000001 120.50000000000001 -16.950000000000003Q122.30000000000001 -20.700000000000003 122.30000000000001 -25.8Q122.30000000000001 -33.300000000000004 118.35000000000001 -37.60000000000001Q114.4 -41.900000000000006 108.30000000000001 -41.900000000000006Q102.2 -41.900000000000006 98.2 -37.60000000000001Q94.2 -33.300000000000004 94.2 -25.8Q94.2 -20.700000000000003 96.05000000000001 -16.950000000000003Q97.9 -13.200000000000001 101.05000000000001 -11.15Q104.2 -9.1 108.30000000000001 -9.1Z"/>
+<path class="ink" fill="currentColor" d="M150.5 0.0 134.9 -51.0H148.10000000000002L157.3 -12.700000000000001H156.4L167.70000000000002 -51.0H179.20000000000002L190.70000000000002 -12.700000000000001H189.70000000000002L198.8 -51.0H211.70000000000002L196.10000000000002 0.0H184.3L172.8 -37.9H173.8L162.3 0.0Z"/>
+<path class="accent" fill="var(--accent)" d="M206.10000000000002 0.0 232.60000000000002 -72.0H243.8L218.9 0.0ZM260.40000000000003 0.0 235.60000000000002 -72.0H247.4L273.8 0.0ZM219.8 -28.3H259.20000000000005V-17.900000000000002H219.8Z"/>
+<path class="accent" fill="var(--accent)" d="M279.3 0.0V-72.0H292.3V0.0Z"/>
+<path class="ink" fill="currentColor" d="M338.1 0.0V-11.5L339.1 -11.3Q337.8 -5.7 332.8 -2.35Q327.8 1.0 320.9 1.0Q313.9 1.0 308.75 -2.25Q303.6 -5.5 300.8 -11.4Q298.0 -17.3 298.0 -25.3Q298.0 -33.4 300.9 -39.400000000000006Q303.8 -45.400000000000006 309.05 -48.7Q314.3 -52.0 321.3 -52.0Q328.5 -52.0 333.2 -48.55Q337.9 -45.1 339.0 -39.0L337.7 -38.900000000000006V-72.0H350.4V0.0ZM324.6 -9.3Q330.7 -9.3 334.35 -13.55Q338.0 -17.8 338.0 -25.5Q338.0 -33.2 334.3 -37.400000000000006Q330.6 -41.6 324.5 -41.6Q318.5 -41.6 314.8 -37.35Q311.1 -33.1 311.1 -25.400000000000002Q311.1 -17.7 314.8 -13.5Q318.5 -9.3 324.6 -9.3Z"/>
+</symbol>
+      <symbol id="wordmark-mono" viewBox="4.20 -74.00 348.20 77.00">
+<path class="ink" fill="currentColor" d="M6.2 0.0V-72.0H19.200000000000003V0.0ZM12.4 -28.900000000000002V-39.2H52.900000000000006V-28.900000000000002ZM12.4 -61.7V-72.0H55.300000000000004V-61.7Z"/>
+<path class="ink" fill="currentColor" d="M62.60000000000001 0.0V-72.0H75.2V0.0Z"/>
+<path class="ink" fill="currentColor" d="M108.30000000000001 1.0Q100.2 1.0 94.05000000000001 -2.4000000000000004Q87.9 -5.800000000000001 84.5 -11.850000000000001Q81.10000000000001 -17.900000000000002 81.10000000000001 -25.700000000000003Q81.10000000000001 -33.5 84.5 -39.400000000000006Q87.9 -45.300000000000004 94.05000000000001 -48.650000000000006Q100.2 -52.0 108.30000000000001 -52.0Q116.5 -52.0 122.60000000000001 -48.650000000000006Q128.70000000000002 -45.300000000000004 132.10000000000002 -39.400000000000006Q135.5 -33.5 135.5 -25.700000000000003Q135.5 -17.900000000000002 132.05 -11.850000000000001Q128.60000000000002 -5.800000000000001 122.50000000000001 -2.4000000000000004Q116.4 1.0 108.30000000000001 1.0ZM108.30000000000001 -9.1Q112.30000000000001 -9.1 115.50000000000001 -11.15Q118.70000000000002 -13.200000000000001 120.50000000000001 -16.950000000000003Q122.30000000000001 -20.700000000000003 122.30000000000001 -25.8Q122.30000000000001 -33.300000000000004 118.35000000000001 -37.60000000000001Q114.4 -41.900000000000006 108.30000000000001 -41.900000000000006Q102.2 -41.900000000000006 98.2 -37.60000000000001Q94.2 -33.300000000000004 94.2 -25.8Q94.2 -20.700000000000003 96.05000000000001 -16.950000000000003Q97.9 -13.200000000000001 101.05000000000001 -11.15Q104.2 -9.1 108.30000000000001 -9.1Z"/>
+<path class="ink" fill="currentColor" d="M150.5 0.0 134.9 -51.0H148.10000000000002L157.3 -12.700000000000001H156.4L167.70000000000002 -51.0H179.20000000000002L190.70000000000002 -12.700000000000001H189.70000000000002L198.8 -51.0H211.70000000000002L196.10000000000002 0.0H184.3L172.8 -37.9H173.8L162.3 0.0Z"/>
+<path class="ink" fill="currentColor" d="M206.10000000000002 0.0 232.60000000000002 -72.0H243.8L218.9 0.0ZM260.40000000000003 0.0 235.60000000000002 -72.0H247.4L273.8 0.0ZM219.8 -28.3H259.20000000000005V-17.900000000000002H219.8Z"/>
+<path class="ink" fill="currentColor" d="M279.3 0.0V-72.0H292.3V0.0Z"/>
+<path class="ink" fill="currentColor" d="M338.1 0.0V-11.5L339.1 -11.3Q337.8 -5.7 332.8 -2.35Q327.8 1.0 320.9 1.0Q313.9 1.0 308.75 -2.25Q303.6 -5.5 300.8 -11.4Q298.0 -17.3 298.0 -25.3Q298.0 -33.4 300.9 -39.400000000000006Q303.8 -45.400000000000006 309.05 -48.7Q314.3 -52.0 321.3 -52.0Q328.5 -52.0 333.2 -48.55Q337.9 -45.1 339.0 -39.0L337.7 -38.900000000000006V-72.0H350.4V0.0ZM324.6 -9.3Q330.7 -9.3 334.35 -13.55Q338.0 -17.8 338.0 -25.5Q338.0 -33.2 334.3 -37.400000000000006Q330.6 -41.6 324.5 -41.6Q318.5 -41.6 314.8 -37.35Q311.1 -33.1 311.1 -25.400000000000002Q311.1 -17.7 314.8 -13.5Q318.5 -9.3 324.6 -9.3Z"/>
+</symbol>
+    </defs>
+  </svg>
+
+  <main class="page">
+    <section class="hero">
+      <div>
+        <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><use href="#mark"/></svg>
+        <h1>Design, compile, run and inspect intelligent software.</h1>
+        <p>FlowAId is the open-source runtime for AI agents and workflows. Decisions are typed and carry their probabilities. Generation is a tool, not a control flow. Every run is a trace you can replay.</p>
+        <svg class="wm-lg" viewBox="0 0 348.20 77.00" aria-label="FlowAId"><use href="#wordmark"/></svg>
+        <div class="ruler" aria-label="Probability ruler: security 0.81, technical 0.12, billing 0.04, sales 0.03">
+          <i style="flex: 81"></i><i style="flex: 12"></i><i style="flex: 4"></i><i style="flex: 3"></i>
+        </div>
+        <div class="ruler-legend" aria-hidden="true">
+          <span style="flex: 81">security 0.81</span><span style="flex: 12">technical 0.12</span><span style="flex: 4"></span><span style="flex: 3"></span>
+        </div>
+      </div>
+    </section>
+
+    <h2>The mark</h2>
+    <p>One path in, three paths out. The weight of each branch is its probability, and the dot is the decision that was taken. It is the shape of every TypeSafe node in the product, and it is drawn with a single stroke so it survives at 16 pixels.</p>
+    <div class="lockups">
+      <div class="card lockup light"><span class="lbl eyebrow">on light</span><div class="row"><svg class="l-mark" viewBox="0 0 32 32"><use href="#mark"/></svg><svg class="l-wm" viewBox="0 0 348.20 77.00"><use href="#wordmark"/></svg></div></div>
+      <div class="card lockup dark"><span class="lbl eyebrow">on dark</span><div class="row"><svg class="l-mark" viewBox="0 0 32 32"><use href="#mark"/></svg><svg class="l-wm" viewBox="0 0 348.20 77.00"><use href="#wordmark"/></svg></div></div>
+      <div class="card lockup tint"><span class="lbl eyebrow" style="color: var(--accent-ink); opacity: .7">on accent, monochrome</span><div class="row"><svg class="l-mark" viewBox="0 0 32 32"><use href="#mark-mono"/></svg><svg class="l-wm" viewBox="0 0 348.20 77.00"><use href="#wordmark-mono"/></svg></div></div>
+    </div>
+    <div class="card" style="margin-top: 12px; padding: 24px;">
+      <div class="sizes">
+        <figure><svg viewBox="0 0 32 32" width="96" height="96"><use href="#mark"/></svg><figcaption>96</figcaption></figure>
+        <figure><svg viewBox="0 0 32 32" width="48" height="48"><use href="#mark"/></svg><figcaption>48</figcaption></figure>
+        <figure><svg viewBox="0 0 32 32" width="24" height="24"><use href="#mark"/></svg><figcaption>24</figcaption></figure>
+        <figure><svg viewBox="0 0 32 32" width="16" height="16"><use href="#mark"/></svg><figcaption>16</figcaption></figure>
+        <figure><img src="favicon.svg" width="48" height="48" alt="Favicon tile"><figcaption>favicon</figcaption></figure>
+        <figure><img src="favicon.svg" width="16" height="16" alt="Favicon at 16 pixels"><figcaption>16</figcaption></figure>
+      </div>
+    </div>
+
+    <h2>Color</h2>
+    <p>Cool graphite neutrals carry the interface. Cobalt is the one accent, and it belongs to decision intelligence: the mark, the primary action, and every TypeSafe node share it. Status colors are reserved for run state. Each node category has one hue so a canvas reads at a glance.</p>
+    <p class="eyebrow">Surfaces and ink</p>
+    <div class="grid" style="margin: 8px 0 24px">
+      <div class="card sw"><i style="background: var(--canvas)"></i><b>canvas</b><code>--canvas</code></div>
+      <div class="card sw"><i style="background: var(--surface)"></i><b>surface</b><code>--surface</code></div>
+      <div class="card sw"><i style="background: var(--surface-3)"></i><b>surface 3</b><code>--surface-3</code></div>
+      <div class="card sw"><i style="background: var(--border)"></i><b>border</b><code>--border</code></div>
+      <div class="card sw"><i style="background: var(--ink)"></i><b>ink</b><code>--ink</code></div>
+      <div class="card sw"><i style="background: var(--ink-3)"></i><b>ink 3</b><code>--ink-3</code></div>
+      <div class="card sw"><i style="background: var(--accent)"></i><b>accent</b><code>--accent</code></div>
+      <div class="card sw"><i style="background: var(--accent-soft)"></i><b>accent soft</b><code>--accent-soft</code></div>
+    </div>
+    <p class="eyebrow">Run status</p>
+    <div class="chips" style="margin: 8px 0 24px">
+      <span class="chip queued">Queued</span><span class="chip run">Running</span><span class="chip wait">Waiting for approval</span><span class="chip ok">Completed</span><span class="chip fail">Failed</span><span class="chip neutral">Cancelled</span>
+    </div>
+    <p class="eyebrow">Node categories</p>
+    <div class="grid" style="margin: 8px 0 0">
+      <div class="card sw"><i style="background: var(--cat-decision)"></i><b>Decision</b><code>--cat-decision</code></div>
+      <div class="card sw"><i style="background: var(--cat-generation)"></i><b>Generation</b><code>--cat-generation</code></div>
+      <div class="card sw"><i style="background: var(--cat-agent)"></i><b>Agent</b><code>--cat-agent</code></div>
+      <div class="card sw"><i style="background: var(--cat-tool)"></i><b>Tool</b><code>--cat-tool</code></div>
+      <div class="card sw"><i style="background: var(--cat-data)"></i><b>Data</b><code>--cat-data</code></div>
+      <div class="card sw"><i style="background: var(--cat-retrieval)"></i><b>Retrieval</b><code>--cat-retrieval</code></div>
+      <div class="card sw"><i style="background: var(--cat-state)"></i><b>State</b><code>--cat-state</code></div>
+      <div class="card sw"><i style="background: var(--cat-human)"></i><b>Human</b><code>--cat-human</code></div>
+      <div class="card sw"><i style="background: var(--cat-safety)"></i><b>Safety</b><code>--cat-safety</code></div>
+      <div class="card sw"><i style="background: var(--cat-flow)"></i><b>Flow</b><code>--cat-flow</code></div>
+      <div class="card sw"><i style="background: var(--cat-developer)"></i><b>Developer</b><code>--cat-developer</code></div>
+    </div>
+
+    <h2>Type</h2>
+    <p>Instrument Sans for everything a person reads; JetBrains Mono, with tabular numerals, for everything a machine produced: probabilities, durations, tokens, cost, identifiers. The two faces never share a line unless the line mixes a label with a value.</p>
+    <div class="card type" style="padding: 24px">
+      <dl>
+        <dt>display 40/600</dt><dd style="font-size: var(--text-2xl); font-weight: 600; letter-spacing: var(--tracking-display); line-height: 1.05">Confidence drives automation</dd>
+        <dt>heading 20/600</dt><dd style="font-size: var(--text-lg); font-weight: 600; letter-spacing: var(--tracking-tight)">Customer Support Agent · v12</dd>
+        <dt>ui 13/400</dt><dd>Route the request to the team most likely to resolve it, then gate on confidence.</dd>
+        <dt>label 12/500</dt><dd style="font-size: var(--text-xs); font-weight: 500; color: var(--ink-2)">Confidence threshold</dd>
+        <dt>mono 12/400</dt><dd class="mono" style="font-size: var(--text-xs)">choice=security  confidence=0.81  latency=84ms  cost=$0.000021</dd>
+        <dt>mono 11 caps</dt><dd class="eyebrow">run_01j8k2v9 · node intent · attempt 2</dd>
+      </dl>
+    </div>
+
+    <h2>Nodes</h2>
+    <p>A node says what it is, what it is for, and what happened. Configuration lives in the inspector. Decision nodes show their distribution inline because the probabilities are the point.</p>
+    <div class="nodes">
+      <div class="node selected" style="--c: var(--cat-decision)">
+        <span class="port in typed"></span><span class="port out typed"></span>
+        <div class="head"><span class="dot"></span><span class="name">Intent</span><span class="kind">choice</span></div>
+        <div class="sub">Which team should handle this?</div>
+        <div class="dist">
+          <div class="opt win"><span>security</span><span>0.81</span></div><div class="bar"><i style="--w: 81%"></i></div>
+          <div class="opt"><span>technical</span><span>0.12</span></div><div class="bar"><i style="--w: 12%"></i></div>
+          <div class="opt"><span>billing</span><span>0.04</span></div><div class="bar"><i style="--w: 4%"></i></div>
+        </div>
+        <div class="foot"><span class="st">jev-latest</span><span class="r">84 ms</span></div>
+      </div>
+      <div class="node" style="--c: var(--cat-decision)">
+        <span class="port in typed"></span><span class="port out typed"></span>
+        <div class="head"><span class="dot"></span><span class="name">Urgency</span><span class="kind">score</span></div>
+        <div class="sub">How urgent is this request?</div>
+        <div class="meta"><span>5 levels</span><span>score 3.72</span><span>conf 0.77</span></div>
+        <div class="foot"><span class="st">jev-latest</span><span class="r">61 ms</span></div>
+      </div>
+      <div class="node running" style="--c: var(--cat-generation)">
+        <span class="port in typed"></span><span class="port out typed"></span>
+        <div class="head"><span class="dot"></span><span class="name">Draft reply</span><span class="kind">generate</span></div>
+        <div class="sub">Write the response for the chosen team</div>
+        <div class="meta"><span>gpt-5-mini</span><span>temp 0.3</span></div>
+        <div class="foot"><span class="st run">streaming</span><span class="r">1.2 s</span></div>
+      </div>
+      <div class="node" style="--c: var(--cat-tool)">
+        <span class="port in typed"></span><span class="port out typed"></span>
+        <div class="head"><span class="dot"></span><span class="name">Lookup account</span><span class="kind">http</span></div>
+        <div class="sub">GET /customers/{id}</div>
+        <div class="meta"><span>stripe_prod</span><span>retry ×3</span></div>
+        <div class="foot"><span class="st">200</span><span class="r">212 ms</span></div>
+      </div>
+      <div class="node waiting" style="--c: var(--cat-human)">
+        <span class="port in typed"></span><span class="port out typed"></span>
+        <div class="head"><span class="dot"></span><span class="name">Approve refund</span><span class="kind">approval</span></div>
+        <div class="sub">Confidence below 0.90</div>
+        <div class="meta"><span>assignee: support-leads</span></div>
+        <div class="foot"><span class="st wait">waiting 4 m</span><span class="r">—</span></div>
+      </div>
+      <div class="node failed" style="--c: var(--cat-flow)">
+        <span class="port in"></span><span class="port out"></span>
+        <div class="head"><span class="dot"></span><span class="name">Confidence gate</span><span class="kind">gate</span></div>
+        <div class="sub">auto ≥ 0.90 · review ≥ 0.70 · else human</div>
+        <div class="foot"><span class="st fail">TypeError: confidence is undefined</span></div>
+      </div>
+    </div>
+
+    <h2>Trace</h2>
+    <p>The run timeline reads like a distributed trace. Time on the left, a span per node, and the decision's distribution expanded under the node that produced it.</p>
+    <div class="trace">
+      <div class="row"><span class="t">0 ms</span><span class="k"></span><span class="n">Start</span><span class="span" style="--off: 0; --w: 2%"></span><span class="d">1 ms</span></div>
+      <div class="row"><span class="t">12 ms</span><span class="k"></span><span class="n">Parse input<small>data.transform</small></span><span class="span" style="--off: 4%; --w: 5%; --c: var(--cat-data)"></span><span class="d">7 ms</span></div>
+      <div class="row sel"><span class="t">31 ms</span><span class="k" style="--c: var(--cat-decision)"></span><span class="n">Intent<small>decision.choice</small></span><span class="span" style="--off: 11%; --w: 26%; --c: var(--cat-decision)"></span><span class="d">84 ms</span></div>
+      <div class="row sel detail"><span class="sub"><b>security 0.81</b><span>technical 0.12</span><span>billing 0.04</span><span>sales 0.03</span><span>· conf 0.81</span></span></div>
+      <div class="row"><span class="t">116 ms</span><span class="k" style="--c: var(--cat-decision)"></span><span class="n">Urgency<small>decision.score</small></span><span class="span" style="--off: 38%; --w: 20%; --c: var(--cat-decision)"></span><span class="d">61 ms</span></div>
+      <div class="row"><span class="t">178 ms</span><span class="k"></span><span class="n">Route → Security</span><span class="span" style="--off: 58%; --w: 1%"></span><span class="d">0 ms</span></div>
+      <div class="row"><span class="t">180 ms</span><span class="k" style="--c: var(--cat-tool)"></span><span class="n">Lookup account<small>tool.http</small></span><span class="span" style="--off: 59%; --w: 30%; --c: var(--cat-tool)"></span><span class="d">212 ms</span></div>
+      <div class="row"><span class="t">392 ms</span><span class="k" style="--c: var(--cat-human)"></span><span class="n">Approve refund<small>human.approval</small></span><span class="span" style="--off: 89%; --w: 11%; --c: var(--cat-human)"></span><span class="d">waiting</span></div>
+    </div>
+
+    <h2>Controls</h2>
+    <p>Small, quiet, and precise. Twenty-eight pixel controls, five pixel radii, one pixel borders. Focus is a two-ring outline in the accent so keyboard users always know where they are.</p>
+    <div class="two">
+      <div class="card" style="display: grid; gap: 14px">
+        <div class="field"><label for="f1">Question</label><input id="f1" value="Which team should handle this?"><span class="hint">Shown to the decision model as instructions.</span></div>
+        <div class="field"><label for="f2">Model</label><select id="f2"><option>jev-latest</option><option>jev-preview</option></select></div>
+        <div class="field"><label for="f3">Auto-act above</label><input id="f3" class="mono" value="0.90"><span class="hint">Below this, the run waits for a person.</span></div>
+      </div>
+      <div class="card" style="display: flex; flex-wrap: wrap; gap: 8px; align-content: flex-start">
+        <button class="btn primary" type="button">Publish</button>
+        <button class="btn" type="button">Run <kbd>⌘↵</kbd></button>
+        <button class="btn" type="button">Compare versions</button>
+        <button class="btn" type="button">Replay run</button>
+        <button class="btn" type="button" style="color: var(--danger)">Cancel run</button>
+      </div>
+    </div>
+
+    <h2>Principles for the interface</h2>
+    <p>These are the rules the app follows. When a screen breaks one, the screen is wrong.</p>
+    <div class="principles">
+      <div class="card"><b>Numbers are monospaced</b><span>Anything a model or a clock produced is set in JetBrains Mono with tabular figures, so columns of probabilities line up.</span></div>
+      <div class="card"><b>Cobalt means decision</b><span>The accent is spent on decision intelligence and the primary action. Nothing else is blue.</span></div>
+      <div class="card"><b>State is a border, not a fill</b><span>Running, waiting and failed nodes change their outline. Fills stay neutral so the canvas never shouts.</span></div>
+      <div class="card"><b>Configuration lives in the inspector</b><span>A node shows its name, purpose, provider and last result. Everything else is one click away.</span></div>
+      <div class="card"><b>Errors say what to do</b><span>An error names the node, the cause, and the next step. It never apologizes and never says "something went wrong".</span></div>
+      <div class="card"><b>Empty states invite</b><span>An empty canvas offers the palette and the AI builder. An empty run list offers a first run.</span></div>
+    </div>
+  </main>
+
+  <script>
+    (function () {
+      var root = document.documentElement;
+      function apply(t) {
+        if (t) root.setAttribute('data-theme', t); else root.removeAttribute('data-theme');
+        document.querySelectorAll('[data-theme-set]').forEach(function (b) {
+          var mode = t || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+          b.setAttribute('aria-pressed', String(b.getAttribute('data-theme-set') === mode));
+        });
+      }
+      var saved = null;
+      try { saved = localStorage.getItem('flowaid-theme'); } catch (e) {}
+      apply(saved);
+      document.querySelectorAll('[data-theme-set]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var t = b.getAttribute('data-theme-set');
+          try { localStorage.setItem('flowaid-theme', t); } catch (e) {}
+          apply(t);
+        });
+      });
+      var q = new URLSearchParams(location.search).get('theme');
+      if (q) apply(q);
+    })();
+  </script>
+</body>
+</html>

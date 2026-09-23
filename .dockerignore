@@ -1,0 +1,31 @@
+# Build context of docker/Dockerfile (context is the repository root). Everything listed here
+# never reaches a build layer or the BuildKit cache. scripts/check-dockerignore.test.ts fails
+# when a pattern under `# env & secrets` or `# local data` in .gitignore is missing here.
+
+# version control
+.git
+
+# dependencies and build output (rebuilt inside the image from the lockfile)
+**/node_modules
+**/dist
+**/.next
+**/.turbo
+**/coverage
+**/*.tsbuildinfo
+
+# env & secrets
+.env
+.env.*
+!.env.example
+
+# local data (master key file, generated JWT keys, plugins, database dumps)
+.flowaid
+data
+
+# not needed to build
+docs
+brand/fonts
+playwright-report
+test-results
+.claude
+*.log

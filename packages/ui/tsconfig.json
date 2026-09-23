@@ -1,0 +1,12 @@
+{
+  "extends": "@flowaid/config/tsconfig.react.json",
+  "compilerOptions": {
+    "plugins": [],
+    "jsx": "react-jsx",
+    "types": ["vite/client", "@testing-library/jest-dom"],
+    "baseUrl": ".",
+    "paths": { "@/*": ["src/*"] }
+  },
+  "include": ["src", "playground", "vitest.config.ts", "vitest.setup.ts"],
+  "exclude": ["node_modules", "dist", "playground/dist"]
+}

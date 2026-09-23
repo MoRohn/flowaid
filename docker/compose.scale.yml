@@ -1,0 +1,48 @@
+# Scale-out overlay, activated with `docker compose --profile scale up`.
+#
+# Adds Redis 7 (BullMQ queues, Redis pub/sub event bus, shared rate-limit store) and lets the
+# worker run as several replicas. Set in ../.env when using this profile:
+#
+#   REDIS_PASSWORD=<openssl rand -hex 16>
+#   REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+#   WORKER_REPLICAS=3
+#
+# Redis refuses to start without REDIS_PASSWORD (checked when the container starts, so the
+# default profile does not need it). Without the profile REDIS_URL stays empty (the Postgres
+# queue driver is used) and WORKER_REPLICAS defaults to 1, so this file is safe to include
+# unconditionally.
+
+x-redis-image: &redis-image redis:7.4.11-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
+
+services:
+  redis:
+    image: *redis-image
+    profiles: [scale]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+    command:
+      - /bin/sh
+      - -c
+      - |
+        : "$${REDIS_PASSWORD:?set REDIS_PASSWORD in .env (openssl rand -hex 16) to start redis}"
+        exec redis-server --requirepass "$$REDIS_PASSWORD" --save 60 1 --loglevel warning --maxmemory-policy noeviction
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - internal
+      - admin
+    healthcheck:
+      test: ["CMD-SHELL", 'redis-cli -a "$$REDIS_PASSWORD" --no-auth-warning ping | grep -q PONG']
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+  worker:
+    deploy:
+      replicas: ${WORKER_REPLICAS:-1}
+
+volumes:
+  redis-data:

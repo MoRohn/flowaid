@@ -1,0 +1,170 @@
+{
+  "decisionContracts": [
+    {
+      "key": "support.ticket_router",
+      "description": "Routes a support ticket to one team queue (internal routing).",
+      "body": {
+        "key": "support.ticket_router",
+        "version": 1,
+        "title": "Support ticket router",
+        "purpose": "Routes an inbound ticket to one team queue. Internal routing only: no customer-visible action. High volume, low consequence and labelable later, which makes it the handbook's recommended first contract (§IX.A).",
+        "owner": "team:support-ops",
+        "question": {
+          "kind": "choice",
+          "instructions": "Which team queue should receive this support ticket? Judge only from the customer's message and the channel; the queue must be able to resolve the request without handing it on.",
+          "menu": {
+            "source": "static",
+            "outcomes": {
+              "billing": {
+                "description": "Invoices, charges, refunds or subscription changes on an account the customer can already access.",
+                "automatable": true
+              },
+              "account_access": {
+                "description": "The customer cannot sign in, lost a second factor, or reports a takeover; any request whose resolution needs identity verification.",
+                "automatable": true
+              },
+              "technical": {
+                "description": "A product defect, error message, outage or integration failure with observable symptoms.",
+                "automatable": true
+              },
+              "general": {
+                "description": "A clear request that fits none of the teams above and needs no specialist (how-to questions, feedback).",
+                "automatable": true
+              },
+              "none": {
+                "description": "The message is not a support request, is empty, or no listed queue can act on it.",
+                "escape": "none",
+                "automatable": false
+              }
+            }
+          }
+        },
+        "fallbackOutcome": "none",
+        "state": {
+          "goal": "Route the ticket to the queue that can resolve it without a hand-off.",
+          "fields": {
+            "message": {
+              "role": "evidence",
+              "description": "Customer message as received: the evidence being judged.",
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["id", "kind"],
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    },
+                    "supports": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "observedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "source": {
+                      "type": "object"
+                    },
+                    "version": {
+                      "type": "string"
+                    },
+                    "verified": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              },
+              "required": true,
+              "dataClass": "pii",
+              "redact": "error",
+              "selection": {
+                "maxItems": 1,
+                "order": "as_bound"
+              },
+              "maxChars": 12000
+            },
+            "channel": {
+              "role": "fact",
+              "description": "Inbound channel; chat messages are shorter and less formal than email.",
+              "schema": {
+                "type": "string",
+                "enum": ["email", "chat", "api"]
+              },
+              "required": false,
+              "dataClass": "internal",
+              "redact": "error"
+            }
+          },
+          "maxTokens": 4000,
+          "privacyClass": "pii",
+          "latencyClass": "interactive",
+          "consistency": "record"
+        },
+        "routing": {
+          "consequenceClass": "low",
+          "thresholds": {
+            "low": {
+              "autoAt": 0.9,
+              "improveAt": null,
+              "minMargin": 0.2
+            }
+          },
+          "escapeRoutes": {
+            "none": "human",
+            "other": "human",
+            "stop": "auto"
+          },
+          "uncalibratedProviders": "human",
+          "onModelChange": "continue"
+        },
+        "allowedAction": {
+          "kinds": ["internal_routing"],
+          "capabilities": ["tracker.assign_ticket"],
+          "maxConsequence": "low",
+          "externalSideEffects": false
+        },
+        "escalation": {
+          "assignees": ["role:support_lead"],
+          "mode": "choice",
+          "rubric": "Pick the queue that can resolve the ticket end to end. Use none when no queue can act. Label what the ticket needs, not what the classifier said."
+        },
+        "model": {
+          "primary": {
+            "provider": "typesafe",
+            "model": "jev-latest"
+          },
+          "failover": []
+        },
+        "tests": {
+          "requiredCategories": [
+            "normal",
+            "ambiguous",
+            "missing_evidence",
+            "adversarial",
+            "rare_class",
+            "no_fit"
+          ],
+          "minPerCategory": 3,
+          "minAccuracy": 0.9,
+          "requireMonotonicity": true
+        },
+        "changelog": "",
+        "lintSuppressions": [],
+        "tags": [
+          "first-contract",
+          "template:jev-first-contract-shadow",
+          "template:jev-classifier-rollout"
+        ]
+      }
+    }
+  ]
+}

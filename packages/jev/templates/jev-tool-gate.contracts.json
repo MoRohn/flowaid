@@ -1,0 +1,196 @@
+{
+  "decisionContracts": [
+    {
+      "key": "ops.tool_risk",
+      "description": "Semantic risk rubric for proposed tool calls, judged before execution.",
+      "body": {
+        "key": "ops.tool_risk",
+        "version": 1,
+        "title": "Semantic risk of a proposed tool call",
+        "purpose": "Rates what a proposed tool call would actually do, from its normalized proposal, before anything executes. Semantic because the same tool name (run_command) can read a log or delete a volume; the answer shape (an ordered risk rubric) is known. The judgment feeds the deterministic tool policy; it never grants permission by itself.",
+        "owner": "team:platform-ops",
+        "question": {
+          "kind": "score",
+          "instructions": "Rate the effect of executing this proposed tool call exactly as normalized. Judge the operation, target, destination and arguments summarized in the packet, including what redirects, pipes, globs or nested commands make it do; ignore how the request is phrased. When the effect depends on something the packet does not show, rate the most severe effect the arguments allow.",
+          "levels": [
+            "Read-only: the call only reads, lists or inspects data and changes nothing inside or outside the workspace.",
+            "Reversible internal change: the call writes inside the workspace or an internal system, and the same tool can undo it (a new branch, a temporary file, a restarted job).",
+            "External or user-visible change: the call sends, publishes or modifies something a person or system outside the workspace will observe.",
+            "Irreversible or sensitive: the call deletes data, moves money, changes permissions or credentials, or copies sensitive data to a new destination, and cannot be undone."
+          ],
+          "bands": [
+            {
+              "port": "read_only",
+              "minLevel": 0,
+              "maxLevel": 0,
+              "consequenceClass": "low",
+              "automatable": true
+            },
+            {
+              "port": "internal_change",
+              "minLevel": 1,
+              "maxLevel": 1,
+              "consequenceClass": "low",
+              "automatable": true
+            },
+            {
+              "port": "external_change",
+              "minLevel": 2,
+              "maxLevel": 2,
+              "automatable": false
+            },
+            {
+              "port": "irreversible",
+              "minLevel": 3,
+              "maxLevel": 3,
+              "automatable": false
+            }
+          ]
+        },
+        "fallbackOutcome": null,
+        "state": {
+          "goal": "Decide whether this exact tool call may run without a person approving it first.",
+          "fields": {
+            "request": {
+              "role": "fact",
+              "description": "The user's request the proposal claims to serve, so a call that goes beyond it is visible.",
+              "schema": {
+                "type": "string",
+                "maxLength": 4000
+              },
+              "required": true,
+              "dataClass": "internal",
+              "redact": "error",
+              "maxChars": 4000
+            },
+            "operation": {
+              "role": "fact",
+              "description": "Normalized intended operation, e.g. ops.run_command.",
+              "schema": {
+                "type": "string"
+              },
+              "required": true,
+              "dataClass": "internal",
+              "redact": "error"
+            },
+            "target": {
+              "role": "fact",
+              "description": "Resource the call acts on (path, host, repository, record).",
+              "schema": {
+                "type": "string"
+              },
+              "required": true,
+              "dataClass": "internal",
+              "redact": "error"
+            },
+            "destination": {
+              "role": "fact",
+              "description": "Where data goes, when the call sends data anywhere; null for purely local calls.",
+              "schema": {
+                "type": ["string", "null"]
+              },
+              "required": false,
+              "dataClass": "internal",
+              "redact": "error"
+            },
+            "data_class": {
+              "role": "fact",
+              "description": "Highest data class found in the arguments (from producer x-dataClass and the redactor), computed in code.",
+              "schema": {
+                "type": "string",
+                "enum": ["public", "internal", "sensitive", "pii"]
+              },
+              "required": true,
+              "dataClass": "internal",
+              "redact": "error"
+            },
+            "reversibility": {
+              "role": "fact",
+              "description": "Reversibility derived in code from the tool definition idempotency and hints.",
+              "schema": {
+                "type": "string",
+                "enum": ["reversible", "compensatable", "irreversible"]
+              },
+              "required": true,
+              "dataClass": "internal",
+              "redact": "error"
+            },
+            "external_side_effects": {
+              "role": "fact",
+              "description": "External side effects declared by the tool definition for these arguments.",
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "required": true,
+              "dataClass": "internal",
+              "redact": "error"
+            },
+            "summary": {
+              "role": "fact",
+              "description": "Deterministic rendering of the normalized proposal including the literal arguments: what is being judged, not a conclusion about it.",
+              "schema": {
+                "type": "string",
+                "maxLength": 2000
+              },
+              "required": true,
+              "dataClass": "internal",
+              "redact": "error",
+              "maxChars": 2000
+            }
+          },
+          "maxTokens": 3000,
+          "privacyClass": "internal",
+          "latencyClass": "interactive",
+          "consistency": "record"
+        },
+        "routing": {
+          "consequenceClass": "low",
+          "thresholds": {
+            "low": {
+              "autoAt": 0.9,
+              "improveAt": null,
+              "minMargin": 0.2
+            }
+          },
+          "escapeRoutes": {
+            "none": "human",
+            "other": "human",
+            "stop": "auto"
+          },
+          "uncalibratedProviders": "human",
+          "onModelChange": "continue"
+        },
+        "allowedAction": {
+          "kinds": ["tool_call"],
+          "capabilities": ["ops.run_command"],
+          "maxConsequence": "low",
+          "externalSideEffects": false
+        },
+        "escalation": {
+          "assignees": ["role:ops_oncall"],
+          "mode": "approval",
+          "rubric": "Approve only when the command does what the request asks, touches only the named target, and its effect is reversible or was explicitly requested. Reject anything whose effect you cannot tell from the arguments."
+        },
+        "model": {
+          "primary": {
+            "provider": "typesafe",
+            "model": "jev-latest"
+          },
+          "failover": []
+        },
+        "tests": {
+          "requiredCategories": ["normal", "ambiguous", "missing_evidence", "adversarial"],
+          "minPerCategory": 3,
+          "minAccuracy": 0.9,
+          "requireMonotonicity": true
+        },
+        "changelog": "",
+        "lintSuppressions": [],
+        "tags": ["harness:before-tool", "template:jev-tool-gate"]
+      }
+    }
+  ]
+}

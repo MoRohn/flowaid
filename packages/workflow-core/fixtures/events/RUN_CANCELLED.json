@@ -1,0 +1,13 @@
+{
+  "type": "RUN_CANCELLED",
+  "runId": "0192f0a1-5b3c-7d4e-8f60-1a2b3c4d5e6f",
+  "seq": 30,
+  "at": "2026-09-22T10:00:07.500Z",
+  "by": "user:ops-lead",
+  "usage": {
+    "inputTokens": 1842,
+    "outputTokens": 296
+  },
+  "costUsd": 0.00087,
+  "durationMs": 7500
+}

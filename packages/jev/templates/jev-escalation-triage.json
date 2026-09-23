@@ -1,0 +1,825 @@
+{
+  "$schema": "https://flowaid.dev/schemas/workflow/v1",
+  "id": "c9c35337-1ee4-4e2a-959e-38cb1c62135a",
+  "name": "Escalation triage (Jev)",
+  "description": "Code turns raw service signals into exact facts; one Jev bundle asks three independent questions of one snapshot: does a person need to own this (Noul), how much customer impact is there (Score), which runbook step fits (Choice with a none escape). Routers apply consequence before confidence: low-consequence ticketing may automate, runbook actions carry a medium class, and every uncertain, escaped or out-of-scope case escalates to the on-call engineer with the receipts attached. Handbook §VI.A, §II.F, §II.G Primitive Anti-Patterns, §V.A, §V.E, Table V.",
+  "inputs": {
+    "type": "object",
+    "required": ["alert", "service", "received_at"],
+    "properties": {
+      "alert": {
+        "type": "object",
+        "required": ["title", "description"],
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "monitor": {
+            "type": "string"
+          }
+        }
+      },
+      "service": {
+        "type": "string"
+      },
+      "received_at": {
+        "type": "string",
+        "format": "date-time"
+      }
+    }
+  },
+  "outputs": {
+    "type": "object",
+    "required": ["handling", "decided_by"],
+    "properties": {
+      "handling": {
+        "type": "string",
+        "enum": ["runbook", "ticket", "dismissed", "unacknowledged"]
+      },
+      "decided_by": {
+        "type": "string"
+      },
+      "receipts": {
+        "type": "object"
+      }
+    }
+  },
+  "secrets": [
+    {
+      "name": "TYPESAFE_API_KEY",
+      "credentialType": "typesafe.api_key",
+      "description": "TypeSafe System One key for Jev. Without it the contract model chain falls back to its failover hops, which are uncalibrated and cannot route auto."
+    },
+    {
+      "name": "OBSERVABILITY_API",
+      "credentialType": "http.bearer"
+    }
+  ],
+  "variables": [
+    {
+      "name": "observabilityBase",
+      "schema": {
+        "type": "string"
+      },
+      "source": "environment",
+      "description": "Base URL of the service signals API."
+    }
+  ],
+  "execution": {
+    "timeoutMs": 2400000,
+    "maxCostUsd": 0.1,
+    "decisions": {
+      "primary": {
+        "provider": "typesafe",
+        "model": "jev-latest"
+      },
+      "failover": []
+    }
+  },
+  "nodes": [
+    {
+      "id": "start",
+      "kind": "input",
+      "name": "Alert"
+    },
+    {
+      "id": "signals",
+      "kind": "task",
+      "type": "flowaid.tools.http",
+      "typeVersion": "1.0.0",
+      "name": "Read service signals",
+      "config": {
+        "method": "GET",
+        "url": "{{ $vars.observabilityBase }}/v1/services/{{ start.service }}/signals?window=15m",
+        "responseType": "json"
+      },
+      "credentials": {
+        "auth": "OBSERVABILITY_API"
+      },
+      "policy": {
+        "retry": {
+          "maxAttempts": 3
+        }
+      }
+    },
+    {
+      "id": "facts",
+      "kind": "task",
+      "type": "flowaid.data.transform",
+      "typeVersion": "1.0.0",
+      "name": "Compute exact facts",
+      "description": "SLO comparisons and counts are exact: code computes them so Jev never re-derives arithmetic (§IV.E, §X.H).",
+      "config": {
+        "output": {
+          "type": "object"
+        },
+        "expr": "{error_rate_beyond_slo: signals.body.error_rate > signals.body.slo_error_rate, latency_beyond_slo: signals.body.p95_latency_ms > signals.body.slo_p95_ms, customer_reports_15m: coalesce(signals.body.customer_reports, 0), open_incidents: coalesce(signals.body.open_incidents, 0), deploy_in_last_hour: len(coalesce(signals.body.recent_deploys, [])) > 0, affected_regions: coalesce(signals.body.affected_regions, [])}"
+      }
+    },
+    {
+      "id": "triage",
+      "kind": "task",
+      "type": "flowaid.jev.bundle",
+      "typeVersion": "1.0.0",
+      "name": "Triage questions",
+      "description": "One snapshot, three independent questions; each contract sees only its declared projection.",
+      "config": {
+        "contracts": {
+          "needs_owner": {
+            "key": "ops.alert_needs_owner",
+            "version": "deployed"
+          },
+          "impact": {
+            "key": "ops.alert_impact",
+            "version": "deployed"
+          },
+          "runbook": {
+            "key": "ops.alert_runbook",
+            "version": "deployed"
+          }
+        }
+      },
+      "inputs": {
+        "state": {
+          "kind": "object",
+          "fields": {
+            "alert": {
+              "kind": "array",
+              "items": [
+                {
+                  "kind": "object",
+                  "fields": {
+                    "id": {
+                      "kind": "literal",
+                      "value": "alert"
+                    },
+                    "kind": {
+                      "kind": "literal",
+                      "value": "alert"
+                    },
+                    "summary": {
+                      "kind": "template",
+                      "source": "{{ start.alert.title }}\n{{ start.alert.description }}"
+                    },
+                    "observedAt": {
+                      "kind": "ref",
+                      "ref": {
+                        "kind": "port",
+                        "node": "start",
+                        "port": "received_at"
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            "signals": {
+              "kind": "ref",
+              "ref": {
+                "kind": "port",
+                "node": "facts",
+                "port": "result"
+              }
+            },
+            "recent_deploys": {
+              "kind": "expr",
+              "source": "map(coalesce(signals.body.recent_deploys, []), d => {id: d.id, kind: 'deploy', summary: d.description, observedAt: d.finished_at, version: d.version})"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "typesafe": "TYPESAFE_API_KEY"
+      }
+    },
+    {
+      "id": "owner_route",
+      "kind": "task",
+      "type": "flowaid.jev.route",
+      "typeVersion": "1.0.0",
+      "name": "Needs an owner?",
+      "config": {
+        "contract": {
+          "key": "ops.alert_needs_owner",
+          "version": "deployed"
+        },
+        "question": "needs_owner",
+        "legacyPort": false,
+        "escalation": "wired"
+      },
+      "inputs": {
+        "decision": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "triage",
+            "port": "answers",
+            "path": "/needs_owner"
+          }
+        },
+        "receipt": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "triage",
+            "port": "receipts",
+            "path": "/needs_owner"
+          }
+        }
+      }
+    },
+    {
+      "id": "impact_route",
+      "kind": "task",
+      "type": "flowaid.jev.route",
+      "typeVersion": "1.0.0",
+      "name": "Customer impact",
+      "config": {
+        "contract": {
+          "key": "ops.alert_impact",
+          "version": "deployed"
+        },
+        "question": "impact",
+        "legacyPort": false,
+        "escalation": "wired"
+      },
+      "inputs": {
+        "decision": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "triage",
+            "port": "answers",
+            "path": "/impact"
+          }
+        },
+        "receipt": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "triage",
+            "port": "receipts",
+            "path": "/impact"
+          }
+        }
+      }
+    },
+    {
+      "id": "runbook_route",
+      "kind": "task",
+      "type": "flowaid.jev.route",
+      "typeVersion": "1.0.0",
+      "name": "Runbook step",
+      "config": {
+        "contract": {
+          "key": "ops.alert_runbook",
+          "version": "deployed"
+        },
+        "question": "runbook",
+        "legacyPort": false,
+        "escalation": "wired"
+      },
+      "inputs": {
+        "decision": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "triage",
+            "port": "answers",
+            "path": "/runbook"
+          }
+        },
+        "receipt": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "triage",
+            "port": "receipts",
+            "path": "/runbook"
+          }
+        }
+      }
+    },
+    {
+      "id": "oncall",
+      "kind": "human",
+      "name": "On-call decides",
+      "description": "The escalation path of all three routers. The reviewer sees the packet facts and every receipt; a choice that differs from the router becomes an override label.",
+      "mode": {
+        "type": "choice",
+        "options": [
+          {
+            "id": "restart_workers",
+            "label": "Restart workers"
+          },
+          {
+            "id": "scale_out",
+            "label": "Scale out"
+          },
+          {
+            "id": "open_ticket",
+            "label": "Open a ticket"
+          },
+          {
+            "id": "dismiss",
+            "label": "Dismiss"
+          }
+        ]
+      },
+      "title": {
+        "kind": "template",
+        "source": "[{{ start.service }}] {{ start.alert.title }}"
+      },
+      "context": {
+        "alert": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "start",
+            "port": "alert"
+          }
+        },
+        "facts": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "facts",
+            "port": "result"
+          }
+        },
+        "receipts": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "triage",
+            "port": "receipts"
+          }
+        }
+      },
+      "assignees": ["role:oncall"],
+      "expiresInMs": 1800000,
+      "onExpire": "route",
+      "escalation": {
+        "afterMs": 900000,
+        "to": ["role:incident_commander"]
+      }
+    },
+    {
+      "id": "restart",
+      "kind": "task",
+      "type": "flowaid.tools.mcp",
+      "typeVersion": "1.0.0",
+      "name": "Restart workers",
+      "config": {
+        "serverId": "$template.mcp.runbook",
+        "tool": "restart_workers"
+      },
+      "inputs": {
+        "service": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "start",
+            "port": "service"
+          }
+        },
+        "reason": {
+          "kind": "template",
+          "source": "Alert: {{ start.alert.title }}"
+        }
+      }
+    },
+    {
+      "id": "scale",
+      "kind": "task",
+      "type": "flowaid.tools.mcp",
+      "typeVersion": "1.0.0",
+      "name": "Scale out",
+      "config": {
+        "serverId": "$template.mcp.runbook",
+        "tool": "scale_out"
+      },
+      "inputs": {
+        "service": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "start",
+            "port": "service"
+          }
+        },
+        "reason": {
+          "kind": "template",
+          "source": "Alert: {{ start.alert.title }}"
+        }
+      }
+    },
+    {
+      "id": "ticket",
+      "kind": "task",
+      "type": "flowaid.tools.mcp",
+      "typeVersion": "1.0.0",
+      "name": "Open ticket",
+      "config": {
+        "serverId": "$template.mcp.tracker",
+        "tool": "create_ticket"
+      },
+      "inputs": {
+        "title": {
+          "kind": "template",
+          "source": "[{{ start.service }}] {{ start.alert.title }}"
+        },
+        "body": {
+          "kind": "template",
+          "source": "{{ start.alert.description }}\n\nFacts: {{ facts.result | json }}\nImpact band: {{ triage.receipts.impact.outcome }}"
+        },
+        "labels": {
+          "kind": "expr",
+          "source": "['alert', coalesce(triage.receipts.impact.outcome, 'unknown')]"
+        }
+      }
+    },
+    {
+      "id": "out_runbook",
+      "kind": "output",
+      "name": "Runbook step ran",
+      "outcome": "runbook",
+      "value": {
+        "kind": "object",
+        "fields": {
+          "handling": {
+            "kind": "literal",
+            "value": "runbook"
+          },
+          "decided_by": {
+            "kind": "expr",
+            "source": "coalesce(oncall.decision.by, 'jev')"
+          },
+          "receipts": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "triage",
+              "port": "receipts"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "out_ticket",
+      "kind": "output",
+      "name": "Ticket opened",
+      "outcome": "ticket",
+      "value": {
+        "kind": "object",
+        "fields": {
+          "handling": {
+            "kind": "literal",
+            "value": "ticket"
+          },
+          "decided_by": {
+            "kind": "expr",
+            "source": "coalesce(oncall.decision.by, 'jev')"
+          },
+          "receipts": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "triage",
+              "port": "receipts"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "out_dismissed",
+      "kind": "output",
+      "name": "Dismissed by on-call",
+      "outcome": "dismissed",
+      "value": {
+        "kind": "object",
+        "fields": {
+          "handling": {
+            "kind": "literal",
+            "value": "dismissed"
+          },
+          "decided_by": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "oncall",
+              "port": "decision",
+              "path": "/by"
+            }
+          },
+          "receipts": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "triage",
+              "port": "receipts"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "out_unacknowledged",
+      "kind": "output",
+      "name": "Unacknowledged",
+      "outcome": "unacknowledged",
+      "value": {
+        "kind": "object",
+        "fields": {
+          "handling": {
+            "kind": "literal",
+            "value": "unacknowledged"
+          },
+          "decided_by": {
+            "kind": "literal",
+            "value": "expired"
+          },
+          "receipts": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "triage",
+              "port": "receipts"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "c1",
+      "from": {
+        "node": "owner_route",
+        "port": "yes"
+      },
+      "to": {
+        "node": "oncall"
+      }
+    },
+    {
+      "id": "c2",
+      "from": {
+        "node": "owner_route",
+        "port": "human"
+      },
+      "to": {
+        "node": "oncall"
+      }
+    },
+    {
+      "id": "c3",
+      "from": {
+        "node": "owner_route",
+        "port": "no"
+      },
+      "to": {
+        "node": "impact_route"
+      }
+    },
+    {
+      "id": "c4",
+      "from": {
+        "node": "impact_route",
+        "port": "minor"
+      },
+      "to": {
+        "node": "ticket"
+      }
+    },
+    {
+      "id": "c5",
+      "from": {
+        "node": "impact_route",
+        "port": "major"
+      },
+      "to": {
+        "node": "runbook_route"
+      }
+    },
+    {
+      "id": "c6",
+      "from": {
+        "node": "impact_route",
+        "port": "human"
+      },
+      "to": {
+        "node": "oncall"
+      }
+    },
+    {
+      "id": "c7",
+      "from": {
+        "node": "runbook_route",
+        "port": "restart_workers"
+      },
+      "to": {
+        "node": "restart"
+      }
+    },
+    {
+      "id": "c8",
+      "from": {
+        "node": "runbook_route",
+        "port": "scale_out"
+      },
+      "to": {
+        "node": "scale"
+      }
+    },
+    {
+      "id": "c9",
+      "from": {
+        "node": "runbook_route",
+        "port": "open_ticket"
+      },
+      "to": {
+        "node": "ticket"
+      }
+    },
+    {
+      "id": "c10",
+      "from": {
+        "node": "runbook_route",
+        "port": "human"
+      },
+      "to": {
+        "node": "oncall"
+      }
+    },
+    {
+      "id": "c11",
+      "from": {
+        "node": "oncall",
+        "port": "restart_workers"
+      },
+      "to": {
+        "node": "restart"
+      }
+    },
+    {
+      "id": "c12",
+      "from": {
+        "node": "oncall",
+        "port": "scale_out"
+      },
+      "to": {
+        "node": "scale"
+      }
+    },
+    {
+      "id": "c13",
+      "from": {
+        "node": "oncall",
+        "port": "open_ticket"
+      },
+      "to": {
+        "node": "ticket"
+      }
+    },
+    {
+      "id": "c14",
+      "from": {
+        "node": "oncall",
+        "port": "dismiss"
+      },
+      "to": {
+        "node": "out_dismissed"
+      }
+    },
+    {
+      "id": "c15",
+      "from": {
+        "node": "oncall",
+        "port": "expired"
+      },
+      "to": {
+        "node": "out_unacknowledged"
+      }
+    },
+    {
+      "id": "c16",
+      "from": {
+        "node": "restart",
+        "port": "done"
+      },
+      "to": {
+        "node": "out_runbook"
+      }
+    },
+    {
+      "id": "c17",
+      "from": {
+        "node": "scale",
+        "port": "done"
+      },
+      "to": {
+        "node": "out_runbook"
+      }
+    },
+    {
+      "id": "c18",
+      "from": {
+        "node": "ticket",
+        "port": "done"
+      },
+      "to": {
+        "node": "out_ticket"
+      }
+    }
+  ],
+  "metadata": {
+    "template": {
+      "key": "jev-escalation-triage",
+      "pattern": "D — escalation, over a Choice/Score/Noul bundle",
+      "contracts": ["ops.alert_needs_owner", "ops.alert_impact", "ops.alert_runbook"],
+      "handbook": [
+        "§VI.A One Snapshot, Many Questions",
+        "§II.F Primitive Composition",
+        "§II.G Primitive Anti-Patterns",
+        "§V.A Confidence Is a Routing Signal",
+        "§V.E Confidence Is Not Authority",
+        "Table V",
+        "§XI.C (The system can stop or escalate safely)"
+      ],
+      "design": "docs/design/JEV_ENGINEERING.md §6, §8, §9.5",
+      "docs": "docs/jev/confidence-and-consequence.md"
+    }
+  },
+  "layout": {
+    "nodes": {
+      "start": {
+        "x": 0,
+        "y": 0
+      },
+      "signals": {
+        "x": 0,
+        "y": 160
+      },
+      "facts": {
+        "x": 0,
+        "y": 320
+      },
+      "triage": {
+        "x": 280,
+        "y": 0
+      },
+      "owner_route": {
+        "x": 560,
+        "y": 0
+      },
+      "impact_route": {
+        "x": 840,
+        "y": 0
+      },
+      "runbook_route": {
+        "x": 1120,
+        "y": 0
+      },
+      "oncall": {
+        "x": 1400,
+        "y": 0
+      },
+      "restart": {
+        "x": 1680,
+        "y": 0
+      },
+      "scale": {
+        "x": 1680,
+        "y": 160
+      },
+      "ticket": {
+        "x": 1680,
+        "y": 320
+      },
+      "out_runbook": {
+        "x": 1960,
+        "y": 0
+      },
+      "out_ticket": {
+        "x": 1960,
+        "y": 160
+      },
+      "out_dismissed": {
+        "x": 1680,
+        "y": 480
+      },
+      "out_unacknowledged": {
+        "x": 1680,
+        "y": 640
+      }
+    }
+  }
+}

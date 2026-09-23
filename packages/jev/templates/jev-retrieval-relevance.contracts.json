@@ -1,0 +1,328 @@
+{
+  "decisionContracts": [
+    {
+      "key": "research.next_source",
+      "description": "Chooses the next live source to search, or stops.",
+      "body": {
+        "key": "research.next_source",
+        "version": 1,
+        "title": "Next retrieval source",
+        "purpose": "Chooses which live source to search next, from the source registry as it is at evaluation time, or stops when no source can add support. Semantic because \"likely to add missing support\" is a judgment; availability, access and budget are filtered in code first.",
+        "owner": "team:research",
+        "question": {
+          "kind": "choice",
+          "instructions": "Which source should be searched next to find support for the parts of the question that the collected evidence does not yet support? Judge only from the question, the evidence already collected, the sources already searched and each source's description.",
+          "menu": {
+            "source": "dynamic",
+            "escapes": {
+              "stop": {
+                "description": "The collected evidence already supports every part of the question, or no listed source is likely to add support for the missing parts.",
+                "escape": "stop",
+                "automatable": true
+              },
+              "review": {
+                "description": "The question is ambiguous, or it needs a source the menu does not list (internal records, a named expert, a paid database).",
+                "escape": "review",
+                "automatable": false
+              }
+            },
+            "maxOptions": 20,
+            "keyStrategy": "slug",
+            "maxAgeMs": 300000,
+            "descriptionGuidance": "Describe what a source contains and when it is authoritative (coverage, recency, kind of document), never how good it is."
+          }
+        },
+        "fallbackOutcome": "review",
+        "state": {
+          "goal": "Collect enough cited evidence to answer the question.",
+          "fields": {
+            "question": {
+              "role": "fact",
+              "description": "The question the evidence must support.",
+              "schema": {
+                "type": "string",
+                "maxLength": 2000
+              },
+              "required": true,
+              "dataClass": "internal",
+              "redact": "error"
+            },
+            "evidence": {
+              "role": "evidence",
+              "description": "Evidence items that survived relevance filtering in earlier rounds, with their support relations.",
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["id", "kind"],
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    },
+                    "supports": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "observedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "source": {
+                      "type": "object"
+                    },
+                    "version": {
+                      "type": "string"
+                    },
+                    "verified": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              },
+              "required": false,
+              "dataClass": "internal",
+              "redact": "error",
+              "selection": {
+                "maxItems": 20,
+                "order": "as_bound"
+              }
+            },
+            "searched": {
+              "role": "fact",
+              "description": "Ids of sources already searched in this run; code already removed them from the menu, listed so the judge knows what was tried.",
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "required": false,
+              "dataClass": "internal",
+              "redact": "error"
+            }
+          },
+          "maxTokens": 6000,
+          "privacyClass": "internal",
+          "latencyClass": "standard",
+          "consistency": "record"
+        },
+        "routing": {
+          "consequenceClass": "low",
+          "thresholds": {
+            "low": {
+              "autoAt": 0.8,
+              "improveAt": null,
+              "minMargin": 0.15
+            }
+          },
+          "escapeRoutes": {
+            "none": "human",
+            "other": "human",
+            "stop": "auto"
+          },
+          "uncalibratedProviders": "human",
+          "onModelChange": "continue"
+        },
+        "allowedAction": {
+          "kinds": ["retrieval_filter", "internal_routing"],
+          "capabilities": [],
+          "maxConsequence": "low",
+          "externalSideEffects": false
+        },
+        "escalation": {
+          "assignees": ["role:researcher"],
+          "mode": "choice",
+          "rubric": "Pick the source most likely to support a claim the evidence still lacks; pick stop when nothing listed would help."
+        },
+        "model": {
+          "primary": {
+            "provider": "typesafe",
+            "model": "jev-latest"
+          },
+          "failover": []
+        },
+        "tests": {
+          "requiredCategories": [
+            "normal",
+            "ambiguous",
+            "missing_evidence",
+            "adversarial",
+            "stale_options",
+            "rare_class",
+            "no_fit"
+          ],
+          "minPerCategory": 3,
+          "minAccuracy": 0.9,
+          "requireMonotonicity": true
+        },
+        "changelog": "",
+        "lintSuppressions": [],
+        "tags": ["harness:retrieval", "live-menu", "template:jev-retrieval-relevance"]
+      }
+    },
+    {
+      "key": "research.source_relevance",
+      "description": "Scores decision relevance of one retrieved item.",
+      "body": {
+        "key": "research.source_relevance",
+        "version": 1,
+        "title": "Retrieval relevance",
+        "purpose": "Scores whether one retrieved item contributes evidence to the question, rather than being topically close. Items in the partial and direct bands survive into the evidence packet. Exact filters (collection, access control, date) and the embedding shortlist run in code before it.",
+        "owner": "team:research",
+        "question": {
+          "kind": "score",
+          "instructions": "How much does this evidence item support a claim that an answer to the question needs? Judge the stated content of the item, how authoritative its kind of source is for that claim, and whether it is current enough; topical similarity alone is not support.",
+          "levels": [
+            "Unrelated: the item does not address the question's subject.",
+            "Topical only: same subject, but it states nothing that supports or refutes a claim the answer needs.",
+            "Partial support: it supports part of a needed claim, or supports it only from a secondary or dated source.",
+            "Direct support: it states a needed fact from an authoritative, current source that can be cited as is."
+          ],
+          "bands": [
+            {
+              "port": "drop",
+              "minLevel": 0,
+              "maxLevel": 1,
+              "consequenceClass": "low",
+              "automatable": true
+            },
+            {
+              "port": "partial",
+              "minLevel": 2,
+              "maxLevel": 2,
+              "consequenceClass": "low",
+              "automatable": true
+            },
+            {
+              "port": "direct",
+              "minLevel": 3,
+              "maxLevel": 3,
+              "consequenceClass": "low",
+              "automatable": true
+            }
+          ]
+        },
+        "fallbackOutcome": null,
+        "state": {
+          "fields": {
+            "question": {
+              "role": "goal",
+              "description": "The question the evidence must support; placed as the packet goal.",
+              "schema": {
+                "type": "string",
+                "maxLength": 2000
+              },
+              "required": true,
+              "dataClass": "internal",
+              "redact": "error"
+            },
+            "candidates": {
+              "role": "evidence",
+              "description": "Shortlisted candidates of one group, with ids; every question judges one item and sees the group as context.",
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["id", "kind"],
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    },
+                    "supports": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "observedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "source": {
+                      "type": "object"
+                    },
+                    "version": {
+                      "type": "string"
+                    },
+                    "verified": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              },
+              "required": true,
+              "dataClass": "internal",
+              "redact": "error",
+              "selection": {
+                "maxItems": 16,
+                "order": "as_bound"
+              }
+            }
+          },
+          "maxTokens": 12000,
+          "privacyClass": "internal",
+          "latencyClass": "standard",
+          "consistency": "record"
+        },
+        "routing": {
+          "consequenceClass": "low",
+          "thresholds": {
+            "low": {
+              "autoAt": 0.7,
+              "improveAt": null,
+              "minMargin": 0.1
+            }
+          },
+          "escapeRoutes": {
+            "none": "human",
+            "other": "human",
+            "stop": "auto"
+          },
+          "uncalibratedProviders": "human",
+          "onModelChange": "continue"
+        },
+        "allowedAction": {
+          "kinds": ["retrieval_filter"],
+          "capabilities": [],
+          "maxConsequence": "low",
+          "externalSideEffects": false
+        },
+        "escalation": {
+          "assignees": ["role:researcher"],
+          "mode": "choice",
+          "rubric": "Label the band the item belongs to for this question; topical similarity without a supported claim is drop."
+        },
+        "model": {
+          "primary": {
+            "provider": "typesafe",
+            "model": "jev-latest"
+          },
+          "failover": []
+        },
+        "tests": {
+          "requiredCategories": ["normal", "ambiguous", "missing_evidence", "adversarial"],
+          "minPerCategory": 3,
+          "minAccuracy": 0.9,
+          "requireMonotonicity": true
+        },
+        "changelog": "",
+        "lintSuppressions": [],
+        "tags": ["harness:retrieval", "template:jev-retrieval-relevance"]
+      }
+    }
+  ]
+}

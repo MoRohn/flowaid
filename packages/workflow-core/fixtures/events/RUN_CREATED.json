@@ -1,0 +1,18 @@
+{
+  "type": "RUN_CREATED",
+  "runId": "0192f0a1-5b3c-7d4e-8f60-1a2b3c4d5e6f",
+  "seq": 0,
+  "at": "2026-09-22T10:00:00.000Z",
+  "workflowVersionId": "0192f0a1-5b3c-7d4e-8f60-000000000001",
+  "environmentId": "0192f0a1-5b3c-7d4e-8f60-000000000002",
+  "origin": "api",
+  "mode": "async",
+  "input": {
+    "message": "I was charged twice for my gold plan this month. Please fix this.",
+    "customer_id": "cus_8842",
+    "tier": "gold"
+  },
+  "planHash": "dbf9868785714c2519824d5a01bea297a3ef16fa141bec86a4caff8320cdbc4c",
+  "idempotencyKey": "ticket-8842-2026-09-22",
+  "sourceRunId": null
+}

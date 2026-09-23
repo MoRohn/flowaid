@@ -1,0 +1,39 @@
+{
+  "name": "@flowaid/workflow-core",
+  "version": "0.3.0",
+  "private": true,
+  "description": "Portable flowaid contracts: workflow definition, bindings, FlowExpr, events, errors, DecisionResult, NodeManifest, ExecutionPlan, diagnostics and store interfaces. Browser-safe; depends only on zod, recheck (pure-JS build) and @flowaid/shared.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src",
+    "dist",
+    "fixtures",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src",
+    "test": "vitest run",
+    "test:tz": "vitest run --project tz-new-york",
+    "clean": "rm -rf dist .turbo *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@flowaid/shared": "workspace:*",
+    "recheck": "4.5.0",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@flowaid/config": "workspace:*",
+    "@types/node": "24.13.6",
+    "eslint": "9.39.5",
+    "fast-check": "4.10.2",
+    "typescript": "5.9.3",
+    "vitest": "4.1.11"
+  }
+}

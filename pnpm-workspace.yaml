@@ -1,0 +1,23 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+
+# Native/postinstall builds we allow (pnpm blocks dependency scripts by default).
+allowBuilds:
+  esbuild: true
+  argon2: true
+  isolated-vm: true
+  sharp: true
+  "@tailwindcss/oxide": true
+  unrs-resolver: true
+
+# pnpm's supply-chain policy refuses very new releases; these were published in
+# the last days and are pinned to exact versions we verified.
+minimumReleaseAgeExclude:
+  - "@codemirror/state@6.7.6"
+  - "@codemirror/view@6.43.13"
+  - framer-motion@13.4.1
+  - motion-dom@13.4.1
+  - motion@13.4.1
+  - react-resizable-panels@4.13.2
+  - fast-check@4.10.2

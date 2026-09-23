@@ -1,0 +1,779 @@
+{
+  "$schema": "https://flowaid.dev/schemas/workflow/v1",
+  "id": "9c2e5f7a-3b1d-4e8f-a6c4-2d7b9e1f3a5c",
+  "description": "Batch-judge a support ticket (team, urgency, escalation), gather team-specific context, draft a reply, run safety checks and gate on confidence with a human fallback.",
+  "name": "Intelligent Support Triage",
+  "inputs": {
+    "type": "object",
+    "required": ["message", "customer_id"],
+    "properties": {
+      "message": {
+        "type": "string",
+        "x-dataClass": "pii"
+      },
+      "customer_id": {
+        "type": "string"
+      },
+      "channel": {
+        "type": "string",
+        "enum": ["email", "chat", "api"]
+      }
+    }
+  },
+  "outputs": {
+    "type": "object",
+    "required": ["team", "urgency", "reply", "disposition"],
+    "properties": {
+      "team": {
+        "type": "string"
+      },
+      "urgency": {
+        "type": "number"
+      },
+      "reply": {
+        "type": "string"
+      },
+      "disposition": {
+        "type": "string",
+        "enum": ["auto", "human_approved", "escalated"]
+      }
+    }
+  },
+  "secrets": [
+    {
+      "name": "TYPESAFE_API_KEY",
+      "credentialType": "typesafe.api_key"
+    },
+    {
+      "name": "OPENAI_API_KEY",
+      "credentialType": "openai.api_key"
+    },
+    {
+      "name": "BILLING_API",
+      "credentialType": "http.bearer"
+    },
+    {
+      "name": "STATUS_API",
+      "credentialType": "http.bearer",
+      "required": false
+    }
+  ],
+  "variables": [
+    {
+      "name": "billingBase",
+      "schema": {
+        "type": "string"
+      },
+      "source": "environment"
+    },
+    {
+      "name": "autoThreshold",
+      "schema": {
+        "type": "number"
+      },
+      "default": 0.9
+    }
+  ],
+  "execution": {
+    "timeoutMs": 180000,
+    "maxCostUsd": 0.25,
+    "decisions": {
+      "primary": {
+        "provider": "typesafe",
+        "model": "jev-latest"
+      },
+      "failover": [
+        {
+          "provider": "llm",
+          "model": {
+            "provider": "openai",
+            "model": "gpt-4.1-mini"
+          }
+        }
+      ]
+    }
+  },
+  "nodes": [
+    {
+      "id": "start",
+      "kind": "input",
+      "name": "Ticket"
+    },
+    {
+      "id": "judgments",
+      "kind": "task",
+      "type": "flowaid.decision.batch",
+      "typeVersion": "1.0.0",
+      "name": "Triage judgments",
+      "config": {
+        "questions": {
+          "intent": {
+            "kind": "choice",
+            "instructions": "Which team should handle this?",
+            "options": {
+              "billing": "Invoices, charges, refunds, subscriptions",
+              "technical": "Bugs, errors, outages, integrations",
+              "security": "Fraud, stolen cards, account takeover, data exposure",
+              "general": "Anything else"
+            }
+          },
+          "urgency": {
+            "kind": "score",
+            "instructions": "How urgent is this request?",
+            "levels": ["Not urgent", "Low", "Moderate", "High", "Critical"]
+          },
+          "escalate": {
+            "kind": "boolean",
+            "instructions": "Should a human handle this from the start (legal threat, churn risk, abuse)?",
+            "criteria": {
+              "true": "Human must handle",
+              "false": "Automation may proceed"
+            }
+          }
+        }
+      },
+      "inputs": {
+        "state": {
+          "kind": "object",
+          "fields": {
+            "message": {
+              "kind": "ref",
+              "ref": {
+                "kind": "port",
+                "node": "start",
+                "port": "message"
+              }
+            },
+            "channel": {
+              "kind": "ref",
+              "ref": {
+                "kind": "port",
+                "node": "start",
+                "port": "channel"
+              },
+              "default": "api"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "typesafe": "TYPESAFE_API_KEY",
+        "llm": "OPENAI_API_KEY"
+      }
+    },
+    {
+      "id": "esc_gate",
+      "kind": "branch",
+      "name": "Escalate now?",
+      "cases": [
+        {
+          "port": "escalate",
+          "when": "judgments.answers.escalate.value || judgments.answers.urgency.value >= 3.5"
+        }
+      ],
+      "defaultPort": "continue"
+    },
+    {
+      "id": "route",
+      "kind": "branch",
+      "name": "Route by team",
+      "cases": [
+        {
+          "port": "billing",
+          "when": "judgments.answers.intent.value == 'billing'"
+        },
+        {
+          "port": "technical",
+          "when": "judgments.answers.intent.value == 'technical'"
+        },
+        {
+          "port": "security",
+          "when": "judgments.answers.intent.value == 'security'"
+        }
+      ],
+      "defaultPort": "general"
+    },
+    {
+      "id": "billing_lookup",
+      "kind": "task",
+      "type": "flowaid.tools.http",
+      "typeVersion": "1.0.0",
+      "name": "Billing lookup",
+      "config": {
+        "method": "GET",
+        "url": "{{ $vars.billingBase }}/customers/{{ start.customer_id }}/invoices?limit=3",
+        "responseType": "json"
+      },
+      "credentials": {
+        "auth": "BILLING_API"
+      },
+      "policy": {
+        "retry": {
+          "maxAttempts": 3
+        },
+        "onError": "ignore"
+      }
+    },
+    {
+      "id": "status_lookup",
+      "kind": "task",
+      "type": "flowaid.tools.http",
+      "typeVersion": "1.0.0",
+      "name": "Status page",
+      "config": {
+        "method": "GET",
+        "url": "https://status.example.com/api/v2/incidents/unresolved.json",
+        "responseType": "json"
+      },
+      "credentials": {
+        "auth": "STATUS_API"
+      },
+      "policy": {
+        "onError": "ignore"
+      }
+    },
+    {
+      "id": "security_kb",
+      "kind": "task",
+      "type": "flowaid.tools.mcp",
+      "typeVersion": "1.0.0",
+      "name": "Security playbook",
+      "config": {
+        "serverId": "$template.mcp.security_kb",
+        "tool": "search_playbooks"
+      },
+      "inputs": {
+        "query": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "start",
+            "port": "message"
+          }
+        }
+      }
+    },
+    {
+      "id": "context",
+      "kind": "join",
+      "name": "Context",
+      "mode": {
+        "type": "all"
+      },
+      "inputs": {
+        "billing": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "billing_lookup",
+            "port": "body"
+          }
+        },
+        "status": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "status_lookup",
+            "port": "body"
+          }
+        },
+        "security": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "security_kb",
+            "port": "result"
+          }
+        }
+      }
+    },
+    {
+      "id": "draft",
+      "kind": "task",
+      "type": "flowaid.ai.generate",
+      "typeVersion": "1.0.0",
+      "name": "Draft response",
+      "config": {
+        "model": {
+          "provider": "openai",
+          "model": "gpt-4.1-mini"
+        },
+        "temperature": 0.2,
+        "maxOutputTokens": 500,
+        "stream": true,
+        "system": "You write concise, accurate support replies. Never promise refunds or timelines."
+      },
+      "inputs": {
+        "prompt": {
+          "kind": "template",
+          "source": "Team: {{ judgments.answers.intent.value }} (p={{ round(judgments.answers.intent.confidence, 2) }})\nUrgency: {{ judgments.answers.urgency.levelLabel }}\nContext: {{ context.values | json }}\n\nCustomer message:\n{{ start.message }}"
+        }
+      },
+      "credentials": {
+        "llm": "OPENAI_API_KEY"
+      }
+    },
+    {
+      "id": "safety",
+      "kind": "task",
+      "type": "flowaid.decision.batch",
+      "typeVersion": "1.0.0",
+      "name": "Safety checks",
+      "config": {
+        "questions": {
+          "safe": {
+            "kind": "boolean",
+            "instructions": "Is the reply safe to send (no promises, no policy violations, no PII leakage)?",
+            "criteria": {
+              "true": "Safe",
+              "false": "Unsafe"
+            }
+          },
+          "on_topic": {
+            "kind": "boolean",
+            "instructions": "Does the reply address the customer's actual issue?"
+          }
+        }
+      },
+      "inputs": {
+        "state": {
+          "kind": "object",
+          "fields": {
+            "message": {
+              "kind": "ref",
+              "ref": {
+                "kind": "port",
+                "node": "start",
+                "port": "message"
+              }
+            },
+            "reply": {
+              "kind": "ref",
+              "ref": {
+                "kind": "port",
+                "node": "draft",
+                "port": "text"
+              }
+            }
+          }
+        }
+      },
+      "credentials": {
+        "typesafe": "TYPESAFE_API_KEY",
+        "llm": "OPENAI_API_KEY"
+      }
+    },
+    {
+      "id": "gate",
+      "kind": "task",
+      "type": "flowaid.decision.confidence_gate",
+      "typeVersion": "1.0.0",
+      "name": "Confidence gate",
+      "config": {
+        "threshold": {
+          "kind": "ref",
+          "ref": {
+            "kind": "var",
+            "name": "autoThreshold"
+          }
+        },
+        "requireValue": true
+      },
+      "inputs": {
+        "decision": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "safety",
+            "port": "answers",
+            "path": "/safe"
+          }
+        }
+      }
+    },
+    {
+      "id": "approve",
+      "kind": "human",
+      "name": "Agent approval",
+      "mode": {
+        "type": "review",
+        "value": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "draft",
+            "port": "text"
+          }
+        },
+        "schema": {
+          "type": "string"
+        }
+      },
+      "title": {
+        "kind": "template",
+        "source": "Review reply for a {{ judgments.answers.intent.value }} ticket (safety p={{ round(safety.answers.safe.pYes, 2) }})"
+      },
+      "context": {
+        "message": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "start",
+            "port": "message"
+          }
+        },
+        "safety": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "safety",
+            "port": "answers"
+          }
+        }
+      },
+      "assignees": ["role:support_lead"],
+      "expiresInMs": 7200000,
+      "onExpire": "route",
+      "escalation": {
+        "afterMs": 1800000,
+        "to": ["role:admin"]
+      },
+      "externalReview": true
+    },
+    {
+      "id": "out_auto",
+      "kind": "output",
+      "name": "Auto respond",
+      "outcome": "auto",
+      "value": {
+        "kind": "object",
+        "fields": {
+          "team": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "judgments",
+              "port": "answers",
+              "path": "/intent/value"
+            }
+          },
+          "urgency": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "judgments",
+              "port": "answers",
+              "path": "/urgency/value"
+            }
+          },
+          "reply": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "draft",
+              "port": "text"
+            }
+          },
+          "disposition": {
+            "kind": "literal",
+            "value": "auto"
+          }
+        }
+      }
+    },
+    {
+      "id": "out_human",
+      "kind": "output",
+      "name": "Human approved",
+      "outcome": "human_approved",
+      "value": {
+        "kind": "object",
+        "fields": {
+          "team": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "judgments",
+              "port": "answers",
+              "path": "/intent/value"
+            }
+          },
+          "urgency": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "judgments",
+              "port": "answers",
+              "path": "/urgency/value"
+            }
+          },
+          "reply": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "approve",
+              "port": "value"
+            }
+          },
+          "disposition": {
+            "kind": "literal",
+            "value": "human_approved"
+          }
+        }
+      }
+    },
+    {
+      "id": "out_esc",
+      "kind": "output",
+      "name": "Escalated",
+      "outcome": "escalated",
+      "value": {
+        "kind": "object",
+        "fields": {
+          "team": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "judgments",
+              "port": "answers",
+              "path": "/intent/value"
+            }
+          },
+          "urgency": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "judgments",
+              "port": "answers",
+              "path": "/urgency/value"
+            }
+          },
+          "reply": {
+            "kind": "literal",
+            "value": ""
+          },
+          "disposition": {
+            "kind": "literal",
+            "value": "escalated"
+          }
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "c1",
+      "from": {
+        "node": "esc_gate",
+        "port": "escalate"
+      },
+      "to": {
+        "node": "out_esc"
+      }
+    },
+    {
+      "id": "c2",
+      "from": {
+        "node": "esc_gate",
+        "port": "continue"
+      },
+      "to": {
+        "node": "route"
+      }
+    },
+    {
+      "id": "c3",
+      "from": {
+        "node": "route",
+        "port": "billing"
+      },
+      "to": {
+        "node": "billing_lookup"
+      }
+    },
+    {
+      "id": "c4",
+      "from": {
+        "node": "route",
+        "port": "technical"
+      },
+      "to": {
+        "node": "status_lookup"
+      }
+    },
+    {
+      "id": "c5",
+      "from": {
+        "node": "route",
+        "port": "security"
+      },
+      "to": {
+        "node": "security_kb"
+      }
+    },
+    {
+      "id": "c6",
+      "from": {
+        "node": "billing_lookup",
+        "port": "done"
+      },
+      "to": {
+        "node": "context"
+      }
+    },
+    {
+      "id": "c7",
+      "from": {
+        "node": "status_lookup",
+        "port": "done"
+      },
+      "to": {
+        "node": "context"
+      }
+    },
+    {
+      "id": "c8",
+      "from": {
+        "node": "security_kb",
+        "port": "done"
+      },
+      "to": {
+        "node": "context"
+      }
+    },
+    {
+      "id": "c9",
+      "from": {
+        "node": "route",
+        "port": "general"
+      },
+      "to": {
+        "node": "context"
+      }
+    },
+    {
+      "id": "c10",
+      "from": {
+        "node": "gate",
+        "port": "pass"
+      },
+      "to": {
+        "node": "out_auto"
+      }
+    },
+    {
+      "id": "c11",
+      "from": {
+        "node": "gate",
+        "port": "review"
+      },
+      "to": {
+        "node": "approve"
+      }
+    },
+    {
+      "id": "c12",
+      "from": {
+        "node": "gate",
+        "port": "fail"
+      },
+      "to": {
+        "node": "approve"
+      }
+    },
+    {
+      "id": "c13",
+      "from": {
+        "node": "approve",
+        "port": "approved"
+      },
+      "to": {
+        "node": "out_human"
+      }
+    },
+    {
+      "id": "c14",
+      "from": {
+        "node": "approve",
+        "port": "rejected"
+      },
+      "to": {
+        "node": "out_esc"
+      }
+    },
+    {
+      "id": "c15",
+      "from": {
+        "node": "approve",
+        "port": "expired"
+      },
+      "to": {
+        "node": "out_esc"
+      }
+    }
+  ],
+  "layout": {
+    "nodes": {
+      "start": {
+        "x": 0,
+        "y": 220
+      },
+      "judgments": {
+        "x": 260,
+        "y": 220
+      },
+      "esc_gate": {
+        "x": 520,
+        "y": 220
+      },
+      "route": {
+        "x": 780,
+        "y": 220
+      },
+      "billing_lookup": {
+        "x": 1040,
+        "y": 220
+      },
+      "status_lookup": {
+        "x": 1300,
+        "y": 220
+      },
+      "security_kb": {
+        "x": 1560,
+        "y": 220
+      },
+      "context": {
+        "x": 1820,
+        "y": 220
+      },
+      "draft": {
+        "x": 2080,
+        "y": 220
+      },
+      "safety": {
+        "x": 2340,
+        "y": 220
+      },
+      "gate": {
+        "x": 2600,
+        "y": 220
+      },
+      "approve": {
+        "x": 2860,
+        "y": 220
+      },
+      "out_auto": {
+        "x": 3120,
+        "y": 220
+      },
+      "out_human": {
+        "x": 3380,
+        "y": 220
+      },
+      "out_esc": {
+        "x": 3640,
+        "y": 220
+      }
+    }
+  }
+}

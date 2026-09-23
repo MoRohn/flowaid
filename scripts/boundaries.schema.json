@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "flowaid dependency boundaries",
+  "type": "object",
+  "required": ["packages"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "$comment": { "type": "string" },
+    "packages": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["dir", "allow"],
+        "additionalProperties": false,
+        "properties": {
+          "dir": { "type": "string", "pattern": "^(packages|apps)/[a-z0-9-]+$" },
+          "allow": {
+            "type": "array",
+            "items": { "type": "string", "pattern": "^[a-z0-9-]+(/[a-z0-9-]+)*$" },
+            "uniqueItems": true
+          },
+          "browserSafe": { "type": "boolean" }
+        }
+      }
+    },
+    "thirdParty": {
+      "description": "External import boundaries. Each key is a `|`-separated list of module-specifier globs (`*` matches any characters, e.g. `langchain|langchain/*|@langchain/*`). The value names the only workspace packages and the only files (repo-relative globs) that may import a matching specifier; every other package gets a matching `no-restricted-imports` pattern and may not declare a matching dependency in its package.json.",
+      "type": "object",
+      "propertyNames": { "pattern": "^[^|\\s]+(\\|[^|\\s]+)*$" },
+      "additionalProperties": {
+        "type": "object",
+        "required": ["packages", "files"],
+        "additionalProperties": false,
+        "properties": {
+          "packages": {
+            "type": "array",
+            "items": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+            "uniqueItems": true
+          },
+          "files": {
+            "type": "array",
+            "items": { "type": "string", "pattern": "^(packages|apps)/[a-z0-9-]+/.+$" },
+            "uniqueItems": true
+          }
+        }
+      }
+    }
+  }
+}

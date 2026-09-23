@@ -1,0 +1,19 @@
+{
+  "type": "RUN_COMPLETED",
+  "runId": "0192f0a1-5b3c-7d4e-8f60-1a2b3c4d5e6f",
+  "seq": 27,
+  "at": "2026-09-22T10:00:06.750Z",
+  "output": {
+    "reply": "Hi Dana, sorry about the double charge on your gold plan. I have flagged the duplicate to billing; you will hear back within one business day.",
+    "team": "billing",
+    "auto_sent": false,
+    "approved_by": "user:maria"
+  },
+  "outcome": "human_approved",
+  "usage": {
+    "inputTokens": 1842,
+    "outputTokens": 296
+  },
+  "costUsd": 0.00087,
+  "durationMs": 6750
+}

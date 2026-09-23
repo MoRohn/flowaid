@@ -1,0 +1,12 @@
+{
+  "type": "FOREACH_STARTED",
+  "runId": "0192f0a1-5b3c-7d4e-8f60-1a2b3c4d5e6f",
+  "seq": 35,
+  "at": "2026-09-22T10:00:08.750Z",
+  "nodeRunId": "0192f0a1-5b3c-7d4e-8f60-0000000000b4",
+  "nodeId": "search_all",
+  "scope": "research#0",
+  "attempt": 1,
+  "itemCount": 3,
+  "concurrency": 3
+}

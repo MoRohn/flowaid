@@ -1,0 +1,17 @@
+{
+  "type": "HUMAN_APPROVAL_RECEIVED",
+  "runId": "0192f0a1-5b3c-7d4e-8f60-1a2b3c4d5e6f",
+  "seq": 24,
+  "at": "2026-09-22T10:00:06.000Z",
+  "nodeRunId": "0192f0a1-5b3c-7d4e-8f60-0000000000a8",
+  "nodeId": "approve",
+  "scope": "",
+  "attempt": 1,
+  "humanTaskId": "0192f0a1-5b3c-7d4e-8f60-0000000000c1",
+  "response": {
+    "action": "approve",
+    "value": "Hi Dana, sorry about the double charge on your gold plan. I have flagged the duplicate to billing; you will hear back within one business day.",
+    "comment": "Softened the tone."
+  },
+  "by": "user:maria"
+}

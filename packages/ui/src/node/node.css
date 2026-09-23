@@ -1,0 +1,384 @@
+/*
+ * @flowaid/ui node — canvas node renderers for @xyflow/react.
+ * Pulls in xyflow's base stylesheet (positioning only) and layers the FlowAId
+ * card and handle treatment on top. State is a border, not a fill.
+ */
+@import "@xyflow/react/dist/base.css";
+
+.fa-node {
+  --fa-node-shadow: var(--shadow-1);
+  position: relative;
+  box-sizing: border-box;
+  width: 232px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--fa-node-shadow);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  transition:
+    box-shadow var(--dur-base) var(--ease-out),
+    border-color var(--dur-base) var(--ease-out),
+    opacity var(--dur-base) var(--ease-out);
+}
+.fa-node[data-pill="true"] {
+  width: auto;
+  border-radius: var(--radius-full);
+}
+.fa-node:hover,
+.fa-node[data-hovered="true"] {
+  --fa-node-shadow: var(--shadow-2);
+}
+.react-flow__node.dragging .fa-node,
+.fa-node[data-dragging="true"] {
+  --fa-node-shadow: var(--shadow-3);
+}
+.fa-node[data-selected="true"] {
+  --fa-node-shadow: 0 0 0 3px var(--accent-soft), var(--shadow-1);
+  border-color: var(--accent);
+}
+.fa-node[data-selected="true"]:hover,
+.fa-node[data-selected="true"][data-hovered="true"] {
+  --fa-node-shadow: 0 0 0 3px var(--accent-soft), var(--shadow-2);
+}
+.fa-node[data-status="running"] {
+  border-color: var(--info);
+  animation: fa-node-ring 1.8s var(--ease-out) infinite;
+}
+/* waiting on a timer, a person, a subflow or an event; retry_wait is the back-off before the next attempt */
+.fa-node[data-status="waiting"],
+.fa-node[data-status="retry_wait"] {
+  border-color: var(--warn);
+}
+.fa-node[data-status="waiting"][data-category="human"] {
+  border-color: var(--cat-human);
+}
+/* a cached result (UI.md §4.3): green dashed */
+.fa-node[data-status="reused"] {
+  border-style: dashed;
+  border-color: var(--ok);
+}
+.fa-node[data-status="failed"] {
+  border-color: var(--danger);
+}
+.fa-node[data-status="skipped"] {
+  border-style: dashed;
+  opacity: 0.6;
+}
+.fa-node[data-status="cancelled"] {
+  border-style: dashed;
+  border-color: var(--border-strong);
+}
+.fa-node[data-disabled="true"] {
+  opacity: 0.5;
+}
+.fa-node[data-status="skipped"][data-disabled="true"] {
+  opacity: 0.4;
+}
+
+@keyframes fa-node-ring {
+  0% {
+    box-shadow:
+      var(--fa-node-shadow),
+      0 0 0 0 color-mix(in srgb, var(--info) 45%, transparent);
+  }
+  100% {
+    box-shadow:
+      var(--fa-node-shadow),
+      0 0 0 7px transparent;
+  }
+}
+
+/* The xyflow node wrapper: keep our card in charge of the visuals. */
+.react-flow__node:has(> .fa-node),
+.react-flow__node:has(> .fa-node-root) {
+  border-radius: var(--radius-md);
+}
+.react-flow__node:has(> .fa-node[data-pill="true"]),
+.react-flow__node:has(> .fa-node-root > .fa-node[data-pill="true"]) {
+  border-radius: var(--radius-full);
+}
+
+/* ---- handles ---- */
+.fa-handle.react-flow__handle {
+  width: 8px;
+  height: 8px;
+  min-width: 0;
+  min-height: 0;
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  border: 1.5px solid var(--border-strong);
+  pointer-events: all;
+  cursor: crosshair;
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
+}
+/* 22px hit area around the 8px circle. */
+.fa-handle.react-flow__handle::before {
+  content: "";
+  position: absolute;
+  inset: -7px;
+  border-radius: inherit;
+}
+.fa-handle[data-typed="true"] {
+  border-color: var(--fa-handle-c, var(--border-strong));
+}
+.fa-handle[data-connected="true"] {
+  background: var(--fa-handle-c, var(--ink-3));
+  border-color: var(--fa-handle-c, var(--ink-3));
+}
+.fa-handle.react-flow__handle-left:hover,
+.fa-handle.react-flow__handle-left.connectingfrom,
+.fa-handle.react-flow__handle-left.connectingto {
+  transform: translate(-50%, -50%) scale(1.5);
+}
+.fa-handle.react-flow__handle-right:hover,
+.fa-handle.react-flow__handle-right.connectingfrom,
+.fa-handle.react-flow__handle-right.connectingto {
+  transform: translate(50%, -50%) scale(1.5);
+}
+/* Control-outs: small squares on the right edge (activation, not data). */
+.fa-handle[data-handle-kind="ctl"].react-flow__handle {
+  width: 7px;
+  height: 7px;
+  border-radius: 1.5px;
+}
+/* Control-in: a single notch on the top edge near the left corner (UI.md §6). */
+.fa-handle[data-handle-kind="ctl-in"].react-flow__handle {
+  width: 12px;
+  height: 6px;
+  border-radius: 0 0 3px 3px;
+}
+.fa-handle.react-flow__handle-top:hover,
+.fa-handle.react-flow__handle-top.connectingfrom,
+.fa-handle.react-flow__handle-top.connectingto {
+  transform: translate(-50%, -50%) scale(1.35);
+}
+.react-flow__handle-top .fa-handle-label {
+  top: auto;
+  bottom: calc(100% + 7px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+/* A rejected handle states the reason in its label while a connection drags. */
+.fa-handle[data-compatible="false"][data-reason] .fa-handle-label {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.fa-handle[data-compatible="false"][data-reason]:hover {
+  opacity: 1;
+}
+.fa-handle[data-compatible="true"] {
+  border-color: var(--fa-handle-c, var(--accent));
+  background: color-mix(in srgb, var(--fa-handle-c, var(--accent)) 25%, var(--surface));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--fa-handle-c, var(--accent)) 28%, transparent);
+  animation: fa-handle-glow 1.2s ease-in-out infinite;
+}
+.fa-handle[data-compatible="false"] {
+  opacity: 0.35;
+}
+@keyframes fa-handle-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--fa-handle-c, var(--accent)) 28%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 5px color-mix(in srgb, var(--fa-handle-c, var(--accent)) 14%, transparent);
+  }
+}
+.fa-handle-label {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 16px;
+  padding: 0 5px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  line-height: 1;
+  white-space: nowrap;
+  box-shadow: var(--shadow-1);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+.fa-handle-label small {
+  font-size: var(--text-2xs);
+  color: var(--ink-4);
+}
+.react-flow__handle-left .fa-handle-label {
+  right: calc(100% + 7px);
+}
+.react-flow__handle-right .fa-handle-label {
+  left: calc(100% + 7px);
+}
+.fa-handle:hover .fa-handle-label,
+.fa-handle[data-label="always"] .fa-handle-label,
+.fa-handle.connectingfrom .fa-handle-label,
+.fa-handle.connectingto .fa-handle-label {
+  opacity: 1;
+}
+
+/* ---- container frames (loop / foreach group nodes, UI.md §4.2) ---- */
+.fa-frame {
+  --fa-frame-shadow: none;
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: color-mix(
+    in srgb,
+    var(--fa-frame-c, var(--ink-4)) 3%,
+    color-mix(in srgb, var(--surface) 55%, transparent)
+  );
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--fa-frame-shadow);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  transition:
+    box-shadow var(--dur-base) var(--ease-out),
+    border-color var(--dur-base) var(--ease-out),
+    opacity var(--dur-base) var(--ease-out);
+}
+.fa-frame-header {
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  background: color-mix(in srgb, var(--fa-frame-c, var(--ink-4)) 6%, var(--surface));
+  cursor: grab;
+}
+.react-flow__node.dragging .fa-frame-header {
+  cursor: grabbing;
+}
+.fa-frame-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+.fa-frame:hover,
+.fa-frame[data-hovered="true"] {
+  border-color: var(--ink-4);
+}
+.fa-frame[data-selected="true"] {
+  --fa-frame-shadow: 0 0 0 3px var(--accent-soft);
+  border-style: solid;
+  border-color: var(--accent);
+}
+.fa-frame[data-status="running"] {
+  border-style: solid;
+  border-color: var(--info);
+}
+.fa-frame[data-status="waiting"],
+.fa-frame[data-status="retry_wait"] {
+  border-style: solid;
+  border-color: var(--warn);
+}
+.fa-frame[data-status="completed"] {
+  border-style: solid;
+  border-color: var(--ok);
+}
+.fa-frame[data-status="reused"] {
+  border-color: var(--ok);
+}
+.fa-frame[data-status="failed"] {
+  border-style: solid;
+  border-color: var(--danger);
+}
+.fa-frame[data-status="skipped"] {
+  opacity: 0.6;
+}
+.fa-frame[data-disabled="true"] {
+  opacity: 0.5;
+}
+/* The xyflow group wrapper: transparent, rounded, behind its children. */
+.react-flow__node-container {
+  border-radius: var(--radius-lg);
+  background: transparent;
+}
+/* A frame lights up while a node is dragged over it (drop sets the parent). */
+.react-flow__node-container.fa-frame-drop-target .fa-frame {
+  border-style: solid;
+  border-color: var(--accent);
+  --fa-frame-shadow: 0 0 0 3px var(--accent-soft);
+}
+.fa-frame-resize-line.react-flow__resize-control.line {
+  border-color: var(--accent);
+}
+.fa-frame-resize-handle.react-flow__resize-control.handle {
+  width: 8px;
+  height: 8px;
+  border: 1.5px solid var(--accent);
+  border-radius: 2px;
+  background: var(--surface);
+}
+
+/* ---- notes ---- */
+.react-flow__node-note {
+  border-radius: var(--radius-md);
+}
+
+/* ---- streaming caret ---- */
+.fa-caret {
+  display: inline-block;
+  width: 1px;
+  height: 11px;
+  margin-left: 1px;
+  vertical-align: -1px;
+  background: var(--ink-2);
+  animation: fa-caret 1s steps(2, start) infinite;
+}
+@keyframes fa-caret {
+  to {
+    visibility: hidden;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fa-node[data-status="running"],
+  .fa-handle[data-compatible="true"],
+  .fa-caret {
+    animation: none !important;
+  }
+  .fa-node,
+  .fa-frame,
+  .fa-handle.react-flow__handle,
+  .fa-handle-label {
+    transition: none;
+  }
+}
+
+/* The React Flow attribution stays visible (xyflow asks open-source users to keep it), set
+   small in the mono face so it reads as a credit, not chrome. */
+.react-flow__attribution {
+  margin: 0 6px 4px;
+  padding: 1px 4px;
+  border-radius: var(--radius-xs);
+  background: color-mix(in srgb, var(--canvas) 85%, transparent);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  line-height: 1.4;
+}
+.react-flow__attribution a {
+  color: var(--ink-3);
+  text-decoration: none;
+}
+.react-flow__attribution a:hover {
+  color: var(--ink-2);
+  text-decoration: underline;
+}

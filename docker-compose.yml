@@ -1,0 +1,5 @@
+# Entry point so a plain `docker compose up` works from the repository root.
+# The stack itself lives in docker/ (see docker/README.md).
+include:
+  - docker/compose.yml
+  - docker/compose.scale.yml

@@ -1,0 +1,192 @@
+{
+  "decisionContracts": [
+    {
+      "key": "research.report_verifier",
+      "description": "Verifies a drafted report against its goal and evidence.",
+      "body": {
+        "key": "research.report_verifier",
+        "version": 1,
+        "title": "Report verifier",
+        "purpose": "After generation: decides whether a drafted report meets its goal from the artifact and the evidence packet, and names the kind of repair when it does not. Semantic because \"supported by the cited evidence\" is a judgment; artifact structure and citation presence are checked in code first.",
+        "owner": "team:research",
+        "question": {
+          "kind": "choice",
+          "instructions": "Judge the draft report against the goal and the evidence items in the packet. A material claim is one the goal depends on. Decide what should happen to the draft next.",
+          "menu": {
+            "source": "static",
+            "outcomes": {
+              "pass": {
+                "description": "Every material claim cites an evidence id from the packet, each cited item supports its claim, and the draft answers the goal without an unresolved approval.",
+                "automatable": true
+              },
+              "repair": {
+                "description": "The packet already holds the evidence needed, but the draft misstates, omits or mis-cites it; a rewrite from the same evidence would fix it.",
+                "automatable": true
+              },
+              "collect_evidence": {
+                "description": "At least one material claim has no supporting item in the packet, or its only support is stale or the wrong kind of source for the claim; new evidence is needed before rewriting.",
+                "automatable": true
+              },
+              "review": {
+                "description": "The goal is ambiguous, evidence items contradict each other on a material point, or the draft makes a claim that needs legal, financial or policy approval.",
+                "escape": "review",
+                "automatable": false
+              }
+            }
+          }
+        },
+        "fallbackOutcome": "review",
+        "state": {
+          "fields": {
+            "goal": {
+              "role": "goal",
+              "description": "What the report must achieve; the success condition the verifier checks against.",
+              "schema": {
+                "type": "string",
+                "maxLength": 2000
+              },
+              "required": true,
+              "dataClass": "internal",
+              "redact": "error"
+            },
+            "artifact": {
+              "role": "fact",
+              "description": "The draft being verified: body and cited evidence ids. The verifier judges this new artifact, never a tool status code.",
+              "schema": {
+                "type": "object",
+                "required": ["body", "citations"],
+                "properties": {
+                  "body": {
+                    "type": "string"
+                  },
+                  "citations": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "required": true,
+              "dataClass": "internal",
+              "redact": "error",
+              "maxChars": 40000
+            },
+            "evidence": {
+              "role": "evidence",
+              "description": "Evidence items the draft may cite, with ids and support relations.",
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["id", "kind"],
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    },
+                    "supports": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "observedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "source": {
+                      "type": "object"
+                    },
+                    "version": {
+                      "type": "string"
+                    },
+                    "verified": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              },
+              "required": true,
+              "dataClass": "internal",
+              "redact": "error",
+              "selection": {
+                "maxItems": 30,
+                "order": "as_bound"
+              }
+            }
+          },
+          "maxTokens": 16000,
+          "privacyClass": "internal",
+          "latencyClass": "standard",
+          "consistency": "record"
+        },
+        "routing": {
+          "consequenceClass": "low",
+          "thresholds": {
+            "low": {
+              "autoAt": 0.9,
+              "improveAt": 0.7,
+              "minMargin": 0.2
+            }
+          },
+          "escapeRoutes": {
+            "none": "human",
+            "other": "human",
+            "stop": "auto"
+          },
+          "improve": {
+            "actions": [
+              {
+                "kind": "collect_evidence",
+                "description": "Search for evidence on the claims the verifier could not match, add it to the loop carry, and redraft from the larger packet."
+              }
+            ],
+            "maxRounds": 2
+          },
+          "uncalibratedProviders": "human",
+          "onModelChange": "continue"
+        },
+        "allowedAction": {
+          "kinds": ["internal_routing"],
+          "capabilities": [],
+          "maxConsequence": "low",
+          "externalSideEffects": false
+        },
+        "escalation": {
+          "assignees": ["role:editor"],
+          "mode": "choice",
+          "rubric": "Pick pass only when you would sign the report as is. Pick collect_evidence when a claim needs a source the packet lacks."
+        },
+        "model": {
+          "primary": {
+            "provider": "typesafe",
+            "model": "jev-latest"
+          },
+          "failover": []
+        },
+        "tests": {
+          "requiredCategories": [
+            "normal",
+            "ambiguous",
+            "missing_evidence",
+            "adversarial",
+            "rare_class",
+            "no_fit"
+          ],
+          "minPerCategory": 3,
+          "minAccuracy": 0.9,
+          "requireMonotonicity": true
+        },
+        "changelog": "",
+        "lintSuppressions": [],
+        "tags": ["harness:after-generation", "template:jev-verified-builder"]
+      }
+    }
+  ]
+}

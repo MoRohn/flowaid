@@ -1,0 +1,17 @@
+{
+  "type": "BRANCH_EVALUATED",
+  "runId": "0192f0a1-5b3c-7d4e-8f60-1a2b3c4d5e6f",
+  "seq": 7,
+  "at": "2026-09-22T10:00:01.750Z",
+  "nodeRunId": "0192f0a1-5b3c-7d4e-8f60-0000000000a3",
+  "nodeId": "route",
+  "scope": "",
+  "attempt": 1,
+  "taken": ["billing"],
+  "evaluations": [
+    {
+      "port": "billing",
+      "result": true
+    }
+  ]
+}

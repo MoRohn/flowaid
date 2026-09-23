@@ -1,0 +1,136 @@
+{
+  "id": "flowaid.tools.http",
+  "version": "1.0.0",
+  "metadata": {
+    "name": "HTTP request",
+    "description": "Calls an HTTP endpoint through the safe fetch (private-network, redirect and size limits) and returns status, headers and the parsed body.",
+    "category": "tool",
+    "icon": "globe",
+    "tags": ["http", "tool", "network"],
+    "summary": "{{ config.method }} {{ config.url }}"
+  },
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "method": {
+        "type": "string",
+        "enum": ["GET", "HEAD", "OPTIONS", "POST", "PUT", "PATCH", "DELETE"],
+        "default": "GET",
+        "x-ui": {
+          "widget": "select"
+        }
+      },
+      "url": {
+        "type": "string",
+        "minLength": 1,
+        "x-ui": {
+          "widget": "template",
+          "placeholder": "https://api.example.com/items/{{ start.id }}"
+        }
+      },
+      "headers": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "string"
+        },
+        "default": {},
+        "x-ui": {
+          "widget": "keyvalue"
+        }
+      },
+      "query": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "string"
+        },
+        "default": {},
+        "x-ui": {
+          "widget": "keyvalue"
+        }
+      },
+      "body": {
+        "x-ui": {
+          "widget": "json",
+          "showWhen": {
+            "path": "/method",
+            "oneOf": ["POST", "PUT", "PATCH"]
+          },
+          "bindable": true
+        }
+      },
+      "responseType": {
+        "type": "string",
+        "enum": ["json", "text", "binary"],
+        "default": "json"
+      },
+      "timeoutMs": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 120000,
+        "default": 30000
+      }
+    },
+    "required": ["method", "url"],
+    "additionalProperties": false
+  },
+  "inputs": [],
+  "outputs": [
+    {
+      "name": "status",
+      "schema": {
+        "type": "integer",
+        "minimum": 100,
+        "maximum": 599
+      },
+      "required": true
+    },
+    {
+      "name": "headers",
+      "schema": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "string"
+        }
+      },
+      "required": true
+    },
+    {
+      "name": "body",
+      "schema": {},
+      "required": false,
+      "description": "Parsed JSON or text; { \"$artifact\": id } for binary responses; null for empty bodies."
+    }
+  ],
+  "controlPorts": [],
+  "portRules": [],
+  "credentials": [
+    {
+      "name": "auth",
+      "types": ["http.bearer", "http.basic", "http.header"],
+      "required": false,
+      "description": "Applied as Authorization or a custom header."
+    }
+  ],
+  "capabilities": ["network", "credentials", "artifacts"],
+  "idempotency": {
+    "byConfig": "/method",
+    "cases": {
+      "GET": "safe",
+      "HEAD": "safe",
+      "OPTIONS": "safe",
+      "PUT": "keyed",
+      "DELETE": "keyed",
+      "POST": "none",
+      "PATCH": "none"
+    },
+    "default": "none"
+  },
+  "pool": "general",
+  "generation": false,
+  "streams": false,
+  "optionProviders": [],
+  "migrations": [],
+  "defaultPolicy": {
+    "timeoutMs": 30000
+  }
+}

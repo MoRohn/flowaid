@@ -1,0 +1,312 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="brand/readme/lockup-dark.svg">
+    <img alt="FlowAId" src="brand/readme/lockup-light.svg" width="360">
+  </picture>
+</p>
+
+<p align="center">
+  <strong>The open-source runtime for AI agents and workflows, with typed decisions you can inspect, verify and trust.</strong>
+</p>
+
+<p align="center">
+  <a href="https://github.com/MoRohn/flowaid/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/MoRohn/flowaid/actions/workflows/ci.yml/badge.svg?branch=main"></a>
+  <a href="LICENSE"><img alt="License: Apache 2.0" src="https://img.shields.io/badge/license-Apache%202.0-2f5be8"></a>
+  <img alt="Status: pre-alpha" src="https://img.shields.io/badge/status-pre--alpha-c98a12">
+  <img alt="TypeScript 5.9 strict" src="https://img.shields.io/badge/TypeScript-5.9%20strict-17171c">
+  <img alt="Node.js 24+" src="https://img.shields.io/badge/node-%E2%89%A524-17171c">
+  <img alt="Tests: 3,782 passing" src="https://img.shields.io/badge/tests-3%2C782%20passing-1f9d64">
+</p>
+
+---
+
+FlowAId is a backend-first platform for building, running and evaluating AI agents and
+workflows. It treats the **runtime** as the product. Every workflow is a typed document that is
+compiled, versioned and executed over an append-only event log. The visual canvas, the REST API,
+the TypeScript SDK and the CLI are all clients of that same runtime.
+
+Its central idea is that **decisions are typed data, not prose**. Routing, classification, risk
+scoring and approval gates run on [TypeSafe AI's Jev](https://docs.typesafe.ai), a decision model
+that returns a constrained answer with a calibrated probability distribution. Confidence then
+decides what happens next: act automatically, gather more evidence, or ask a person.
+
+> [!IMPORTANT]
+> **FlowAId is pre-alpha.** The architecture is fully designed and the foundation libraries are
+> built and tested. The API server, worker and web app are not built yet, so there is nothing
+> to deploy today. See [Project status](#project-status).
+
+## Why FlowAId
+
+Most agent frameworks let a generative model make every decision inside a prompt. That is
+expensive, hard to audit, and impossible to calibrate. FlowAId separates the jobs:
+
+| Owner              | Does                                                            | In FlowAId                                                            |
+| ------------------ | --------------------------------------------------------------- | --------------------------------------------------------------------- |
+| **Generative LLM** | Writes: replies, summaries, code, plans                         | Generation nodes (OpenAI, Anthropic, Ollama, any compatible endpoint) |
+| **Jev**            | Judges: which option, how severe, yes or no, with probabilities | Decision nodes bound to versioned **decision contracts**              |
+| **Code**           | Enforces: permissions, budgets, exact rules, side effects       | Branches, the expression language, policies, human approvals          |
+
+What that makes possible:
+
+- **Confidence drives automation.** Thresholds belong to the consequence of an action, not to
+  the model. Irreversible actions always reach a person.
+- **Every run can be inspected and replayed.** One event log is the source of truth. Receipts
+  record the state, the contract version, the full distribution and the route of every decision.
+- **Workflows are checked before they run.** A compiler type-checks every connection, finds
+  unreachable nodes and ambiguous branches, and emits an immutable, hashed execution plan.
+- **Results are verified, not just reported.** A Lean 4 checker recomputes run and evaluation
+  results and returns a certificate or a counterexample (designed; see
+  [LEAN_VERIFICATION.md](docs/design/LEAN_VERIFICATION.md)).
+- **Nothing is locked in.** Self-hosted on PostgreSQL, every AI provider optional, a flow can be
+  downloaded as a runnable code package, and LangChain is supported behind a strict boundary.
+
+## Product tour
+
+These screenshots come from the `@flowaid/ui` component playground
+(`pnpm --filter @flowaid/ui dev`), which renders every component against sample data. They
+follow your GitHub theme, light or dark.
+
+**Workflow canvas.** Typed ports, decision nodes that show their probability distribution
+inline, a confidence gate with its thresholds, and a human approval waiting on its timer.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/canvas-dark.webp">
+  <img alt="The FlowAId workflow canvas showing a support triage flow with decision, HTTP, router, generation, safety, confidence gate and human approval nodes" src="docs/assets/screenshots/canvas-light.webp">
+</picture>
+
+**Run trace.** One run's header, cost and token totals, the pending approval, and a timeline
+whose decision spans expand into the full distribution returned by Jev.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/run-trace-dark.webp">
+  <img alt="The run viewer showing a support triage run waiting for approval, with a timeline where the Intent decision is expanded to show its probability distribution" src="docs/assets/screenshots/run-trace-light.webp">
+</picture>
+
+**Decision contracts.** Each contract card shows its question, outcomes and escape hatches,
+the confidence zones for each consequence class, what the decision is allowed to do, its
+deployments by environment, and how its decisions were routed.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/decision-contracts-dark.webp">
+  <img alt="Three decision contract cards for a ticket router, a reply safety gate and an on-shift agent picker, each showing question, zones, authority and deployments" src="docs/assets/screenshots/decision-contracts-light.webp">
+</picture>
+
+<table>
+  <tr>
+    <td width="42%" valign="top">
+      <strong>Human review.</strong> A run pauses when confidence falls below its threshold;
+      the reviewer sees why, what was decided, and the full context.<br><br>
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/approval-dark.webp">
+        <img alt="An approval card for a refund, explaining that confidence 0.78 is below the pass threshold 0.90" src="docs/assets/screenshots/approval-light.webp">
+      </picture>
+    </td>
+    <td width="58%" valign="top">
+      <strong>Observability.</strong> Runs, success rate, latency, AI cost by provider and the
+      human review rate for a workflow.<br><br>
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/observability-dark.webp">
+        <img alt="The observability dashboard with metric tiles and charts for runs, errors and AI cost by provider" src="docs/assets/screenshots/observability-light.webp">
+      </picture>
+    </td>
+  </tr>
+</table>
+
+## Project status
+
+| Area                                                         | State                                                                                                                                                                       |
+| ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Architecture and contracts                                   | **Designed.** Architecture, contracts, database, API, UI, code export, LangChain, Jev engineering and Lean verification are all specified in [`docs/design/`](docs/design/) |
+| `@flowaid/workflow-core`                                     | **Built.** Workflow contracts, the FlowExpr expression language, templates and a JSON Schema compatibility checker. 2,643 tests                                             |
+| `@flowaid/jev`                                               | **Built (library core).** Decision contracts, state packets, bundles, confidence × consequence routing, live menus, receipts, calibration and shadow comparison. 183 tests  |
+| `@flowaid/ui`                                                | **Built (components).** 13 groups of React components: canvas, nodes, trace viewer, inspector, forms, decision visuals, dashboards. 820 tests, with a playground            |
+| `@flowaid/shared`, `@flowaid/env`, `@flowaid/config`         | **Built.** Primitives, environment schema and tooling presets. 136 tests                                                                                                    |
+| Compiler, runtime, database, providers, API, worker, web app | **Not started.** Planned in [`docs/UPGRADE_PLAN.md`](docs/UPGRADE_PLAN.md), phases P1–P5                                                                                    |
+| CI                                                           | **Running.** GitHub Actions runs the audit, boundary, format, lint, typecheck, build and test gates on every push and pull request                                          |
+
+The live snapshot is always [`docs/STATUS.md`](docs/STATUS.md).
+
+## How it works
+
+```
+ Canvas · REST API · SDK · CLI · YAML · AI builder
+                     │
+                     ▼
+            WorkflowDefinition ─────── typed JSON document; data flows through bindings,
+                     │                  control flows through explicit edges
+                     ▼
+                 Compiler ───────────── schema, binding, type and guard checks → diagnostics
+                     │
+                     ▼
+              ExecutionPlan ─────────── immutable, content-hashed, versioned
+                     │
+                     ▼
+     Runtime (pure reducer over an append-only event log)
+       ├─ Jev decisions     typed answer + distribution → auto / improve / human
+       ├─ LLM generation    streamed, budgeted, cost-accounted
+       ├─ Tools             HTTP, MCP, OpenAPI, sandboxed code
+       └─ Humans            approval, review, form, choice; durable suspension
+                     │
+                     ▼
+   Events · receipts · traces · evaluation · Lean certificates
+```
+
+## Getting started
+
+FlowAId is a pnpm monorepo. Today you can build and test the libraries and explore the UI
+components.
+
+**Requirements:** Node.js 24+ and pnpm 12.
+
+```sh
+git clone https://github.com/MoRohn/flowaid.git && cd flowaid
+pnpm install
+
+pnpm typecheck && pnpm lint && pnpm test   # every package
+pnpm boundaries                            # the dependency-graph check
+pnpm --filter @flowaid/ui dev              # UI playground at http://127.0.0.1:5178
+```
+
+### Validate a workflow and evaluate an expression
+
+```ts
+import { readFileSync } from "node:fs";
+import {
+  WorkflowDefinitionSchema,
+  definitionHash,
+  parseExpression,
+  evaluateExpression,
+  createEvalScope,
+  isSubschema,
+} from "@flowaid/workflow-core";
+
+const def = WorkflowDefinitionSchema.parse(
+  JSON.parse(readFileSync("packages/workflow-core/fixtures/support-triage.json", "utf8")),
+);
+definitionHash(def); // stable across key order and layout changes
+
+const expr = parseExpression(
+  "intent.decision.confidence >= 0.9 && intent.decision.value == 'security'",
+);
+if (expr.ok) {
+  const scope = createEvalScope({
+    ports: { intent: { decision: { value: "security", confidence: 0.93 } } },
+  });
+  evaluateExpression(expr.ast, scope); // true
+}
+
+isSubschema({ type: "integer", minimum: 0 }, { type: "number" }); // { ok: true, verified: true }
+```
+
+### Route a Jev decision through a decision contract
+
+```ts
+import { readFileSync } from "node:fs";
+import type { ChoiceDecision } from "@flowaid/workflow-core";
+import { parseContract, toDecisionQuestion, toSystemOneQuestion, route } from "@flowaid/jev";
+
+const file = JSON.parse(
+  readFileSync("packages/jev/templates/jev-classifier-rollout.contracts.json", "utf8"),
+);
+const contract = parseContract(file.decisionContracts[0].body); // support.ticket_router@1
+const question = toSystemOneQuestion(toDecisionQuestion(contract)); // ready for POST /v1/systemone
+
+const decision: ChoiceDecision = {
+  kind: "choice",
+  value: "billing",
+  confidence: 0.93,
+  probabilities: {
+    billing: 0.93,
+    account_access: 0.03,
+    technical: 0.02,
+    general: 0.01,
+    none: 0.01,
+  },
+  provider: "typesafe",
+  model: "jev-1.13.0",
+  latencyMs: 84,
+  costUsd: 0.00002,
+  attempts: [],
+};
+
+route({ contract, decision, calibrated: true });
+// → { route: "auto", port: "billing", reasons: ["zone_auto"], consequenceClass: "low", … }
+```
+
+Both examples run against the current packages; the decision is written by hand here, and in production it comes from the TypeSafe provider.
+
+## Core concepts
+
+- **Typed decisions.** Jev answers three kinds of question: _Noul_ (yes or no, with P(yes)),
+  _Choice_ (one of up to 255 options, with a distribution) and _Score_ (a position on an ordered
+  2–10 level rubric). Independent questions about one state go out in one request. The live
+  API shape is recorded in [TYPESAFE_API.md](docs/design/TYPESAFE_API.md).
+- **Decision contracts.** A decision is a versioned contract (`support.ticket_router@1`) that
+  declares its state, outcomes, escape hatches, consequence class, thresholds, allowed actions
+  and escalation. Contracts are reviewed like code, run in shadow first, and are rolled out one
+  outcome at a time. See the [Jev engineering guides](docs/jev/overview.md).
+- **Bindings and control edges.** Data reaches a node only through typed bindings (references,
+  templates, expressions). Control flows only along explicit edges. That is what makes a graph
+  statically checkable.
+- **Event-sourced runs.** The event log is the only source of truth. Replay, recovery,
+  restart-from-node, fork and audit all come from it.
+- **Human in the loop.** Approval, review, form and choice nodes suspend a run durably, with
+  typed requests and responses and external review links.
+- **Evaluation.** Datasets of expected decisions, branches and outputs; regression reports that
+  can gate publishing; calibration measured per contract version.
+
+## Repository layout
+
+```
+brand/                  Identity: logo, design tokens, fonts (OFL), style guide
+docker/                 Compose stack and Dockerfile (for the apps, once built)
+docs/                   Design, guides, research, plan and status (index: docs/README.md)
+packages/
+  config/               Shared TypeScript, ESLint and Prettier presets
+  shared/               JSON helpers, Result, uuidv7, SHA-256 (browser-safe)
+  env/                  Environment variable schema and loader
+  workflow-core/        Portable contracts, FlowExpr, templates, schema checker
+  jev/                  Jev engineering library and harness templates
+  ui/                   React component library and playground
+scripts/                Repository checks: boundaries, browser bundle, compose, env, UI inventory
+boundaries.json         The allowed dependency graph between packages
+```
+
+Planned packages and apps (compiler, runtime, database, providers, API, worker, web, SDK, CLI,
+code export, LangChain adapters, the FlowAId importer and the Lean checker) are listed with
+their responsibilities in [ARCHITECTURE.md §1](docs/design/ARCHITECTURE.md).
+
+## Documentation
+
+|                                                                                     |                                                                          |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| [Documentation index](docs/README.md)                                               | Every design document, guide and research source                         |
+| [Product specification](docs/design/SPEC.md)                                        | What FlowAId is meant to be                                              |
+| [Architecture](docs/design/ARCHITECTURE.md)                                         | How it is built, and why                                                 |
+| [Jev engineering](docs/jev/overview.md)                                             | Decision contracts, packets, routing, calibration, shadow mode, receipts |
+| [Lean verification](docs/design/LEAN_VERIFICATION.md)                               | The self-critical, certified evaluation layer                            |
+| [Download code](docs/design/CODE_EXPORT.md) · [LangChain](docs/design/LANGCHAIN.md) | Code export and the LangChain boundary                                   |
+| [Upgrade plan](docs/UPGRADE_PLAN.md) · [Status](docs/STATUS.md)                     | What is next, and where things stand                                     |
+
+## Roadmap
+
+1. **Phase 0, finishing:** release automation and git hooks, package builds, contributor docs,
+   the UI regression suite.
+2. **Phases 1–2:** compiler, database, node SDK, providers (TypeSafe first), credentials,
+   observability, then the runtime, core nodes, MCP and OpenAPI tools, and the code sandbox.
+3. **Phases 3–4:** API, worker, SDK and CLI, code export, and the LangChain adapters and nodes.
+4. **Phase 5:** the web app, and the end-to-end acceptance journey from a clean clone as the
+   release gate.
+5. **Alongside:** track J (Jev integration across the platform) and track L (the Lean 4 checker
+   and certified evaluation).
+
+## Contributing
+
+Contributions are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md) and the
+[Code of Conduct](CODE_OF_CONDUCT.md). Report security issues privately as described in
+[SECURITY.md](SECURITY.md).
+
+## License
+
+Apache License 2.0; see [LICENSE](LICENSE) and [NOTICE](NOTICE). The bundled fonts are under
+the SIL Open Font License.

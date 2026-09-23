@@ -1,0 +1,16 @@
+{
+  "type": "NODE_SCHEDULED",
+  "runId": "0192f0a1-5b3c-7d4e-8f60-1a2b3c4d5e6f",
+  "seq": 2,
+  "at": "2026-09-22T10:00:00.500Z",
+  "nodeRunId": "0192f0a1-5b3c-7d4e-8f60-0000000000a1",
+  "nodeId": "start",
+  "scope": "",
+  "attempt": 1,
+  "kind": "input",
+  "nodeType": null,
+  "inputHash": "e9797a42ab65c5341a4a57823db31608496df3133bd1e34ade3ebecc5269e05d",
+  "idempotencyKey": null,
+  "reusedFromNodeRunId": null,
+  "batchId": null
+}

@@ -1,0 +1,580 @@
+{
+  "$schema": "https://flowaid.dev/schemas/workflow/v1",
+  "id": "2cd18ca1-a43c-4d6b-a898-3506ade24076",
+  "name": "Post-generation verification (Jev)",
+  "description": "Builder and verifier share an artifact and a rubric. The LLM drafts; deterministic checks run first (citations present, required section, citations resolve to known evidence ids); Jev judges whether the claims are supported and routes to pass, repair or evidence collection inside a bounded loop; anything else escalates. Handbook §VII.C After the Tool, §VII.D Builder and Verifier, §X.K, §V.B.",
+  "inputs": {
+    "type": "object",
+    "required": ["goal", "evidence"],
+    "properties": {
+      "goal": {
+        "type": "string",
+        "maxLength": 2000
+      },
+      "evidence": {
+        "type": "array",
+        "maxItems": 30,
+        "items": {
+          "type": "object",
+          "required": ["id", "kind"],
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string"
+            },
+            "summary": {
+              "type": "string"
+            },
+            "supports": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "observedAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "source": {
+              "type": "object"
+            },
+            "version": {
+              "type": "string"
+            },
+            "verified": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    }
+  },
+  "outputs": {
+    "type": "object",
+    "required": ["report", "status"],
+    "properties": {
+      "report": {
+        "type": "object"
+      },
+      "status": {
+        "type": "string",
+        "enum": ["verified", "approved_by_reviewer", "rejected"]
+      },
+      "rounds": {
+        "type": "integer"
+      }
+    }
+  },
+  "secrets": [
+    {
+      "name": "TYPESAFE_API_KEY",
+      "credentialType": "typesafe.api_key",
+      "description": "TypeSafe System One key for Jev. Without it the contract model chain falls back to its failover hops, which are uncalibrated and cannot route auto."
+    },
+    {
+      "name": "ANTHROPIC_API_KEY",
+      "credentialType": "anthropic.api_key"
+    },
+    {
+      "name": "SEARCH_API",
+      "credentialType": "http.api_key"
+    }
+  ],
+  "variables": [
+    {
+      "name": "searchBase",
+      "schema": {
+        "type": "string"
+      },
+      "source": "environment",
+      "description": "Base URL of the evidence search API."
+    }
+  ],
+  "execution": {
+    "timeoutMs": 900000,
+    "maxCostUsd": 1,
+    "decisions": {
+      "primary": {
+        "provider": "typesafe",
+        "model": "jev-latest"
+      },
+      "failover": []
+    }
+  },
+  "nodes": [
+    {
+      "id": "start",
+      "kind": "input",
+      "name": "Goal and evidence"
+    },
+    {
+      "id": "build",
+      "kind": "loop",
+      "name": "Draft until verified",
+      "description": "Bounded: each round must change the artifact or the evidence (the blind-retry guard stops a round that changed neither).",
+      "carrySchema": {
+        "type": "object",
+        "required": ["feedback", "evidence"],
+        "properties": {
+          "feedback": {
+            "type": "string"
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
+        }
+      },
+      "carry": {
+        "initial": {
+          "feedback": "",
+          "evidence": []
+        },
+        "next": {
+          "feedback": {
+            "kind": "expr",
+            "source": "json({checks: check.checks, receipt: check.receipt})"
+          },
+          "evidence": {
+            "kind": "expr",
+            "source": "$scope.carry.evidence + coalesce(more.body.results, [])"
+          }
+        }
+      },
+      "result": {
+        "report": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "draft",
+            "port": "structured"
+          }
+        },
+        "outcome": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "check",
+            "port": "decision",
+            "path": "/value"
+          },
+          "default": "repair"
+        }
+      },
+      "exitWhen": "check.decision.value == 'pass' || check.receipt.route == 'human'",
+      "bounds": {
+        "maxIterations": 3,
+        "maxCostUsd": 0.5
+      },
+      "onExhausted": "route"
+    },
+    {
+      "id": "draft",
+      "kind": "task",
+      "parent": "build",
+      "type": "flowaid.ai.structured_generate",
+      "typeVersion": "1.0.0",
+      "name": "Draft report",
+      "config": {
+        "model": {
+          "provider": "anthropic",
+          "model": "claude-sonnet-4-5"
+        },
+        "schema": {
+          "type": "object",
+          "required": ["body", "citations"],
+          "properties": {
+            "body": {
+              "type": "string",
+              "maxLength": 30000
+            },
+            "citations": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "inputs": {
+        "prompt": {
+          "kind": "template",
+          "source": "Goal: {{ start.goal }}\n\nEvidence (cite by id):\n{{ start.evidence + $scope.carry.evidence | json }}\n\nVerifier feedback from the previous round:\n{{ $scope.carry.feedback }}\n\nWrite the report in markdown with a '## Findings' section. Cite every material claim with an evidence id in [brackets] and list the ids you cited in citations. Do not state anything the evidence does not support."
+        }
+      },
+      "credentials": {
+        "llm": "ANTHROPIC_API_KEY"
+      }
+    },
+    {
+      "id": "check",
+      "kind": "task",
+      "parent": "build",
+      "type": "flowaid.jev.verify",
+      "typeVersion": "1.0.0",
+      "name": "Verify report",
+      "description": "Deterministic checks first (no Jev call when one fails); then the report_verifier contract over the artifact and the evidence.",
+      "config": {
+        "contract": {
+          "key": "research.report_verifier",
+          "version": "deployed"
+        },
+        "checks": [
+          {
+            "name": "has_citations",
+            "when": "len(draft.structured.citations) > 0",
+            "onFail": "repair"
+          },
+          {
+            "name": "findings_section",
+            "when": "contains(draft.structured.body, '## Findings')",
+            "onFail": "repair"
+          },
+          {
+            "name": "citations_resolve",
+            "when": "all(draft.structured.citations, c => c in map(start.evidence + $scope.carry.evidence, e => e.id))",
+            "onFail": "repair"
+          }
+        ]
+      },
+      "inputs": {
+        "artifact": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "draft",
+            "port": "structured"
+          }
+        },
+        "evidence": {
+          "kind": "expr",
+          "source": "start.evidence + $scope.carry.evidence"
+        },
+        "goal": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "start",
+            "port": "goal"
+          }
+        }
+      },
+      "credentials": {
+        "typesafe": "TYPESAFE_API_KEY"
+      }
+    },
+    {
+      "id": "more",
+      "kind": "task",
+      "parent": "build",
+      "type": "flowaid.tools.http",
+      "typeVersion": "1.0.0",
+      "name": "Collect evidence",
+      "description": "The improve action: it adds evidence, so the next round's packet differs (§V.B, §X.E).",
+      "config": {
+        "method": "GET",
+        "url": "{{ $vars.searchBase }}/v1/search?q={{ start.goal }}&exclude={{ join(map(start.evidence + $scope.carry.evidence, e => e.id), ',') }}&shape=evidence&top_k=5",
+        "responseType": "json"
+      },
+      "credentials": {
+        "auth": "SEARCH_API"
+      },
+      "policy": {
+        "retry": {
+          "maxAttempts": 2
+        }
+      }
+    },
+    {
+      "id": "verdict",
+      "kind": "branch",
+      "name": "Verified?",
+      "mode": "first",
+      "cases": [
+        {
+          "port": "verified",
+          "when": "build.result.outcome == 'pass'",
+          "label": "pass"
+        }
+      ],
+      "defaultPort": "needs_review"
+    },
+    {
+      "id": "review",
+      "kind": "human",
+      "name": "Editor review",
+      "mode": {
+        "type": "review",
+        "value": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "build",
+            "port": "result",
+            "path": "/report"
+          }
+        },
+        "schema": {
+          "type": "object"
+        }
+      },
+      "title": {
+        "kind": "template",
+        "source": "Review report for: {{ start.goal }}"
+      },
+      "context": {
+        "goal": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "start",
+            "port": "goal"
+          }
+        },
+        "result": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "build",
+            "port": "result"
+          }
+        },
+        "evidence": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "build",
+            "port": "carry",
+            "path": "/evidence"
+          }
+        }
+      },
+      "assignees": ["role:editor"],
+      "expiresInMs": 86400000,
+      "onExpire": "route"
+    },
+    {
+      "id": "out_verified",
+      "kind": "output",
+      "name": "Verified report",
+      "outcome": "verified",
+      "value": {
+        "kind": "object",
+        "fields": {
+          "report": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "build",
+              "port": "result",
+              "path": "/report"
+            }
+          },
+          "status": {
+            "kind": "literal",
+            "value": "verified"
+          },
+          "rounds": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "build",
+              "port": "iterations"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "out_reviewed",
+      "kind": "output",
+      "name": "Approved by reviewer",
+      "outcome": "approved_by_reviewer",
+      "value": {
+        "kind": "object",
+        "fields": {
+          "report": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "review",
+              "port": "value"
+            }
+          },
+          "status": {
+            "kind": "literal",
+            "value": "approved_by_reviewer"
+          },
+          "rounds": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "build",
+              "port": "iterations"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "out_rejected",
+      "kind": "output",
+      "name": "Rejected",
+      "outcome": "rejected",
+      "value": {
+        "kind": "object",
+        "fields": {
+          "report": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "build",
+              "port": "result",
+              "path": "/report"
+            }
+          },
+          "status": {
+            "kind": "literal",
+            "value": "rejected"
+          },
+          "rounds": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "build",
+              "port": "iterations"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "c1",
+      "from": {
+        "node": "check",
+        "port": "collect_evidence"
+      },
+      "to": {
+        "node": "more"
+      }
+    },
+    {
+      "id": "c2",
+      "from": {
+        "node": "verdict",
+        "port": "verified"
+      },
+      "to": {
+        "node": "out_verified"
+      }
+    },
+    {
+      "id": "c3",
+      "from": {
+        "node": "verdict",
+        "port": "needs_review"
+      },
+      "to": {
+        "node": "review"
+      }
+    },
+    {
+      "id": "c4",
+      "from": {
+        "node": "review",
+        "port": "approved"
+      },
+      "to": {
+        "node": "out_reviewed"
+      }
+    },
+    {
+      "id": "c5",
+      "from": {
+        "node": "review",
+        "port": "rejected"
+      },
+      "to": {
+        "node": "out_rejected"
+      }
+    },
+    {
+      "id": "c6",
+      "from": {
+        "node": "review",
+        "port": "expired"
+      },
+      "to": {
+        "node": "out_rejected"
+      }
+    }
+  ],
+  "metadata": {
+    "template": {
+      "key": "jev-verified-builder",
+      "pattern": "C — after the tool / after generation",
+      "contracts": ["research.report_verifier"],
+      "handbook": [
+        "§VII.C After the Tool",
+        "§VII.D Builder and Verifier",
+        "§X.K Verifier Checks Transport Success",
+        "§V.B Improving the State",
+        "§X.E Blind Retries",
+        "Table I (Verify a report: Jev + code)"
+      ],
+      "design": "docs/design/JEV_ENGINEERING.md §9.4",
+      "docs": "docs/jev/harness-patterns.md"
+    }
+  },
+  "layout": {
+    "nodes": {
+      "start": {
+        "x": 0,
+        "y": 0
+      },
+      "build": {
+        "x": 1120,
+        "y": 0
+      },
+      "draft": {
+        "x": 280,
+        "y": 0
+      },
+      "check": {
+        "x": 560,
+        "y": 0
+      },
+      "more": {
+        "x": 840,
+        "y": 0
+      },
+      "verdict": {
+        "x": 1400,
+        "y": 0
+      },
+      "review": {
+        "x": 1680,
+        "y": 0
+      },
+      "out_verified": {
+        "x": 1680,
+        "y": 160
+      },
+      "out_reviewed": {
+        "x": 1960,
+        "y": 0
+      },
+      "out_rejected": {
+        "x": 1960,
+        "y": 160
+      }
+    }
+  }
+}

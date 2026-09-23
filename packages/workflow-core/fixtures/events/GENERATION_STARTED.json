@@ -1,0 +1,14 @@
+{
+  "type": "GENERATION_STARTED",
+  "runId": "0192f0a1-5b3c-7d4e-8f60-1a2b3c4d5e6f",
+  "seq": 12,
+  "at": "2026-09-22T10:00:03.000Z",
+  "nodeRunId": "0192f0a1-5b3c-7d4e-8f60-0000000000a5",
+  "nodeId": "draft",
+  "scope": "",
+  "attempt": 1,
+  "provider": "openai",
+  "model": "gpt-4.1-mini",
+  "promptHash": "698529fa97ce1e5af535082769c1da0c2bfd2d82eba644a6d063071bea9e8e5c",
+  "stream": true
+}

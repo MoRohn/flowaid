@@ -1,0 +1,62 @@
+{
+  "type": "HUMAN_APPROVAL_REQUESTED",
+  "runId": "0192f0a1-5b3c-7d4e-8f60-1a2b3c4d5e6f",
+  "seq": 17,
+  "at": "2026-09-22T10:00:04.500Z",
+  "nodeRunId": "0192f0a1-5b3c-7d4e-8f60-0000000000a8",
+  "nodeId": "approve",
+  "scope": "",
+  "attempt": 1,
+  "humanTaskId": "0192f0a1-5b3c-7d4e-8f60-0000000000c1",
+  "request": {
+    "title": "Review reply for cus_8842 (billing)",
+    "context": {
+      "message": "[REDACTED]",
+      "safety": {
+        "kind": "boolean",
+        "value": true,
+        "pYes": 0.78,
+        "probabilities": {
+          "true": 0.78,
+          "false": 0.22
+        },
+        "confidence": 0.78,
+        "provider": "llm",
+        "model": "gpt-4.1-mini",
+        "latencyMs": 940,
+        "usage": {
+          "inputTokens": 530,
+          "outputTokens": 4
+        },
+        "costUsd": 0.00022,
+        "attempts": [
+          {
+            "provider": "typesafe",
+            "model": "jev-1.13.0",
+            "outcome": "error",
+            "errorCode": "PROVIDER_OVERLOADED",
+            "latencyMs": 120
+          },
+          {
+            "provider": "llm",
+            "model": "gpt-4.1-mini",
+            "outcome": "ok",
+            "latencyMs": 820
+          }
+        ]
+      }
+    },
+    "mode": {
+      "type": "review",
+      "value": "Hi Dana, sorry about the double charge on your gold plan. I have flagged the duplicate to billing; you will hear back within one business day.",
+      "schema": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "assignees": ["role:support_lead"],
+    "expiresAt": "2026-09-23T10:00:00.000Z",
+    "externalReview": true,
+    "origin": "human_node"
+  }
+}

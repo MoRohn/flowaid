@@ -1,0 +1,619 @@
+{
+  "decisionContracts": [
+    {
+      "key": "ops.alert_needs_owner",
+      "description": "Does an alert need a named owner now?",
+      "body": {
+        "key": "ops.alert_needs_owner",
+        "version": 1,
+        "title": "Alert needs a named owner now",
+        "purpose": "Yes/no: must a named engineer own this alert from the start instead of an automated runbook step. Detecting the need for a person is a semantic judgment; who is on call and how they are paged stays in code.",
+        "owner": "team:sre",
+        "question": {
+          "kind": "boolean",
+          "instructions": "Must a named engineer take ownership of this alert now, instead of an automated runbook step, because it involves a security or customer-data exposure, a recent deploy that may need a rollback decision, or a condition the runbook does not cover?",
+          "outcomes": {
+            "true": {
+              "description": "A person must own it now: security or data exposure, a suspicious recent deploy, or a failure mode no runbook step addresses.",
+              "automatable": true
+            },
+            "false": {
+              "description": "The alert matches a known failure mode that a runbook step or a ticket can handle without an owner.",
+              "automatable": true
+            }
+          },
+          "yesAt": 0.5
+        },
+        "fallbackOutcome": null,
+        "state": {
+          "goal": "Get the alert to the cheapest safe handling: a runbook step, a ticket, or a person.",
+          "fields": {
+            "alert": {
+              "role": "evidence",
+              "description": "The alert as received: title and description, when it fired and which monitor raised it.",
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["id", "kind"],
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    },
+                    "supports": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "observedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "source": {
+                      "type": "object"
+                    },
+                    "version": {
+                      "type": "string"
+                    },
+                    "verified": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              },
+              "required": true,
+              "dataClass": "internal",
+              "redact": "error",
+              "selection": {
+                "maxItems": 1,
+                "order": "as_bound"
+              }
+            },
+            "signals": {
+              "role": "fact",
+              "description": "Observable service signals computed in code from the last 15 minutes (SLO comparisons are exact and done before Jev).",
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "error_rate_beyond_slo": {
+                    "type": "boolean"
+                  },
+                  "latency_beyond_slo": {
+                    "type": "boolean"
+                  },
+                  "customer_reports_15m": {
+                    "type": "integer"
+                  },
+                  "open_incidents": {
+                    "type": "integer"
+                  },
+                  "deploy_in_last_hour": {
+                    "type": "boolean"
+                  },
+                  "affected_regions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "required": true,
+              "dataClass": "internal",
+              "redact": "error"
+            },
+            "recent_deploys": {
+              "role": "evidence",
+              "description": "Deploys of the service in the last hour, with what changed.",
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["id", "kind"],
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    },
+                    "supports": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "observedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "source": {
+                      "type": "object"
+                    },
+                    "version": {
+                      "type": "string"
+                    },
+                    "verified": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              },
+              "required": false,
+              "dataClass": "internal",
+              "redact": "error",
+              "selection": {
+                "maxItems": 5,
+                "order": "observed_desc"
+              }
+            }
+          },
+          "maxTokens": 3000,
+          "privacyClass": "internal",
+          "latencyClass": "interactive",
+          "consistency": "record"
+        },
+        "routing": {
+          "consequenceClass": "low",
+          "thresholds": {
+            "low": {
+              "autoAt": 0.9,
+              "improveAt": null
+            }
+          },
+          "escapeRoutes": {
+            "none": "human",
+            "other": "human",
+            "stop": "auto"
+          },
+          "uncalibratedProviders": "human",
+          "onModelChange": "continue"
+        },
+        "allowedAction": {
+          "kinds": ["internal_routing"],
+          "capabilities": [],
+          "maxConsequence": "low",
+          "externalSideEffects": false
+        },
+        "escalation": {
+          "assignees": ["role:oncall"],
+          "mode": "choice",
+          "rubric": "Yes when you would want to be paged for this alert yourself."
+        },
+        "model": {
+          "primary": {
+            "provider": "typesafe",
+            "model": "jev-latest"
+          },
+          "failover": []
+        },
+        "tests": {
+          "requiredCategories": ["normal", "ambiguous", "missing_evidence", "adversarial"],
+          "minPerCategory": 3,
+          "minAccuracy": 0.9,
+          "requireMonotonicity": true
+        },
+        "changelog": "",
+        "lintSuppressions": [],
+        "tags": ["harness:escalation", "bundle:alert-triage", "template:jev-escalation-triage"]
+      }
+    },
+    {
+      "key": "ops.alert_impact",
+      "description": "Customer impact of an alert on an ordered rubric.",
+      "body": {
+        "key": "ops.alert_impact",
+        "version": 1,
+        "title": "Alert customer impact",
+        "purpose": "Ordered rubric of observable customer impact. Rates evidence, not alarm wording. The minor band opens a ticket; the major band goes to the runbook decision.",
+        "owner": "team:sre",
+        "question": {
+          "kind": "score",
+          "instructions": "How much customer impact does the evidence show right now? Judge the signals and reports, not the wording or the severity label of the alert.",
+          "levels": [
+            "No observable impact: signals are within their SLOs and there are no customer reports.",
+            "Degradation without customer impact: a trend toward an SLO boundary, or an internal job failing, with no customer reports.",
+            "Partial customer impact: one feature, region or customer segment is failing or beyond its SLO, or customers report it.",
+            "Broad customer impact: the service is down for most users, data is being lost, or a security exposure is reported."
+          ],
+          "bands": [
+            {
+              "port": "minor",
+              "minLevel": 0,
+              "maxLevel": 1,
+              "consequenceClass": "low",
+              "automatable": true
+            },
+            {
+              "port": "major",
+              "minLevel": 2,
+              "maxLevel": 3,
+              "consequenceClass": "low",
+              "automatable": true
+            }
+          ]
+        },
+        "fallbackOutcome": null,
+        "state": {
+          "goal": "Get the alert to the cheapest safe handling: a runbook step, a ticket, or a person.",
+          "fields": {
+            "alert": {
+              "role": "evidence",
+              "description": "The alert as received: title and description, when it fired and which monitor raised it.",
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["id", "kind"],
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    },
+                    "supports": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "observedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "source": {
+                      "type": "object"
+                    },
+                    "version": {
+                      "type": "string"
+                    },
+                    "verified": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              },
+              "required": true,
+              "dataClass": "internal",
+              "redact": "error",
+              "selection": {
+                "maxItems": 1,
+                "order": "as_bound"
+              }
+            },
+            "signals": {
+              "role": "fact",
+              "description": "Observable service signals computed in code from the last 15 minutes (SLO comparisons are exact and done before Jev).",
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "error_rate_beyond_slo": {
+                    "type": "boolean"
+                  },
+                  "latency_beyond_slo": {
+                    "type": "boolean"
+                  },
+                  "customer_reports_15m": {
+                    "type": "integer"
+                  },
+                  "open_incidents": {
+                    "type": "integer"
+                  },
+                  "deploy_in_last_hour": {
+                    "type": "boolean"
+                  },
+                  "affected_regions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "required": true,
+              "dataClass": "internal",
+              "redact": "error"
+            }
+          },
+          "maxTokens": 3000,
+          "privacyClass": "internal",
+          "latencyClass": "interactive",
+          "consistency": "record"
+        },
+        "routing": {
+          "consequenceClass": "low",
+          "thresholds": {
+            "low": {
+              "autoAt": 0.9,
+              "improveAt": null,
+              "minMargin": 0.2
+            }
+          },
+          "escapeRoutes": {
+            "none": "human",
+            "other": "human",
+            "stop": "auto"
+          },
+          "uncalibratedProviders": "human",
+          "onModelChange": "continue"
+        },
+        "allowedAction": {
+          "kinds": ["internal_routing", "annotate"],
+          "capabilities": [],
+          "maxConsequence": "low",
+          "externalSideEffects": false
+        },
+        "escalation": {
+          "assignees": ["role:oncall"],
+          "mode": "choice",
+          "rubric": "Place the alert by what customers experience now, not by what might happen."
+        },
+        "model": {
+          "primary": {
+            "provider": "typesafe",
+            "model": "jev-latest"
+          },
+          "failover": []
+        },
+        "tests": {
+          "requiredCategories": ["normal", "ambiguous", "missing_evidence", "adversarial"],
+          "minPerCategory": 3,
+          "minAccuracy": 0.9,
+          "requireMonotonicity": true
+        },
+        "changelog": "",
+        "lintSuppressions": [],
+        "tags": ["harness:escalation", "bundle:alert-triage", "template:jev-escalation-triage"]
+      }
+    },
+    {
+      "key": "ops.alert_runbook",
+      "description": "Runbook step for a major alert, with a none escape.",
+      "body": {
+        "key": "ops.alert_runbook",
+        "version": 1,
+        "title": "Alert runbook step",
+        "purpose": "Chooses the permitted automated route for a major alert. Runbook actions carry a stricter consequence class than ticketing, so with default guardrails and illustrative thresholds they go to a person until thresholds are governed and the outcome is rolled out.",
+        "owner": "team:sre",
+        "question": {
+          "kind": "choice",
+          "instructions": "Which runbook step fits the failure the evidence shows? Judge only from the alert, the signals and the recent deploys.",
+          "menu": {
+            "source": "static",
+            "outcomes": {
+              "restart_workers": {
+                "description": "Workers are crash-looping or a queue is stuck while dependencies are healthy and no deploy happened in the last hour.",
+                "consequenceClass": "medium",
+                "automatable": true
+              },
+              "scale_out": {
+                "description": "Latency or saturation is beyond the SLO while error rates are normal; demand exceeds capacity.",
+                "consequenceClass": "medium",
+                "automatable": true
+              },
+              "open_ticket": {
+                "description": "A real defect with no immediate remediation step: it needs normal engineering work, not an intervention now.",
+                "consequenceClass": "low",
+                "automatable": true
+              },
+              "none": {
+                "description": "No listed step fits the evidence, or the evidence points at a recent deploy or a dependency outside this service.",
+                "escape": "none",
+                "automatable": false
+              }
+            }
+          }
+        },
+        "fallbackOutcome": "none",
+        "state": {
+          "goal": "Get the alert to the cheapest safe handling: a runbook step, a ticket, or a person.",
+          "fields": {
+            "alert": {
+              "role": "evidence",
+              "description": "The alert as received: title and description, when it fired and which monitor raised it.",
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["id", "kind"],
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    },
+                    "supports": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "observedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "source": {
+                      "type": "object"
+                    },
+                    "version": {
+                      "type": "string"
+                    },
+                    "verified": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              },
+              "required": true,
+              "dataClass": "internal",
+              "redact": "error",
+              "selection": {
+                "maxItems": 1,
+                "order": "as_bound"
+              }
+            },
+            "signals": {
+              "role": "fact",
+              "description": "Observable service signals computed in code from the last 15 minutes (SLO comparisons are exact and done before Jev).",
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "error_rate_beyond_slo": {
+                    "type": "boolean"
+                  },
+                  "latency_beyond_slo": {
+                    "type": "boolean"
+                  },
+                  "customer_reports_15m": {
+                    "type": "integer"
+                  },
+                  "open_incidents": {
+                    "type": "integer"
+                  },
+                  "deploy_in_last_hour": {
+                    "type": "boolean"
+                  },
+                  "affected_regions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "required": true,
+              "dataClass": "internal",
+              "redact": "error"
+            },
+            "recent_deploys": {
+              "role": "evidence",
+              "description": "Deploys of the service in the last hour, with what changed.",
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["id", "kind"],
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    },
+                    "supports": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "observedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "source": {
+                      "type": "object"
+                    },
+                    "version": {
+                      "type": "string"
+                    },
+                    "verified": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              },
+              "required": false,
+              "dataClass": "internal",
+              "redact": "error",
+              "selection": {
+                "maxItems": 5,
+                "order": "observed_desc"
+              }
+            }
+          },
+          "maxTokens": 3000,
+          "privacyClass": "internal",
+          "latencyClass": "interactive",
+          "consistency": "record"
+        },
+        "routing": {
+          "consequenceClass": "low",
+          "thresholds": {
+            "low": {
+              "autoAt": 0.9,
+              "improveAt": null,
+              "minMargin": 0.2
+            },
+            "medium": {
+              "autoAt": 0.95,
+              "improveAt": null,
+              "minMargin": 0.3
+            }
+          },
+          "escapeRoutes": {
+            "none": "human",
+            "other": "human",
+            "stop": "auto"
+          },
+          "uncalibratedProviders": "human",
+          "onModelChange": "continue"
+        },
+        "allowedAction": {
+          "kinds": ["tool_call", "internal_routing"],
+          "capabilities": ["runbook.restart_workers", "runbook.scale_out", "tracker.create_ticket"],
+          "maxConsequence": "medium",
+          "externalSideEffects": false
+        },
+        "escalation": {
+          "assignees": ["role:oncall"],
+          "mode": "choice",
+          "rubric": "Pick the step you would run yourself; pick none when you would investigate first."
+        },
+        "model": {
+          "primary": {
+            "provider": "typesafe",
+            "model": "jev-latest"
+          },
+          "failover": []
+        },
+        "tests": {
+          "requiredCategories": [
+            "normal",
+            "ambiguous",
+            "missing_evidence",
+            "adversarial",
+            "rare_class",
+            "no_fit"
+          ],
+          "minPerCategory": 3,
+          "minAccuracy": 0.9,
+          "requireMonotonicity": true
+        },
+        "changelog": "",
+        "lintSuppressions": [],
+        "tags": ["harness:escalation", "bundle:alert-triage", "template:jev-escalation-triage"]
+      }
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "name": "@flowaid/jev",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Jev engineering for flowaid: decision contracts, state packets, question bundles, confidence x consequence routing, live option menus, decision receipts, shadow comparison, calibration and the failure-mode catalog (JEV_ENGINEERING.md). Browser-safe; depends only on @flowaid/workflow-core, @flowaid/shared and zod.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src",
+    "dist",
+    "README.md",
+    "templates"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src",
+    "test": "vitest run --passWithNoTests",
+    "clean": "rm -rf dist .turbo *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@flowaid/shared": "workspace:*",
+    "@flowaid/workflow-core": "workspace:*",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@flowaid/config": "workspace:*",
+    "@types/node": "24.13.6",
+    "eslint": "9.39.5",
+    "fast-check": "4.10.2",
+    "typescript": "5.9.3",
+    "vitest": "4.1.11"
+  }
+}

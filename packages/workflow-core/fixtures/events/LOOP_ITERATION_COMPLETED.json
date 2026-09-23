@@ -1,0 +1,30 @@
+{
+  "type": "LOOP_ITERATION_COMPLETED",
+  "runId": "0192f0a1-5b3c-7d4e-8f60-1a2b3c4d5e6f",
+  "seq": 43,
+  "at": "2026-09-22T10:00:10.750Z",
+  "nodeRunId": "0192f0a1-5b3c-7d4e-8f60-0000000000b3",
+  "nodeId": "research",
+  "scope": "",
+  "attempt": 1,
+  "iteration": 0,
+  "childScope": "research#0",
+  "carry": {
+    "queries": ["gold plan double charge refund policy"],
+    "evidence": [
+      {
+        "url": "https://example.com/refunds"
+      }
+    ],
+    "gaps": []
+  },
+  "result": {
+    "summary": "Refunds for duplicate charges are issued within 5 days."
+  },
+  "exit": false,
+  "usage": {
+    "inputTokens": 3120,
+    "outputTokens": 410
+  },
+  "costUsd": 0.0021
+}

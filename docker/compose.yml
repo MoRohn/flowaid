@@ -1,0 +1,324 @@
+# flowaid default stack: Postgres 16 + pgvector, MinIO, api, worker, worker-code, web.
+# No Redis: queues and the event bus run over Postgres (ARCHITECTURE.md D10).
+# `docker compose --profile scale up` (see compose.scale.yml) adds Redis and worker replicas.
+# `docker compose --profile tools up` also publishes the MinIO console.
+#
+# Configuration comes from ../.env (copy ../.env.example; every variable is documented in
+# packages/env/README.md). Only `api` and `worker` read the whole file (env_file): `web` and the
+# sandbox host `worker-code` receive the explicit variables listed below and nothing else, so a
+# compromised sandbox or web process never holds the master key, provider keys or the owner's
+# database password. Values that must differ inside the compose network (database and
+# object-storage hosts, data paths, the listen address) are pinned per service and override
+# the file. docker/compose.test.ts asserts the per-service variable sets;
+# scripts/check-compose.test.ts feeds each service environment to loadEnv().
+#
+# Images are pinned to a release tag and its digest; renovate bumps them.
+#
+# Networks:
+#   internal  internal: true (no egress): postgres, minio, minio-init, redis, api, worker,
+#             worker-code. Service-to-service traffic only. `web` is not on it.
+#   edge      api, web, worker, worker-code: the published api/web ports and outbound access
+#             (providers, webhooks, MCP servers, `allowNetwork` code nodes). Remove worker-code
+#             from it for a sandbox host without egress (code nodes then cannot fetch).
+#   admin     postgres, minio, redis, minio-console: publishes the databases on the host
+#             (BIND_ADDRESS, loopback by default) for local development and administration.
+#             Published ports do not work on an internal-only network, hence this third one.
+#
+# Passwords have no defaults: POSTGRES_PASSWORD, POSTGRES_CODE_PASSWORD and S3_SECRET_KEY must
+# be set in ../.env (and REDIS_PASSWORD with the scale profile).
+
+name: flowaid
+
+x-env-file: &env-file
+  - path: ../.env
+    required: false
+
+x-postgres-image: &postgres-image pgvector/pgvector:0.8.6-pg16@sha256:ccc6e83d6e35e931dc7c5def2022729d5a6c370318d099181995567ff1fb4d6b
+x-minio-image: &minio-image quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
+x-mc-image: &mc-image quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727
+x-socat-image: &socat-image alpine/socat:1.8.1.3@sha256:24220ef2c80a2a421ea08e4624488e985330c421b6aa3329bae14b0933a1d403
+
+# Shared by api and worker (the trusted tier). worker-code and web get their own explicit maps.
+x-service-env: &service-env
+  NODE_ENV: ${NODE_ENV:-production}
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  # api and worker connect as the restricted flowaid_app role (docker/postgres-init/01-roles.sql);
+  # the api runs migrations as the owner through DATABASE_ADMIN_URL.
+  DATABASE_URL: postgres://flowaid_app:${POSTGRES_APP_PASSWORD:-${POSTGRES_PASSWORD}}@postgres:5432/${POSTGRES_DB:-flowaid}
+  DB_RLS: ${DB_RLS:-true}
+  REDIS_URL: ${REDIS_URL:-}
+  S3_ENDPOINT: http://minio:9000
+  S3_BUCKET: ${S3_BUCKET:-flowaid}
+  S3_ACCESS_KEY: ${S3_ACCESS_KEY:-flowaid}
+  S3_SECRET_KEY: ${S3_SECRET_KEY:?set S3_SECRET_KEY in .env (openssl rand -hex 16); it is the MinIO root password}
+  S3_REGION: ${S3_REGION:-us-east-1}
+  S3_FORCE_PATH_STYLE: "true"
+  # FLOWAID_MASTER_KEY (from .env) takes precedence over the key file when both are present.
+  FLOWAID_MASTER_KEY: ${FLOWAID_MASTER_KEY:-}
+  FLOWAID_MASTER_KEY_FILE: /data/master.key
+  FLOWAID_MASTER_KEY_AUTOGENERATE: ${FLOWAID_MASTER_KEY_AUTOGENERATE:-false}
+  FLOWAID_JWT_KEYS_DIR: /data/keys
+  FLOWAID_PLUGIN_DIR: /data/plugins
+  FLOWAID_VENDOR_DIR: /opt/flowaid/vendor
+  FLOWAID_BASE_URL: ${FLOWAID_BASE_URL:-http://localhost:3000}
+  FLOWAID_WEB_URL: ${FLOWAID_WEB_URL:-http://localhost:3001}
+
+x-worker-security: &worker-security
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+
+services:
+  postgres:
+    image: *postgres-image
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-flowaid}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env (openssl rand -hex 16)}
+      POSTGRES_DB: ${POSTGRES_DB:-flowaid}
+      # Login roles created by postgres-init/01-roles.sql on the first start.
+      POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD:-${POSTGRES_PASSWORD}}
+      POSTGRES_CODE_PASSWORD: ${POSTGRES_CODE_PASSWORD:?set POSTGRES_CODE_PASSWORD in .env (openssl rand -hex 16); the sandbox host's database password, distinct from POSTGRES_PASSWORD}
+    command:
+      - postgres
+      - -c
+      - max_connections=200
+      - -c
+      - shared_buffers=256MB
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - internal
+      - admin
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-flowaid} -d ${POSTGRES_DB:-flowaid}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+
+  minio:
+    image: *minio-image
+    # The console listens on 9001 inside the network only; `--profile tools` publishes it.
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-flowaid}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:?set S3_SECRET_KEY in .env (openssl rand -hex 16); it is the MinIO root password}
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${MINIO_PORT:-9000}:9000"
+    volumes:
+      - minio-data:/data
+    networks:
+      - internal
+      - admin
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+
+  # `docker compose --profile tools up -d minio-console`: publishes the MinIO console (object
+  # browser, root credentials) on the host. Off by default.
+  minio-console:
+    image: *socat-image
+    profiles: [tools]
+    command: ["TCP-LISTEN:9001,fork,reuseaddr", "TCP:minio:9001"]
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${MINIO_CONSOLE_PORT:-9001}:9001"
+    depends_on:
+      minio:
+        condition: service_healthy
+    networks:
+      - internal
+      - admin
+    restart: unless-stopped
+
+  # One-shot: creates the artifacts bucket, then exits 0.
+  minio-init:
+    image: *mc-image
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-flowaid}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:?set S3_SECRET_KEY in .env (openssl rand -hex 16); it is the MinIO root password}
+      S3_BUCKET: ${S3_BUCKET:-flowaid}
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"
+        mc mb --ignore-existing "local/$$S3_BUCKET"
+        echo "bucket $$S3_BUCKET ready"
+    networks:
+      - internal
+    restart: "no"
+
+  # Fastify API: HTTP, SSE, webhooks, MCP endpoint. Runs migrations at start; never executes nodes.
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: api
+    image: flowaid/api:local
+    env_file: *env-file
+    environment:
+      <<: *service-env
+      HOST: 0.0.0.0
+      PORT: "3000"
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3001}
+      # Owner connection used only for migrations (DATABASE.md).
+      DATABASE_ADMIN_URL: postgres://${POSTGRES_USER:-flowaid}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env (openssl rand -hex 16)}@postgres:5432/${POSTGRES_DB:-flowaid}
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${PORT:-3000}:3000"
+    volumes:
+      - flowaid-data:/data
+    networks:
+      - internal
+      - edge
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    restart: unless-stopped
+
+  # Orchestrator + general-purpose node executors and plugin host (the trusted tier: it holds
+  # the master key file and every provider key). Waits for the api so migrations are applied.
+  worker:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: worker
+    image: flowaid/worker:local
+    env_file: *env-file
+    environment:
+      <<: *service-env
+      WORKER_POOLS: ${WORKER_POOLS:-general,retrieval,browser,high_memory}
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-10}
+      MCP_STDIO_ENABLED: ${MCP_STDIO_ENABLED:-false}
+    volumes:
+      - flowaid-data:/data
+    networks:
+      - internal
+      - edge
+    depends_on:
+      postgres:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    <<: *worker-security
+    pids_limit: 1024
+    healthcheck:
+      test: ["CMD", "node", "dist/health.js"]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 30s
+    restart: unless-stopped
+
+  # Sandbox host for the `code` pool (isolated-vm; ARCHITECTURE.md §10.7). Separate container so
+  # a sandbox escape reaches neither orchestrator memory nor any secret: no env_file, no /data
+  # mount, no master key, no provider keys, a database role limited to the queue tables, a
+  # read-only root filesystem, no capabilities, and process and memory limits.
+  worker-code:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: worker
+    image: flowaid/worker:local
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DATABASE_URL: postgres://flowaid_code:${POSTGRES_CODE_PASSWORD:?set POSTGRES_CODE_PASSWORD in .env (openssl rand -hex 16); the sandbox host's database password, distinct from POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-flowaid}
+      DB_RLS: ${DB_RLS:-true}
+      REDIS_URL: ${REDIS_URL:-}
+      WORKER_POOLS: code
+      WORKER_CONCURRENCY: ${WORKER_CODE_CONCURRENCY:-4}
+      SANDBOX_MODE: ${SANDBOX_MODE:-isolated-vm}
+    networks:
+      - internal
+      - edge
+    depends_on:
+      postgres:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    <<: *worker-security
+    read_only: true
+    tmpfs:
+      - /tmp:size=256m
+    # pids_limit is expressed here because compose rejects `pids_limit` next to a `deploy` block.
+    deploy:
+      resources:
+        limits:
+          pids: 256
+          memory: 1g
+    healthcheck:
+      test: ["CMD", "node", "dist/health.js"]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 30s
+    restart: unless-stopped
+
+  # Next.js app: builder, runs, trace viewer, human tasks, evaluations, settings. Receives only
+  # what the server side needs; browsers use the public api URL baked in at build time.
+  web:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: web
+      args:
+        NEXT_PUBLIC_FLOWAID_BASE_URL: ${FLOWAID_BASE_URL:-http://localhost:3000}
+    image: flowaid/web:local
+    environment:
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: "3000"
+      # Server components reach the api over the edge network; browsers use the public URL.
+      FLOWAID_API_INTERNAL_URL: http://api:3000
+      NEXT_PUBLIC_FLOWAID_BASE_URL: ${FLOWAID_BASE_URL:-http://localhost:3000}
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${WEB_PORT:-3001}:3000"
+    networks:
+      - edge
+    depends_on:
+      api:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    restart: unless-stopped
+
+networks:
+  internal:
+    internal: true
+  edge:
+  admin:
+
+volumes:
+  postgres-data:
+  minio-data:
+  # Master key file, generated JWT keys and installed plugins, shared by api and worker only.
+  flowaid-data:

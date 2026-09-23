@@ -1,0 +1,11 @@
+{
+  "type": "NODE_SKIPPED",
+  "runId": "0192f0a1-5b3c-7d4e-8f60-1a2b3c4d5e6f",
+  "seq": 19,
+  "at": "2026-09-22T10:00:04.750Z",
+  "nodeRunId": "0192f0a1-5b3c-7d4e-8f60-0000000000a9",
+  "nodeId": "out_auto",
+  "scope": "",
+  "attempt": 1,
+  "reason": "pruned"
+}

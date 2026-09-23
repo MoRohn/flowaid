@@ -1,0 +1,137 @@
+/*
+ * @flowaid/ui — global stylesheet.
+ * Import once in the app root: `import "@flowaid/ui/styles.css"`.
+ * Tokens come from ./tokens.css (synced from /brand/tokens.css; do not edit here).
+ */
+@import "tailwindcss";
+@import "./tokens.css";
+
+/* The playground's Vite root is ./playground, so tell Tailwind to scan the library sources too. */
+@source "../src";
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+@theme inline {
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-ink-4: var(--ink-4);
+  --color-grid: var(--grid);
+
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-soft-2: var(--accent-soft-2);
+  --color-accent-text: var(--accent-text);
+
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-ok-text: var(--ok-text);
+  --color-warn-text: var(--warn-text);
+  --color-danger-text: var(--danger-text);
+  --color-info-text: var(--info-text);
+
+  --color-cat-flow: var(--cat-flow);
+  --color-cat-decision: var(--cat-decision);
+  --color-cat-generation: var(--cat-generation);
+  --color-cat-agent: var(--cat-agent);
+  --color-cat-tool: var(--cat-tool);
+  --color-cat-data: var(--cat-data);
+  --color-cat-retrieval: var(--cat-retrieval);
+  --color-cat-state: var(--cat-state);
+  --color-cat-human: var(--cat-human);
+  --color-cat-safety: var(--cat-safety);
+  --color-cat-developer: var(--cat-developer);
+
+  --color-p-1: var(--p-1);
+  --color-p-2: var(--p-2);
+  --color-p-3: var(--p-3);
+  --color-p-4: var(--p-4);
+
+  --radius-xs: var(--radius-xs);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+
+  --shadow-1: var(--shadow-1);
+  --shadow-2: var(--shadow-2);
+  --shadow-3: var(--shadow-3);
+
+  --text-2xs: var(--text-2xs);
+  --text-xs: var(--text-xs);
+  --text-sm: var(--text-sm);
+  --text-base: var(--text-base);
+  --text-md: var(--text-md);
+  --text-lg: var(--text-lg);
+  --text-xl: var(--text-xl);
+  --text-2xl: var(--text-2xl);
+
+  --ease-out: var(--ease-out);
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    margin: 0;
+    background: var(--canvas);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: var(--text-sm);
+    line-height: var(--leading-normal);
+  }
+  code,
+  kbd,
+  pre,
+  .font-mono {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+  :focus-visible {
+    outline: none;
+    box-shadow: var(--focus);
+  }
+  ::selection {
+    background: var(--accent-soft-2);
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) transparent;
+  }
+}
+
+@layer utilities {
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+  .text-eyebrow {
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    letter-spacing: var(--tracking-caps);
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .canvas-grid {
+    background-color: var(--canvas);
+    background-image: radial-gradient(var(--grid) 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+}

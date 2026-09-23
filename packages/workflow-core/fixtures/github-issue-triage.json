@@ -1,0 +1,693 @@
+{
+  "$schema": "https://flowaid.dev/schemas/workflow/v1",
+  "id": "3e7a1c9b-8d2f-4b6e-9a0c-5f4d3e2b1a09",
+  "description": "Webhook-triggered triage of new GitHub issues: actionability, classification, duplicate detection over similar issues found with the GitHub MCP search_issues tool, labels via MCP and routing to on-call, product or backlog.",
+  "name": "GitHub Issue Triage",
+  "triggers": [
+    {
+      "type": "webhook",
+      "path": "github-issues",
+      "signature": "hmac_sha256",
+      "responseMode": "async",
+      "inputPointer": "/body",
+      "allowedHeaders": ["x-github-event", "x-github-delivery"]
+    }
+  ],
+  "inputs": {
+    "type": "object",
+    "required": ["action", "issue", "repository"],
+    "properties": {
+      "action": {
+        "type": "string"
+      },
+      "issue": {
+        "type": "object",
+        "required": ["number", "title", "html_url"],
+        "properties": {
+          "number": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": ["string", "null"]
+          },
+          "html_url": {
+            "type": "string"
+          }
+        }
+      },
+      "repository": {
+        "type": "object",
+        "required": ["full_name"],
+        "properties": {
+          "full_name": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "outputs": {
+    "type": "object",
+    "required": ["handled"],
+    "properties": {
+      "handled": {
+        "type": "boolean"
+      },
+      "labels": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "duplicate_of": {
+        "type": ["integer", "null"]
+      },
+      "route": {
+        "type": "string"
+      }
+    }
+  },
+  "secrets": [
+    {
+      "name": "TYPESAFE_API_KEY",
+      "credentialType": "typesafe.api_key"
+    },
+    {
+      "name": "GITHUB_MCP",
+      "credentialType": "mcp.headers"
+    }
+  ],
+  "execution": {
+    "timeoutMs": 120000,
+    "maxCostUsd": 0.2
+  },
+  "nodes": [
+    {
+      "id": "start",
+      "kind": "input",
+      "name": "Webhook"
+    },
+    {
+      "id": "opened",
+      "kind": "branch",
+      "name": "Opened?",
+      "cases": [
+        {
+          "port": "yes",
+          "when": "start.action == 'opened' || start.action == 'reopened'"
+        }
+      ],
+      "defaultPort": "no"
+    },
+    {
+      "id": "actionable",
+      "kind": "task",
+      "type": "flowaid.decision.boolean",
+      "typeVersion": "1.0.0",
+      "name": "Actionable?",
+      "config": {
+        "instructions": "Is this issue actionable by maintainers (a real bug, feature, docs or usage question rather than spam/empty)?",
+        "criteria": {
+          "true": "Actionable",
+          "false": "Spam, empty or off-topic"
+        }
+      },
+      "inputs": {
+        "state": {
+          "kind": "object",
+          "fields": {
+            "title": {
+              "kind": "ref",
+              "ref": {
+                "kind": "port",
+                "node": "start",
+                "port": "issue"
+              },
+              "default": {}
+            },
+            "body": {
+              "kind": "expr",
+              "source": "coalesce(start.issue.body, '')"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "typesafe": "TYPESAFE_API_KEY"
+      }
+    },
+    {
+      "id": "act_gate",
+      "kind": "branch",
+      "name": "Actionable gate",
+      "cases": [
+        {
+          "port": "yes",
+          "when": "actionable.decision.value && actionable.decision.confidence >= 0.7"
+        }
+      ],
+      "defaultPort": "no"
+    },
+    {
+      "id": "classify",
+      "kind": "task",
+      "type": "flowaid.decision.batch",
+      "typeVersion": "1.0.0",
+      "name": "Classify",
+      "config": {
+        "questions": {
+          "kind": {
+            "kind": "choice",
+            "instructions": "What kind of issue is this?",
+            "options": {
+              "bug": "Something is broken",
+              "feature": "New capability requested",
+              "docs": "Documentation problem",
+              "question": "Usage question"
+            }
+          },
+          "severity": {
+            "kind": "score",
+            "instructions": "How severe (bugs) or impactful (otherwise) is this?",
+            "levels": ["Trivial", "Minor", "Moderate", "Major", "Critical"]
+          }
+        }
+      },
+      "inputs": {
+        "state": {
+          "kind": "object",
+          "fields": {
+            "title": {
+              "kind": "ref",
+              "ref": {
+                "kind": "port",
+                "node": "start",
+                "port": "issue",
+                "path": "/title"
+              }
+            },
+            "body": {
+              "kind": "expr",
+              "source": "coalesce(start.issue.body, '')"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "typesafe": "TYPESAFE_API_KEY"
+      }
+    },
+    {
+      "id": "similar",
+      "kind": "task",
+      "type": "flowaid.tools.mcp",
+      "typeVersion": "1.0.0",
+      "name": "Similar issues",
+      "config": {
+        "serverId": "$template.mcp.github",
+        "tool": "search_issues"
+      },
+      "inputs": {
+        "q": {
+          "kind": "template",
+          "source": "repo:{{ start.repository.full_name }} is:issue {{ start.issue.title }}"
+        },
+        "per_page": {
+          "kind": "literal",
+          "value": 5
+        }
+      },
+      "credentials": {
+        "mcp": "GITHUB_MCP"
+      }
+    },
+    {
+      "id": "dup_judge",
+      "kind": "task",
+      "type": "flowaid.decision.boolean",
+      "typeVersion": "1.0.0",
+      "name": "Duplicate of top candidate?",
+      "config": {
+        "instructions": "Is the new issue a duplicate of the top candidate (same root cause or same request)?",
+        "criteria": {
+          "true": "Duplicate",
+          "false": "Different problem despite similar words"
+        }
+      },
+      "inputs": {
+        "state": {
+          "kind": "object",
+          "fields": {
+            "issue": {
+              "kind": "ref",
+              "ref": {
+                "kind": "port",
+                "node": "start",
+                "port": "issue"
+              }
+            },
+            "candidate": {
+              "kind": "expr",
+              "source": "first(similar.result.items)"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "typesafe": "TYPESAFE_API_KEY"
+      }
+    },
+    {
+      "id": "is_dup",
+      "kind": "branch",
+      "name": "Duplicate?",
+      "cases": [
+        {
+          "port": "dup",
+          "when": "len(similar.result.items) > 0 && dup_judge.decision.value && dup_judge.decision.confidence >= 0.8"
+        }
+      ],
+      "defaultPort": "new"
+    },
+    {
+      "id": "gh_dup_comment",
+      "kind": "task",
+      "type": "flowaid.tools.mcp",
+      "typeVersion": "1.0.0",
+      "name": "Comment duplicate",
+      "config": {
+        "serverId": "$template.mcp.github",
+        "tool": "add_issue_comment"
+      },
+      "inputs": {
+        "owner": {
+          "kind": "expr",
+          "source": "split(start.repository.full_name, '/')[0]"
+        },
+        "repo": {
+          "kind": "expr",
+          "source": "split(start.repository.full_name, '/')[1]"
+        },
+        "issue_number": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "start",
+            "port": "issue",
+            "path": "/number"
+          }
+        },
+        "body": {
+          "kind": "template",
+          "source": "Possible duplicate of #{{ first(similar.result.items).number }} (confidence {{ round(dup_judge.decision.confidence, 2) }})."
+        }
+      },
+      "credentials": {
+        "mcp": "GITHUB_MCP"
+      }
+    },
+    {
+      "id": "labels",
+      "kind": "task",
+      "type": "flowaid.data.transform",
+      "typeVersion": "1.0.0",
+      "name": "Compute labels",
+      "config": {
+        "output": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "expr": "[classify.answers.kind.value, 'severity:' + lower(classify.answers.severity.levelLabel)]"
+      }
+    },
+    {
+      "id": "gh_label",
+      "kind": "task",
+      "type": "flowaid.tools.mcp",
+      "typeVersion": "1.0.0",
+      "name": "Apply labels",
+      "config": {
+        "serverId": "$template.mcp.github",
+        "tool": "add_issue_labels"
+      },
+      "inputs": {
+        "owner": {
+          "kind": "expr",
+          "source": "split(start.repository.full_name, '/')[0]"
+        },
+        "repo": {
+          "kind": "expr",
+          "source": "split(start.repository.full_name, '/')[1]"
+        },
+        "issue_number": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "start",
+            "port": "issue",
+            "path": "/number"
+          }
+        },
+        "labels": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "labels",
+            "port": "result"
+          }
+        }
+      },
+      "credentials": {
+        "mcp": "GITHUB_MCP"
+      },
+      "policy": {
+        "retry": {
+          "maxAttempts": 3
+        }
+      }
+    },
+    {
+      "id": "route",
+      "kind": "branch",
+      "name": "Route",
+      "cases": [
+        {
+          "port": "oncall",
+          "when": "classify.answers.kind.value == 'bug' && classify.answers.severity.value >= 3"
+        },
+        {
+          "port": "product",
+          "when": "classify.answers.kind.value == 'feature'"
+        }
+      ],
+      "defaultPort": "backlog"
+    },
+    {
+      "id": "page",
+      "kind": "task",
+      "type": "flowaid.tools.http",
+      "typeVersion": "1.0.0",
+      "name": "Notify on-call",
+      "config": {
+        "method": "POST",
+        "url": "https://hooks.slack.com/services/T000/B000/XXXX",
+        "responseType": "json"
+      },
+      "inputs": {
+        "body": {
+          "kind": "object",
+          "fields": {
+            "text": {
+              "kind": "template",
+              "source": ":rotating_light: Critical bug {{ start.issue.html_url }} (sev {{ round(classify.answers.severity.value, 1) }})"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "out_ignored",
+      "kind": "output",
+      "name": "Ignored",
+      "outcome": "ignored",
+      "value": {
+        "kind": "object",
+        "fields": {
+          "handled": {
+            "kind": "literal",
+            "value": false
+          },
+          "route": {
+            "kind": "literal",
+            "value": "ignored"
+          }
+        }
+      }
+    },
+    {
+      "id": "out_dup",
+      "kind": "output",
+      "name": "Duplicate",
+      "outcome": "duplicate",
+      "value": {
+        "kind": "object",
+        "fields": {
+          "handled": {
+            "kind": "literal",
+            "value": true
+          },
+          "duplicate_of": {
+            "kind": "expr",
+            "source": "first(similar.result.items).number"
+          },
+          "route": {
+            "kind": "literal",
+            "value": "duplicate"
+          }
+        }
+      }
+    },
+    {
+      "id": "out_routed",
+      "kind": "output",
+      "name": "Routed",
+      "outcome": "routed",
+      "value": {
+        "kind": "object",
+        "fields": {
+          "handled": {
+            "kind": "literal",
+            "value": true
+          },
+          "labels": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "labels",
+              "port": "result"
+            }
+          },
+          "route": {
+            "kind": "expr",
+            "source": "first(route.taken)"
+          }
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "c1",
+      "from": {
+        "node": "opened",
+        "port": "no"
+      },
+      "to": {
+        "node": "out_ignored"
+      }
+    },
+    {
+      "id": "c2",
+      "from": {
+        "node": "opened",
+        "port": "yes"
+      },
+      "to": {
+        "node": "actionable"
+      }
+    },
+    {
+      "id": "c3",
+      "from": {
+        "node": "act_gate",
+        "port": "no"
+      },
+      "to": {
+        "node": "out_ignored"
+      }
+    },
+    {
+      "id": "c4",
+      "from": {
+        "node": "act_gate",
+        "port": "yes"
+      },
+      "to": {
+        "node": "classify"
+      }
+    },
+    {
+      "id": "c5",
+      "from": {
+        "node": "act_gate",
+        "port": "yes"
+      },
+      "to": {
+        "node": "similar"
+      }
+    },
+    {
+      "id": "c6",
+      "from": {
+        "node": "is_dup",
+        "port": "dup"
+      },
+      "to": {
+        "node": "gh_dup_comment"
+      }
+    },
+    {
+      "id": "c7",
+      "from": {
+        "node": "gh_dup_comment",
+        "port": "done"
+      },
+      "to": {
+        "node": "out_dup"
+      }
+    },
+    {
+      "id": "c8",
+      "from": {
+        "node": "is_dup",
+        "port": "new"
+      },
+      "to": {
+        "node": "labels"
+      }
+    },
+    {
+      "id": "c9",
+      "from": {
+        "node": "labels",
+        "port": "done"
+      },
+      "to": {
+        "node": "gh_label"
+      }
+    },
+    {
+      "id": "c10",
+      "from": {
+        "node": "gh_label",
+        "port": "done"
+      },
+      "to": {
+        "node": "route"
+      }
+    },
+    {
+      "id": "c11",
+      "from": {
+        "node": "route",
+        "port": "oncall"
+      },
+      "to": {
+        "node": "page"
+      }
+    },
+    {
+      "id": "c12",
+      "from": {
+        "node": "page",
+        "port": "done"
+      },
+      "to": {
+        "node": "out_routed"
+      }
+    },
+    {
+      "id": "c13",
+      "from": {
+        "node": "route",
+        "port": "product"
+      },
+      "to": {
+        "node": "out_routed"
+      }
+    },
+    {
+      "id": "c14",
+      "from": {
+        "node": "route",
+        "port": "backlog"
+      },
+      "to": {
+        "node": "out_routed"
+      }
+    }
+  ],
+  "layout": {
+    "nodes": {
+      "start": {
+        "x": 0,
+        "y": 220
+      },
+      "opened": {
+        "x": 260,
+        "y": 220
+      },
+      "actionable": {
+        "x": 520,
+        "y": 220
+      },
+      "act_gate": {
+        "x": 780,
+        "y": 220
+      },
+      "classify": {
+        "x": 1040,
+        "y": 220
+      },
+      "similar": {
+        "x": 1300,
+        "y": 220
+      },
+      "dup_judge": {
+        "x": 1560,
+        "y": 220
+      },
+      "is_dup": {
+        "x": 1820,
+        "y": 220
+      },
+      "gh_dup_comment": {
+        "x": 2080,
+        "y": 220
+      },
+      "labels": {
+        "x": 2340,
+        "y": 220
+      },
+      "gh_label": {
+        "x": 2600,
+        "y": 220
+      },
+      "route": {
+        "x": 2860,
+        "y": 220
+      },
+      "page": {
+        "x": 3120,
+        "y": 220
+      },
+      "out_ignored": {
+        "x": 3380,
+        "y": 220
+      },
+      "out_dup": {
+        "x": 3640,
+        "y": 220
+      },
+      "out_routed": {
+        "x": 3900,
+        "y": 220
+      }
+    }
+  }
+}
