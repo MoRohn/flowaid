@@ -1,5 +1,8 @@
 # Entry point so a plain `docker compose up` works from the repository root.
 # The stack itself lives in docker/ (see docker/README.md).
+# One include entry with both paths, so compose.scale.yml is merged over compose.yml as an
+# overlay (it extends `worker`); separate entries would declare `worker` twice.
 include:
-  - docker/compose.yml
-  - docker/compose.scale.yml
+  - path:
+      - docker/compose.yml
+      - docker/compose.scale.yml
