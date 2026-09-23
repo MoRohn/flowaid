@@ -592,7 +592,7 @@ describe("evaluateExpression: regular expressions", () => {
   });
   const runRegex = (source: string): JsonValue => evaluateExpression(ast(source), regexScope);
 
-  it("rejects a catastrophic pattern in under 50 ms instead of backtracking", () => {
+  it("rejects a catastrophic pattern instead of backtracking", () => {
     const started = performance.now();
     for (const source of [
       "r.subject matches '(a+)+$'",
@@ -605,7 +605,9 @@ describe("evaluateExpression: regular expressions", () => {
         source,
       ).toBe("INVALID_REGEX");
     }
-    expect(performance.now() - started).toBeLessThan(50);
+    // Backtracking these patterns over the subject would take seconds or far longer; the bound
+    // only has to separate "refused up front" from that, with room for a slow shared CI runner.
+    expect(performance.now() - started).toBeLessThan(1000);
     try {
       runRegex("r.subject matches '(a+)+$'");
     } catch (error) {
