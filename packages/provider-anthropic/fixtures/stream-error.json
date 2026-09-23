@@ -1,0 +1,5 @@
+{
+  "constructed": true,
+  "note": "Constructed from Anthropic's documented Messages API streaming events (no live key was available when this package was written); re-record against the live API when a key is configured.",
+  "sse": "event: message_start\ndata: {\"type\": \"message_start\", \"message\": {\"id\": \"m\", \"model\": \"claude-sonnet-5\", \"usage\": {\"input_tokens\": 5, \"output_tokens\": 0}}}\n\nevent: error\ndata: {\"type\": \"error\", \"error\": {\"type\": \"overloaded_error\", \"message\": \"Overloaded\"}}\n\n"
+}

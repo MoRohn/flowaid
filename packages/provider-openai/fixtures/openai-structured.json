@@ -1,0 +1,25 @@
+{
+  "constructed": true,
+  "note": "Constructed from the vendor's documented Chat Completions streaming format (no live key was available when this package was written); re-record against the live API when a key is configured.",
+  "model": "gpt-5.4-mini",
+  "json": {
+    "id": "chatcmpl-2",
+    "object": "chat.completion",
+    "model": "gpt-5.4-mini-2026-08-01",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "{\"team\":\"billing\",\"urgency\":2}"
+        },
+        "finish_reason": "stop"
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 210,
+      "completion_tokens": 14,
+      "total_tokens": 224
+    }
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "name": "@flowaid/provider-ollama",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Ollama generation and embedding provider for flowaid: /api/chat NDJSON streaming, JSON-schema format, tools, /api/embed and /api/tags discovery; local models cost nothing (ARCHITECTURE.md \u00a76.6).",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src",
+    "dist",
+    "fixtures",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src",
+    "test": "vitest run",
+    "clean": "rm -rf dist .turbo *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@flowaid/providers": "workspace:*",
+    "@flowaid/shared": "workspace:*",
+    "@flowaid/workflow-core": "workspace:*"
+  },
+  "devDependencies": {
+    "@flowaid/config": "workspace:*",
+    "@types/node": "24.13.6",
+    "eslint": "9.39.5",
+    "typescript": "5.9.3",
+    "vitest": "4.1.11"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "constructed": true,
+  "note": "Constructed from Anthropic's documented Messages API streaming events (no live key was available when this package was written); re-record against the live API when a key is configured.",
+  "status": 529,
+  "json": {
+    "type": "error",
+    "error": {
+      "type": "overloaded_error",
+      "message": "Overloaded"
+    }
+  }
+}

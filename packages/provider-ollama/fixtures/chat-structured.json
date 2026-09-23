@@ -1,0 +1,15 @@
+{
+  "constructed": true,
+  "note": "Constructed from Ollama's documented /api/chat streaming format (NDJSON; Ollama was not installed when this package was written); re-record against a local server when available.",
+  "json": {
+    "model": "llama3.1:8b",
+    "message": {
+      "role": "assistant",
+      "content": "{\"team\":\"billing\"}"
+    },
+    "done": true,
+    "done_reason": "stop",
+    "prompt_eval_count": 50,
+    "eval_count": 6
+  }
+}

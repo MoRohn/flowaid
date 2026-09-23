@@ -1,0 +1,6 @@
+{
+  "constructed": true,
+  "note": "Constructed from the vendor's documented Chat Completions streaming format (no live key was available when this package was written); re-record against the live API when a key is configured. Gemini's OpenAI-compatible endpoint streams the same frames.",
+  "model": "gemini-3.5-flash",
+  "sse": "data: {\"id\": \"g-1\", \"object\": \"chat.completion.chunk\", \"created\": 1790200000, \"model\": \"gemini-3.5-flash\", \"choices\": [{\"index\": 0, \"delta\": {\"role\": \"assistant\", \"content\": \"The duplicate charge \"}, \"finish_reason\": null}]}\n\ndata: {\"id\": \"g-1\", \"object\": \"chat.completion.chunk\", \"created\": 1790200000, \"model\": \"gemini-3.5-flash\", \"choices\": [{\"index\": 0, \"delta\": {\"content\": \"will be refunded.\"}, \"finish_reason\": \"stop\"}], \"usage\": {\"prompt_tokens\": 800, \"completion_tokens\": 12, \"total_tokens\": 812}}\n\ndata: [DONE]\n\n"
+}

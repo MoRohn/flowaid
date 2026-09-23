@@ -1,0 +1,5 @@
+{
+  "constructed": true,
+  "note": "Constructed from Ollama's documented /api/chat streaming format (NDJSON; Ollama was not installed when this package was written); re-record against a local server when available.",
+  "ndjson": "{\"model\": \"llama3.1:8b\", \"created_at\": \"2026-09-23T10:00:00Z\", \"message\": {\"role\": \"assistant\", \"content\": \"The duplicate \"}, \"done\": false}\n{\"model\": \"llama3.1:8b\", \"created_at\": \"2026-09-23T10:00:00Z\", \"message\": {\"role\": \"assistant\", \"content\": \"will be refunded.\"}, \"done\": false}\n{\"model\": \"llama3.1:8b\", \"created_at\": \"2026-09-23T10:00:01Z\", \"message\": {\"role\": \"assistant\", \"content\": \"\"}, \"done\": true, \"done_reason\": \"stop\", \"total_duration\": 900000000, \"prompt_eval_count\": 42, \"eval_count\": 7}\n"
+}

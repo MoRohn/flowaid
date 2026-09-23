@@ -1,0 +1,27 @@
+{
+  "constructed": true,
+  "note": "Constructed from Anthropic's documented Messages API streaming events (no live key was available when this package was written); re-record against the live API when a key is configured.",
+  "json": {
+    "id": "msg_2",
+    "type": "message",
+    "role": "assistant",
+    "model": "claude-sonnet-5",
+    "content": [
+      {
+        "type": "tool_use",
+        "id": "toolu_2",
+        "name": "respond",
+        "input": {
+          "team": "billing",
+          "urgency": 2
+        }
+      }
+    ],
+    "stop_reason": "tool_use",
+    "usage": {
+      "input_tokens": 400,
+      "output_tokens": 30,
+      "cache_creation_input_tokens": 1500
+    }
+  }
+}

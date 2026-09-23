@@ -607,13 +607,7 @@ export class MemoryQueueDriver implements QueueDriver {
     const list = this.waiting.get(queue) ?? [];
     list.push({ id, job, runAt: Date.now() + (opts.delayMs ?? 0), priority: opts.priority ?? 0 });
     this.waiting.set(queue, list);
-    if (opts.delayMs) {
-      const t = setTimeout(() => {
-        this.timeouts.delete(t);
-        this.pump(queue);
-      }, opts.delayMs);
-      this.timeouts.add(t);
-    }
+    if (opts.delayMs) this.wake(queue, opts.delayMs);
     queueMicrotask(() => this.pump(queue));
     return Promise.resolve();
   }
@@ -626,7 +620,12 @@ export class MemoryQueueDriver implements QueueDriver {
       const now = Date.now();
       list.sort((a, b) => a.priority - b.priority || a.runAt - b.runAt);
       const index = list.findIndex((j) => j.runAt <= now);
-      if (index < 0) return;
+      if (index < 0) {
+        // Nothing is due yet. Timers can fire a little before Date.now() reaches runAt, so
+        // always re-arm for the earliest waiting job instead of relying on the enqueue timer.
+        this.wake(queue, Math.min(...list.map((j) => j.runAt)) - now);
+        return;
+      }
       const [next] = list.splice(index, 1);
       if (!next) return;
       this.pendingIds.delete(next.id);
@@ -639,6 +638,19 @@ export class MemoryQueueDriver implements QueueDriver {
           this.pump(queue);
         });
     }
+  }
+
+  /** Pumps `queue` again after `ms` (at least 1 ms). */
+  private wake(queue: QueueName, ms: number): void {
+    if (this.closed) return;
+    const t = setTimeout(
+      () => {
+        this.timeouts.delete(t);
+        this.pump(queue);
+      },
+      Math.max(1, Math.ceil(ms)),
+    );
+    this.timeouts.add(t);
   }
 
   consume(
