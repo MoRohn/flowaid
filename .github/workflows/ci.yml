@@ -82,8 +82,8 @@ jobs:
       - name: Unit and component tests
         run: pnpm turbo run test --concurrency=3
 
-  database:
-    name: database
+  integration:
+    name: integration
     runs-on: ubuntu-latest
     timeout-minutes: 20
     # The image the compose stack runs (docker/compose.yml), pinned by digest.
@@ -99,9 +99,21 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 12
+      redis:
+        # The image the scale profile runs (docker/compose.scale.yml), pinned by digest.
+        image: redis:7.4.11-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
     env:
       # Superuser connection; every suite creates and drops its own database.
       FLOWAID_TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+      # Suites use a unique key prefix per run.
+      FLOWAID_TEST_REDIS_URL: redis://localhost:6379
     steps:
       - uses: actions/checkout@v5
 
@@ -116,3 +128,6 @@ jobs:
 
       - name: Migrations, RLS, run store, queue and repositories against PostgreSQL 16
         run: pnpm --filter @flowaid/database test
+
+      - name: BullMQ queue and Redis event bus against the store contract suite
+        run: pnpm --filter @flowaid/workflow-runtime test

@@ -14,3 +14,14 @@ export function testDatabaseUrl(
   const value = source.FLOWAID_TEST_DATABASE_URL?.trim();
   return value ? value : undefined;
 }
+
+/**
+ * `FLOWAID_TEST_REDIS_URL`: a disposable Redis for the BullMQ/Redis contract suites. Suites use a
+ * unique key prefix per run and skip when the variable is unset.
+ */
+export function testRedisUrl(
+  source: Readonly<Record<string, string | undefined>> = process.env,
+): string | undefined {
+  const value = source.FLOWAID_TEST_REDIS_URL?.trim();
+  return value ? value : undefined;
+}

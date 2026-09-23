@@ -10,6 +10,8 @@ allowBuilds:
   sharp: true
   "@tailwindcss/oxide": true
   unrs-resolver: true
+  # optional native speed-up of BullMQ's msgpack; the pure-JS path is used instead
+  msgpackr-extract: false
 
 # pnpm's supply-chain policy refuses very new releases; these were published in
 # the last days and are pinned to exact versions we verified.

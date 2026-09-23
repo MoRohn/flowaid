@@ -6,14 +6,14 @@ restart from a known state. The repository is published at
 
 ## Gates
 
-| gate                | result                                                          |
-| ------------------- | --------------------------------------------------------------- |
-| `pnpm typecheck`    | pass                                                            |
-| `pnpm lint`         | pass (0 errors; 19 warnings in `@flowaid/ui`)                   |
-| `pnpm boundaries`   | pass (67 tests)                                                 |
-| `pnpm test`         | pass                                                            |
-| `pnpm format:check` | pass                                                            |
-| CI                  | `.github/workflows/ci.yml`: jobs `check`, `test` and `database` |
+| gate                | result                                                                                |
+| ------------------- | ------------------------------------------------------------------------------------- |
+| `pnpm typecheck`    | pass                                                                                  |
+| `pnpm lint`         | pass (0 errors; 19 warnings in `@flowaid/ui`)                                         |
+| `pnpm boundaries`   | pass (67 tests)                                                                       |
+| `pnpm test`         | pass                                                                                  |
+| `pnpm format:check` | pass                                                                                  |
+| CI                  | `.github/workflows/ci.yml`: jobs `check`, `test` and `integration` (Postgres + Redis) |
 
 ## Packages
 
@@ -31,6 +31,7 @@ restart from a known state. The repository is published at
 | `@flowaid/credentials`       | done (P1-05): AES-256-GCM envelope, KEK versions under env/file/KMS/Vault master keys with KCV and rotation, external references, Redactor (also JSON-escaped forms), credential types                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `@flowaid/observability`     | done (P1-06): redacting pino logger, OpenTelemetry tracer and meter with OTLP and Prometheus, the 17-metric registry (checked against ARCHITECTURE §10.5), `buildTimeline` with golden sets, TraceReviewer                                                                                                                                                                                                                                                                                                                                                                              |
 | `@flowaid/database`          | done (P1-02): DATABASE.md schema verbatim (45 tables, drift-tested against the doc and the migrations), 4 migrations with forced RLS for 39 tables and roles, `PgRunStore` (fenced appends, projections, reproject ≡ rows), `PgQueueDriver`, `PgEventBus`, credential/KEK/artifact stores, repositories, retention sweep, seeds; CI `database` job on pgvector pg16                                                                                                                                                                                                                     |
+| `@flowaid/workflow-runtime`  | done (P2-01): pure `initialState/reduce/ready/step` for all ten kinds; Orchestrator (per-run mutex, lease take-over with `RUN_LEASE_TAKEN`, checkpoint + tail recovery, `recovered` trigger, fenced append, publish, checkpoints every 200 events, timer CAS, lease renew/reap, cancel pickup); task executor with schema validation and scoped ctx; ProviderRegistry bridge emitting decision/generation events; write-time redaction; `runLocally`; memory, BullMQ and Redis drivers with a shared contract suite; fast-check replay-determinism properties on golden plans           |
 | apps                         | not started                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | —     |
 | other platform packages      | not started (upgrade phases P1 to P4)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | —     |
 | `lean/`                      | not started; the toolchain (Lean 4.34.0) is installed and verified in `~/.elan`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | —     |
@@ -40,7 +41,8 @@ restart from a known state. The repository is published at
 - **Phase 0 done:** P0-01, P0-02, P0-04 (formatting part), P0-06, P0-07, P0-09 to P0-19.
 - **Phase 0 not done:** P0-20 (UI visual/axe regression suite; state unverified), P0-03 (dist exports; partly present), P0-05 (partly done: `ci.yml` with the `check` and `test` jobs and Dependabot are in; release, e2e and Docker workflows, git hooks, changesets and coverage thresholds remain), P0-08 (repo docs), P0-04 (version pins and supply-chain part).
 - **Phase 1:** P1-01 (workflow compiler), P1-03 (node SDK), P1-04 (providers), P1-05 (credentials), P1-06 (observability), P1-02 (database) and P1-07 (UI WP-08 closure) done — Phase 1 complete.
-- **Phases 2 to 6:** not started.
+- **Phase 2:** P2-01 (workflow runtime) done. P2-02 to P2-07 not started.
+- **Phases 3 to 6:** not started.
 - **Track J (Jev):** J-01 to J-07 library core built in `@flowaid/jev`. Still to come in the library: tool-proposal normalizer and tool policy, receipt reconstruction and replay planning, workflow analyzers, incident review. J-08 onward needs RFC acceptance and platform packages.
 - **Track L (Lean verification):** designed in `docs/design/LEAN_VERIFICATION.md`, RFC-0017 proposed, items L-01 to L-15 added. L-01 to L-09 and L-13 are buildable now.
 
@@ -59,4 +61,4 @@ restart from a known state. The repository is published at
 
 ## Loose ends
 
-None open from the 2026-09-23 list. Next on the critical path: P2-01 (runtime), with the rest of Phase 1; as do tracks J and L where they are buildable.
+None open from the 2026-09-23 list. Next on the critical path: P2-02 to P2-05 (providers, core nodes, MCP/OpenAPI), then P3 (API, worker); as do tracks J and L where they are buildable.

@@ -32,7 +32,7 @@
     "test": {
       "dependsOn": ["^build"],
       "outputs": ["coverage/**"],
-      "env": ["FLOWAID_TEST_DATABASE_URL"]
+      "env": ["FLOWAID_TEST_DATABASE_URL", "FLOWAID_TEST_REDIS_URL"]
     },
     "test:e2e": {
       "dependsOn": ["build"],

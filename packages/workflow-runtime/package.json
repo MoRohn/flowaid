@@ -1,0 +1,46 @@
+{
+  "name": "@flowaid/workflow-runtime",
+  "version": "0.1.0",
+  "private": true,
+  "description": "flowaid workflow runtime: the pure event-sourced scheduler (initialState, reduce, ready, step) for all ten node kinds, the orchestrator with fenced appends, recovery and effects, the task executor, in-memory stores and the RunStore/QueueDriver/EventBus contract suite, and runLocally() (ARCHITECTURE.md \u00a75).",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./testing": "./src/testing/index.ts"
+  },
+  "files": [
+    "src",
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src",
+    "test": "vitest run",
+    "clean": "rm -rf dist .turbo *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@flowaid/credentials": "workspace:*",
+    "@flowaid/node-sdk": "workspace:*",
+    "@flowaid/observability": "workspace:*",
+    "@flowaid/providers": "workspace:*",
+    "@flowaid/shared": "workspace:*",
+    "@flowaid/workflow-compiler": "workspace:*",
+    "@flowaid/workflow-core": "workspace:*",
+    "bullmq": "6.3.8",
+    "ioredis": "6.0.0",
+    "zod": "4.6.5",
+    "@flowaid/env": "workspace:*"
+  },
+  "devDependencies": {
+    "@flowaid/config": "workspace:*",
+    "@types/node": "24.13.6",
+    "eslint": "9.39.5",
+    "fast-check": "4.10.2",
+    "typescript": "5.9.3",
+    "vitest": "4.1.11"
+  }
+}

@@ -8,6 +8,7 @@
  * batch; node-level changes are written per event, keyed by node run id.
  */
 import { and, eq, inArray, sql } from "drizzle-orm";
+import { sha256Hex } from "@flowaid/shared";
 import type { DurableRunEvent, ErrorInfo, JsonValue, TokenUsage } from "@flowaid/workflow-core";
 import type { Queryable } from "./db.js";
 import type { RunRow } from "./mappers.js";
@@ -86,6 +87,16 @@ export function addUsage(a: TokenUsage, b: TokenUsage | null | undefined): Token
   return out;
 }
 
+/**
+ * Id of a run's deadline timer: derived from the run id, so the scheduler (which has no event
+ * for it) and this projection agree. Must equal `deadlineTimerId` in @flowaid/workflow-runtime;
+ * both packages test the same vector.
+ */
+export function deadlineTimerId(runId: string): string {
+  const h = sha256Hex(`${runId}|run_deadline`);
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-8${h.slice(17, 20)}-${h.slice(20, 32)}`;
+}
+
 /** Money as the `numeric(12,6)` text Postgres stores. */
 export const money = (usd: number): string => (Math.round(usd * 1e6) / 1e6).toFixed(6);
 
@@ -112,6 +123,17 @@ export async function applyProjection(
       run.startedAt ??= at;
       run.leaseOwner = event.workerId;
       run.leaseUntil = date(event.leaseUntil);
+      // The run deadline is a durable timer too, so a waiting run times out (§5.8).
+      await tx
+        .insert(runTimers)
+        .values({
+          id: deadlineTimerId(run.id),
+          runId: run.id,
+          nodeRunId: null,
+          purpose: "run_deadline",
+          fireAt: date(event.deadlineAt),
+        })
+        .onConflictDoNothing();
       return;
     case "RUN_LEASE_TAKEN":
       run.leaseOwner = event.workerId;

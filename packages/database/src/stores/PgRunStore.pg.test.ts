@@ -146,10 +146,16 @@ describeDb("PgRunStore", () => {
       });
       const snap = await snapshot(played.run.id);
       expect(snap.tasks[0]?.assignees).toEqual(["user:lead"]);
-      expect(snap.timers.map((x) => [x.purpose, x.firedAt !== null])).toEqual([
+      expect(
+        snap.timers
+          .filter((x) => x.purpose !== "run_deadline")
+          .map((x) => [x.purpose, x.firedAt !== null]),
+      ).toEqual([
         ["retry", true],
         ["human_expiry", false],
       ]);
+      // RUN_STARTED also schedules the run's deadline as a durable timer.
+      expect(snap.timers.filter((x) => x.purpose === "run_deadline")).toHaveLength(1);
     });
 
     it("returns recorded outputs and node outputs for replay", async () => {
