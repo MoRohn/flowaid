@@ -34,12 +34,13 @@ describe("advancesChain", () => {
 
 describe("FailoverChain", () => {
   it("returns the primary's answer with one ok attempt", async () => {
-    const primary = scriptedDecider("typesafe", [0.9]);
-    const chain = new FailoverChain([{ hop: TS, provider: primary }]);
+    const clock = new FakeClock();
+    const primary = scriptedDecider("typesafe", [0.9], clock, 15);
+    const chain = new FailoverChain([{ hop: TS, provider: primary }], { clock });
     const result = await chain.decideBoolean("s", Q, ctx());
     expect(result.value).toBe(true);
     expect(result.attempts).toEqual([
-      { provider: "typesafe", model: "typesafe-model", outcome: "ok", latencyMs: 0 },
+      { provider: "typesafe", model: "typesafe-model", outcome: "ok", latencyMs: 15 },
     ]);
   });
 

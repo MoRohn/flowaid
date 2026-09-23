@@ -124,7 +124,7 @@ deployments by environment, and how its decisions were routed.
 | `@flowaid/node-sdk`                                  | **Built.** `defineNode`, `toManifest` (reproduces the fixture manifests exactly), capability-scoped context and a runtime-faithful test harness. 23 tests                   |
 | `@flowaid/providers`                                 | **Built.** Registry, sourced model catalog and pricing, failover with circuit breaking, LLM and rule decision providers, OpenAI-compatible client, record/replay. 80 tests  |
 | `@flowaid/shared`, `@flowaid/env`, `@flowaid/config` | **Built.** Primitives, environment schema and tooling presets. 136 tests                                                                                                    |
-| Runtime, database, providers, API, worker, web app   | **Not started.** Planned in [`docs/UPGRADE_PLAN.md`](docs/UPGRADE_PLAN.md), phases P1–P5                                                                                    |
+| Runtime, database, API, worker, web app              | **Not started.** Planned in [`docs/UPGRADE_PLAN.md`](docs/UPGRADE_PLAN.md), phases P1–P5                                                                                    |
 | CI                                                   | **Running.** GitHub Actions runs the audit, boundary, format, lint, typecheck, build and test gates on every push and pull request                                          |
 
 The live snapshot is always [`docs/STATUS.md`](docs/STATUS.md).
