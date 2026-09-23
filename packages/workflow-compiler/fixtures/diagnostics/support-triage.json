@@ -1,0 +1,20 @@
+[
+  {
+    "code": "W_TYPE_UNVERIFIED",
+    "message": "'start.message' may not satisfy the bounds of 'query' (source minLength unbounded is below target minLength 1); it is validated when the node runs",
+    "location": {
+      "nodeId": "security_kb",
+      "port": "query",
+      "path": "/nodes/6/inputs/query"
+    }
+  },
+  {
+    "code": "W_TYPE_UNVERIFIED",
+    "message": "'$vars.autoThreshold' may not satisfy the bounds of 'threshold' (source has no minimum but the target requires minimum 0); it is validated when the node runs",
+    "location": {
+      "nodeId": "gate",
+      "port": "threshold",
+      "path": "/nodes/10/config/threshold"
+    }
+  }
+]

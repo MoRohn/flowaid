@@ -1,0 +1,54 @@
+[
+  {
+    "code": "W_REF_PATH_UNTYPED",
+    "message": "web.body.results is not described by the producer's schema; it is checked at run time",
+    "location": {
+      "nodeId": "search_all",
+      "path": "/nodes/3/collect/fields/result",
+      "bindingPath": "/collect/result"
+    }
+  },
+  {
+    "code": "W_EXPR_UNTYPED",
+    "message": "argument of first has unknown type",
+    "location": {
+      "nodeId": "search_all",
+      "path": "/nodes/3/collect/fields/result",
+      "bindingPath": "/collect/result",
+      "range": {
+        "start": 0,
+        "end": 23
+      }
+    }
+  },
+  {
+    "code": "W_REF_PATH_UNTYPED",
+    "message": "web.body.results is not described by the producer's schema; it is checked at run time",
+    "location": {
+      "nodeId": "judge",
+      "path": "/nodes/5/inputs/state/fields/result",
+      "bindingPath": "/state/result"
+    }
+  },
+  {
+    "code": "W_EXPR_UNTYPED",
+    "message": "argument of first has unknown type",
+    "location": {
+      "nodeId": "judge",
+      "path": "/nodes/5/inputs/state/fields/result",
+      "bindingPath": "/state/result",
+      "range": {
+        "start": 0,
+        "end": 23
+      }
+    }
+  },
+  {
+    "code": "W_LOOSE_BOUNDS",
+    "message": "'search_all' has a body that calls AI models with no cost or token bound; add bounds.maxCostUsd or bounds.maxTokens",
+    "location": {
+      "nodeId": "search_all",
+      "path": "/nodes/3/bounds"
+    }
+  }
+]

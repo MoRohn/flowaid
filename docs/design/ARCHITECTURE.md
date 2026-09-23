@@ -198,7 +198,7 @@ lambda   := IDENT '=>' expr                                              -- only
 STRING   := '\'' chars '\'' | '"' chars '"'                                    -- single or double quotes, JSON escapes; NUMBER := JSON number
 ```
 
-Functions (closed set; names are in `RESERVED_IDS`, which is derived from `EXPRESSION_KEYWORDS ∪ EXPRESSION_FUNCTION_NAMES`): `len, lower, upper, trim, contains, starts_with, ends_with, split, join, json, parse_json, keys, values, has, get(obj, pointer, default), coalesce, min, max, abs, round(x, digits?), floor, ceil, sum, avg, first, last, filter(arr, x => …), map(arr, x => …), any, all, sort(arr, x => key), to_number, to_string, regex_test, regex_match, now, format_date`. Errors are `ExpressionError` with a machine-readable `details.reason`. The typer (`inferExprType`) is structural; an `unknown`-typed operand yields `W_EXPR_UNTYPED`, a type contradiction `E_EXPR_TYPE`, a non-boolean `when`/`exitWhen` `E_EXPR_NOT_BOOLEAN`.
+Functions (closed set; names are in `RESERVED_IDS`, which is derived from `EXPRESSION_KEYWORDS ∪ EXPRESSION_FUNCTION_NAMES`): `len, lower, upper, trim, contains, starts_with, ends_with, split, join, json, parse_json, keys, values, has, get(obj, pointer, default), coalesce, min, max, abs, round(x, digits?), floor, ceil, sum, avg, first, last, concat(arr, …), filter(arr, x => …), map(arr, x => …), any, all, sort(arr, x => key), to_number, to_string, regex_test, regex_match, now, format_date`. Errors are `ExpressionError` with a machine-readable `details.reason`. The typer (`inferExprType`) is structural; an `unknown`-typed operand yields `W_EXPR_UNTYPED`, a type contradiction `E_EXPR_TYPE`, a non-boolean `when`/`exitWhen` `E_EXPR_NOT_BOOLEAN`.
 
 Literals: a number literal must be a finite double (`1e999` is `E_EXPR_SYNTAX` "number literal out of range"; hand-built ASTs holding `Infinity`/`NaN` are `NOT_FINITE` at runtime); an object literal may not repeat a key (`{a: 1, a: 2}` is `E_EXPR_SYNTAX`; a hand-built AST with a repeated key is `INVALID_ARGUMENT`). `has(arr, i)` accepts an integer or a canonical integer string (`has(arr, "0")` ≡ `arr["0"]`).
 
@@ -622,7 +622,7 @@ Kind handlers and executors both produce only events; executors never see schedu
 
 ## 4. Compiler (`@flowaid/workflow-compiler`)
 
-Pure, synchronous, deterministic; runs in the API (save/publish), the worker (plan hash re-check), the browser (Web Worker, debounced 150 ms) and the CLI. Same package, so diagnostics never disagree. Inputs that are not JSON (tool signatures, subflow signatures, provider availability, bound secrets) are supplied by the caller through `CompileOptions`; the web app fetches them from `GET /v1/nodes`, `GET /v1/tools/catalog`, `GET /v1/workflows/:id/signature` and passes lookups.
+Pure, synchronous, deterministic; runs in the API (save/publish), the worker (plan hash re-check), the browser (Web Worker, debounced 150 ms) and the CLI. It compiles the **canonical** definition — every object's keys in code-point order — because `jsonb` storage does not keep key order: two documents with the same `definitionHash` always compile to the same `planHash`, so the worker's re-check never fails on a stored definition. Arrays that come from object keys (rule-derived control ports, data dependencies of object bindings, `required` lists) therefore follow key order, not authoring order. Same package, so diagnostics never disagree. Inputs that are not JSON (tool signatures, subflow signatures, provider availability, bound secrets) are supplied by the caller through `CompileOptions`; the web app fetches them from `GET /v1/nodes`, `GET /v1/tools/catalog`, `GET /v1/workflows/:id/signature` and passes lookups.
 
 ### 4.1 Passes
 
@@ -1567,6 +1567,7 @@ All three ship as templates in `packages/nodes-core/templates/*.json`, are compi
     },
     { "id": "c8", "from": { "node": "security_kb", "port": "done" }, "to": { "node": "context" } },
     { "id": "c9", "from": { "node": "route", "port": "general" }, "to": { "node": "context" } },
+    { "id": "c9b", "from": { "node": "context", "port": "done" }, "to": { "node": "draft" } },
     { "id": "c10", "from": { "node": "gate", "port": "pass" }, "to": { "node": "out_auto" } },
     { "id": "c11", "from": { "node": "gate", "port": "review" }, "to": { "node": "approve" } },
     { "id": "c12", "from": { "node": "gate", "port": "fail" }, "to": { "node": "approve" } },
@@ -1831,8 +1832,6 @@ Trace highlights: `judgments` is one `DECISION_REQUESTED{questionCount: 3}` and 
         "method": "POST",
         "url": "https://hooks.slack.com/services/T000/B000/XXXX",
         "responseType": "json",
-      },
-      "inputs": {
         "body": {
           "kind": "object",
           "fields": {
@@ -2083,7 +2082,7 @@ Notes: `similar` is the GitHub MCP `search_issues` tool (its `result` port is ty
       "name": "Accumulate evidence",
       "config": {
         "output": { "type": "array", "items": { "type": "object" } },
-        "expr": "$scope.carry.evidence + filter(search_all.results, r => r.judgment.relevant.value >= 2 && r.judgment.reliable.value >= 2)",
+        "expr": "concat($scope.carry.evidence, filter(search_all.results, r => r.judgment.relevant.value >= 2 && r.judgment.reliable.value >= 2))",
       },
     },
     {

@@ -1,0 +1,39 @@
+{
+  "name": "@flowaid/workflow-compiler",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The flowaid workflow compiler: validates a WorkflowDefinition against node manifests and emits an immutable, content-hashed ExecutionPlan with diagnostics (ARCHITECTURE.md §4). Pure, synchronous and browser-safe; depends only on @flowaid/workflow-core and @flowaid/shared.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src",
+    "dist",
+    "fixtures",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src",
+    "test": "vitest run",
+    "clean": "rm -rf dist .turbo *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@flowaid/shared": "workspace:*",
+    "@flowaid/workflow-core": "workspace:*",
+    "ajv": "8.20.0",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@flowaid/config": "workspace:*",
+    "@types/node": "24.13.6",
+    "eslint": "9.39.5",
+    "fast-check": "4.10.2",
+    "typescript": "5.9.3",
+    "vitest": "4.1.11"
+  }
+}

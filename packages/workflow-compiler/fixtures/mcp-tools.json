@@ -1,0 +1,127 @@
+{
+  "$comment": "MCP tool signatures the demo templates call, as a workspace's discovered tools would expose them. Keyed by the template's requiredResources server key.",
+  "github": [
+    {
+      "name": "search_issues",
+      "description": "Search issues and pull requests with GitHub search syntax.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "q": { "type": "string", "minLength": 1 },
+          "per_page": { "type": "integer", "minimum": 1, "maximum": 100 },
+          "page": { "type": "integer", "minimum": 1 }
+        },
+        "required": ["q"],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "total_count": { "type": "integer" },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "number": { "type": "integer" },
+                "title": { "type": "string" },
+                "state": { "type": "string" },
+                "html_url": { "type": "string" },
+                "body": { "type": ["string", "null"] }
+              },
+              "required": ["number", "title", "state", "html_url"]
+            }
+          }
+        },
+        "required": ["total_count", "items"]
+      },
+      "capability": "github.read",
+      "idempotency": "safe",
+      "approvalRequired": false
+    },
+    {
+      "name": "add_issue_comment",
+      "description": "Add a comment to an issue.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "owner": { "type": "string" },
+          "repo": { "type": "string" },
+          "issue_number": { "type": "integer", "minimum": 1 },
+          "body": { "type": "string", "minLength": 1 }
+        },
+        "required": ["owner", "repo", "issue_number", "body"],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": { "id": { "type": "integer" }, "html_url": { "type": "string" } },
+        "required": ["id", "html_url"]
+      },
+      "capability": "github.write",
+      "idempotency": "none",
+      "approvalRequired": false
+    },
+    {
+      "name": "add_issue_labels",
+      "description": "Add labels to an issue.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "owner": { "type": "string" },
+          "repo": { "type": "string" },
+          "issue_number": { "type": "integer", "minimum": 1 },
+          "labels": { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+        },
+        "required": ["owner", "repo", "issue_number", "labels"],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": { "name": { "type": "string" } },
+          "required": ["name"]
+        }
+      },
+      "capability": "github.write",
+      "idempotency": "keyed",
+      "approvalRequired": false
+    }
+  ],
+  "security_kb": [
+    {
+      "name": "search_playbooks",
+      "description": "Search the security team's incident playbooks.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": { "type": "string", "minLength": 1 },
+          "limit": { "type": "integer", "minimum": 1, "maximum": 20 }
+        },
+        "required": ["query"],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "playbooks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": { "type": "string" },
+                "url": { "type": "string" },
+                "summary": { "type": "string" }
+              },
+              "required": ["title", "url", "summary"]
+            }
+          }
+        },
+        "required": ["playbooks"]
+      },
+      "idempotency": "safe",
+      "approvalRequired": false
+    }
+  ]
+}

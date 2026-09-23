@@ -1,0 +1,73 @@
+[
+  {
+    "code": "W_TYPE_UNVERIFIED",
+    "message": "'start.issue.number' may not satisfy the bounds of 'issue_number' (source has no minimum but the target requires minimum 1); it is validated when the node runs",
+    "location": {
+      "nodeId": "gh_dup_comment",
+      "port": "issue_number",
+      "path": "/nodes/8/inputs/issue_number"
+    }
+  },
+  {
+    "code": "W_NULLABLE_INPUT",
+    "message": "The expression may be null at run time, which 'owner' does not accept; wrap it in coalesce(…, default)",
+    "location": {
+      "nodeId": "gh_dup_comment",
+      "port": "owner",
+      "path": "/nodes/8/inputs/owner"
+    }
+  },
+  {
+    "code": "W_NULLABLE_INPUT",
+    "message": "The expression may be null at run time, which 'repo' does not accept; wrap it in coalesce(…, default)",
+    "location": {
+      "nodeId": "gh_dup_comment",
+      "port": "repo",
+      "path": "/nodes/8/inputs/repo"
+    }
+  },
+  {
+    "code": "W_TYPE_UNVERIFIED",
+    "message": "'start.issue.number' may not satisfy the bounds of 'issue_number' (source has no minimum but the target requires minimum 1); it is validated when the node runs",
+    "location": {
+      "nodeId": "gh_label",
+      "port": "issue_number",
+      "path": "/nodes/10/inputs/issue_number"
+    }
+  },
+  {
+    "code": "W_TYPE_UNVERIFIED",
+    "message": "'labels.result' may not satisfy the bounds of 'labels' (source minItems 0 is below target minItems 1); it is validated when the node runs",
+    "location": {
+      "nodeId": "gh_label",
+      "port": "labels",
+      "path": "/nodes/10/inputs/labels"
+    }
+  },
+  {
+    "code": "W_NULLABLE_INPUT",
+    "message": "The expression may be null at run time, which 'owner' does not accept; wrap it in coalesce(…, default)",
+    "location": {
+      "nodeId": "gh_label",
+      "port": "owner",
+      "path": "/nodes/10/inputs/owner"
+    }
+  },
+  {
+    "code": "W_NULLABLE_INPUT",
+    "message": "The expression may be null at run time, which 'repo' does not accept; wrap it in coalesce(…, default)",
+    "location": {
+      "nodeId": "gh_label",
+      "port": "repo",
+      "path": "/nodes/10/inputs/repo"
+    }
+  },
+  {
+    "code": "W_NULLABLE_INPUT",
+    "message": "Output 'out_routed' may produce null at /route, which the workflow outputs do not accept; add a default",
+    "location": {
+      "nodeId": "out_routed",
+      "path": "/nodes/15/value"
+    }
+  }
+]

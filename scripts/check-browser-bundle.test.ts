@@ -17,6 +17,7 @@
  * @vitest-environment happy-dom
  */
 import { createHash } from "node:crypto";
+import { readFileSync, readdirSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -33,11 +34,12 @@ const FIXTURE = join(ROOT, "packages/workflow-core/fixtures/example-support-repl
 
 /**
  * Entry points that must bundle for the browser. Every entry must be marked `browserSafe`
- * in boundaries.json (asserted below); later items extend the list (workflow-compiler).
+ * in boundaries.json (asserted below).
  */
 const BUNDLE_ENTRIES: ReadonlyArray<{ name: string; entry: string }> = [
   { name: "shared", entry: "packages/shared/src/index.ts" },
   { name: "workflow-core", entry: "packages/workflow-core/src/index.ts" },
+  { name: "workflow-compiler", entry: "packages/workflow-compiler/src/index.ts" },
 ];
 
 const NODE_BUILTIN = new RegExp(NODE_BUILTIN_REGEX);
@@ -202,9 +204,9 @@ describe("browser bundle entries", () => {
     }
   });
 
-  it("cover shared and workflow-core", () => {
+  it("cover shared, workflow-core and workflow-compiler", () => {
     expect(BUNDLE_ENTRIES.map((e) => e.name)).toEqual(
-      expect.arrayContaining(["shared", "workflow-core"]),
+      expect.arrayContaining(["shared", "workflow-core", "workflow-compiler"]),
     );
   });
 });
@@ -309,6 +311,58 @@ describe("workflow-core bundle runs in the browser", () => {
     const hash = asString(definitionHash(definition), "definitionHash");
     expect(hash).toMatch(/^[0-9a-f]{64}$/);
     expect(runInContext("typeof Buffer", context)).toBe("undefined");
+    expect(runInContext("typeof process", context)).toBe("undefined");
+  });
+});
+
+describe("workflow-compiler bundle runs in the browser", () => {
+  const MANIFESTS_DIR = join(ROOT, "packages/workflow-core/fixtures/manifests");
+  const GOLDEN_PLAN = join(
+    ROOT,
+    "packages/workflow-core/fixtures/plans/example-support-reply.plan.json",
+  );
+  const manifestsJson = JSON.stringify(
+    readdirSync(MANIFESTS_DIR)
+      .filter((f) => f.endsWith(".json"))
+      .sort()
+      .map((f) => JSON.parse(readFileSync(join(MANIFESTS_DIR, f), "utf8")) as unknown),
+  );
+  const goldenHash = (JSON.parse(readFileSync(GOLDEN_PLAN, "utf8")) as { planHash: string })
+    .planHash;
+  it("compiles fixtures/example-support-reply.json to the golden planHash under happy-dom", () => {
+    expect("document" in globalThis).toBe(true);
+    const mod = evaluateIifeHere(getBundle("workflow-compiler").iife);
+    const compile = exportedFunction(mod, "compile");
+    const manifests = JSON.parse(manifestsJson) as { id: string; version: string }[];
+    const catalog = {
+      get: (id: string, version?: string) =>
+        manifests.find((m) => m.id === id && (version === undefined || m.version === version)),
+      list: () => manifests,
+    };
+    const result = compile(fixtureRaw, { catalog }) as { ok: boolean; plan?: { planHash: string } };
+    expect(result.ok).toBe(true);
+    expect(result.plan?.planHash).toBe(goldenHash);
+  });
+
+  it("compiles with only Web platform globals (no Buffer, no process)", () => {
+    const context = webOnlyContext();
+    const mod = evaluateIife(getBundle("workflow-compiler").iife, context);
+    const compile = exportedFunction(mod, "compile");
+    // The catalog and the document are built inside the realm, so zod sees same-realm objects.
+    const run = runInContext(
+      `(compile) => {
+        const manifests = ${manifestsJson};
+        const catalog = {
+          get: (id, version) => manifests.find((m) => m.id === id && (version === undefined || m.version === version)),
+          list: () => manifests,
+        };
+        return compile(${JSON.stringify(fixtureRaw)}, { catalog });
+      }`,
+      context,
+    ) as (fn: unknown) => { ok: boolean; plan?: { planHash: string } };
+    const result = run(compile);
+    expect(result.ok).toBe(true);
+    expect(result.plan?.planHash).toBe(goldenHash);
     expect(runInContext("typeof process", context)).toBe("undefined");
   });
 });

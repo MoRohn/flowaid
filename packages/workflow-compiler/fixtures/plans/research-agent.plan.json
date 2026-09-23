@@ -1,0 +1,5891 @@
+{
+  "batchGroups": {},
+  "catalogSnapshot": {
+    "flowaid.ai.structured_generate": "1.0.0",
+    "flowaid.data.transform": "1.0.0",
+    "flowaid.decision.batch": "1.0.0",
+    "flowaid.tools.http": "1.0.0"
+  },
+  "compilerVersion": "0.1.0",
+  "dataEdges": [
+    {
+      "from": {
+        "node": "start",
+        "port": "max_rounds"
+      },
+      "optional": false,
+      "to": {
+        "node": "research",
+        "port": "exit_when"
+      },
+      "via": "expr"
+    },
+    {
+      "from": {
+        "node": "start",
+        "port": "question"
+      },
+      "optional": false,
+      "to": {
+        "node": "research",
+        "port": "body"
+      },
+      "via": "hoisted"
+    },
+    {
+      "from": {
+        "node": "start",
+        "port": "question"
+      },
+      "optional": false,
+      "to": {
+        "node": "planner",
+        "port": "prompt"
+      },
+      "via": "hoisted"
+    },
+    {
+      "from": {
+        "node": "planner",
+        "port": "structured"
+      },
+      "optional": false,
+      "path": "/queries",
+      "to": {
+        "node": "search_all",
+        "port": "items"
+      },
+      "via": "ref"
+    },
+    {
+      "from": {
+        "node": "start",
+        "port": "question"
+      },
+      "optional": false,
+      "to": {
+        "node": "judge",
+        "port": "state"
+      },
+      "via": "hoisted"
+    },
+    {
+      "from": {
+        "node": "web",
+        "port": "body"
+      },
+      "optional": false,
+      "path": "/results",
+      "to": {
+        "node": "judge",
+        "port": "state"
+      },
+      "via": "expr"
+    },
+    {
+      "from": {
+        "node": "search_all",
+        "port": "results"
+      },
+      "optional": false,
+      "to": {
+        "node": "store",
+        "port": "expr"
+      },
+      "via": "expr"
+    },
+    {
+      "from": {
+        "node": "start",
+        "port": "question"
+      },
+      "optional": false,
+      "to": {
+        "node": "synthesis",
+        "port": "prompt"
+      },
+      "via": "hoisted"
+    },
+    {
+      "from": {
+        "node": "store",
+        "port": "result"
+      },
+      "optional": false,
+      "to": {
+        "node": "synthesis",
+        "port": "prompt"
+      },
+      "via": "template"
+    },
+    {
+      "from": {
+        "node": "synthesis",
+        "port": "structured"
+      },
+      "optional": false,
+      "path": "/answer",
+      "to": {
+        "node": "completeness",
+        "port": "state"
+      },
+      "via": "ref"
+    },
+    {
+      "from": {
+        "node": "store",
+        "port": "result"
+      },
+      "optional": false,
+      "to": {
+        "node": "completeness",
+        "port": "state"
+      },
+      "via": "expr"
+    },
+    {
+      "from": {
+        "node": "start",
+        "port": "question"
+      },
+      "optional": false,
+      "to": {
+        "node": "completeness",
+        "port": "state"
+      },
+      "via": "hoisted"
+    },
+    {
+      "from": {
+        "node": "research",
+        "port": "result"
+      },
+      "optional": false,
+      "path": "/answer",
+      "to": {
+        "node": "out_done",
+        "port": "value"
+      },
+      "via": "ref"
+    },
+    {
+      "from": {
+        "node": "research",
+        "port": "result"
+      },
+      "optional": false,
+      "path": "/complete",
+      "to": {
+        "node": "out_done",
+        "port": "value"
+      },
+      "via": "ref"
+    },
+    {
+      "from": {
+        "node": "research",
+        "port": "carry"
+      },
+      "optional": false,
+      "path": "/evidence",
+      "to": {
+        "node": "out_done",
+        "port": "value"
+      },
+      "via": "ref"
+    },
+    {
+      "from": {
+        "node": "research",
+        "port": "iterations"
+      },
+      "optional": false,
+      "to": {
+        "node": "out_done",
+        "port": "value"
+      },
+      "via": "ref"
+    },
+    {
+      "from": {
+        "node": "research",
+        "port": "result"
+      },
+      "optional": true,
+      "path": "/answer",
+      "to": {
+        "node": "out_partial",
+        "port": "value"
+      },
+      "via": "expr"
+    },
+    {
+      "from": {
+        "node": "research",
+        "port": "carry"
+      },
+      "optional": false,
+      "path": "/evidence",
+      "to": {
+        "node": "out_partial",
+        "port": "value"
+      },
+      "via": "ref"
+    },
+    {
+      "from": {
+        "node": "research",
+        "port": "iterations"
+      },
+      "optional": false,
+      "to": {
+        "node": "out_partial",
+        "port": "value"
+      },
+      "via": "ref"
+    }
+  ],
+  "definitionHash": "45e437d3a1eb08aa544993bc42e88daff3119a5224c3eaaf5a8d81fd21254562",
+  "estimate": {
+    "maxCostUsd": 2,
+    "nodeCount": 11
+  },
+  "execution": {
+    "concurrency": 6,
+    "decisions": {
+      "batching": true,
+      "failover": [],
+      "primary": {
+        "model": "jev-latest",
+        "provider": "typesafe"
+      }
+    },
+    "defaultNodeTimeoutMs": 120000,
+    "defaultRetry": {
+      "allowOnIrreversible": false,
+      "backoff": {
+        "factor": 2,
+        "initialMs": 500,
+        "jitter": true,
+        "maxMs": 30000,
+        "type": "exponential"
+      },
+      "maxAttempts": 1
+    },
+    "maxCostUsd": 2,
+    "maxNodeRuns": 2000,
+    "maxSubflowDepth": 4,
+    "maxTokens": 400000,
+    "privacy": {
+      "containsPII": false,
+      "doNotPersist": false,
+      "redactFields": [],
+      "sensitive": false
+    },
+    "retention": "standard",
+    "timeoutMs": 600000
+  },
+  "inputs": {
+    "properties": {
+      "max_rounds": {
+        "default": 3,
+        "maximum": 5,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "question": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "question"
+    ],
+    "type": "object"
+  },
+  "nodes": {
+    "completeness": {
+      "batchGroup": null,
+      "controlIn": [],
+      "controlOut": [
+        "done"
+      ],
+      "dataIn": [
+        {
+          "from": {
+            "node": "synthesis",
+            "port": "structured"
+          },
+          "optional": false,
+          "path": "/answer",
+          "to": {
+            "node": "completeness",
+            "port": "state"
+          },
+          "via": "ref"
+        },
+        {
+          "from": {
+            "node": "store",
+            "port": "result"
+          },
+          "optional": false,
+          "to": {
+            "node": "completeness",
+            "port": "state"
+          },
+          "via": "expr"
+        },
+        {
+          "from": {
+            "node": "start",
+            "port": "question"
+          },
+          "optional": false,
+          "to": {
+            "node": "completeness",
+            "port": "state"
+          },
+          "via": "hoisted"
+        }
+      ],
+      "guard": [
+        []
+      ],
+      "id": "completeness",
+      "idempotency": "safe",
+      "kind": "task",
+      "name": "Complete?",
+      "op": {
+        "config": {
+          "questions": {
+            "complete": {
+              "criteria": {
+                "false": "Missing aspects or weak evidence",
+                "true": "Complete and well-supported"
+              },
+              "instructions": "Does the answer fully address the question with adequate evidence?",
+              "kind": "boolean"
+            },
+            "gap": {
+              "instructions": "What is the main gap, if any?",
+              "kind": "choice",
+              "options": {
+                "conflicting": "Sources conflict",
+                "missing_data": "Key facts missing",
+                "none": "No gap",
+                "outdated": "Evidence may be stale"
+              }
+            }
+          }
+        },
+        "configBindings": {},
+        "configTemplates": {},
+        "credentials": {
+          "typesafe": "TYPESAFE_API_KEY"
+        },
+        "inputs": {
+          "state": {
+            "fields": {
+              "answer": {
+                "kind": "ref",
+                "optional": false,
+                "ref": {
+                  "kind": "port",
+                  "node": "synthesis",
+                  "path": "/answer",
+                  "port": "structured"
+                },
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "evidence_count": {
+                "ast": {
+                  "args": [
+                    {
+                      "kind": "ref",
+                      "ref": {
+                        "kind": "port",
+                        "node": "store",
+                        "port": "result"
+                      }
+                    }
+                  ],
+                  "fn": "len",
+                  "kind": "call"
+                },
+                "kind": "expr",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "question": {
+                "kind": "ref",
+                "optional": false,
+                "ref": {
+                  "kind": "port",
+                  "node": "start",
+                  "port": "question"
+                },
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "kind": "object",
+            "schema": {
+              "additionalProperties": false,
+              "properties": {
+                "answer": {
+                  "type": "string"
+                },
+                "evidence_count": {
+                  "type": "integer"
+                },
+                "question": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "answer",
+                "evidence_count",
+                "question"
+              ],
+              "type": "object"
+            }
+          }
+        },
+        "kind": "task",
+        "manifest": {
+          "capabilities": [
+            "decision",
+            "credentials"
+          ],
+          "configSchema": {
+            "additionalProperties": false,
+            "properties": {
+              "questions": {
+                "additionalProperties": {
+                  "oneOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "criteria": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "false": {
+                              "type": "string"
+                            },
+                            "true": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "true",
+                            "false"
+                          ],
+                          "type": "object"
+                        },
+                        "instructions": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "kind": {
+                          "const": "boolean"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "instructions"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "instructions": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "kind": {
+                          "const": "choice"
+                        },
+                        "options": {
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "maxProperties": 255,
+                          "minProperties": 2,
+                          "propertyNames": {
+                            "pattern": "^[a-z0-9_]{1,64}$"
+                          },
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "instructions",
+                        "options"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "instructions": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "kind": {
+                          "const": "score"
+                        },
+                        "levels": {
+                          "items": {
+                            "type": "string"
+                          },
+                          "maxItems": 10,
+                          "minItems": 2,
+                          "type": "array"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "instructions",
+                        "levels"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                },
+                "maxProperties": 32,
+                "minProperties": 1,
+                "propertyNames": {
+                  "pattern": "^[a-z][a-z0-9_]{0,63}$"
+                },
+                "type": "object",
+                "x-ui": {
+                  "help": "Question id → question. Ids become the keys of `answers`.",
+                  "widget": "questions"
+                }
+              }
+            },
+            "required": [
+              "questions"
+            ],
+            "type": "object"
+          },
+          "controlPorts": [],
+          "credentials": [
+            {
+              "name": "typesafe",
+              "required": true,
+              "types": [
+                "typesafe.api_key"
+              ]
+            },
+            {
+              "description": "Optional LLM decision provider used when a failover hop (or the workspace chain) routes decisions to a chat model.",
+              "name": "llm",
+              "required": false,
+              "types": [
+                "openai.api_key",
+                "anthropic.api_key",
+                "ollama.none"
+              ]
+            }
+          ],
+          "decision": {
+            "kind": "batch"
+          },
+          "defaultPolicy": {
+            "timeoutMs": 30000
+          },
+          "generation": false,
+          "id": "flowaid.decision.batch",
+          "idempotency": "safe",
+          "inputs": [
+            {
+              "name": "state",
+              "required": true,
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "object"
+                  },
+                  {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                ],
+                "description": "TypeSafe state: text, an object (sent verbatim) or an array of text."
+              }
+            }
+          ],
+          "metadata": {
+            "category": "decision",
+            "description": "Asks several typed questions (boolean, choice, score) about one `state` in a single TypeSafe request. Output `answers` holds one DecisionResult per question id.",
+            "icon": "list-checks",
+            "name": "Decision batch",
+            "summary": "{{ config.questions | json }}",
+            "tags": [
+              "decision",
+              "typesafe",
+              "batch"
+            ]
+          },
+          "migrations": [],
+          "optionProviders": [],
+          "outputs": [
+            {
+              "name": "answers",
+              "required": true,
+              "schema": {
+                "description": "One DecisionResult per question id (typed per question by the compiler).",
+                "type": "object"
+              }
+            }
+          ],
+          "pool": "general",
+          "portRules": [
+            {
+              "kind": "decisionAnswersFromConfig",
+              "path": "/questions",
+              "port": "answers"
+            }
+          ],
+          "streams": false,
+          "version": "1.0.0"
+        },
+        "tool": null,
+        "type": "flowaid.decision.batch",
+        "typeVersion": "1.0.0"
+      },
+      "outputs": {
+        "answers": {
+          "additionalProperties": false,
+          "properties": {
+            "complete": {
+              "$defs": {
+                "__schema0": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "items": {
+                        "$ref": "#/$defs/__schema0"
+                      },
+                      "type": "array"
+                    },
+                    {
+                      "additionalProperties": {
+                        "$ref": "#/$defs/__schema0"
+                      },
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "type": "object"
+                    }
+                  ]
+                }
+              },
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "additionalProperties": false,
+              "properties": {
+                "attempts": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "errorCode": {
+                        "enum": [
+                          "WORKFLOW_VALIDATION_ERROR",
+                          "SCHEMA_VALIDATION_ERROR",
+                          "NODE_EXECUTION_ERROR",
+                          "TOOL_EXECUTION_ERROR",
+                          "PROVIDER_ERROR",
+                          "PROVIDER_RATE_LIMITED",
+                          "PROVIDER_OVERLOADED",
+                          "CREDENTIAL_ERROR",
+                          "TIMEOUT_ERROR",
+                          "RATE_LIMIT_ERROR",
+                          "CANCELLED_ERROR",
+                          "BOUNDS_EXCEEDED",
+                          "INPUT_MISSING",
+                          "OUTPUT_SCHEMA_MISMATCH",
+                          "EXPRESSION_ERROR",
+                          "SANDBOX_ERROR",
+                          "WORKER_LOST",
+                          "NONIDEMPOTENT_INTERRUPTED",
+                          "HUMAN_APPROVAL_REQUIRED",
+                          "HUMAN_TASK_EXPIRED",
+                          "SUBFLOW_ERROR",
+                          "NO_OUTPUT",
+                          "NETWORK_ERROR",
+                          "NOT_FOUND",
+                          "CONFLICT",
+                          "UNAUTHORIZED",
+                          "FORBIDDEN",
+                          "BAD_REQUEST",
+                          "PAYLOAD_TOO_LARGE",
+                          "INTERNAL"
+                        ],
+                        "type": "string"
+                      },
+                      "latencyMs": {
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "model": {
+                        "type": "string"
+                      },
+                      "outcome": {
+                        "enum": [
+                          "ok",
+                          "error",
+                          "skipped_unhealthy"
+                        ],
+                        "type": "string"
+                      },
+                      "provider": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "provider",
+                      "model",
+                      "outcome",
+                      "latencyMs"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "confidence": {
+                  "maximum": 1,
+                  "minimum": 0,
+                  "type": "number"
+                },
+                "costUsd": {
+                  "minimum": 0,
+                  "type": "number"
+                },
+                "kind": {
+                  "const": "boolean",
+                  "type": "string"
+                },
+                "latencyMs": {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "model": {
+                  "type": "string"
+                },
+                "pYes": {
+                  "maximum": 1,
+                  "minimum": 0,
+                  "type": "number"
+                },
+                "probabilities": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "false": {
+                      "maximum": 1,
+                      "minimum": 0,
+                      "type": "number"
+                    },
+                    "true": {
+                      "maximum": 1,
+                      "minimum": 0,
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "true",
+                    "false"
+                  ],
+                  "type": "object"
+                },
+                "provider": {
+                  "type": "string"
+                },
+                "raw": {
+                  "$ref": "#/$defs/__schema0"
+                },
+                "requestId": {
+                  "type": "string"
+                },
+                "usage": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "cacheReadTokens": {
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "cacheWriteTokens": {
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "inputTokens": {
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "outputTokens": {
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "inputTokens",
+                    "outputTokens"
+                  ],
+                  "type": "object"
+                },
+                "value": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "confidence",
+                "provider",
+                "model",
+                "latencyMs",
+                "costUsd",
+                "attempts",
+                "kind",
+                "value",
+                "pYes",
+                "probabilities"
+              ],
+              "type": "object"
+            },
+            "gap": {
+              "$defs": {
+                "__schema0": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "items": {
+                        "$ref": "#/$defs/__schema0"
+                      },
+                      "type": "array"
+                    },
+                    {
+                      "additionalProperties": {
+                        "$ref": "#/$defs/__schema0"
+                      },
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "type": "object"
+                    }
+                  ]
+                }
+              },
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "additionalProperties": false,
+              "properties": {
+                "attempts": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "errorCode": {
+                        "enum": [
+                          "WORKFLOW_VALIDATION_ERROR",
+                          "SCHEMA_VALIDATION_ERROR",
+                          "NODE_EXECUTION_ERROR",
+                          "TOOL_EXECUTION_ERROR",
+                          "PROVIDER_ERROR",
+                          "PROVIDER_RATE_LIMITED",
+                          "PROVIDER_OVERLOADED",
+                          "CREDENTIAL_ERROR",
+                          "TIMEOUT_ERROR",
+                          "RATE_LIMIT_ERROR",
+                          "CANCELLED_ERROR",
+                          "BOUNDS_EXCEEDED",
+                          "INPUT_MISSING",
+                          "OUTPUT_SCHEMA_MISMATCH",
+                          "EXPRESSION_ERROR",
+                          "SANDBOX_ERROR",
+                          "WORKER_LOST",
+                          "NONIDEMPOTENT_INTERRUPTED",
+                          "HUMAN_APPROVAL_REQUIRED",
+                          "HUMAN_TASK_EXPIRED",
+                          "SUBFLOW_ERROR",
+                          "NO_OUTPUT",
+                          "NETWORK_ERROR",
+                          "NOT_FOUND",
+                          "CONFLICT",
+                          "UNAUTHORIZED",
+                          "FORBIDDEN",
+                          "BAD_REQUEST",
+                          "PAYLOAD_TOO_LARGE",
+                          "INTERNAL"
+                        ],
+                        "type": "string"
+                      },
+                      "latencyMs": {
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "model": {
+                        "type": "string"
+                      },
+                      "outcome": {
+                        "enum": [
+                          "ok",
+                          "error",
+                          "skipped_unhealthy"
+                        ],
+                        "type": "string"
+                      },
+                      "provider": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "provider",
+                      "model",
+                      "outcome",
+                      "latencyMs"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "confidence": {
+                  "maximum": 1,
+                  "minimum": 0,
+                  "type": "number"
+                },
+                "costUsd": {
+                  "minimum": 0,
+                  "type": "number"
+                },
+                "kind": {
+                  "const": "choice",
+                  "type": "string"
+                },
+                "latencyMs": {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "model": {
+                  "type": "string"
+                },
+                "probabilities": {
+                  "additionalProperties": {
+                    "maximum": 1,
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                "provider": {
+                  "type": "string"
+                },
+                "raw": {
+                  "$ref": "#/$defs/__schema0"
+                },
+                "requestId": {
+                  "type": "string"
+                },
+                "usage": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "cacheReadTokens": {
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "cacheWriteTokens": {
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "inputTokens": {
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "outputTokens": {
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "inputTokens",
+                    "outputTokens"
+                  ],
+                  "type": "object"
+                },
+                "value": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "confidence",
+                "provider",
+                "model",
+                "latencyMs",
+                "costUsd",
+                "attempts",
+                "kind",
+                "value",
+                "probabilities"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "complete",
+            "gap"
+          ],
+          "type": "object"
+        }
+      },
+      "policy": {
+        "maxCostUsd": null,
+        "maxTokens": null,
+        "onError": "fail",
+        "privacy": {
+          "containsPII": false,
+          "doNotPersist": false,
+          "redactFields": [],
+          "sensitive": false
+        },
+        "retry": {
+          "allowOnIrreversible": false,
+          "backoff": {
+            "factor": 2,
+            "initialMs": 500,
+            "jitter": true,
+            "maxMs": 30000,
+            "type": "exponential"
+          },
+          "maxAttempts": 1
+        },
+        "timeoutMs": 30000
+      },
+      "pool": "general",
+      "redact": [],
+      "scope": "research",
+      "successors": []
+    },
+    "judge": {
+      "batchGroup": null,
+      "controlIn": [],
+      "controlOut": [
+        "done"
+      ],
+      "dataIn": [
+        {
+          "from": {
+            "node": "start",
+            "port": "question"
+          },
+          "optional": false,
+          "to": {
+            "node": "judge",
+            "port": "state"
+          },
+          "via": "hoisted"
+        },
+        {
+          "from": {
+            "node": "web",
+            "port": "body"
+          },
+          "optional": false,
+          "path": "/results",
+          "to": {
+            "node": "judge",
+            "port": "state"
+          },
+          "via": "expr"
+        }
+      ],
+      "guard": [
+        []
+      ],
+      "id": "judge",
+      "idempotency": "safe",
+      "kind": "task",
+      "name": "Judge result",
+      "op": {
+        "config": {
+          "questions": {
+            "relevant": {
+              "instructions": "How relevant is this result to the question?",
+              "kind": "score",
+              "levels": [
+                "Irrelevant",
+                "Weak",
+                "Partial",
+                "Strong",
+                "Direct answer"
+              ]
+            },
+            "reliable": {
+              "instructions": "How reliable is the source?",
+              "kind": "score",
+              "levels": [
+                "Unreliable",
+                "Questionable",
+                "Mixed",
+                "Reliable",
+                "Authoritative"
+              ]
+            }
+          }
+        },
+        "configBindings": {},
+        "configTemplates": {},
+        "credentials": {
+          "typesafe": "TYPESAFE_API_KEY"
+        },
+        "inputs": {
+          "state": {
+            "fields": {
+              "question": {
+                "kind": "ref",
+                "optional": false,
+                "ref": {
+                  "kind": "port",
+                  "node": "start",
+                  "port": "question"
+                },
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "result": {
+                "ast": {
+                  "args": [
+                    {
+                      "kind": "ref",
+                      "ref": {
+                        "kind": "port",
+                        "node": "web",
+                        "path": "/results",
+                        "port": "body"
+                      }
+                    }
+                  ],
+                  "fn": "first",
+                  "kind": "call"
+                },
+                "kind": "expr",
+                "schema": {}
+              }
+            },
+            "kind": "object",
+            "schema": {
+              "additionalProperties": false,
+              "properties": {
+                "question": {
+                  "type": "string"
+                },
+                "result": {}
+              },
+              "required": [
+                "question",
+                "result"
+              ],
+              "type": "object"
+            }
+          }
+        },
+        "kind": "task",
+        "manifest": {
+          "capabilities": [
+            "decision",
+            "credentials"
+          ],
+          "configSchema": {
+            "additionalProperties": false,
+            "properties": {
+              "questions": {
+                "additionalProperties": {
+                  "oneOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "criteria": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "false": {
+                              "type": "string"
+                            },
+                            "true": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "true",
+                            "false"
+                          ],
+                          "type": "object"
+                        },
+                        "instructions": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "kind": {
+                          "const": "boolean"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "instructions"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "instructions": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "kind": {
+                          "const": "choice"
+                        },
+                        "options": {
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "maxProperties": 255,
+                          "minProperties": 2,
+                          "propertyNames": {
+                            "pattern": "^[a-z0-9_]{1,64}$"
+                          },
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "instructions",
+                        "options"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "instructions": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "kind": {
+                          "const": "score"
+                        },
+                        "levels": {
+                          "items": {
+                            "type": "string"
+                          },
+                          "maxItems": 10,
+                          "minItems": 2,
+                          "type": "array"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "instructions",
+                        "levels"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                },
+                "maxProperties": 32,
+                "minProperties": 1,
+                "propertyNames": {
+                  "pattern": "^[a-z][a-z0-9_]{0,63}$"
+                },
+                "type": "object",
+                "x-ui": {
+                  "help": "Question id → question. Ids become the keys of `answers`.",
+                  "widget": "questions"
+                }
+              }
+            },
+            "required": [
+              "questions"
+            ],
+            "type": "object"
+          },
+          "controlPorts": [],
+          "credentials": [
+            {
+              "name": "typesafe",
+              "required": true,
+              "types": [
+                "typesafe.api_key"
+              ]
+            },
+            {
+              "description": "Optional LLM decision provider used when a failover hop (or the workspace chain) routes decisions to a chat model.",
+              "name": "llm",
+              "required": false,
+              "types": [
+                "openai.api_key",
+                "anthropic.api_key",
+                "ollama.none"
+              ]
+            }
+          ],
+          "decision": {
+            "kind": "batch"
+          },
+          "defaultPolicy": {
+            "timeoutMs": 30000
+          },
+          "generation": false,
+          "id": "flowaid.decision.batch",
+          "idempotency": "safe",
+          "inputs": [
+            {
+              "name": "state",
+              "required": true,
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "object"
+                  },
+                  {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                ],
+                "description": "TypeSafe state: text, an object (sent verbatim) or an array of text."
+              }
+            }
+          ],
+          "metadata": {
+            "category": "decision",
+            "description": "Asks several typed questions (boolean, choice, score) about one `state` in a single TypeSafe request. Output `answers` holds one DecisionResult per question id.",
+            "icon": "list-checks",
+            "name": "Decision batch",
+            "summary": "{{ config.questions | json }}",
+            "tags": [
+              "decision",
+              "typesafe",
+              "batch"
+            ]
+          },
+          "migrations": [],
+          "optionProviders": [],
+          "outputs": [
+            {
+              "name": "answers",
+              "required": true,
+              "schema": {
+                "description": "One DecisionResult per question id (typed per question by the compiler).",
+                "type": "object"
+              }
+            }
+          ],
+          "pool": "general",
+          "portRules": [
+            {
+              "kind": "decisionAnswersFromConfig",
+              "path": "/questions",
+              "port": "answers"
+            }
+          ],
+          "streams": false,
+          "version": "1.0.0"
+        },
+        "tool": null,
+        "type": "flowaid.decision.batch",
+        "typeVersion": "1.0.0"
+      },
+      "outputs": {
+        "answers": {
+          "additionalProperties": false,
+          "properties": {
+            "relevant": {
+              "$defs": {
+                "__schema0": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "items": {
+                        "$ref": "#/$defs/__schema0"
+                      },
+                      "type": "array"
+                    },
+                    {
+                      "additionalProperties": {
+                        "$ref": "#/$defs/__schema0"
+                      },
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "type": "object"
+                    }
+                  ]
+                }
+              },
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "additionalProperties": false,
+              "properties": {
+                "attempts": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "errorCode": {
+                        "enum": [
+                          "WORKFLOW_VALIDATION_ERROR",
+                          "SCHEMA_VALIDATION_ERROR",
+                          "NODE_EXECUTION_ERROR",
+                          "TOOL_EXECUTION_ERROR",
+                          "PROVIDER_ERROR",
+                          "PROVIDER_RATE_LIMITED",
+                          "PROVIDER_OVERLOADED",
+                          "CREDENTIAL_ERROR",
+                          "TIMEOUT_ERROR",
+                          "RATE_LIMIT_ERROR",
+                          "CANCELLED_ERROR",
+                          "BOUNDS_EXCEEDED",
+                          "INPUT_MISSING",
+                          "OUTPUT_SCHEMA_MISMATCH",
+                          "EXPRESSION_ERROR",
+                          "SANDBOX_ERROR",
+                          "WORKER_LOST",
+                          "NONIDEMPOTENT_INTERRUPTED",
+                          "HUMAN_APPROVAL_REQUIRED",
+                          "HUMAN_TASK_EXPIRED",
+                          "SUBFLOW_ERROR",
+                          "NO_OUTPUT",
+                          "NETWORK_ERROR",
+                          "NOT_FOUND",
+                          "CONFLICT",
+                          "UNAUTHORIZED",
+                          "FORBIDDEN",
+                          "BAD_REQUEST",
+                          "PAYLOAD_TOO_LARGE",
+                          "INTERNAL"
+                        ],
+                        "type": "string"
+                      },
+                      "latencyMs": {
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "model": {
+                        "type": "string"
+                      },
+                      "outcome": {
+                        "enum": [
+                          "ok",
+                          "error",
+                          "skipped_unhealthy"
+                        ],
+                        "type": "string"
+                      },
+                      "provider": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "provider",
+                      "model",
+                      "outcome",
+                      "latencyMs"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "confidence": {
+                  "maximum": 1,
+                  "minimum": 0,
+                  "type": "number"
+                },
+                "costUsd": {
+                  "minimum": 0,
+                  "type": "number"
+                },
+                "kind": {
+                  "const": "score",
+                  "type": "string"
+                },
+                "latencyMs": {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "level": {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "levelLabel": {
+                  "type": "string"
+                },
+                "levels": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "maxItems": 10,
+                  "minItems": 2,
+                  "type": "array"
+                },
+                "model": {
+                  "type": "string"
+                },
+                "normalized": {
+                  "maximum": 1,
+                  "minimum": 0,
+                  "type": "number"
+                },
+                "probabilities": {
+                  "additionalProperties": {
+                    "maximum": 1,
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                "provider": {
+                  "type": "string"
+                },
+                "raw": {
+                  "$ref": "#/$defs/__schema0"
+                },
+                "requestId": {
+                  "type": "string"
+                },
+                "usage": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "cacheReadTokens": {
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "cacheWriteTokens": {
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "inputTokens": {
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "outputTokens": {
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "inputTokens",
+                    "outputTokens"
+                  ],
+                  "type": "object"
+                },
+                "value": {
+                  "minimum": 0,
+                  "type": "number"
+                }
+              },
+              "required": [
+                "confidence",
+                "provider",
+                "model",
+                "latencyMs",
+                "costUsd",
+                "attempts",
+                "kind",
+                "value",
+                "normalized",
+                "level",
+                "levelLabel",
+                "levels",
+                "probabilities"
+              ],
+              "type": "object"
+            },
+            "reliable": {
+              "$defs": {
+                "__schema0": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "items": {
+                        "$ref": "#/$defs/__schema0"
+                      },
+                      "type": "array"
+                    },
+                    {
+                      "additionalProperties": {
+                        "$ref": "#/$defs/__schema0"
+                      },
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "type": "object"
+                    }
+                  ]
+                }
+              },
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "additionalProperties": false,
+              "properties": {
+                "attempts": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "errorCode": {
+                        "enum": [
+                          "WORKFLOW_VALIDATION_ERROR",
+                          "SCHEMA_VALIDATION_ERROR",
+                          "NODE_EXECUTION_ERROR",
+                          "TOOL_EXECUTION_ERROR",
+                          "PROVIDER_ERROR",
+                          "PROVIDER_RATE_LIMITED",
+                          "PROVIDER_OVERLOADED",
+                          "CREDENTIAL_ERROR",
+                          "TIMEOUT_ERROR",
+                          "RATE_LIMIT_ERROR",
+                          "CANCELLED_ERROR",
+                          "BOUNDS_EXCEEDED",
+                          "INPUT_MISSING",
+                          "OUTPUT_SCHEMA_MISMATCH",
+                          "EXPRESSION_ERROR",
+                          "SANDBOX_ERROR",
+                          "WORKER_LOST",
+                          "NONIDEMPOTENT_INTERRUPTED",
+                          "HUMAN_APPROVAL_REQUIRED",
+                          "HUMAN_TASK_EXPIRED",
+                          "SUBFLOW_ERROR",
+                          "NO_OUTPUT",
+                          "NETWORK_ERROR",
+                          "NOT_FOUND",
+                          "CONFLICT",
+                          "UNAUTHORIZED",
+                          "FORBIDDEN",
+                          "BAD_REQUEST",
+                          "PAYLOAD_TOO_LARGE",
+                          "INTERNAL"
+                        ],
+                        "type": "string"
+                      },
+                      "latencyMs": {
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "model": {
+                        "type": "string"
+                      },
+                      "outcome": {
+                        "enum": [
+                          "ok",
+                          "error",
+                          "skipped_unhealthy"
+                        ],
+                        "type": "string"
+                      },
+                      "provider": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "provider",
+                      "model",
+                      "outcome",
+                      "latencyMs"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "confidence": {
+                  "maximum": 1,
+                  "minimum": 0,
+                  "type": "number"
+                },
+                "costUsd": {
+                  "minimum": 0,
+                  "type": "number"
+                },
+                "kind": {
+                  "const": "score",
+                  "type": "string"
+                },
+                "latencyMs": {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "level": {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "levelLabel": {
+                  "type": "string"
+                },
+                "levels": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "maxItems": 10,
+                  "minItems": 2,
+                  "type": "array"
+                },
+                "model": {
+                  "type": "string"
+                },
+                "normalized": {
+                  "maximum": 1,
+                  "minimum": 0,
+                  "type": "number"
+                },
+                "probabilities": {
+                  "additionalProperties": {
+                    "maximum": 1,
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                "provider": {
+                  "type": "string"
+                },
+                "raw": {
+                  "$ref": "#/$defs/__schema0"
+                },
+                "requestId": {
+                  "type": "string"
+                },
+                "usage": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "cacheReadTokens": {
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "cacheWriteTokens": {
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "inputTokens": {
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "outputTokens": {
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "inputTokens",
+                    "outputTokens"
+                  ],
+                  "type": "object"
+                },
+                "value": {
+                  "minimum": 0,
+                  "type": "number"
+                }
+              },
+              "required": [
+                "confidence",
+                "provider",
+                "model",
+                "latencyMs",
+                "costUsd",
+                "attempts",
+                "kind",
+                "value",
+                "normalized",
+                "level",
+                "levelLabel",
+                "levels",
+                "probabilities"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "relevant",
+            "reliable"
+          ],
+          "type": "object"
+        }
+      },
+      "policy": {
+        "maxCostUsd": null,
+        "maxTokens": null,
+        "onError": "fail",
+        "privacy": {
+          "containsPII": false,
+          "doNotPersist": false,
+          "redactFields": [],
+          "sensitive": false
+        },
+        "retry": {
+          "allowOnIrreversible": false,
+          "backoff": {
+            "factor": 2,
+            "initialMs": 500,
+            "jitter": true,
+            "maxMs": 30000,
+            "type": "exponential"
+          },
+          "maxAttempts": 1
+        },
+        "timeoutMs": 30000
+      },
+      "pool": "general",
+      "redact": [],
+      "scope": "search_all",
+      "successors": []
+    },
+    "out_done": {
+      "batchGroup": null,
+      "controlIn": [
+        {
+          "edgeId": "c1",
+          "from": {
+            "node": "research",
+            "port": "done"
+          },
+          "group": 0
+        }
+      ],
+      "controlOut": [],
+      "dataIn": [
+        {
+          "from": {
+            "node": "research",
+            "port": "result"
+          },
+          "optional": false,
+          "path": "/answer",
+          "to": {
+            "node": "out_done",
+            "port": "value"
+          },
+          "via": "ref"
+        },
+        {
+          "from": {
+            "node": "research",
+            "port": "result"
+          },
+          "optional": false,
+          "path": "/complete",
+          "to": {
+            "node": "out_done",
+            "port": "value"
+          },
+          "via": "ref"
+        },
+        {
+          "from": {
+            "node": "research",
+            "port": "carry"
+          },
+          "optional": false,
+          "path": "/evidence",
+          "to": {
+            "node": "out_done",
+            "port": "value"
+          },
+          "via": "ref"
+        },
+        {
+          "from": {
+            "node": "research",
+            "port": "iterations"
+          },
+          "optional": false,
+          "to": {
+            "node": "out_done",
+            "port": "value"
+          },
+          "via": "ref"
+        }
+      ],
+      "guard": [
+        [
+          {
+            "node": "research",
+            "port": "done"
+          }
+        ]
+      ],
+      "id": "out_done",
+      "idempotency": "safe",
+      "kind": "output",
+      "name": "Answer",
+      "op": {
+        "earlyExit": false,
+        "kind": "output",
+        "outcome": "complete",
+        "value": {
+          "fields": {
+            "answer": {
+              "kind": "ref",
+              "optional": false,
+              "ref": {
+                "kind": "port",
+                "node": "research",
+                "path": "/answer",
+                "port": "result"
+              },
+              "schema": {
+                "type": "string"
+              }
+            },
+            "complete": {
+              "kind": "ref",
+              "optional": false,
+              "ref": {
+                "kind": "port",
+                "node": "research",
+                "path": "/complete",
+                "port": "result"
+              },
+              "schema": {
+                "type": "boolean"
+              }
+            },
+            "evidence": {
+              "kind": "ref",
+              "optional": false,
+              "ref": {
+                "kind": "port",
+                "node": "research",
+                "path": "/evidence",
+                "port": "carry"
+              },
+              "schema": {
+                "items": {
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "rounds": {
+              "kind": "ref",
+              "optional": false,
+              "ref": {
+                "kind": "port",
+                "node": "research",
+                "port": "iterations"
+              },
+              "schema": {
+                "minimum": 0,
+                "type": "integer"
+              }
+            }
+          },
+          "kind": "object",
+          "schema": {
+            "additionalProperties": false,
+            "properties": {
+              "answer": {
+                "type": "string"
+              },
+              "complete": {
+                "type": "boolean"
+              },
+              "evidence": {
+                "items": {
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "rounds": {
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "answer",
+              "complete",
+              "evidence",
+              "rounds"
+            ],
+            "type": "object"
+          }
+        }
+      },
+      "outputs": {},
+      "policy": {
+        "maxCostUsd": null,
+        "maxTokens": null,
+        "onError": "fail",
+        "privacy": {
+          "containsPII": false,
+          "doNotPersist": false,
+          "redactFields": [],
+          "sensitive": false
+        },
+        "retry": {
+          "allowOnIrreversible": false,
+          "backoff": {
+            "factor": 2,
+            "initialMs": 500,
+            "jitter": true,
+            "maxMs": 30000,
+            "type": "exponential"
+          },
+          "maxAttempts": 1
+        },
+        "timeoutMs": 120000
+      },
+      "pool": "general",
+      "redact": [],
+      "scope": "",
+      "successors": []
+    },
+    "out_partial": {
+      "batchGroup": null,
+      "controlIn": [
+        {
+          "edgeId": "c2",
+          "from": {
+            "node": "research",
+            "port": "exhausted"
+          },
+          "group": 0
+        }
+      ],
+      "controlOut": [],
+      "dataIn": [
+        {
+          "from": {
+            "node": "research",
+            "port": "result"
+          },
+          "optional": true,
+          "path": "/answer",
+          "to": {
+            "node": "out_partial",
+            "port": "value"
+          },
+          "via": "expr"
+        },
+        {
+          "from": {
+            "node": "research",
+            "port": "carry"
+          },
+          "optional": false,
+          "path": "/evidence",
+          "to": {
+            "node": "out_partial",
+            "port": "value"
+          },
+          "via": "ref"
+        },
+        {
+          "from": {
+            "node": "research",
+            "port": "iterations"
+          },
+          "optional": false,
+          "to": {
+            "node": "out_partial",
+            "port": "value"
+          },
+          "via": "ref"
+        }
+      ],
+      "guard": [
+        [
+          {
+            "node": "research",
+            "port": "exhausted"
+          }
+        ]
+      ],
+      "id": "out_partial",
+      "idempotency": "safe",
+      "kind": "output",
+      "name": "Best effort",
+      "op": {
+        "earlyExit": false,
+        "kind": "output",
+        "outcome": "partial",
+        "value": {
+          "fields": {
+            "answer": {
+              "ast": {
+                "args": [
+                  {
+                    "kind": "ref",
+                    "ref": {
+                      "kind": "port",
+                      "node": "research",
+                      "path": "/answer",
+                      "port": "result"
+                    }
+                  },
+                  {
+                    "kind": "literal",
+                    "value": ""
+                  }
+                ],
+                "fn": "coalesce",
+                "kind": "call"
+              },
+              "kind": "expr",
+              "schema": {
+                "type": "string"
+              }
+            },
+            "complete": {
+              "kind": "literal",
+              "schema": {
+                "const": false,
+                "type": "boolean"
+              },
+              "value": false
+            },
+            "evidence": {
+              "kind": "ref",
+              "optional": false,
+              "ref": {
+                "kind": "port",
+                "node": "research",
+                "path": "/evidence",
+                "port": "carry"
+              },
+              "schema": {
+                "items": {
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "rounds": {
+              "kind": "ref",
+              "optional": false,
+              "ref": {
+                "kind": "port",
+                "node": "research",
+                "port": "iterations"
+              },
+              "schema": {
+                "minimum": 0,
+                "type": "integer"
+              }
+            }
+          },
+          "kind": "object",
+          "schema": {
+            "additionalProperties": false,
+            "properties": {
+              "answer": {
+                "type": "string"
+              },
+              "complete": {
+                "const": false,
+                "type": "boolean"
+              },
+              "evidence": {
+                "items": {
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "rounds": {
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "answer",
+              "complete",
+              "evidence",
+              "rounds"
+            ],
+            "type": "object"
+          }
+        }
+      },
+      "outputs": {},
+      "policy": {
+        "maxCostUsd": null,
+        "maxTokens": null,
+        "onError": "fail",
+        "privacy": {
+          "containsPII": false,
+          "doNotPersist": false,
+          "redactFields": [],
+          "sensitive": false
+        },
+        "retry": {
+          "allowOnIrreversible": false,
+          "backoff": {
+            "factor": 2,
+            "initialMs": 500,
+            "jitter": true,
+            "maxMs": 30000,
+            "type": "exponential"
+          },
+          "maxAttempts": 1
+        },
+        "timeoutMs": 120000
+      },
+      "pool": "general",
+      "redact": [],
+      "scope": "",
+      "successors": []
+    },
+    "planner": {
+      "batchGroup": null,
+      "controlIn": [],
+      "controlOut": [
+        "done"
+      ],
+      "dataIn": [
+        {
+          "from": {
+            "node": "start",
+            "port": "question"
+          },
+          "optional": false,
+          "to": {
+            "node": "planner",
+            "port": "prompt"
+          },
+          "via": "hoisted"
+        }
+      ],
+      "guard": [
+        []
+      ],
+      "id": "planner",
+      "idempotency": "safe",
+      "kind": "task",
+      "name": "Plan queries",
+      "op": {
+        "config": {
+          "model": {
+            "model": "claude-sonnet-4-5",
+            "provider": "anthropic"
+          },
+          "schema": {
+            "properties": {
+              "queries": {
+                "items": {
+                  "properties": {
+                    "query": {
+                      "type": "string"
+                    },
+                    "source": {
+                      "enum": [
+                        "web",
+                        "papers"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "query",
+                    "source"
+                  ],
+                  "type": "object"
+                },
+                "maxItems": 4,
+                "minItems": 1,
+                "type": "array"
+              }
+            },
+            "required": [
+              "queries"
+            ],
+            "type": "object"
+          }
+        },
+        "configBindings": {},
+        "configTemplates": {},
+        "credentials": {
+          "llm": "ANTHROPIC_API_KEY"
+        },
+        "inputs": {
+          "prompt": {
+            "kind": "template",
+            "schema": {
+              "type": "string"
+            },
+            "template": {
+              "parts": [
+                {
+                  "kind": "text",
+                  "text": "Question: "
+                },
+                {
+                  "expr": {
+                    "kind": "ref",
+                    "ref": {
+                      "kind": "port",
+                      "node": "start",
+                      "port": "question"
+                    }
+                  },
+                  "filter": "string",
+                  "kind": "hole",
+                  "range": {
+                    "end": 30,
+                    "start": 10
+                  }
+                },
+                {
+                  "kind": "text",
+                  "text": "\nRound "
+                },
+                {
+                  "expr": {
+                    "kind": "binary",
+                    "left": {
+                      "kind": "ref",
+                      "ref": {
+                        "field": "iteration",
+                        "kind": "scope"
+                      }
+                    },
+                    "op": "+",
+                    "right": {
+                      "kind": "literal",
+                      "value": 1
+                    }
+                  },
+                  "filter": "string",
+                  "kind": "hole",
+                  "range": {
+                    "end": 63,
+                    "start": 37
+                  }
+                },
+                {
+                  "kind": "text",
+                  "text": ". Known gap: "
+                },
+                {
+                  "expr": {
+                    "kind": "ref",
+                    "ref": {
+                      "field": "carry",
+                      "kind": "scope",
+                      "path": "/gap"
+                    }
+                  },
+                  "filter": "string",
+                  "kind": "hole",
+                  "range": {
+                    "end": 98,
+                    "start": 76
+                  }
+                },
+                {
+                  "kind": "text",
+                  "text": "\nEvidence so far: "
+                },
+                {
+                  "expr": {
+                    "kind": "ref",
+                    "ref": {
+                      "field": "carry",
+                      "kind": "scope",
+                      "path": "/evidence"
+                    }
+                  },
+                  "filter": "json",
+                  "kind": "hole",
+                  "range": {
+                    "end": 150,
+                    "start": 116
+                  }
+                },
+                {
+                  "kind": "text",
+                  "text": "\nPropose up to 4 targeted searches."
+                }
+              ]
+            }
+          }
+        },
+        "kind": "task",
+        "manifest": {
+          "capabilities": [
+            "generation",
+            "credentials"
+          ],
+          "configSchema": {
+            "additionalProperties": false,
+            "properties": {
+              "maxOutputTokens": {
+                "default": 1024,
+                "maximum": 65536,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "model": {
+                "properties": {
+                  "model": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "provider": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "provider",
+                  "model"
+                ],
+                "type": "object",
+                "x-ui": {
+                  "widget": "model"
+                }
+              },
+              "schema": {
+                "type": "object",
+                "x-ui": {
+                  "help": "JSON Schema the model's answer must match; it types the `structured` output.",
+                  "widget": "schema"
+                }
+              },
+              "system": {
+                "maxLength": 32000,
+                "type": "string",
+                "x-ui": {
+                  "widget": "template"
+                }
+              },
+              "temperature": {
+                "default": 1,
+                "maximum": 2,
+                "minimum": 0,
+                "type": "number"
+              }
+            },
+            "required": [
+              "model",
+              "schema"
+            ],
+            "type": "object"
+          },
+          "controlPorts": [],
+          "credentials": [
+            {
+              "name": "llm",
+              "required": true,
+              "types": [
+                "openai.api_key",
+                "anthropic.api_key",
+                "ollama.none"
+              ]
+            }
+          ],
+          "defaultPolicy": {
+            "timeoutMs": 120000
+          },
+          "generation": true,
+          "id": "flowaid.ai.structured_generate",
+          "idempotency": "safe",
+          "inputs": [
+            {
+              "name": "prompt",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "metadata": {
+            "category": "generation",
+            "description": "Asks a chat model for a JSON answer that matches `schema` (native structured output where the provider supports it, validated either way).",
+            "icon": "braces",
+            "name": "Structured generation",
+            "summary": "{{ config.model.provider }}/{{ config.model.model }}",
+            "tags": [
+              "ai",
+              "generation",
+              "json"
+            ]
+          },
+          "migrations": [],
+          "optionProviders": [
+            "models"
+          ],
+          "outputs": [
+            {
+              "name": "structured",
+              "required": true,
+              "schema": {
+                "type": "object"
+              }
+            },
+            {
+              "name": "usage",
+              "required": true,
+              "schema": {
+                "properties": {
+                  "inputTokens": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "outputTokens": {
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "inputTokens",
+                  "outputTokens"
+                ],
+                "type": "object"
+              }
+            }
+          ],
+          "pool": "general",
+          "portRules": [
+            {
+              "kind": "outputSchemaFromConfig",
+              "path": "/schema",
+              "port": "structured"
+            }
+          ],
+          "streams": false,
+          "version": "1.0.0"
+        },
+        "tool": null,
+        "type": "flowaid.ai.structured_generate",
+        "typeVersion": "1.0.0"
+      },
+      "outputs": {
+        "structured": {
+          "properties": {
+            "queries": {
+              "items": {
+                "properties": {
+                  "query": {
+                    "type": "string"
+                  },
+                  "source": {
+                    "enum": [
+                      "web",
+                      "papers"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "query",
+                  "source"
+                ],
+                "type": "object"
+              },
+              "maxItems": 4,
+              "minItems": 1,
+              "type": "array"
+            }
+          },
+          "required": [
+            "queries"
+          ],
+          "type": "object"
+        },
+        "usage": {
+          "properties": {
+            "inputTokens": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "outputTokens": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "inputTokens",
+            "outputTokens"
+          ],
+          "type": "object"
+        }
+      },
+      "policy": {
+        "maxCostUsd": null,
+        "maxTokens": null,
+        "onError": "fail",
+        "privacy": {
+          "containsPII": false,
+          "doNotPersist": false,
+          "redactFields": [],
+          "sensitive": false
+        },
+        "retry": {
+          "allowOnIrreversible": false,
+          "backoff": {
+            "factor": 2,
+            "initialMs": 500,
+            "jitter": true,
+            "maxMs": 30000,
+            "type": "exponential"
+          },
+          "maxAttempts": 1
+        },
+        "timeoutMs": 120000
+      },
+      "pool": "general",
+      "redact": [],
+      "scope": "research",
+      "successors": [
+        "search_all"
+      ]
+    },
+    "research": {
+      "batchGroup": null,
+      "controlIn": [],
+      "controlOut": [
+        "done",
+        "exhausted"
+      ],
+      "dataIn": [
+        {
+          "from": {
+            "node": "start",
+            "port": "max_rounds"
+          },
+          "optional": false,
+          "to": {
+            "node": "research",
+            "port": "exit_when"
+          },
+          "via": "expr"
+        },
+        {
+          "from": {
+            "node": "start",
+            "port": "question"
+          },
+          "optional": false,
+          "to": {
+            "node": "research",
+            "port": "body"
+          },
+          "via": "hoisted"
+        }
+      ],
+      "guard": [
+        []
+      ],
+      "id": "research",
+      "idempotency": "safe",
+      "kind": "loop",
+      "name": "Research rounds",
+      "op": {
+        "bodyScope": "research",
+        "bounds": {
+          "maxCostUsd": 1.5,
+          "maxIterations": 5,
+          "timeoutMs": 480000
+        },
+        "carrySchema": {
+          "properties": {
+            "evidence": {
+              "items": {
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "gap": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "evidence",
+            "gap"
+          ],
+          "type": "object"
+        },
+        "exitWhen": {
+          "kind": "binary",
+          "left": {
+            "kind": "binary",
+            "left": {
+              "kind": "ref",
+              "ref": {
+                "kind": "port",
+                "node": "completeness",
+                "path": "/complete/value",
+                "port": "answers"
+              }
+            },
+            "op": "&&",
+            "right": {
+              "kind": "binary",
+              "left": {
+                "kind": "ref",
+                "ref": {
+                  "kind": "port",
+                  "node": "completeness",
+                  "path": "/complete/confidence",
+                  "port": "answers"
+                }
+              },
+              "op": ">=",
+              "right": {
+                "kind": "literal",
+                "value": 0.8
+              }
+            }
+          },
+          "op": "||",
+          "right": {
+            "kind": "binary",
+            "left": {
+              "kind": "binary",
+              "left": {
+                "kind": "ref",
+                "ref": {
+                  "field": "iteration",
+                  "kind": "scope"
+                }
+              },
+              "op": "+",
+              "right": {
+                "kind": "literal",
+                "value": 1
+              }
+            },
+            "op": ">=",
+            "right": {
+              "kind": "ref",
+              "ref": {
+                "kind": "port",
+                "node": "start",
+                "port": "max_rounds"
+              }
+            }
+          }
+        },
+        "initialCarry": {
+          "evidence": [],
+          "gap": "none"
+        },
+        "kind": "loop",
+        "next": {
+          "evidence": {
+            "kind": "ref",
+            "optional": false,
+            "ref": {
+              "kind": "port",
+              "node": "store",
+              "port": "result"
+            },
+            "schema": {
+              "items": {
+                "type": "object"
+              },
+              "type": "array"
+            }
+          },
+          "gap": {
+            "kind": "ref",
+            "optional": false,
+            "ref": {
+              "kind": "port",
+              "node": "completeness",
+              "path": "/gap/value",
+              "port": "answers"
+            },
+            "schema": {
+              "type": "string"
+            }
+          }
+        },
+        "onExhausted": "route",
+        "result": {
+          "answer": {
+            "kind": "ref",
+            "optional": false,
+            "ref": {
+              "kind": "port",
+              "node": "synthesis",
+              "path": "/answer",
+              "port": "structured"
+            },
+            "schema": {
+              "type": "string"
+            }
+          },
+          "complete": {
+            "kind": "ref",
+            "optional": false,
+            "ref": {
+              "kind": "port",
+              "node": "completeness",
+              "path": "/complete/value",
+              "port": "answers"
+            },
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        }
+      },
+      "outputs": {
+        "carry": {
+          "properties": {
+            "evidence": {
+              "items": {
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "gap": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "evidence",
+            "gap"
+          ],
+          "type": "object"
+        },
+        "iterations": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "result": {
+          "additionalProperties": false,
+          "properties": {
+            "answer": {
+              "type": "string"
+            },
+            "complete": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "answer",
+            "complete"
+          ],
+          "type": "object"
+        }
+      },
+      "policy": {
+        "maxCostUsd": null,
+        "maxTokens": null,
+        "onError": "fail",
+        "privacy": {
+          "containsPII": false,
+          "doNotPersist": false,
+          "redactFields": [],
+          "sensitive": false
+        },
+        "retry": {
+          "allowOnIrreversible": false,
+          "backoff": {
+            "factor": 2,
+            "initialMs": 500,
+            "jitter": true,
+            "maxMs": 30000,
+            "type": "exponential"
+          },
+          "maxAttempts": 1
+        },
+        "timeoutMs": 120000
+      },
+      "pool": "general",
+      "redact": [],
+      "scope": "",
+      "successors": [
+        "out_done",
+        "out_partial"
+      ]
+    },
+    "search_all": {
+      "batchGroup": null,
+      "controlIn": [],
+      "controlOut": [
+        "done"
+      ],
+      "dataIn": [
+        {
+          "from": {
+            "node": "planner",
+            "port": "structured"
+          },
+          "optional": false,
+          "path": "/queries",
+          "to": {
+            "node": "search_all",
+            "port": "items"
+          },
+          "via": "ref"
+        }
+      ],
+      "guard": [
+        []
+      ],
+      "id": "search_all",
+      "idempotency": "safe",
+      "kind": "foreach",
+      "name": "Run searches",
+      "op": {
+        "bodyScope": "search_all",
+        "bounds": {
+          "maxIterations": 4
+        },
+        "collect": {
+          "fields": {
+            "judgment": {
+              "kind": "ref",
+              "optional": false,
+              "ref": {
+                "kind": "port",
+                "node": "judge",
+                "port": "answers"
+              },
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "relevant": {
+                    "$defs": {
+                      "__schema0": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "boolean"
+                          },
+                          {
+                            "type": "null"
+                          },
+                          {
+                            "items": {
+                              "$ref": "#/$defs/__schema0"
+                            },
+                            "type": "array"
+                          },
+                          {
+                            "additionalProperties": {
+                              "$ref": "#/$defs/__schema0"
+                            },
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "type": "object"
+                          }
+                        ]
+                      }
+                    },
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "additionalProperties": false,
+                    "properties": {
+                      "attempts": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "errorCode": {
+                              "enum": [
+                                "WORKFLOW_VALIDATION_ERROR",
+                                "SCHEMA_VALIDATION_ERROR",
+                                "NODE_EXECUTION_ERROR",
+                                "TOOL_EXECUTION_ERROR",
+                                "PROVIDER_ERROR",
+                                "PROVIDER_RATE_LIMITED",
+                                "PROVIDER_OVERLOADED",
+                                "CREDENTIAL_ERROR",
+                                "TIMEOUT_ERROR",
+                                "RATE_LIMIT_ERROR",
+                                "CANCELLED_ERROR",
+                                "BOUNDS_EXCEEDED",
+                                "INPUT_MISSING",
+                                "OUTPUT_SCHEMA_MISMATCH",
+                                "EXPRESSION_ERROR",
+                                "SANDBOX_ERROR",
+                                "WORKER_LOST",
+                                "NONIDEMPOTENT_INTERRUPTED",
+                                "HUMAN_APPROVAL_REQUIRED",
+                                "HUMAN_TASK_EXPIRED",
+                                "SUBFLOW_ERROR",
+                                "NO_OUTPUT",
+                                "NETWORK_ERROR",
+                                "NOT_FOUND",
+                                "CONFLICT",
+                                "UNAUTHORIZED",
+                                "FORBIDDEN",
+                                "BAD_REQUEST",
+                                "PAYLOAD_TOO_LARGE",
+                                "INTERNAL"
+                              ],
+                              "type": "string"
+                            },
+                            "latencyMs": {
+                              "maximum": 9007199254740991,
+                              "minimum": 0,
+                              "type": "integer"
+                            },
+                            "model": {
+                              "type": "string"
+                            },
+                            "outcome": {
+                              "enum": [
+                                "ok",
+                                "error",
+                                "skipped_unhealthy"
+                              ],
+                              "type": "string"
+                            },
+                            "provider": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "provider",
+                            "model",
+                            "outcome",
+                            "latencyMs"
+                          ],
+                          "type": "object"
+                        },
+                        "type": "array"
+                      },
+                      "confidence": {
+                        "maximum": 1,
+                        "minimum": 0,
+                        "type": "number"
+                      },
+                      "costUsd": {
+                        "minimum": 0,
+                        "type": "number"
+                      },
+                      "kind": {
+                        "const": "score",
+                        "type": "string"
+                      },
+                      "latencyMs": {
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "level": {
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "levelLabel": {
+                        "type": "string"
+                      },
+                      "levels": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "maxItems": 10,
+                        "minItems": 2,
+                        "type": "array"
+                      },
+                      "model": {
+                        "type": "string"
+                      },
+                      "normalized": {
+                        "maximum": 1,
+                        "minimum": 0,
+                        "type": "number"
+                      },
+                      "probabilities": {
+                        "additionalProperties": {
+                          "maximum": 1,
+                          "minimum": 0,
+                          "type": "number"
+                        },
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "type": "object"
+                      },
+                      "provider": {
+                        "type": "string"
+                      },
+                      "raw": {
+                        "$ref": "#/$defs/__schema0"
+                      },
+                      "requestId": {
+                        "type": "string"
+                      },
+                      "usage": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "cacheReadTokens": {
+                            "maximum": 9007199254740991,
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          "cacheWriteTokens": {
+                            "maximum": 9007199254740991,
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          "inputTokens": {
+                            "maximum": 9007199254740991,
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          "outputTokens": {
+                            "maximum": 9007199254740991,
+                            "minimum": 0,
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "inputTokens",
+                          "outputTokens"
+                        ],
+                        "type": "object"
+                      },
+                      "value": {
+                        "minimum": 0,
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "confidence",
+                      "provider",
+                      "model",
+                      "latencyMs",
+                      "costUsd",
+                      "attempts",
+                      "kind",
+                      "value",
+                      "normalized",
+                      "level",
+                      "levelLabel",
+                      "levels",
+                      "probabilities"
+                    ],
+                    "type": "object"
+                  },
+                  "reliable": {
+                    "$defs": {
+                      "__schema0": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "boolean"
+                          },
+                          {
+                            "type": "null"
+                          },
+                          {
+                            "items": {
+                              "$ref": "#/$defs/__schema0"
+                            },
+                            "type": "array"
+                          },
+                          {
+                            "additionalProperties": {
+                              "$ref": "#/$defs/__schema0"
+                            },
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "type": "object"
+                          }
+                        ]
+                      }
+                    },
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "additionalProperties": false,
+                    "properties": {
+                      "attempts": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "errorCode": {
+                              "enum": [
+                                "WORKFLOW_VALIDATION_ERROR",
+                                "SCHEMA_VALIDATION_ERROR",
+                                "NODE_EXECUTION_ERROR",
+                                "TOOL_EXECUTION_ERROR",
+                                "PROVIDER_ERROR",
+                                "PROVIDER_RATE_LIMITED",
+                                "PROVIDER_OVERLOADED",
+                                "CREDENTIAL_ERROR",
+                                "TIMEOUT_ERROR",
+                                "RATE_LIMIT_ERROR",
+                                "CANCELLED_ERROR",
+                                "BOUNDS_EXCEEDED",
+                                "INPUT_MISSING",
+                                "OUTPUT_SCHEMA_MISMATCH",
+                                "EXPRESSION_ERROR",
+                                "SANDBOX_ERROR",
+                                "WORKER_LOST",
+                                "NONIDEMPOTENT_INTERRUPTED",
+                                "HUMAN_APPROVAL_REQUIRED",
+                                "HUMAN_TASK_EXPIRED",
+                                "SUBFLOW_ERROR",
+                                "NO_OUTPUT",
+                                "NETWORK_ERROR",
+                                "NOT_FOUND",
+                                "CONFLICT",
+                                "UNAUTHORIZED",
+                                "FORBIDDEN",
+                                "BAD_REQUEST",
+                                "PAYLOAD_TOO_LARGE",
+                                "INTERNAL"
+                              ],
+                              "type": "string"
+                            },
+                            "latencyMs": {
+                              "maximum": 9007199254740991,
+                              "minimum": 0,
+                              "type": "integer"
+                            },
+                            "model": {
+                              "type": "string"
+                            },
+                            "outcome": {
+                              "enum": [
+                                "ok",
+                                "error",
+                                "skipped_unhealthy"
+                              ],
+                              "type": "string"
+                            },
+                            "provider": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "provider",
+                            "model",
+                            "outcome",
+                            "latencyMs"
+                          ],
+                          "type": "object"
+                        },
+                        "type": "array"
+                      },
+                      "confidence": {
+                        "maximum": 1,
+                        "minimum": 0,
+                        "type": "number"
+                      },
+                      "costUsd": {
+                        "minimum": 0,
+                        "type": "number"
+                      },
+                      "kind": {
+                        "const": "score",
+                        "type": "string"
+                      },
+                      "latencyMs": {
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "level": {
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "levelLabel": {
+                        "type": "string"
+                      },
+                      "levels": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "maxItems": 10,
+                        "minItems": 2,
+                        "type": "array"
+                      },
+                      "model": {
+                        "type": "string"
+                      },
+                      "normalized": {
+                        "maximum": 1,
+                        "minimum": 0,
+                        "type": "number"
+                      },
+                      "probabilities": {
+                        "additionalProperties": {
+                          "maximum": 1,
+                          "minimum": 0,
+                          "type": "number"
+                        },
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "type": "object"
+                      },
+                      "provider": {
+                        "type": "string"
+                      },
+                      "raw": {
+                        "$ref": "#/$defs/__schema0"
+                      },
+                      "requestId": {
+                        "type": "string"
+                      },
+                      "usage": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "cacheReadTokens": {
+                            "maximum": 9007199254740991,
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          "cacheWriteTokens": {
+                            "maximum": 9007199254740991,
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          "inputTokens": {
+                            "maximum": 9007199254740991,
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          "outputTokens": {
+                            "maximum": 9007199254740991,
+                            "minimum": 0,
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "inputTokens",
+                          "outputTokens"
+                        ],
+                        "type": "object"
+                      },
+                      "value": {
+                        "minimum": 0,
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "confidence",
+                      "provider",
+                      "model",
+                      "latencyMs",
+                      "costUsd",
+                      "attempts",
+                      "kind",
+                      "value",
+                      "normalized",
+                      "level",
+                      "levelLabel",
+                      "levels",
+                      "probabilities"
+                    ],
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "relevant",
+                  "reliable"
+                ],
+                "type": "object"
+              }
+            },
+            "query": {
+              "kind": "ref",
+              "optional": false,
+              "ref": {
+                "field": "item",
+                "kind": "scope",
+                "path": "/query"
+              },
+              "schema": {
+                "type": "string"
+              }
+            },
+            "result": {
+              "ast": {
+                "args": [
+                  {
+                    "kind": "ref",
+                    "ref": {
+                      "kind": "port",
+                      "node": "web",
+                      "path": "/results",
+                      "port": "body"
+                    }
+                  }
+                ],
+                "fn": "first",
+                "kind": "call"
+              },
+              "kind": "expr",
+              "schema": {}
+            }
+          },
+          "kind": "object",
+          "schema": {
+            "additionalProperties": false,
+            "properties": {
+              "judgment": {
+                "additionalProperties": false,
+                "properties": {
+                  "relevant": {
+                    "$defs": {
+                      "__schema0": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "boolean"
+                          },
+                          {
+                            "type": "null"
+                          },
+                          {
+                            "items": {
+                              "$ref": "#/$defs/__schema0"
+                            },
+                            "type": "array"
+                          },
+                          {
+                            "additionalProperties": {
+                              "$ref": "#/$defs/__schema0"
+                            },
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "type": "object"
+                          }
+                        ]
+                      }
+                    },
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "additionalProperties": false,
+                    "properties": {
+                      "attempts": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "errorCode": {
+                              "enum": [
+                                "WORKFLOW_VALIDATION_ERROR",
+                                "SCHEMA_VALIDATION_ERROR",
+                                "NODE_EXECUTION_ERROR",
+                                "TOOL_EXECUTION_ERROR",
+                                "PROVIDER_ERROR",
+                                "PROVIDER_RATE_LIMITED",
+                                "PROVIDER_OVERLOADED",
+                                "CREDENTIAL_ERROR",
+                                "TIMEOUT_ERROR",
+                                "RATE_LIMIT_ERROR",
+                                "CANCELLED_ERROR",
+                                "BOUNDS_EXCEEDED",
+                                "INPUT_MISSING",
+                                "OUTPUT_SCHEMA_MISMATCH",
+                                "EXPRESSION_ERROR",
+                                "SANDBOX_ERROR",
+                                "WORKER_LOST",
+                                "NONIDEMPOTENT_INTERRUPTED",
+                                "HUMAN_APPROVAL_REQUIRED",
+                                "HUMAN_TASK_EXPIRED",
+                                "SUBFLOW_ERROR",
+                                "NO_OUTPUT",
+                                "NETWORK_ERROR",
+                                "NOT_FOUND",
+                                "CONFLICT",
+                                "UNAUTHORIZED",
+                                "FORBIDDEN",
+                                "BAD_REQUEST",
+                                "PAYLOAD_TOO_LARGE",
+                                "INTERNAL"
+                              ],
+                              "type": "string"
+                            },
+                            "latencyMs": {
+                              "maximum": 9007199254740991,
+                              "minimum": 0,
+                              "type": "integer"
+                            },
+                            "model": {
+                              "type": "string"
+                            },
+                            "outcome": {
+                              "enum": [
+                                "ok",
+                                "error",
+                                "skipped_unhealthy"
+                              ],
+                              "type": "string"
+                            },
+                            "provider": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "provider",
+                            "model",
+                            "outcome",
+                            "latencyMs"
+                          ],
+                          "type": "object"
+                        },
+                        "type": "array"
+                      },
+                      "confidence": {
+                        "maximum": 1,
+                        "minimum": 0,
+                        "type": "number"
+                      },
+                      "costUsd": {
+                        "minimum": 0,
+                        "type": "number"
+                      },
+                      "kind": {
+                        "const": "score",
+                        "type": "string"
+                      },
+                      "latencyMs": {
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "level": {
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "levelLabel": {
+                        "type": "string"
+                      },
+                      "levels": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "maxItems": 10,
+                        "minItems": 2,
+                        "type": "array"
+                      },
+                      "model": {
+                        "type": "string"
+                      },
+                      "normalized": {
+                        "maximum": 1,
+                        "minimum": 0,
+                        "type": "number"
+                      },
+                      "probabilities": {
+                        "additionalProperties": {
+                          "maximum": 1,
+                          "minimum": 0,
+                          "type": "number"
+                        },
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "type": "object"
+                      },
+                      "provider": {
+                        "type": "string"
+                      },
+                      "raw": {
+                        "$ref": "#/$defs/__schema0"
+                      },
+                      "requestId": {
+                        "type": "string"
+                      },
+                      "usage": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "cacheReadTokens": {
+                            "maximum": 9007199254740991,
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          "cacheWriteTokens": {
+                            "maximum": 9007199254740991,
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          "inputTokens": {
+                            "maximum": 9007199254740991,
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          "outputTokens": {
+                            "maximum": 9007199254740991,
+                            "minimum": 0,
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "inputTokens",
+                          "outputTokens"
+                        ],
+                        "type": "object"
+                      },
+                      "value": {
+                        "minimum": 0,
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "confidence",
+                      "provider",
+                      "model",
+                      "latencyMs",
+                      "costUsd",
+                      "attempts",
+                      "kind",
+                      "value",
+                      "normalized",
+                      "level",
+                      "levelLabel",
+                      "levels",
+                      "probabilities"
+                    ],
+                    "type": "object"
+                  },
+                  "reliable": {
+                    "$defs": {
+                      "__schema0": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "boolean"
+                          },
+                          {
+                            "type": "null"
+                          },
+                          {
+                            "items": {
+                              "$ref": "#/$defs/__schema0"
+                            },
+                            "type": "array"
+                          },
+                          {
+                            "additionalProperties": {
+                              "$ref": "#/$defs/__schema0"
+                            },
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "type": "object"
+                          }
+                        ]
+                      }
+                    },
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "additionalProperties": false,
+                    "properties": {
+                      "attempts": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "errorCode": {
+                              "enum": [
+                                "WORKFLOW_VALIDATION_ERROR",
+                                "SCHEMA_VALIDATION_ERROR",
+                                "NODE_EXECUTION_ERROR",
+                                "TOOL_EXECUTION_ERROR",
+                                "PROVIDER_ERROR",
+                                "PROVIDER_RATE_LIMITED",
+                                "PROVIDER_OVERLOADED",
+                                "CREDENTIAL_ERROR",
+                                "TIMEOUT_ERROR",
+                                "RATE_LIMIT_ERROR",
+                                "CANCELLED_ERROR",
+                                "BOUNDS_EXCEEDED",
+                                "INPUT_MISSING",
+                                "OUTPUT_SCHEMA_MISMATCH",
+                                "EXPRESSION_ERROR",
+                                "SANDBOX_ERROR",
+                                "WORKER_LOST",
+                                "NONIDEMPOTENT_INTERRUPTED",
+                                "HUMAN_APPROVAL_REQUIRED",
+                                "HUMAN_TASK_EXPIRED",
+                                "SUBFLOW_ERROR",
+                                "NO_OUTPUT",
+                                "NETWORK_ERROR",
+                                "NOT_FOUND",
+                                "CONFLICT",
+                                "UNAUTHORIZED",
+                                "FORBIDDEN",
+                                "BAD_REQUEST",
+                                "PAYLOAD_TOO_LARGE",
+                                "INTERNAL"
+                              ],
+                              "type": "string"
+                            },
+                            "latencyMs": {
+                              "maximum": 9007199254740991,
+                              "minimum": 0,
+                              "type": "integer"
+                            },
+                            "model": {
+                              "type": "string"
+                            },
+                            "outcome": {
+                              "enum": [
+                                "ok",
+                                "error",
+                                "skipped_unhealthy"
+                              ],
+                              "type": "string"
+                            },
+                            "provider": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "provider",
+                            "model",
+                            "outcome",
+                            "latencyMs"
+                          ],
+                          "type": "object"
+                        },
+                        "type": "array"
+                      },
+                      "confidence": {
+                        "maximum": 1,
+                        "minimum": 0,
+                        "type": "number"
+                      },
+                      "costUsd": {
+                        "minimum": 0,
+                        "type": "number"
+                      },
+                      "kind": {
+                        "const": "score",
+                        "type": "string"
+                      },
+                      "latencyMs": {
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "level": {
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "levelLabel": {
+                        "type": "string"
+                      },
+                      "levels": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "maxItems": 10,
+                        "minItems": 2,
+                        "type": "array"
+                      },
+                      "model": {
+                        "type": "string"
+                      },
+                      "normalized": {
+                        "maximum": 1,
+                        "minimum": 0,
+                        "type": "number"
+                      },
+                      "probabilities": {
+                        "additionalProperties": {
+                          "maximum": 1,
+                          "minimum": 0,
+                          "type": "number"
+                        },
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "type": "object"
+                      },
+                      "provider": {
+                        "type": "string"
+                      },
+                      "raw": {
+                        "$ref": "#/$defs/__schema0"
+                      },
+                      "requestId": {
+                        "type": "string"
+                      },
+                      "usage": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "cacheReadTokens": {
+                            "maximum": 9007199254740991,
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          "cacheWriteTokens": {
+                            "maximum": 9007199254740991,
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          "inputTokens": {
+                            "maximum": 9007199254740991,
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          "outputTokens": {
+                            "maximum": 9007199254740991,
+                            "minimum": 0,
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "inputTokens",
+                          "outputTokens"
+                        ],
+                        "type": "object"
+                      },
+                      "value": {
+                        "minimum": 0,
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "confidence",
+                      "provider",
+                      "model",
+                      "latencyMs",
+                      "costUsd",
+                      "attempts",
+                      "kind",
+                      "value",
+                      "normalized",
+                      "level",
+                      "levelLabel",
+                      "levels",
+                      "probabilities"
+                    ],
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "relevant",
+                  "reliable"
+                ],
+                "type": "object"
+              },
+              "query": {
+                "type": "string"
+              },
+              "result": {}
+            },
+            "required": [
+              "judgment",
+              "query",
+              "result"
+            ],
+            "type": "object"
+          }
+        },
+        "concurrency": 4,
+        "failurePolicy": "collect",
+        "itemSchema": {
+          "properties": {
+            "query": {
+              "type": "string"
+            },
+            "source": {
+              "enum": [
+                "web",
+                "papers"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "query",
+            "source"
+          ],
+          "type": "object"
+        },
+        "items": {
+          "kind": "ref",
+          "optional": false,
+          "ref": {
+            "kind": "port",
+            "node": "planner",
+            "path": "/queries",
+            "port": "structured"
+          },
+          "schema": {
+            "items": {
+              "properties": {
+                "query": {
+                  "type": "string"
+                },
+                "source": {
+                  "enum": [
+                    "web",
+                    "papers"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "query",
+                "source"
+              ],
+              "type": "object"
+            },
+            "maxItems": 4,
+            "minItems": 1,
+            "type": "array"
+          }
+        },
+        "kind": "foreach",
+        "reduce": null
+      },
+      "outputs": {
+        "errors": {
+          "items": {
+            "properties": {
+              "error": {
+                "type": "object"
+              },
+              "index": {
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "index",
+              "error"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "results": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "judgment": {
+                "additionalProperties": false,
+                "properties": {
+                  "relevant": {
+                    "$defs": {
+                      "__schema0": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "boolean"
+                          },
+                          {
+                            "type": "null"
+                          },
+                          {
+                            "items": {
+                              "$ref": "#/$defs/__schema0"
+                            },
+                            "type": "array"
+                          },
+                          {
+                            "additionalProperties": {
+                              "$ref": "#/$defs/__schema0"
+                            },
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "type": "object"
+                          }
+                        ]
+                      }
+                    },
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "additionalProperties": false,
+                    "properties": {
+                      "attempts": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "errorCode": {
+                              "enum": [
+                                "WORKFLOW_VALIDATION_ERROR",
+                                "SCHEMA_VALIDATION_ERROR",
+                                "NODE_EXECUTION_ERROR",
+                                "TOOL_EXECUTION_ERROR",
+                                "PROVIDER_ERROR",
+                                "PROVIDER_RATE_LIMITED",
+                                "PROVIDER_OVERLOADED",
+                                "CREDENTIAL_ERROR",
+                                "TIMEOUT_ERROR",
+                                "RATE_LIMIT_ERROR",
+                                "CANCELLED_ERROR",
+                                "BOUNDS_EXCEEDED",
+                                "INPUT_MISSING",
+                                "OUTPUT_SCHEMA_MISMATCH",
+                                "EXPRESSION_ERROR",
+                                "SANDBOX_ERROR",
+                                "WORKER_LOST",
+                                "NONIDEMPOTENT_INTERRUPTED",
+                                "HUMAN_APPROVAL_REQUIRED",
+                                "HUMAN_TASK_EXPIRED",
+                                "SUBFLOW_ERROR",
+                                "NO_OUTPUT",
+                                "NETWORK_ERROR",
+                                "NOT_FOUND",
+                                "CONFLICT",
+                                "UNAUTHORIZED",
+                                "FORBIDDEN",
+                                "BAD_REQUEST",
+                                "PAYLOAD_TOO_LARGE",
+                                "INTERNAL"
+                              ],
+                              "type": "string"
+                            },
+                            "latencyMs": {
+                              "maximum": 9007199254740991,
+                              "minimum": 0,
+                              "type": "integer"
+                            },
+                            "model": {
+                              "type": "string"
+                            },
+                            "outcome": {
+                              "enum": [
+                                "ok",
+                                "error",
+                                "skipped_unhealthy"
+                              ],
+                              "type": "string"
+                            },
+                            "provider": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "provider",
+                            "model",
+                            "outcome",
+                            "latencyMs"
+                          ],
+                          "type": "object"
+                        },
+                        "type": "array"
+                      },
+                      "confidence": {
+                        "maximum": 1,
+                        "minimum": 0,
+                        "type": "number"
+                      },
+                      "costUsd": {
+                        "minimum": 0,
+                        "type": "number"
+                      },
+                      "kind": {
+                        "const": "score",
+                        "type": "string"
+                      },
+                      "latencyMs": {
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "level": {
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "levelLabel": {
+                        "type": "string"
+                      },
+                      "levels": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "maxItems": 10,
+                        "minItems": 2,
+                        "type": "array"
+                      },
+                      "model": {
+                        "type": "string"
+                      },
+                      "normalized": {
+                        "maximum": 1,
+                        "minimum": 0,
+                        "type": "number"
+                      },
+                      "probabilities": {
+                        "additionalProperties": {
+                          "maximum": 1,
+                          "minimum": 0,
+                          "type": "number"
+                        },
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "type": "object"
+                      },
+                      "provider": {
+                        "type": "string"
+                      },
+                      "raw": {
+                        "$ref": "#/$defs/__schema0"
+                      },
+                      "requestId": {
+                        "type": "string"
+                      },
+                      "usage": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "cacheReadTokens": {
+                            "maximum": 9007199254740991,
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          "cacheWriteTokens": {
+                            "maximum": 9007199254740991,
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          "inputTokens": {
+                            "maximum": 9007199254740991,
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          "outputTokens": {
+                            "maximum": 9007199254740991,
+                            "minimum": 0,
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "inputTokens",
+                          "outputTokens"
+                        ],
+                        "type": "object"
+                      },
+                      "value": {
+                        "minimum": 0,
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "confidence",
+                      "provider",
+                      "model",
+                      "latencyMs",
+                      "costUsd",
+                      "attempts",
+                      "kind",
+                      "value",
+                      "normalized",
+                      "level",
+                      "levelLabel",
+                      "levels",
+                      "probabilities"
+                    ],
+                    "type": "object"
+                  },
+                  "reliable": {
+                    "$defs": {
+                      "__schema0": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "boolean"
+                          },
+                          {
+                            "type": "null"
+                          },
+                          {
+                            "items": {
+                              "$ref": "#/$defs/__schema0"
+                            },
+                            "type": "array"
+                          },
+                          {
+                            "additionalProperties": {
+                              "$ref": "#/$defs/__schema0"
+                            },
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "type": "object"
+                          }
+                        ]
+                      }
+                    },
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "additionalProperties": false,
+                    "properties": {
+                      "attempts": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "errorCode": {
+                              "enum": [
+                                "WORKFLOW_VALIDATION_ERROR",
+                                "SCHEMA_VALIDATION_ERROR",
+                                "NODE_EXECUTION_ERROR",
+                                "TOOL_EXECUTION_ERROR",
+                                "PROVIDER_ERROR",
+                                "PROVIDER_RATE_LIMITED",
+                                "PROVIDER_OVERLOADED",
+                                "CREDENTIAL_ERROR",
+                                "TIMEOUT_ERROR",
+                                "RATE_LIMIT_ERROR",
+                                "CANCELLED_ERROR",
+                                "BOUNDS_EXCEEDED",
+                                "INPUT_MISSING",
+                                "OUTPUT_SCHEMA_MISMATCH",
+                                "EXPRESSION_ERROR",
+                                "SANDBOX_ERROR",
+                                "WORKER_LOST",
+                                "NONIDEMPOTENT_INTERRUPTED",
+                                "HUMAN_APPROVAL_REQUIRED",
+                                "HUMAN_TASK_EXPIRED",
+                                "SUBFLOW_ERROR",
+                                "NO_OUTPUT",
+                                "NETWORK_ERROR",
+                                "NOT_FOUND",
+                                "CONFLICT",
+                                "UNAUTHORIZED",
+                                "FORBIDDEN",
+                                "BAD_REQUEST",
+                                "PAYLOAD_TOO_LARGE",
+                                "INTERNAL"
+                              ],
+                              "type": "string"
+                            },
+                            "latencyMs": {
+                              "maximum": 9007199254740991,
+                              "minimum": 0,
+                              "type": "integer"
+                            },
+                            "model": {
+                              "type": "string"
+                            },
+                            "outcome": {
+                              "enum": [
+                                "ok",
+                                "error",
+                                "skipped_unhealthy"
+                              ],
+                              "type": "string"
+                            },
+                            "provider": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "provider",
+                            "model",
+                            "outcome",
+                            "latencyMs"
+                          ],
+                          "type": "object"
+                        },
+                        "type": "array"
+                      },
+                      "confidence": {
+                        "maximum": 1,
+                        "minimum": 0,
+                        "type": "number"
+                      },
+                      "costUsd": {
+                        "minimum": 0,
+                        "type": "number"
+                      },
+                      "kind": {
+                        "const": "score",
+                        "type": "string"
+                      },
+                      "latencyMs": {
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "level": {
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "levelLabel": {
+                        "type": "string"
+                      },
+                      "levels": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "maxItems": 10,
+                        "minItems": 2,
+                        "type": "array"
+                      },
+                      "model": {
+                        "type": "string"
+                      },
+                      "normalized": {
+                        "maximum": 1,
+                        "minimum": 0,
+                        "type": "number"
+                      },
+                      "probabilities": {
+                        "additionalProperties": {
+                          "maximum": 1,
+                          "minimum": 0,
+                          "type": "number"
+                        },
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "type": "object"
+                      },
+                      "provider": {
+                        "type": "string"
+                      },
+                      "raw": {
+                        "$ref": "#/$defs/__schema0"
+                      },
+                      "requestId": {
+                        "type": "string"
+                      },
+                      "usage": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "cacheReadTokens": {
+                            "maximum": 9007199254740991,
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          "cacheWriteTokens": {
+                            "maximum": 9007199254740991,
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          "inputTokens": {
+                            "maximum": 9007199254740991,
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          "outputTokens": {
+                            "maximum": 9007199254740991,
+                            "minimum": 0,
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "inputTokens",
+                          "outputTokens"
+                        ],
+                        "type": "object"
+                      },
+                      "value": {
+                        "minimum": 0,
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "confidence",
+                      "provider",
+                      "model",
+                      "latencyMs",
+                      "costUsd",
+                      "attempts",
+                      "kind",
+                      "value",
+                      "normalized",
+                      "level",
+                      "levelLabel",
+                      "levels",
+                      "probabilities"
+                    ],
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "relevant",
+                  "reliable"
+                ],
+                "type": "object"
+              },
+              "query": {
+                "type": "string"
+              },
+              "result": {}
+            },
+            "required": [
+              "judgment",
+              "query",
+              "result"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "policy": {
+        "maxCostUsd": null,
+        "maxTokens": null,
+        "onError": "fail",
+        "privacy": {
+          "containsPII": false,
+          "doNotPersist": false,
+          "redactFields": [],
+          "sensitive": false
+        },
+        "retry": {
+          "allowOnIrreversible": false,
+          "backoff": {
+            "factor": 2,
+            "initialMs": 500,
+            "jitter": true,
+            "maxMs": 30000,
+            "type": "exponential"
+          },
+          "maxAttempts": 1
+        },
+        "timeoutMs": 120000
+      },
+      "pool": "general",
+      "redact": [],
+      "scope": "research",
+      "successors": [
+        "store"
+      ]
+    },
+    "start": {
+      "batchGroup": null,
+      "controlIn": [],
+      "controlOut": [
+        "done"
+      ],
+      "dataIn": [],
+      "guard": [
+        []
+      ],
+      "id": "start",
+      "idempotency": "safe",
+      "kind": "input",
+      "name": "Question",
+      "op": {
+        "kind": "input"
+      },
+      "outputs": {
+        "max_rounds": {
+          "default": 3,
+          "maximum": 5,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "question": {
+          "type": "string"
+        }
+      },
+      "policy": {
+        "maxCostUsd": null,
+        "maxTokens": null,
+        "onError": "fail",
+        "privacy": {
+          "containsPII": false,
+          "doNotPersist": false,
+          "redactFields": [],
+          "sensitive": false
+        },
+        "retry": {
+          "allowOnIrreversible": false,
+          "backoff": {
+            "factor": 2,
+            "initialMs": 500,
+            "jitter": true,
+            "maxMs": 30000,
+            "type": "exponential"
+          },
+          "maxAttempts": 1
+        },
+        "timeoutMs": 120000
+      },
+      "pool": "general",
+      "redact": [],
+      "scope": "",
+      "successors": [
+        "completeness",
+        "judge",
+        "planner",
+        "research",
+        "synthesis"
+      ]
+    },
+    "store": {
+      "batchGroup": null,
+      "controlIn": [],
+      "controlOut": [
+        "done"
+      ],
+      "dataIn": [
+        {
+          "from": {
+            "node": "search_all",
+            "port": "results"
+          },
+          "optional": false,
+          "to": {
+            "node": "store",
+            "port": "expr"
+          },
+          "via": "expr"
+        }
+      ],
+      "guard": [
+        []
+      ],
+      "id": "store",
+      "idempotency": "safe",
+      "kind": "task",
+      "name": "Accumulate evidence",
+      "op": {
+        "config": {
+          "output": {
+            "items": {
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "configBindings": {
+          "/expr": {
+            "ast": {
+              "args": [
+                {
+                  "kind": "ref",
+                  "ref": {
+                    "field": "carry",
+                    "kind": "scope",
+                    "path": "/evidence"
+                  }
+                },
+                {
+                  "args": [
+                    {
+                      "kind": "ref",
+                      "ref": {
+                        "kind": "port",
+                        "node": "search_all",
+                        "port": "results"
+                      }
+                    },
+                    {
+                      "body": {
+                        "kind": "binary",
+                        "left": {
+                          "kind": "binary",
+                          "left": {
+                            "key": "value",
+                            "kind": "member",
+                            "object": {
+                              "key": "relevant",
+                              "kind": "member",
+                              "object": {
+                                "key": "judgment",
+                                "kind": "member",
+                                "object": {
+                                  "kind": "ident",
+                                  "name": "r"
+                                }
+                              }
+                            }
+                          },
+                          "op": ">=",
+                          "right": {
+                            "kind": "literal",
+                            "value": 2
+                          }
+                        },
+                        "op": "&&",
+                        "right": {
+                          "kind": "binary",
+                          "left": {
+                            "key": "value",
+                            "kind": "member",
+                            "object": {
+                              "key": "reliable",
+                              "kind": "member",
+                              "object": {
+                                "key": "judgment",
+                                "kind": "member",
+                                "object": {
+                                  "kind": "ident",
+                                  "name": "r"
+                                }
+                              }
+                            }
+                          },
+                          "op": ">=",
+                          "right": {
+                            "kind": "literal",
+                            "value": 2
+                          }
+                        }
+                      },
+                      "kind": "lambda",
+                      "param": "r"
+                    }
+                  ],
+                  "fn": "filter",
+                  "kind": "call"
+                }
+              ],
+              "fn": "concat",
+              "kind": "call"
+            },
+            "kind": "expr",
+            "schema": {
+              "items": {
+                "anyOf": [
+                  {
+                    "properties": {},
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "judgment": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "relevant": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "attempts": {
+                                "items": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "errorCode": {
+                                      "type": "string"
+                                    },
+                                    "latencyMs": {
+                                      "type": "integer"
+                                    },
+                                    "model": {
+                                      "type": "string"
+                                    },
+                                    "outcome": {
+                                      "type": "string"
+                                    },
+                                    "provider": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "provider",
+                                    "model",
+                                    "outcome",
+                                    "latencyMs"
+                                  ],
+                                  "type": "object"
+                                },
+                                "type": "array"
+                              },
+                              "confidence": {
+                                "type": "number"
+                              },
+                              "costUsd": {
+                                "type": "number"
+                              },
+                              "kind": {
+                                "type": "string"
+                              },
+                              "latencyMs": {
+                                "type": "integer"
+                              },
+                              "level": {
+                                "type": "integer"
+                              },
+                              "levelLabel": {
+                                "type": "string"
+                              },
+                              "levels": {
+                                "items": {
+                                  "type": "string"
+                                },
+                                "type": "array"
+                              },
+                              "model": {
+                                "type": "string"
+                              },
+                              "normalized": {
+                                "type": "number"
+                              },
+                              "probabilities": {
+                                "additionalProperties": {
+                                  "type": "number"
+                                },
+                                "properties": {},
+                                "type": "object"
+                              },
+                              "provider": {
+                                "type": "string"
+                              },
+                              "raw": {},
+                              "requestId": {
+                                "type": "string"
+                              },
+                              "usage": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "cacheReadTokens": {
+                                    "type": "integer"
+                                  },
+                                  "cacheWriteTokens": {
+                                    "type": "integer"
+                                  },
+                                  "inputTokens": {
+                                    "type": "integer"
+                                  },
+                                  "outputTokens": {
+                                    "type": "integer"
+                                  }
+                                },
+                                "required": [
+                                  "inputTokens",
+                                  "outputTokens"
+                                ],
+                                "type": "object"
+                              },
+                              "value": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "confidence",
+                              "provider",
+                              "model",
+                              "latencyMs",
+                              "costUsd",
+                              "attempts",
+                              "kind",
+                              "value",
+                              "normalized",
+                              "level",
+                              "levelLabel",
+                              "levels",
+                              "probabilities"
+                            ],
+                            "type": "object"
+                          },
+                          "reliable": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "attempts": {
+                                "items": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "errorCode": {
+                                      "type": "string"
+                                    },
+                                    "latencyMs": {
+                                      "type": "integer"
+                                    },
+                                    "model": {
+                                      "type": "string"
+                                    },
+                                    "outcome": {
+                                      "type": "string"
+                                    },
+                                    "provider": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "provider",
+                                    "model",
+                                    "outcome",
+                                    "latencyMs"
+                                  ],
+                                  "type": "object"
+                                },
+                                "type": "array"
+                              },
+                              "confidence": {
+                                "type": "number"
+                              },
+                              "costUsd": {
+                                "type": "number"
+                              },
+                              "kind": {
+                                "type": "string"
+                              },
+                              "latencyMs": {
+                                "type": "integer"
+                              },
+                              "level": {
+                                "type": "integer"
+                              },
+                              "levelLabel": {
+                                "type": "string"
+                              },
+                              "levels": {
+                                "items": {
+                                  "type": "string"
+                                },
+                                "type": "array"
+                              },
+                              "model": {
+                                "type": "string"
+                              },
+                              "normalized": {
+                                "type": "number"
+                              },
+                              "probabilities": {
+                                "additionalProperties": {
+                                  "type": "number"
+                                },
+                                "properties": {},
+                                "type": "object"
+                              },
+                              "provider": {
+                                "type": "string"
+                              },
+                              "raw": {},
+                              "requestId": {
+                                "type": "string"
+                              },
+                              "usage": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "cacheReadTokens": {
+                                    "type": "integer"
+                                  },
+                                  "cacheWriteTokens": {
+                                    "type": "integer"
+                                  },
+                                  "inputTokens": {
+                                    "type": "integer"
+                                  },
+                                  "outputTokens": {
+                                    "type": "integer"
+                                  }
+                                },
+                                "required": [
+                                  "inputTokens",
+                                  "outputTokens"
+                                ],
+                                "type": "object"
+                              },
+                              "value": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "confidence",
+                              "provider",
+                              "model",
+                              "latencyMs",
+                              "costUsd",
+                              "attempts",
+                              "kind",
+                              "value",
+                              "normalized",
+                              "level",
+                              "levelLabel",
+                              "levels",
+                              "probabilities"
+                            ],
+                            "type": "object"
+                          }
+                        },
+                        "required": [
+                          "relevant",
+                          "reliable"
+                        ],
+                        "type": "object"
+                      },
+                      "query": {
+                        "type": "string"
+                      },
+                      "result": {}
+                    },
+                    "required": [
+                      "judgment",
+                      "query",
+                      "result"
+                    ],
+                    "type": "object"
+                  }
+                ]
+              },
+              "type": "array"
+            }
+          }
+        },
+        "configTemplates": {},
+        "credentials": {},
+        "inputs": {},
+        "kind": "task",
+        "manifest": {
+          "capabilities": [],
+          "configSchema": {
+            "additionalProperties": false,
+            "properties": {
+              "expr": {
+                "maxLength": 4000,
+                "minLength": 1,
+                "type": "string",
+                "x-ui": {
+                  "language": "flowexpr",
+                  "widget": "code"
+                }
+              },
+              "output": {
+                "type": "object",
+                "x-ui": {
+                  "help": "JSON Schema of the result; the compiler checks the expression against it.",
+                  "widget": "schema"
+                }
+              }
+            },
+            "required": [
+              "expr"
+            ],
+            "type": "object"
+          },
+          "controlPorts": [],
+          "credentials": [],
+          "defaultPolicy": {
+            "timeoutMs": 10000
+          },
+          "generation": false,
+          "id": "flowaid.data.transform",
+          "idempotency": "safe",
+          "inputs": [],
+          "metadata": {
+            "category": "data",
+            "description": "Computes a value with a FlowExpr expression over other nodes' outputs. `output` optionally declares the result's JSON Schema.",
+            "icon": "function-square",
+            "name": "Transform",
+            "summary": "{{ config.expr }}",
+            "tags": [
+              "data",
+              "expression"
+            ]
+          },
+          "migrations": [],
+          "optionProviders": [],
+          "outputs": [
+            {
+              "name": "result",
+              "required": true,
+              "schema": {}
+            }
+          ],
+          "pool": "general",
+          "portRules": [
+            {
+              "kind": "outputSchemaFromConfig",
+              "path": "/output",
+              "port": "result"
+            }
+          ],
+          "streams": false,
+          "version": "1.0.0"
+        },
+        "tool": null,
+        "type": "flowaid.data.transform",
+        "typeVersion": "1.0.0"
+      },
+      "outputs": {
+        "result": {
+          "items": {
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "policy": {
+        "maxCostUsd": null,
+        "maxTokens": null,
+        "onError": "fail",
+        "privacy": {
+          "containsPII": false,
+          "doNotPersist": false,
+          "redactFields": [],
+          "sensitive": false
+        },
+        "retry": {
+          "allowOnIrreversible": false,
+          "backoff": {
+            "factor": 2,
+            "initialMs": 500,
+            "jitter": true,
+            "maxMs": 30000,
+            "type": "exponential"
+          },
+          "maxAttempts": 1
+        },
+        "timeoutMs": 10000
+      },
+      "pool": "general",
+      "redact": [],
+      "scope": "research",
+      "successors": [
+        "completeness",
+        "synthesis"
+      ]
+    },
+    "synthesis": {
+      "batchGroup": null,
+      "controlIn": [],
+      "controlOut": [
+        "done"
+      ],
+      "dataIn": [
+        {
+          "from": {
+            "node": "start",
+            "port": "question"
+          },
+          "optional": false,
+          "to": {
+            "node": "synthesis",
+            "port": "prompt"
+          },
+          "via": "hoisted"
+        },
+        {
+          "from": {
+            "node": "store",
+            "port": "result"
+          },
+          "optional": false,
+          "to": {
+            "node": "synthesis",
+            "port": "prompt"
+          },
+          "via": "template"
+        }
+      ],
+      "guard": [
+        []
+      ],
+      "id": "synthesis",
+      "idempotency": "safe",
+      "kind": "task",
+      "name": "Synthesize",
+      "op": {
+        "config": {
+          "model": {
+            "model": "claude-sonnet-4-5",
+            "provider": "anthropic"
+          },
+          "schema": {
+            "properties": {
+              "answer": {
+                "type": "string"
+              },
+              "citations": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "answer",
+              "citations"
+            ],
+            "type": "object"
+          }
+        },
+        "configBindings": {},
+        "configTemplates": {},
+        "credentials": {
+          "llm": "ANTHROPIC_API_KEY"
+        },
+        "inputs": {
+          "prompt": {
+            "kind": "template",
+            "schema": {
+              "type": "string"
+            },
+            "template": {
+              "parts": [
+                {
+                  "kind": "text",
+                  "text": "Question: "
+                },
+                {
+                  "expr": {
+                    "kind": "ref",
+                    "ref": {
+                      "kind": "port",
+                      "node": "start",
+                      "port": "question"
+                    }
+                  },
+                  "filter": "string",
+                  "kind": "hole",
+                  "range": {
+                    "end": 30,
+                    "start": 10
+                  }
+                },
+                {
+                  "kind": "text",
+                  "text": "\nEvidence (scored): "
+                },
+                {
+                  "expr": {
+                    "kind": "ref",
+                    "ref": {
+                      "kind": "port",
+                      "node": "store",
+                      "port": "result"
+                    }
+                  },
+                  "filter": "json",
+                  "kind": "hole",
+                  "range": {
+                    "end": 75,
+                    "start": 50
+                  }
+                },
+                {
+                  "kind": "text",
+                  "text": "\nWrite a sourced answer; cite by url."
+                }
+              ]
+            }
+          }
+        },
+        "kind": "task",
+        "manifest": {
+          "capabilities": [
+            "generation",
+            "credentials"
+          ],
+          "configSchema": {
+            "additionalProperties": false,
+            "properties": {
+              "maxOutputTokens": {
+                "default": 1024,
+                "maximum": 65536,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "model": {
+                "properties": {
+                  "model": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "provider": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "provider",
+                  "model"
+                ],
+                "type": "object",
+                "x-ui": {
+                  "widget": "model"
+                }
+              },
+              "schema": {
+                "type": "object",
+                "x-ui": {
+                  "help": "JSON Schema the model's answer must match; it types the `structured` output.",
+                  "widget": "schema"
+                }
+              },
+              "system": {
+                "maxLength": 32000,
+                "type": "string",
+                "x-ui": {
+                  "widget": "template"
+                }
+              },
+              "temperature": {
+                "default": 1,
+                "maximum": 2,
+                "minimum": 0,
+                "type": "number"
+              }
+            },
+            "required": [
+              "model",
+              "schema"
+            ],
+            "type": "object"
+          },
+          "controlPorts": [],
+          "credentials": [
+            {
+              "name": "llm",
+              "required": true,
+              "types": [
+                "openai.api_key",
+                "anthropic.api_key",
+                "ollama.none"
+              ]
+            }
+          ],
+          "defaultPolicy": {
+            "timeoutMs": 120000
+          },
+          "generation": true,
+          "id": "flowaid.ai.structured_generate",
+          "idempotency": "safe",
+          "inputs": [
+            {
+              "name": "prompt",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "metadata": {
+            "category": "generation",
+            "description": "Asks a chat model for a JSON answer that matches `schema` (native structured output where the provider supports it, validated either way).",
+            "icon": "braces",
+            "name": "Structured generation",
+            "summary": "{{ config.model.provider }}/{{ config.model.model }}",
+            "tags": [
+              "ai",
+              "generation",
+              "json"
+            ]
+          },
+          "migrations": [],
+          "optionProviders": [
+            "models"
+          ],
+          "outputs": [
+            {
+              "name": "structured",
+              "required": true,
+              "schema": {
+                "type": "object"
+              }
+            },
+            {
+              "name": "usage",
+              "required": true,
+              "schema": {
+                "properties": {
+                  "inputTokens": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "outputTokens": {
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "inputTokens",
+                  "outputTokens"
+                ],
+                "type": "object"
+              }
+            }
+          ],
+          "pool": "general",
+          "portRules": [
+            {
+              "kind": "outputSchemaFromConfig",
+              "path": "/schema",
+              "port": "structured"
+            }
+          ],
+          "streams": false,
+          "version": "1.0.0"
+        },
+        "tool": null,
+        "type": "flowaid.ai.structured_generate",
+        "typeVersion": "1.0.0"
+      },
+      "outputs": {
+        "structured": {
+          "properties": {
+            "answer": {
+              "type": "string"
+            },
+            "citations": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "answer",
+            "citations"
+          ],
+          "type": "object"
+        },
+        "usage": {
+          "properties": {
+            "inputTokens": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "outputTokens": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "inputTokens",
+            "outputTokens"
+          ],
+          "type": "object"
+        }
+      },
+      "policy": {
+        "maxCostUsd": null,
+        "maxTokens": null,
+        "onError": "fail",
+        "privacy": {
+          "containsPII": false,
+          "doNotPersist": false,
+          "redactFields": [],
+          "sensitive": false
+        },
+        "retry": {
+          "allowOnIrreversible": false,
+          "backoff": {
+            "factor": 2,
+            "initialMs": 500,
+            "jitter": true,
+            "maxMs": 30000,
+            "type": "exponential"
+          },
+          "maxAttempts": 1
+        },
+        "timeoutMs": 120000
+      },
+      "pool": "general",
+      "redact": [],
+      "scope": "research",
+      "successors": [
+        "completeness"
+      ]
+    },
+    "web": {
+      "batchGroup": null,
+      "controlIn": [],
+      "controlOut": [
+        "done"
+      ],
+      "dataIn": [],
+      "guard": [
+        []
+      ],
+      "id": "web",
+      "idempotency": "safe",
+      "kind": "task",
+      "name": "Search",
+      "op": {
+        "config": {
+          "method": "GET",
+          "responseType": "json"
+        },
+        "configBindings": {},
+        "configTemplates": {
+          "/url": {
+            "parts": [
+              {
+                "kind": "text",
+                "text": "https://search.example.com/v1?q="
+              },
+              {
+                "expr": {
+                  "kind": "ref",
+                  "ref": {
+                    "field": "item",
+                    "kind": "scope",
+                    "path": "/query"
+                  }
+                },
+                "filter": "string",
+                "kind": "hole",
+                "range": {
+                  "end": 55,
+                  "start": 32
+                }
+              },
+              {
+                "kind": "text",
+                "text": "&source="
+              },
+              {
+                "expr": {
+                  "kind": "ref",
+                  "ref": {
+                    "field": "item",
+                    "kind": "scope",
+                    "path": "/source"
+                  }
+                },
+                "filter": "string",
+                "kind": "hole",
+                "range": {
+                  "end": 87,
+                  "start": 63
+                }
+              }
+            ]
+          }
+        },
+        "credentials": {
+          "auth": "SEARCH_API"
+        },
+        "inputs": {},
+        "kind": "task",
+        "manifest": {
+          "capabilities": [
+            "network",
+            "credentials",
+            "artifacts"
+          ],
+          "configSchema": {
+            "additionalProperties": false,
+            "properties": {
+              "body": {
+                "x-ui": {
+                  "bindable": true,
+                  "showWhen": {
+                    "oneOf": [
+                      "POST",
+                      "PUT",
+                      "PATCH"
+                    ],
+                    "path": "/method"
+                  },
+                  "widget": "json"
+                }
+              },
+              "headers": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "default": {},
+                "type": "object",
+                "x-ui": {
+                  "widget": "keyvalue"
+                }
+              },
+              "method": {
+                "default": "GET",
+                "enum": [
+                  "GET",
+                  "HEAD",
+                  "OPTIONS",
+                  "POST",
+                  "PUT",
+                  "PATCH",
+                  "DELETE"
+                ],
+                "type": "string",
+                "x-ui": {
+                  "widget": "select"
+                }
+              },
+              "query": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "default": {},
+                "type": "object",
+                "x-ui": {
+                  "widget": "keyvalue"
+                }
+              },
+              "responseType": {
+                "default": "json",
+                "enum": [
+                  "json",
+                  "text",
+                  "binary"
+                ],
+                "type": "string"
+              },
+              "timeoutMs": {
+                "default": 30000,
+                "maximum": 120000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "url": {
+                "minLength": 1,
+                "type": "string",
+                "x-ui": {
+                  "placeholder": "https://api.example.com/items/{{ start.id }}",
+                  "widget": "template"
+                }
+              }
+            },
+            "required": [
+              "method",
+              "url"
+            ],
+            "type": "object"
+          },
+          "controlPorts": [],
+          "credentials": [
+            {
+              "description": "Applied as Authorization or a custom header.",
+              "name": "auth",
+              "required": false,
+              "types": [
+                "http.bearer",
+                "http.basic",
+                "http.header",
+                "http.api_key"
+              ]
+            }
+          ],
+          "defaultPolicy": {
+            "timeoutMs": 30000
+          },
+          "generation": false,
+          "id": "flowaid.tools.http",
+          "idempotency": {
+            "byConfig": "/method",
+            "cases": {
+              "DELETE": "keyed",
+              "GET": "safe",
+              "HEAD": "safe",
+              "OPTIONS": "safe",
+              "PATCH": "none",
+              "POST": "none",
+              "PUT": "keyed"
+            },
+            "default": "none"
+          },
+          "inputs": [],
+          "metadata": {
+            "category": "tool",
+            "description": "Calls an HTTP endpoint through the safe fetch (private-network, redirect and size limits) and returns status, headers and the parsed body.",
+            "icon": "globe",
+            "name": "HTTP request",
+            "summary": "{{ config.method }} {{ config.url }}",
+            "tags": [
+              "http",
+              "tool",
+              "network"
+            ]
+          },
+          "migrations": [],
+          "optionProviders": [],
+          "outputs": [
+            {
+              "name": "status",
+              "required": true,
+              "schema": {
+                "maximum": 599,
+                "minimum": 100,
+                "type": "integer"
+              }
+            },
+            {
+              "name": "headers",
+              "required": true,
+              "schema": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              }
+            },
+            {
+              "description": "Parsed JSON or text; { \"$artifact\": id } for binary responses; null for empty bodies.",
+              "name": "body",
+              "required": false,
+              "schema": {}
+            }
+          ],
+          "pool": "general",
+          "portRules": [],
+          "streams": false,
+          "version": "1.0.0"
+        },
+        "tool": null,
+        "type": "flowaid.tools.http",
+        "typeVersion": "1.0.0"
+      },
+      "outputs": {
+        "body": {},
+        "headers": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "status": {
+          "maximum": 599,
+          "minimum": 100,
+          "type": "integer"
+        }
+      },
+      "policy": {
+        "maxCostUsd": null,
+        "maxTokens": null,
+        "onError": "fail",
+        "privacy": {
+          "containsPII": false,
+          "doNotPersist": false,
+          "redactFields": [],
+          "sensitive": false
+        },
+        "retry": {
+          "allowOnIrreversible": false,
+          "backoff": {
+            "factor": 2,
+            "initialMs": 500,
+            "jitter": true,
+            "maxMs": 30000,
+            "type": "exponential"
+          },
+          "maxAttempts": 2
+        },
+        "timeoutMs": 30000
+      },
+      "pool": "general",
+      "redact": [],
+      "scope": "search_all",
+      "successors": [
+        "judge"
+      ]
+    }
+  },
+  "outputs": {
+    "properties": {
+      "answer": {
+        "type": "string"
+      },
+      "complete": {
+        "type": "boolean"
+      },
+      "evidence": {
+        "items": {
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "rounds": {
+        "type": "integer"
+      }
+    },
+    "required": [
+      "answer",
+      "evidence",
+      "complete"
+    ],
+    "type": "object"
+  },
+  "planHash": "25adc6fda089b01939600a1338ad7d6240a28f1510467edb4787069b06b60c35",
+  "planVersion": 1,
+  "pools": [
+    "general"
+  ],
+  "requiredCapabilities": [
+    "artifacts",
+    "credentials",
+    "decision",
+    "generation",
+    "network"
+  ],
+  "scopes": {
+    "": {
+      "container": null,
+      "entries": [
+        "start"
+      ],
+      "id": "",
+      "kind": "root",
+      "nodes": [
+        "start",
+        "research",
+        "out_done",
+        "out_partial"
+      ],
+      "order": [
+        "start",
+        "research",
+        "out_done",
+        "out_partial"
+      ],
+      "outputs": [
+        "out_done",
+        "out_partial"
+      ],
+      "parent": null
+    },
+    "research": {
+      "container": "research",
+      "entries": [
+        "planner"
+      ],
+      "id": "research",
+      "kind": "loop",
+      "nodes": [
+        "planner",
+        "search_all",
+        "store",
+        "synthesis",
+        "completeness"
+      ],
+      "order": [
+        "planner",
+        "search_all",
+        "store",
+        "synthesis",
+        "completeness"
+      ],
+      "outputs": [],
+      "parent": ""
+    },
+    "search_all": {
+      "container": "search_all",
+      "entries": [
+        "web"
+      ],
+      "id": "search_all",
+      "kind": "foreach",
+      "nodes": [
+        "web",
+        "judge"
+      ],
+      "order": [
+        "web",
+        "judge"
+      ],
+      "outputs": [],
+      "parent": "research"
+    }
+  },
+  "secrets": [
+    {
+      "credentialType": "typesafe.api_key",
+      "name": "TYPESAFE_API_KEY",
+      "required": true
+    },
+    {
+      "credentialType": "anthropic.api_key",
+      "name": "ANTHROPIC_API_KEY",
+      "required": true
+    },
+    {
+      "credentialType": "http.api_key",
+      "name": "SEARCH_API",
+      "required": true
+    }
+  ],
+  "subflows": [],
+  "triggers": [],
+  "variables": [],
+  "workflowId": "b4d6f8a0-2c4e-4a6b-8d0f-1e3a5c7b9d2f"
+}

@@ -1,0 +1,6072 @@
+{
+  "batchGroups": {},
+  "catalogSnapshot": {
+    "flowaid.data.transform": "1.0.0",
+    "flowaid.decision.batch": "1.0.0",
+    "flowaid.decision.boolean": "1.0.0",
+    "flowaid.tools.http": "1.0.0",
+    "flowaid.tools.mcp": "1.0.0"
+  },
+  "compilerVersion": "0.1.0",
+  "dataEdges": [
+    {
+      "from": {
+        "node": "start",
+        "port": "action"
+      },
+      "optional": false,
+      "to": {
+        "node": "opened",
+        "port": "yes"
+      },
+      "via": "expr"
+    },
+    {
+      "from": {
+        "node": "start",
+        "port": "issue"
+      },
+      "optional": true,
+      "path": "/body",
+      "to": {
+        "node": "actionable",
+        "port": "state"
+      },
+      "via": "expr"
+    },
+    {
+      "from": {
+        "node": "start",
+        "port": "issue"
+      },
+      "optional": true,
+      "to": {
+        "node": "actionable",
+        "port": "state"
+      },
+      "via": "ref"
+    },
+    {
+      "from": {
+        "node": "actionable",
+        "port": "decision"
+      },
+      "optional": false,
+      "path": "/value",
+      "to": {
+        "node": "act_gate",
+        "port": "yes"
+      },
+      "via": "expr"
+    },
+    {
+      "from": {
+        "node": "actionable",
+        "port": "decision"
+      },
+      "optional": false,
+      "path": "/confidence",
+      "to": {
+        "node": "act_gate",
+        "port": "yes"
+      },
+      "via": "expr"
+    },
+    {
+      "from": {
+        "node": "start",
+        "port": "issue"
+      },
+      "optional": true,
+      "path": "/body",
+      "to": {
+        "node": "classify",
+        "port": "state"
+      },
+      "via": "expr"
+    },
+    {
+      "from": {
+        "node": "start",
+        "port": "issue"
+      },
+      "optional": false,
+      "path": "/title",
+      "to": {
+        "node": "classify",
+        "port": "state"
+      },
+      "via": "ref"
+    },
+    {
+      "from": {
+        "node": "start",
+        "port": "repository"
+      },
+      "optional": false,
+      "path": "/full_name",
+      "to": {
+        "node": "similar",
+        "port": "q"
+      },
+      "via": "template"
+    },
+    {
+      "from": {
+        "node": "start",
+        "port": "issue"
+      },
+      "optional": false,
+      "path": "/title",
+      "to": {
+        "node": "similar",
+        "port": "q"
+      },
+      "via": "template"
+    },
+    {
+      "from": {
+        "node": "similar",
+        "port": "result"
+      },
+      "optional": false,
+      "path": "/items",
+      "to": {
+        "node": "dup_judge",
+        "port": "state"
+      },
+      "via": "expr"
+    },
+    {
+      "from": {
+        "node": "start",
+        "port": "issue"
+      },
+      "optional": false,
+      "to": {
+        "node": "dup_judge",
+        "port": "state"
+      },
+      "via": "ref"
+    },
+    {
+      "from": {
+        "node": "similar",
+        "port": "result"
+      },
+      "optional": false,
+      "path": "/items",
+      "to": {
+        "node": "is_dup",
+        "port": "dup"
+      },
+      "via": "expr"
+    },
+    {
+      "from": {
+        "node": "dup_judge",
+        "port": "decision"
+      },
+      "optional": false,
+      "path": "/value",
+      "to": {
+        "node": "is_dup",
+        "port": "dup"
+      },
+      "via": "expr"
+    },
+    {
+      "from": {
+        "node": "dup_judge",
+        "port": "decision"
+      },
+      "optional": false,
+      "path": "/confidence",
+      "to": {
+        "node": "is_dup",
+        "port": "dup"
+      },
+      "via": "expr"
+    },
+    {
+      "from": {
+        "node": "similar",
+        "port": "result"
+      },
+      "optional": false,
+      "path": "/items",
+      "to": {
+        "node": "gh_dup_comment",
+        "port": "body"
+      },
+      "via": "template"
+    },
+    {
+      "from": {
+        "node": "dup_judge",
+        "port": "decision"
+      },
+      "optional": false,
+      "path": "/confidence",
+      "to": {
+        "node": "gh_dup_comment",
+        "port": "body"
+      },
+      "via": "template"
+    },
+    {
+      "from": {
+        "node": "start",
+        "port": "issue"
+      },
+      "optional": false,
+      "path": "/number",
+      "to": {
+        "node": "gh_dup_comment",
+        "port": "issue_number"
+      },
+      "via": "ref"
+    },
+    {
+      "from": {
+        "node": "start",
+        "port": "repository"
+      },
+      "optional": false,
+      "path": "/full_name",
+      "to": {
+        "node": "gh_dup_comment",
+        "port": "owner"
+      },
+      "via": "expr"
+    },
+    {
+      "from": {
+        "node": "start",
+        "port": "repository"
+      },
+      "optional": false,
+      "path": "/full_name",
+      "to": {
+        "node": "gh_dup_comment",
+        "port": "repo"
+      },
+      "via": "expr"
+    },
+    {
+      "from": {
+        "node": "classify",
+        "port": "answers"
+      },
+      "optional": false,
+      "path": "/kind/value",
+      "to": {
+        "node": "labels",
+        "port": "expr"
+      },
+      "via": "expr"
+    },
+    {
+      "from": {
+        "node": "classify",
+        "port": "answers"
+      },
+      "optional": false,
+      "path": "/severity/levelLabel",
+      "to": {
+        "node": "labels",
+        "port": "expr"
+      },
+      "via": "expr"
+    },
+    {
+      "from": {
+        "node": "start",
+        "port": "issue"
+      },
+      "optional": false,
+      "path": "/number",
+      "to": {
+        "node": "gh_label",
+        "port": "issue_number"
+      },
+      "via": "ref"
+    },
+    {
+      "from": {
+        "node": "labels",
+        "port": "result"
+      },
+      "optional": false,
+      "to": {
+        "node": "gh_label",
+        "port": "labels"
+      },
+      "via": "ref"
+    },
+    {
+      "from": {
+        "node": "start",
+        "port": "repository"
+      },
+      "optional": false,
+      "path": "/full_name",
+      "to": {
+        "node": "gh_label",
+        "port": "owner"
+      },
+      "via": "expr"
+    },
+    {
+      "from": {
+        "node": "start",
+        "port": "repository"
+      },
+      "optional": false,
+      "path": "/full_name",
+      "to": {
+        "node": "gh_label",
+        "port": "repo"
+      },
+      "via": "expr"
+    },
+    {
+      "from": {
+        "node": "classify",
+        "port": "answers"
+      },
+      "optional": false,
+      "path": "/kind/value",
+      "to": {
+        "node": "route",
+        "port": "oncall"
+      },
+      "via": "expr"
+    },
+    {
+      "from": {
+        "node": "classify",
+        "port": "answers"
+      },
+      "optional": false,
+      "path": "/severity/value",
+      "to": {
+        "node": "route",
+        "port": "oncall"
+      },
+      "via": "expr"
+    },
+    {
+      "from": {
+        "node": "classify",
+        "port": "answers"
+      },
+      "optional": false,
+      "path": "/kind/value",
+      "to": {
+        "node": "route",
+        "port": "product"
+      },
+      "via": "expr"
+    },
+    {
+      "from": {
+        "node": "start",
+        "port": "issue"
+      },
+      "optional": false,
+      "path": "/html_url",
+      "to": {
+        "node": "page",
+        "port": "body"
+      },
+      "via": "template"
+    },
+    {
+      "from": {
+        "node": "classify",
+        "port": "answers"
+      },
+      "optional": false,
+      "path": "/severity/value",
+      "to": {
+        "node": "page",
+        "port": "body"
+      },
+      "via": "template"
+    },
+    {
+      "from": {
+        "node": "similar",
+        "port": "result"
+      },
+      "optional": false,
+      "path": "/items",
+      "to": {
+        "node": "out_dup",
+        "port": "value"
+      },
+      "via": "expr"
+    },
+    {
+      "from": {
+        "node": "labels",
+        "port": "result"
+      },
+      "optional": false,
+      "to": {
+        "node": "out_routed",
+        "port": "value"
+      },
+      "via": "ref"
+    },
+    {
+      "from": {
+        "node": "route",
+        "port": "taken"
+      },
+      "optional": false,
+      "to": {
+        "node": "out_routed",
+        "port": "value"
+      },
+      "via": "expr"
+    }
+  ],
+  "definitionHash": "35f86a4f4e16ea229e8bccf79b87136e3d7f7878d4ed6a2e459c145811b98090",
+  "estimate": {
+    "maxCostUsd": 0.2,
+    "nodeCount": 16
+  },
+  "execution": {
+    "concurrency": 8,
+    "decisions": {
+      "batching": true,
+      "failover": [],
+      "primary": {
+        "model": "jev-latest",
+        "provider": "typesafe"
+      }
+    },
+    "defaultNodeTimeoutMs": 120000,
+    "defaultRetry": {
+      "allowOnIrreversible": false,
+      "backoff": {
+        "factor": 2,
+        "initialMs": 500,
+        "jitter": true,
+        "maxMs": 30000,
+        "type": "exponential"
+      },
+      "maxAttempts": 1
+    },
+    "maxCostUsd": 0.2,
+    "maxNodeRuns": 2000,
+    "maxSubflowDepth": 4,
+    "privacy": {
+      "containsPII": false,
+      "doNotPersist": false,
+      "redactFields": [],
+      "sensitive": false
+    },
+    "retention": "standard",
+    "timeoutMs": 120000
+  },
+  "inputs": {
+    "properties": {
+      "action": {
+        "type": "string"
+      },
+      "issue": {
+        "properties": {
+          "body": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "html_url": {
+            "type": "string"
+          },
+          "number": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "number",
+          "title",
+          "html_url"
+        ],
+        "type": "object"
+      },
+      "repository": {
+        "properties": {
+          "full_name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "full_name"
+        ],
+        "type": "object"
+      }
+    },
+    "required": [
+      "action",
+      "issue",
+      "repository"
+    ],
+    "type": "object"
+  },
+  "nodes": {
+    "act_gate": {
+      "batchGroup": null,
+      "controlIn": [],
+      "controlOut": [
+        "yes",
+        "no"
+      ],
+      "dataIn": [
+        {
+          "from": {
+            "node": "actionable",
+            "port": "decision"
+          },
+          "optional": false,
+          "path": "/value",
+          "to": {
+            "node": "act_gate",
+            "port": "yes"
+          },
+          "via": "expr"
+        },
+        {
+          "from": {
+            "node": "actionable",
+            "port": "decision"
+          },
+          "optional": false,
+          "path": "/confidence",
+          "to": {
+            "node": "act_gate",
+            "port": "yes"
+          },
+          "via": "expr"
+        }
+      ],
+      "guard": [
+        [
+          {
+            "node": "opened",
+            "port": "yes"
+          }
+        ]
+      ],
+      "id": "act_gate",
+      "idempotency": "safe",
+      "kind": "branch",
+      "name": "Actionable gate",
+      "op": {
+        "cases": [
+          {
+            "port": "yes",
+            "source": "actionable.decision.value && actionable.decision.confidence >= 0.7",
+            "when": {
+              "kind": "binary",
+              "left": {
+                "kind": "ref",
+                "ref": {
+                  "kind": "port",
+                  "node": "actionable",
+                  "path": "/value",
+                  "port": "decision"
+                }
+              },
+              "op": "&&",
+              "right": {
+                "kind": "binary",
+                "left": {
+                  "kind": "ref",
+                  "ref": {
+                    "kind": "port",
+                    "node": "actionable",
+                    "path": "/confidence",
+                    "port": "decision"
+                  }
+                },
+                "op": ">=",
+                "right": {
+                  "kind": "literal",
+                  "value": 0.7
+                }
+              }
+            }
+          }
+        ],
+        "defaultPort": "no",
+        "kind": "branch",
+        "mode": "first"
+      },
+      "outputs": {
+        "taken": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "policy": {
+        "maxCostUsd": null,
+        "maxTokens": null,
+        "onError": "fail",
+        "privacy": {
+          "containsPII": false,
+          "doNotPersist": false,
+          "redactFields": [],
+          "sensitive": false
+        },
+        "retry": {
+          "allowOnIrreversible": false,
+          "backoff": {
+            "factor": 2,
+            "initialMs": 500,
+            "jitter": true,
+            "maxMs": 30000,
+            "type": "exponential"
+          },
+          "maxAttempts": 1
+        },
+        "timeoutMs": 120000
+      },
+      "pool": "general",
+      "redact": [],
+      "scope": "",
+      "successors": [
+        "classify",
+        "out_ignored",
+        "similar"
+      ]
+    },
+    "actionable": {
+      "batchGroup": null,
+      "controlIn": [
+        {
+          "edgeId": "c2",
+          "from": {
+            "node": "opened",
+            "port": "yes"
+          },
+          "group": 0
+        }
+      ],
+      "controlOut": [
+        "done"
+      ],
+      "dataIn": [
+        {
+          "from": {
+            "node": "start",
+            "port": "issue"
+          },
+          "optional": true,
+          "path": "/body",
+          "to": {
+            "node": "actionable",
+            "port": "state"
+          },
+          "via": "expr"
+        },
+        {
+          "from": {
+            "node": "start",
+            "port": "issue"
+          },
+          "optional": true,
+          "to": {
+            "node": "actionable",
+            "port": "state"
+          },
+          "via": "ref"
+        }
+      ],
+      "guard": [
+        [
+          {
+            "node": "opened",
+            "port": "yes"
+          }
+        ]
+      ],
+      "id": "actionable",
+      "idempotency": "safe",
+      "kind": "task",
+      "name": "Actionable?",
+      "op": {
+        "config": {
+          "criteria": {
+            "false": "Spam, empty or off-topic",
+            "true": "Actionable"
+          },
+          "instructions": "Is this issue actionable by maintainers (a real bug, feature, docs or usage question rather than spam/empty)?"
+        },
+        "configBindings": {},
+        "configTemplates": {},
+        "credentials": {
+          "typesafe": "TYPESAFE_API_KEY"
+        },
+        "inputs": {
+          "state": {
+            "fields": {
+              "body": {
+                "ast": {
+                  "args": [
+                    {
+                      "kind": "ref",
+                      "ref": {
+                        "kind": "port",
+                        "node": "start",
+                        "path": "/body",
+                        "port": "issue"
+                      }
+                    },
+                    {
+                      "kind": "literal",
+                      "value": ""
+                    }
+                  ],
+                  "fn": "coalesce",
+                  "kind": "call"
+                },
+                "kind": "expr",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "title": {
+                "default": {},
+                "kind": "ref",
+                "optional": true,
+                "ref": {
+                  "kind": "port",
+                  "node": "start",
+                  "port": "issue"
+                },
+                "schema": {
+                  "properties": {
+                    "body": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "html_url": {
+                      "type": "string"
+                    },
+                    "number": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "number",
+                    "title",
+                    "html_url"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "kind": "object",
+            "schema": {
+              "additionalProperties": false,
+              "properties": {
+                "body": {
+                  "type": "string"
+                },
+                "title": {
+                  "properties": {
+                    "body": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "html_url": {
+                      "type": "string"
+                    },
+                    "number": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "number",
+                    "title",
+                    "html_url"
+                  ],
+                  "type": "object"
+                }
+              },
+              "required": [
+                "body",
+                "title"
+              ],
+              "type": "object"
+            }
+          }
+        },
+        "kind": "task",
+        "manifest": {
+          "capabilities": [
+            "decision",
+            "credentials"
+          ],
+          "configSchema": {
+            "additionalProperties": false,
+            "properties": {
+              "criteria": {
+                "additionalProperties": false,
+                "properties": {
+                  "false": {
+                    "type": "string"
+                  },
+                  "true": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "true",
+                  "false"
+                ],
+                "type": "object",
+                "x-ui": {
+                  "help": "Optional descriptions of what makes the answer true or false (both or none).",
+                  "widget": "criteria"
+                }
+              },
+              "instructions": {
+                "maxLength": 4000,
+                "minLength": 1,
+                "type": "string",
+                "x-ui": {
+                  "widget": "textarea"
+                }
+              }
+            },
+            "required": [
+              "instructions"
+            ],
+            "type": "object"
+          },
+          "controlPorts": [],
+          "credentials": [
+            {
+              "name": "typesafe",
+              "required": true,
+              "types": [
+                "typesafe.api_key"
+              ]
+            }
+          ],
+          "decision": {
+            "kind": "boolean"
+          },
+          "defaultPolicy": {
+            "timeoutMs": 30000
+          },
+          "generation": false,
+          "id": "flowaid.decision.boolean",
+          "idempotency": "safe",
+          "inputs": [
+            {
+              "name": "state",
+              "required": true,
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "object"
+                  },
+                  {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                ],
+                "description": "TypeSafe state: text, an object (sent verbatim) or an array of text."
+              }
+            }
+          ],
+          "metadata": {
+            "category": "decision",
+            "description": "Answers a yes/no question about `state` with `pYes` and `confidence = max(pYes, 1 - pYes)` (TypeSafe boolean decision).",
+            "icon": "toggle-left",
+            "name": "Boolean",
+            "summary": "{{ config.instructions }}",
+            "tags": [
+              "decision",
+              "typesafe"
+            ]
+          },
+          "migrations": [],
+          "optionProviders": [],
+          "outputs": [
+            {
+              "name": "decision",
+              "required": true,
+              "schema": {
+                "$defs": {
+                  "__schema0": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "null"
+                      },
+                      {
+                        "items": {
+                          "$ref": "#/$defs/__schema0"
+                        },
+                        "type": "array"
+                      },
+                      {
+                        "additionalProperties": {
+                          "$ref": "#/$defs/__schema0"
+                        },
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "type": "object"
+                      }
+                    ]
+                  }
+                },
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "additionalProperties": false,
+                "properties": {
+                  "attempts": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "errorCode": {
+                          "enum": [
+                            "WORKFLOW_VALIDATION_ERROR",
+                            "SCHEMA_VALIDATION_ERROR",
+                            "NODE_EXECUTION_ERROR",
+                            "TOOL_EXECUTION_ERROR",
+                            "PROVIDER_ERROR",
+                            "PROVIDER_RATE_LIMITED",
+                            "PROVIDER_OVERLOADED",
+                            "CREDENTIAL_ERROR",
+                            "TIMEOUT_ERROR",
+                            "RATE_LIMIT_ERROR",
+                            "CANCELLED_ERROR",
+                            "BOUNDS_EXCEEDED",
+                            "INPUT_MISSING",
+                            "OUTPUT_SCHEMA_MISMATCH",
+                            "EXPRESSION_ERROR",
+                            "SANDBOX_ERROR",
+                            "WORKER_LOST",
+                            "NONIDEMPOTENT_INTERRUPTED",
+                            "HUMAN_APPROVAL_REQUIRED",
+                            "HUMAN_TASK_EXPIRED",
+                            "SUBFLOW_ERROR",
+                            "NO_OUTPUT",
+                            "NETWORK_ERROR",
+                            "NOT_FOUND",
+                            "CONFLICT",
+                            "UNAUTHORIZED",
+                            "FORBIDDEN",
+                            "BAD_REQUEST",
+                            "PAYLOAD_TOO_LARGE",
+                            "INTERNAL"
+                          ],
+                          "type": "string"
+                        },
+                        "latencyMs": {
+                          "maximum": 9007199254740991,
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "model": {
+                          "type": "string"
+                        },
+                        "outcome": {
+                          "enum": [
+                            "ok",
+                            "error",
+                            "skipped_unhealthy"
+                          ],
+                          "type": "string"
+                        },
+                        "provider": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "provider",
+                        "model",
+                        "outcome",
+                        "latencyMs"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "confidence": {
+                    "maximum": 1,
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  "costUsd": {
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  "kind": {
+                    "const": "boolean",
+                    "type": "string"
+                  },
+                  "latencyMs": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "model": {
+                    "type": "string"
+                  },
+                  "pYes": {
+                    "maximum": 1,
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  "probabilities": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "false": {
+                        "maximum": 1,
+                        "minimum": 0,
+                        "type": "number"
+                      },
+                      "true": {
+                        "maximum": 1,
+                        "minimum": 0,
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "true",
+                      "false"
+                    ],
+                    "type": "object"
+                  },
+                  "provider": {
+                    "type": "string"
+                  },
+                  "raw": {
+                    "$ref": "#/$defs/__schema0"
+                  },
+                  "requestId": {
+                    "type": "string"
+                  },
+                  "usage": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "cacheReadTokens": {
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "cacheWriteTokens": {
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "inputTokens": {
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "outputTokens": {
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "inputTokens",
+                      "outputTokens"
+                    ],
+                    "type": "object"
+                  },
+                  "value": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "confidence",
+                  "provider",
+                  "model",
+                  "latencyMs",
+                  "costUsd",
+                  "attempts",
+                  "kind",
+                  "value",
+                  "pYes",
+                  "probabilities"
+                ],
+                "type": "object"
+              }
+            }
+          ],
+          "pool": "general",
+          "portRules": [],
+          "streams": false,
+          "version": "1.0.0"
+        },
+        "tool": null,
+        "type": "flowaid.decision.boolean",
+        "typeVersion": "1.0.0"
+      },
+      "outputs": {
+        "decision": {
+          "$defs": {
+            "__schema0": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                },
+                {
+                  "items": {
+                    "$ref": "#/$defs/__schema0"
+                  },
+                  "type": "array"
+                },
+                {
+                  "additionalProperties": {
+                    "$ref": "#/$defs/__schema0"
+                  },
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              ]
+            }
+          },
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "properties": {
+            "attempts": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "errorCode": {
+                    "enum": [
+                      "WORKFLOW_VALIDATION_ERROR",
+                      "SCHEMA_VALIDATION_ERROR",
+                      "NODE_EXECUTION_ERROR",
+                      "TOOL_EXECUTION_ERROR",
+                      "PROVIDER_ERROR",
+                      "PROVIDER_RATE_LIMITED",
+                      "PROVIDER_OVERLOADED",
+                      "CREDENTIAL_ERROR",
+                      "TIMEOUT_ERROR",
+                      "RATE_LIMIT_ERROR",
+                      "CANCELLED_ERROR",
+                      "BOUNDS_EXCEEDED",
+                      "INPUT_MISSING",
+                      "OUTPUT_SCHEMA_MISMATCH",
+                      "EXPRESSION_ERROR",
+                      "SANDBOX_ERROR",
+                      "WORKER_LOST",
+                      "NONIDEMPOTENT_INTERRUPTED",
+                      "HUMAN_APPROVAL_REQUIRED",
+                      "HUMAN_TASK_EXPIRED",
+                      "SUBFLOW_ERROR",
+                      "NO_OUTPUT",
+                      "NETWORK_ERROR",
+                      "NOT_FOUND",
+                      "CONFLICT",
+                      "UNAUTHORIZED",
+                      "FORBIDDEN",
+                      "BAD_REQUEST",
+                      "PAYLOAD_TOO_LARGE",
+                      "INTERNAL"
+                    ],
+                    "type": "string"
+                  },
+                  "latencyMs": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "model": {
+                    "type": "string"
+                  },
+                  "outcome": {
+                    "enum": [
+                      "ok",
+                      "error",
+                      "skipped_unhealthy"
+                    ],
+                    "type": "string"
+                  },
+                  "provider": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "provider",
+                  "model",
+                  "outcome",
+                  "latencyMs"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "confidence": {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            "costUsd": {
+              "minimum": 0,
+              "type": "number"
+            },
+            "kind": {
+              "const": "boolean",
+              "type": "string"
+            },
+            "latencyMs": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "model": {
+              "type": "string"
+            },
+            "pYes": {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            "probabilities": {
+              "additionalProperties": false,
+              "properties": {
+                "false": {
+                  "maximum": 1,
+                  "minimum": 0,
+                  "type": "number"
+                },
+                "true": {
+                  "maximum": 1,
+                  "minimum": 0,
+                  "type": "number"
+                }
+              },
+              "required": [
+                "true",
+                "false"
+              ],
+              "type": "object"
+            },
+            "provider": {
+              "type": "string"
+            },
+            "raw": {
+              "$ref": "#/$defs/__schema0"
+            },
+            "requestId": {
+              "type": "string"
+            },
+            "usage": {
+              "additionalProperties": false,
+              "properties": {
+                "cacheReadTokens": {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "cacheWriteTokens": {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "inputTokens": {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "outputTokens": {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "inputTokens",
+                "outputTokens"
+              ],
+              "type": "object"
+            },
+            "value": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "confidence",
+            "provider",
+            "model",
+            "latencyMs",
+            "costUsd",
+            "attempts",
+            "kind",
+            "value",
+            "pYes",
+            "probabilities"
+          ],
+          "type": "object"
+        }
+      },
+      "policy": {
+        "maxCostUsd": null,
+        "maxTokens": null,
+        "onError": "fail",
+        "privacy": {
+          "containsPII": false,
+          "doNotPersist": false,
+          "redactFields": [],
+          "sensitive": false
+        },
+        "retry": {
+          "allowOnIrreversible": false,
+          "backoff": {
+            "factor": 2,
+            "initialMs": 500,
+            "jitter": true,
+            "maxMs": 30000,
+            "type": "exponential"
+          },
+          "maxAttempts": 1
+        },
+        "timeoutMs": 30000
+      },
+      "pool": "general",
+      "redact": [],
+      "scope": "",
+      "successors": [
+        "act_gate"
+      ]
+    },
+    "classify": {
+      "batchGroup": null,
+      "controlIn": [
+        {
+          "edgeId": "c4",
+          "from": {
+            "node": "act_gate",
+            "port": "yes"
+          },
+          "group": 0
+        }
+      ],
+      "controlOut": [
+        "done"
+      ],
+      "dataIn": [
+        {
+          "from": {
+            "node": "start",
+            "port": "issue"
+          },
+          "optional": true,
+          "path": "/body",
+          "to": {
+            "node": "classify",
+            "port": "state"
+          },
+          "via": "expr"
+        },
+        {
+          "from": {
+            "node": "start",
+            "port": "issue"
+          },
+          "optional": false,
+          "path": "/title",
+          "to": {
+            "node": "classify",
+            "port": "state"
+          },
+          "via": "ref"
+        }
+      ],
+      "guard": [
+        [
+          {
+            "node": "opened",
+            "port": "yes"
+          },
+          {
+            "node": "act_gate",
+            "port": "yes"
+          }
+        ]
+      ],
+      "id": "classify",
+      "idempotency": "safe",
+      "kind": "task",
+      "name": "Classify",
+      "op": {
+        "config": {
+          "questions": {
+            "kind": {
+              "instructions": "What kind of issue is this?",
+              "kind": "choice",
+              "options": {
+                "bug": "Something is broken",
+                "docs": "Documentation problem",
+                "feature": "New capability requested",
+                "question": "Usage question"
+              }
+            },
+            "severity": {
+              "instructions": "How severe (bugs) or impactful (otherwise) is this?",
+              "kind": "score",
+              "levels": [
+                "Trivial",
+                "Minor",
+                "Moderate",
+                "Major",
+                "Critical"
+              ]
+            }
+          }
+        },
+        "configBindings": {},
+        "configTemplates": {},
+        "credentials": {
+          "typesafe": "TYPESAFE_API_KEY"
+        },
+        "inputs": {
+          "state": {
+            "fields": {
+              "body": {
+                "ast": {
+                  "args": [
+                    {
+                      "kind": "ref",
+                      "ref": {
+                        "kind": "port",
+                        "node": "start",
+                        "path": "/body",
+                        "port": "issue"
+                      }
+                    },
+                    {
+                      "kind": "literal",
+                      "value": ""
+                    }
+                  ],
+                  "fn": "coalesce",
+                  "kind": "call"
+                },
+                "kind": "expr",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "title": {
+                "kind": "ref",
+                "optional": false,
+                "ref": {
+                  "kind": "port",
+                  "node": "start",
+                  "path": "/title",
+                  "port": "issue"
+                },
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "kind": "object",
+            "schema": {
+              "additionalProperties": false,
+              "properties": {
+                "body": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "body",
+                "title"
+              ],
+              "type": "object"
+            }
+          }
+        },
+        "kind": "task",
+        "manifest": {
+          "capabilities": [
+            "decision",
+            "credentials"
+          ],
+          "configSchema": {
+            "additionalProperties": false,
+            "properties": {
+              "questions": {
+                "additionalProperties": {
+                  "oneOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "criteria": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "false": {
+                              "type": "string"
+                            },
+                            "true": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "true",
+                            "false"
+                          ],
+                          "type": "object"
+                        },
+                        "instructions": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "kind": {
+                          "const": "boolean"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "instructions"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "instructions": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "kind": {
+                          "const": "choice"
+                        },
+                        "options": {
+                          "additionalProperties": {
+                            "type": "string"
+                          },
+                          "maxProperties": 255,
+                          "minProperties": 2,
+                          "propertyNames": {
+                            "pattern": "^[a-z0-9_]{1,64}$"
+                          },
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "instructions",
+                        "options"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "instructions": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "kind": {
+                          "const": "score"
+                        },
+                        "levels": {
+                          "items": {
+                            "type": "string"
+                          },
+                          "maxItems": 10,
+                          "minItems": 2,
+                          "type": "array"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "instructions",
+                        "levels"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                },
+                "maxProperties": 32,
+                "minProperties": 1,
+                "propertyNames": {
+                  "pattern": "^[a-z][a-z0-9_]{0,63}$"
+                },
+                "type": "object",
+                "x-ui": {
+                  "help": "Question id → question. Ids become the keys of `answers`.",
+                  "widget": "questions"
+                }
+              }
+            },
+            "required": [
+              "questions"
+            ],
+            "type": "object"
+          },
+          "controlPorts": [],
+          "credentials": [
+            {
+              "name": "typesafe",
+              "required": true,
+              "types": [
+                "typesafe.api_key"
+              ]
+            },
+            {
+              "description": "Optional LLM decision provider used when a failover hop (or the workspace chain) routes decisions to a chat model.",
+              "name": "llm",
+              "required": false,
+              "types": [
+                "openai.api_key",
+                "anthropic.api_key",
+                "ollama.none"
+              ]
+            }
+          ],
+          "decision": {
+            "kind": "batch"
+          },
+          "defaultPolicy": {
+            "timeoutMs": 30000
+          },
+          "generation": false,
+          "id": "flowaid.decision.batch",
+          "idempotency": "safe",
+          "inputs": [
+            {
+              "name": "state",
+              "required": true,
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "object"
+                  },
+                  {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                ],
+                "description": "TypeSafe state: text, an object (sent verbatim) or an array of text."
+              }
+            }
+          ],
+          "metadata": {
+            "category": "decision",
+            "description": "Asks several typed questions (boolean, choice, score) about one `state` in a single TypeSafe request. Output `answers` holds one DecisionResult per question id.",
+            "icon": "list-checks",
+            "name": "Decision batch",
+            "summary": "{{ config.questions | json }}",
+            "tags": [
+              "decision",
+              "typesafe",
+              "batch"
+            ]
+          },
+          "migrations": [],
+          "optionProviders": [],
+          "outputs": [
+            {
+              "name": "answers",
+              "required": true,
+              "schema": {
+                "description": "One DecisionResult per question id (typed per question by the compiler).",
+                "type": "object"
+              }
+            }
+          ],
+          "pool": "general",
+          "portRules": [
+            {
+              "kind": "decisionAnswersFromConfig",
+              "path": "/questions",
+              "port": "answers"
+            }
+          ],
+          "streams": false,
+          "version": "1.0.0"
+        },
+        "tool": null,
+        "type": "flowaid.decision.batch",
+        "typeVersion": "1.0.0"
+      },
+      "outputs": {
+        "answers": {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "$defs": {
+                "__schema0": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "items": {
+                        "$ref": "#/$defs/__schema0"
+                      },
+                      "type": "array"
+                    },
+                    {
+                      "additionalProperties": {
+                        "$ref": "#/$defs/__schema0"
+                      },
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "type": "object"
+                    }
+                  ]
+                }
+              },
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "additionalProperties": false,
+              "properties": {
+                "attempts": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "errorCode": {
+                        "enum": [
+                          "WORKFLOW_VALIDATION_ERROR",
+                          "SCHEMA_VALIDATION_ERROR",
+                          "NODE_EXECUTION_ERROR",
+                          "TOOL_EXECUTION_ERROR",
+                          "PROVIDER_ERROR",
+                          "PROVIDER_RATE_LIMITED",
+                          "PROVIDER_OVERLOADED",
+                          "CREDENTIAL_ERROR",
+                          "TIMEOUT_ERROR",
+                          "RATE_LIMIT_ERROR",
+                          "CANCELLED_ERROR",
+                          "BOUNDS_EXCEEDED",
+                          "INPUT_MISSING",
+                          "OUTPUT_SCHEMA_MISMATCH",
+                          "EXPRESSION_ERROR",
+                          "SANDBOX_ERROR",
+                          "WORKER_LOST",
+                          "NONIDEMPOTENT_INTERRUPTED",
+                          "HUMAN_APPROVAL_REQUIRED",
+                          "HUMAN_TASK_EXPIRED",
+                          "SUBFLOW_ERROR",
+                          "NO_OUTPUT",
+                          "NETWORK_ERROR",
+                          "NOT_FOUND",
+                          "CONFLICT",
+                          "UNAUTHORIZED",
+                          "FORBIDDEN",
+                          "BAD_REQUEST",
+                          "PAYLOAD_TOO_LARGE",
+                          "INTERNAL"
+                        ],
+                        "type": "string"
+                      },
+                      "latencyMs": {
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "model": {
+                        "type": "string"
+                      },
+                      "outcome": {
+                        "enum": [
+                          "ok",
+                          "error",
+                          "skipped_unhealthy"
+                        ],
+                        "type": "string"
+                      },
+                      "provider": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "provider",
+                      "model",
+                      "outcome",
+                      "latencyMs"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "confidence": {
+                  "maximum": 1,
+                  "minimum": 0,
+                  "type": "number"
+                },
+                "costUsd": {
+                  "minimum": 0,
+                  "type": "number"
+                },
+                "kind": {
+                  "const": "choice",
+                  "type": "string"
+                },
+                "latencyMs": {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "model": {
+                  "type": "string"
+                },
+                "probabilities": {
+                  "additionalProperties": {
+                    "maximum": 1,
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                "provider": {
+                  "type": "string"
+                },
+                "raw": {
+                  "$ref": "#/$defs/__schema0"
+                },
+                "requestId": {
+                  "type": "string"
+                },
+                "usage": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "cacheReadTokens": {
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "cacheWriteTokens": {
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "inputTokens": {
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "outputTokens": {
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "inputTokens",
+                    "outputTokens"
+                  ],
+                  "type": "object"
+                },
+                "value": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "confidence",
+                "provider",
+                "model",
+                "latencyMs",
+                "costUsd",
+                "attempts",
+                "kind",
+                "value",
+                "probabilities"
+              ],
+              "type": "object"
+            },
+            "severity": {
+              "$defs": {
+                "__schema0": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "items": {
+                        "$ref": "#/$defs/__schema0"
+                      },
+                      "type": "array"
+                    },
+                    {
+                      "additionalProperties": {
+                        "$ref": "#/$defs/__schema0"
+                      },
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "type": "object"
+                    }
+                  ]
+                }
+              },
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "additionalProperties": false,
+              "properties": {
+                "attempts": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "errorCode": {
+                        "enum": [
+                          "WORKFLOW_VALIDATION_ERROR",
+                          "SCHEMA_VALIDATION_ERROR",
+                          "NODE_EXECUTION_ERROR",
+                          "TOOL_EXECUTION_ERROR",
+                          "PROVIDER_ERROR",
+                          "PROVIDER_RATE_LIMITED",
+                          "PROVIDER_OVERLOADED",
+                          "CREDENTIAL_ERROR",
+                          "TIMEOUT_ERROR",
+                          "RATE_LIMIT_ERROR",
+                          "CANCELLED_ERROR",
+                          "BOUNDS_EXCEEDED",
+                          "INPUT_MISSING",
+                          "OUTPUT_SCHEMA_MISMATCH",
+                          "EXPRESSION_ERROR",
+                          "SANDBOX_ERROR",
+                          "WORKER_LOST",
+                          "NONIDEMPOTENT_INTERRUPTED",
+                          "HUMAN_APPROVAL_REQUIRED",
+                          "HUMAN_TASK_EXPIRED",
+                          "SUBFLOW_ERROR",
+                          "NO_OUTPUT",
+                          "NETWORK_ERROR",
+                          "NOT_FOUND",
+                          "CONFLICT",
+                          "UNAUTHORIZED",
+                          "FORBIDDEN",
+                          "BAD_REQUEST",
+                          "PAYLOAD_TOO_LARGE",
+                          "INTERNAL"
+                        ],
+                        "type": "string"
+                      },
+                      "latencyMs": {
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "model": {
+                        "type": "string"
+                      },
+                      "outcome": {
+                        "enum": [
+                          "ok",
+                          "error",
+                          "skipped_unhealthy"
+                        ],
+                        "type": "string"
+                      },
+                      "provider": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "provider",
+                      "model",
+                      "outcome",
+                      "latencyMs"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "confidence": {
+                  "maximum": 1,
+                  "minimum": 0,
+                  "type": "number"
+                },
+                "costUsd": {
+                  "minimum": 0,
+                  "type": "number"
+                },
+                "kind": {
+                  "const": "score",
+                  "type": "string"
+                },
+                "latencyMs": {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "level": {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "levelLabel": {
+                  "type": "string"
+                },
+                "levels": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "maxItems": 10,
+                  "minItems": 2,
+                  "type": "array"
+                },
+                "model": {
+                  "type": "string"
+                },
+                "normalized": {
+                  "maximum": 1,
+                  "minimum": 0,
+                  "type": "number"
+                },
+                "probabilities": {
+                  "additionalProperties": {
+                    "maximum": 1,
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                "provider": {
+                  "type": "string"
+                },
+                "raw": {
+                  "$ref": "#/$defs/__schema0"
+                },
+                "requestId": {
+                  "type": "string"
+                },
+                "usage": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "cacheReadTokens": {
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "cacheWriteTokens": {
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "inputTokens": {
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "outputTokens": {
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "inputTokens",
+                    "outputTokens"
+                  ],
+                  "type": "object"
+                },
+                "value": {
+                  "minimum": 0,
+                  "type": "number"
+                }
+              },
+              "required": [
+                "confidence",
+                "provider",
+                "model",
+                "latencyMs",
+                "costUsd",
+                "attempts",
+                "kind",
+                "value",
+                "normalized",
+                "level",
+                "levelLabel",
+                "levels",
+                "probabilities"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "kind",
+            "severity"
+          ],
+          "type": "object"
+        }
+      },
+      "policy": {
+        "maxCostUsd": null,
+        "maxTokens": null,
+        "onError": "fail",
+        "privacy": {
+          "containsPII": false,
+          "doNotPersist": false,
+          "redactFields": [],
+          "sensitive": false
+        },
+        "retry": {
+          "allowOnIrreversible": false,
+          "backoff": {
+            "factor": 2,
+            "initialMs": 500,
+            "jitter": true,
+            "maxMs": 30000,
+            "type": "exponential"
+          },
+          "maxAttempts": 1
+        },
+        "timeoutMs": 30000
+      },
+      "pool": "general",
+      "redact": [],
+      "scope": "",
+      "successors": [
+        "labels",
+        "page",
+        "route"
+      ]
+    },
+    "dup_judge": {
+      "batchGroup": null,
+      "controlIn": [],
+      "controlOut": [
+        "done"
+      ],
+      "dataIn": [
+        {
+          "from": {
+            "node": "similar",
+            "port": "result"
+          },
+          "optional": false,
+          "path": "/items",
+          "to": {
+            "node": "dup_judge",
+            "port": "state"
+          },
+          "via": "expr"
+        },
+        {
+          "from": {
+            "node": "start",
+            "port": "issue"
+          },
+          "optional": false,
+          "to": {
+            "node": "dup_judge",
+            "port": "state"
+          },
+          "via": "ref"
+        }
+      ],
+      "guard": [
+        [
+          {
+            "node": "opened",
+            "port": "yes"
+          },
+          {
+            "node": "act_gate",
+            "port": "yes"
+          }
+        ]
+      ],
+      "id": "dup_judge",
+      "idempotency": "safe",
+      "kind": "task",
+      "name": "Duplicate of top candidate?",
+      "op": {
+        "config": {
+          "criteria": {
+            "false": "Different problem despite similar words",
+            "true": "Duplicate"
+          },
+          "instructions": "Is the new issue a duplicate of the top candidate (same root cause or same request)?"
+        },
+        "configBindings": {},
+        "configTemplates": {},
+        "credentials": {
+          "typesafe": "TYPESAFE_API_KEY"
+        },
+        "inputs": {
+          "state": {
+            "fields": {
+              "candidate": {
+                "ast": {
+                  "args": [
+                    {
+                      "kind": "ref",
+                      "ref": {
+                        "kind": "port",
+                        "node": "similar",
+                        "path": "/items",
+                        "port": "result"
+                      }
+                    }
+                  ],
+                  "fn": "first",
+                  "kind": "call"
+                },
+                "kind": "expr",
+                "schema": {
+                  "anyOf": [
+                    {
+                      "properties": {
+                        "body": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "html_url": {
+                          "type": "string"
+                        },
+                        "number": {
+                          "type": "integer"
+                        },
+                        "state": {
+                          "type": "string"
+                        },
+                        "title": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "number",
+                        "title",
+                        "state",
+                        "html_url"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "issue": {
+                "kind": "ref",
+                "optional": false,
+                "ref": {
+                  "kind": "port",
+                  "node": "start",
+                  "port": "issue"
+                },
+                "schema": {
+                  "properties": {
+                    "body": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "html_url": {
+                      "type": "string"
+                    },
+                    "number": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "number",
+                    "title",
+                    "html_url"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "kind": "object",
+            "schema": {
+              "additionalProperties": false,
+              "properties": {
+                "candidate": {
+                  "anyOf": [
+                    {
+                      "properties": {
+                        "body": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "html_url": {
+                          "type": "string"
+                        },
+                        "number": {
+                          "type": "integer"
+                        },
+                        "state": {
+                          "type": "string"
+                        },
+                        "title": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "number",
+                        "title",
+                        "state",
+                        "html_url"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "issue": {
+                  "properties": {
+                    "body": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "html_url": {
+                      "type": "string"
+                    },
+                    "number": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "number",
+                    "title",
+                    "html_url"
+                  ],
+                  "type": "object"
+                }
+              },
+              "required": [
+                "candidate",
+                "issue"
+              ],
+              "type": "object"
+            }
+          }
+        },
+        "kind": "task",
+        "manifest": {
+          "capabilities": [
+            "decision",
+            "credentials"
+          ],
+          "configSchema": {
+            "additionalProperties": false,
+            "properties": {
+              "criteria": {
+                "additionalProperties": false,
+                "properties": {
+                  "false": {
+                    "type": "string"
+                  },
+                  "true": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "true",
+                  "false"
+                ],
+                "type": "object",
+                "x-ui": {
+                  "help": "Optional descriptions of what makes the answer true or false (both or none).",
+                  "widget": "criteria"
+                }
+              },
+              "instructions": {
+                "maxLength": 4000,
+                "minLength": 1,
+                "type": "string",
+                "x-ui": {
+                  "widget": "textarea"
+                }
+              }
+            },
+            "required": [
+              "instructions"
+            ],
+            "type": "object"
+          },
+          "controlPorts": [],
+          "credentials": [
+            {
+              "name": "typesafe",
+              "required": true,
+              "types": [
+                "typesafe.api_key"
+              ]
+            }
+          ],
+          "decision": {
+            "kind": "boolean"
+          },
+          "defaultPolicy": {
+            "timeoutMs": 30000
+          },
+          "generation": false,
+          "id": "flowaid.decision.boolean",
+          "idempotency": "safe",
+          "inputs": [
+            {
+              "name": "state",
+              "required": true,
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "object"
+                  },
+                  {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                ],
+                "description": "TypeSafe state: text, an object (sent verbatim) or an array of text."
+              }
+            }
+          ],
+          "metadata": {
+            "category": "decision",
+            "description": "Answers a yes/no question about `state` with `pYes` and `confidence = max(pYes, 1 - pYes)` (TypeSafe boolean decision).",
+            "icon": "toggle-left",
+            "name": "Boolean",
+            "summary": "{{ config.instructions }}",
+            "tags": [
+              "decision",
+              "typesafe"
+            ]
+          },
+          "migrations": [],
+          "optionProviders": [],
+          "outputs": [
+            {
+              "name": "decision",
+              "required": true,
+              "schema": {
+                "$defs": {
+                  "__schema0": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "null"
+                      },
+                      {
+                        "items": {
+                          "$ref": "#/$defs/__schema0"
+                        },
+                        "type": "array"
+                      },
+                      {
+                        "additionalProperties": {
+                          "$ref": "#/$defs/__schema0"
+                        },
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "type": "object"
+                      }
+                    ]
+                  }
+                },
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "additionalProperties": false,
+                "properties": {
+                  "attempts": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "errorCode": {
+                          "enum": [
+                            "WORKFLOW_VALIDATION_ERROR",
+                            "SCHEMA_VALIDATION_ERROR",
+                            "NODE_EXECUTION_ERROR",
+                            "TOOL_EXECUTION_ERROR",
+                            "PROVIDER_ERROR",
+                            "PROVIDER_RATE_LIMITED",
+                            "PROVIDER_OVERLOADED",
+                            "CREDENTIAL_ERROR",
+                            "TIMEOUT_ERROR",
+                            "RATE_LIMIT_ERROR",
+                            "CANCELLED_ERROR",
+                            "BOUNDS_EXCEEDED",
+                            "INPUT_MISSING",
+                            "OUTPUT_SCHEMA_MISMATCH",
+                            "EXPRESSION_ERROR",
+                            "SANDBOX_ERROR",
+                            "WORKER_LOST",
+                            "NONIDEMPOTENT_INTERRUPTED",
+                            "HUMAN_APPROVAL_REQUIRED",
+                            "HUMAN_TASK_EXPIRED",
+                            "SUBFLOW_ERROR",
+                            "NO_OUTPUT",
+                            "NETWORK_ERROR",
+                            "NOT_FOUND",
+                            "CONFLICT",
+                            "UNAUTHORIZED",
+                            "FORBIDDEN",
+                            "BAD_REQUEST",
+                            "PAYLOAD_TOO_LARGE",
+                            "INTERNAL"
+                          ],
+                          "type": "string"
+                        },
+                        "latencyMs": {
+                          "maximum": 9007199254740991,
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "model": {
+                          "type": "string"
+                        },
+                        "outcome": {
+                          "enum": [
+                            "ok",
+                            "error",
+                            "skipped_unhealthy"
+                          ],
+                          "type": "string"
+                        },
+                        "provider": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "provider",
+                        "model",
+                        "outcome",
+                        "latencyMs"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "confidence": {
+                    "maximum": 1,
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  "costUsd": {
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  "kind": {
+                    "const": "boolean",
+                    "type": "string"
+                  },
+                  "latencyMs": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "model": {
+                    "type": "string"
+                  },
+                  "pYes": {
+                    "maximum": 1,
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  "probabilities": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "false": {
+                        "maximum": 1,
+                        "minimum": 0,
+                        "type": "number"
+                      },
+                      "true": {
+                        "maximum": 1,
+                        "minimum": 0,
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "true",
+                      "false"
+                    ],
+                    "type": "object"
+                  },
+                  "provider": {
+                    "type": "string"
+                  },
+                  "raw": {
+                    "$ref": "#/$defs/__schema0"
+                  },
+                  "requestId": {
+                    "type": "string"
+                  },
+                  "usage": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "cacheReadTokens": {
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "cacheWriteTokens": {
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "inputTokens": {
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "outputTokens": {
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "inputTokens",
+                      "outputTokens"
+                    ],
+                    "type": "object"
+                  },
+                  "value": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "confidence",
+                  "provider",
+                  "model",
+                  "latencyMs",
+                  "costUsd",
+                  "attempts",
+                  "kind",
+                  "value",
+                  "pYes",
+                  "probabilities"
+                ],
+                "type": "object"
+              }
+            }
+          ],
+          "pool": "general",
+          "portRules": [],
+          "streams": false,
+          "version": "1.0.0"
+        },
+        "tool": null,
+        "type": "flowaid.decision.boolean",
+        "typeVersion": "1.0.0"
+      },
+      "outputs": {
+        "decision": {
+          "$defs": {
+            "__schema0": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                },
+                {
+                  "items": {
+                    "$ref": "#/$defs/__schema0"
+                  },
+                  "type": "array"
+                },
+                {
+                  "additionalProperties": {
+                    "$ref": "#/$defs/__schema0"
+                  },
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                }
+              ]
+            }
+          },
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "properties": {
+            "attempts": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "errorCode": {
+                    "enum": [
+                      "WORKFLOW_VALIDATION_ERROR",
+                      "SCHEMA_VALIDATION_ERROR",
+                      "NODE_EXECUTION_ERROR",
+                      "TOOL_EXECUTION_ERROR",
+                      "PROVIDER_ERROR",
+                      "PROVIDER_RATE_LIMITED",
+                      "PROVIDER_OVERLOADED",
+                      "CREDENTIAL_ERROR",
+                      "TIMEOUT_ERROR",
+                      "RATE_LIMIT_ERROR",
+                      "CANCELLED_ERROR",
+                      "BOUNDS_EXCEEDED",
+                      "INPUT_MISSING",
+                      "OUTPUT_SCHEMA_MISMATCH",
+                      "EXPRESSION_ERROR",
+                      "SANDBOX_ERROR",
+                      "WORKER_LOST",
+                      "NONIDEMPOTENT_INTERRUPTED",
+                      "HUMAN_APPROVAL_REQUIRED",
+                      "HUMAN_TASK_EXPIRED",
+                      "SUBFLOW_ERROR",
+                      "NO_OUTPUT",
+                      "NETWORK_ERROR",
+                      "NOT_FOUND",
+                      "CONFLICT",
+                      "UNAUTHORIZED",
+                      "FORBIDDEN",
+                      "BAD_REQUEST",
+                      "PAYLOAD_TOO_LARGE",
+                      "INTERNAL"
+                    ],
+                    "type": "string"
+                  },
+                  "latencyMs": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "model": {
+                    "type": "string"
+                  },
+                  "outcome": {
+                    "enum": [
+                      "ok",
+                      "error",
+                      "skipped_unhealthy"
+                    ],
+                    "type": "string"
+                  },
+                  "provider": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "provider",
+                  "model",
+                  "outcome",
+                  "latencyMs"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "confidence": {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            "costUsd": {
+              "minimum": 0,
+              "type": "number"
+            },
+            "kind": {
+              "const": "boolean",
+              "type": "string"
+            },
+            "latencyMs": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "model": {
+              "type": "string"
+            },
+            "pYes": {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            "probabilities": {
+              "additionalProperties": false,
+              "properties": {
+                "false": {
+                  "maximum": 1,
+                  "minimum": 0,
+                  "type": "number"
+                },
+                "true": {
+                  "maximum": 1,
+                  "minimum": 0,
+                  "type": "number"
+                }
+              },
+              "required": [
+                "true",
+                "false"
+              ],
+              "type": "object"
+            },
+            "provider": {
+              "type": "string"
+            },
+            "raw": {
+              "$ref": "#/$defs/__schema0"
+            },
+            "requestId": {
+              "type": "string"
+            },
+            "usage": {
+              "additionalProperties": false,
+              "properties": {
+                "cacheReadTokens": {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "cacheWriteTokens": {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "inputTokens": {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "outputTokens": {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "inputTokens",
+                "outputTokens"
+              ],
+              "type": "object"
+            },
+            "value": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "confidence",
+            "provider",
+            "model",
+            "latencyMs",
+            "costUsd",
+            "attempts",
+            "kind",
+            "value",
+            "pYes",
+            "probabilities"
+          ],
+          "type": "object"
+        }
+      },
+      "policy": {
+        "maxCostUsd": null,
+        "maxTokens": null,
+        "onError": "fail",
+        "privacy": {
+          "containsPII": false,
+          "doNotPersist": false,
+          "redactFields": [],
+          "sensitive": false
+        },
+        "retry": {
+          "allowOnIrreversible": false,
+          "backoff": {
+            "factor": 2,
+            "initialMs": 500,
+            "jitter": true,
+            "maxMs": 30000,
+            "type": "exponential"
+          },
+          "maxAttempts": 1
+        },
+        "timeoutMs": 30000
+      },
+      "pool": "general",
+      "redact": [],
+      "scope": "",
+      "successors": [
+        "gh_dup_comment",
+        "is_dup"
+      ]
+    },
+    "gh_dup_comment": {
+      "batchGroup": null,
+      "controlIn": [
+        {
+          "edgeId": "c6",
+          "from": {
+            "node": "is_dup",
+            "port": "dup"
+          },
+          "group": 0
+        }
+      ],
+      "controlOut": [
+        "done"
+      ],
+      "dataIn": [
+        {
+          "from": {
+            "node": "similar",
+            "port": "result"
+          },
+          "optional": false,
+          "path": "/items",
+          "to": {
+            "node": "gh_dup_comment",
+            "port": "body"
+          },
+          "via": "template"
+        },
+        {
+          "from": {
+            "node": "dup_judge",
+            "port": "decision"
+          },
+          "optional": false,
+          "path": "/confidence",
+          "to": {
+            "node": "gh_dup_comment",
+            "port": "body"
+          },
+          "via": "template"
+        },
+        {
+          "from": {
+            "node": "start",
+            "port": "issue"
+          },
+          "optional": false,
+          "path": "/number",
+          "to": {
+            "node": "gh_dup_comment",
+            "port": "issue_number"
+          },
+          "via": "ref"
+        },
+        {
+          "from": {
+            "node": "start",
+            "port": "repository"
+          },
+          "optional": false,
+          "path": "/full_name",
+          "to": {
+            "node": "gh_dup_comment",
+            "port": "owner"
+          },
+          "via": "expr"
+        },
+        {
+          "from": {
+            "node": "start",
+            "port": "repository"
+          },
+          "optional": false,
+          "path": "/full_name",
+          "to": {
+            "node": "gh_dup_comment",
+            "port": "repo"
+          },
+          "via": "expr"
+        }
+      ],
+      "guard": [
+        [
+          {
+            "node": "opened",
+            "port": "yes"
+          },
+          {
+            "node": "act_gate",
+            "port": "yes"
+          },
+          {
+            "node": "is_dup",
+            "port": "dup"
+          }
+        ]
+      ],
+      "id": "gh_dup_comment",
+      "idempotency": "none",
+      "kind": "task",
+      "name": "Comment duplicate",
+      "op": {
+        "config": {
+          "serverId": "00000000-0000-4000-8000-676974687562",
+          "tool": "add_issue_comment"
+        },
+        "configBindings": {},
+        "configTemplates": {},
+        "credentials": {
+          "mcp": "GITHUB_MCP"
+        },
+        "inputs": {
+          "body": {
+            "kind": "template",
+            "schema": {
+              "type": "string"
+            },
+            "template": {
+              "parts": [
+                {
+                  "kind": "text",
+                  "text": "Possible duplicate of #"
+                },
+                {
+                  "expr": {
+                    "key": "number",
+                    "kind": "member",
+                    "object": {
+                      "args": [
+                        {
+                          "kind": "ref",
+                          "ref": {
+                            "kind": "port",
+                            "node": "similar",
+                            "path": "/items",
+                            "port": "result"
+                          }
+                        }
+                      ],
+                      "fn": "first",
+                      "kind": "call"
+                    }
+                  },
+                  "filter": "string",
+                  "kind": "hole",
+                  "range": {
+                    "end": 63,
+                    "start": 23
+                  }
+                },
+                {
+                  "kind": "text",
+                  "text": " (confidence "
+                },
+                {
+                  "expr": {
+                    "args": [
+                      {
+                        "kind": "ref",
+                        "ref": {
+                          "kind": "port",
+                          "node": "dup_judge",
+                          "path": "/confidence",
+                          "port": "decision"
+                        }
+                      },
+                      {
+                        "kind": "literal",
+                        "value": 2
+                      }
+                    ],
+                    "fn": "round",
+                    "kind": "call"
+                  },
+                  "filter": "string",
+                  "kind": "hole",
+                  "range": {
+                    "end": 121,
+                    "start": 76
+                  }
+                },
+                {
+                  "kind": "text",
+                  "text": ")."
+                }
+              ]
+            }
+          },
+          "issue_number": {
+            "kind": "ref",
+            "optional": false,
+            "ref": {
+              "kind": "port",
+              "node": "start",
+              "path": "/number",
+              "port": "issue"
+            },
+            "schema": {
+              "type": "integer"
+            }
+          },
+          "owner": {
+            "ast": {
+              "index": {
+                "kind": "literal",
+                "value": 0
+              },
+              "kind": "index",
+              "object": {
+                "args": [
+                  {
+                    "kind": "ref",
+                    "ref": {
+                      "kind": "port",
+                      "node": "start",
+                      "path": "/full_name",
+                      "port": "repository"
+                    }
+                  },
+                  {
+                    "kind": "literal",
+                    "value": "/"
+                  }
+                ],
+                "fn": "split",
+                "kind": "call"
+              }
+            },
+            "kind": "expr",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "repo": {
+            "ast": {
+              "index": {
+                "kind": "literal",
+                "value": 1
+              },
+              "kind": "index",
+              "object": {
+                "args": [
+                  {
+                    "kind": "ref",
+                    "ref": {
+                      "kind": "port",
+                      "node": "start",
+                      "path": "/full_name",
+                      "port": "repository"
+                    }
+                  },
+                  {
+                    "kind": "literal",
+                    "value": "/"
+                  }
+                ],
+                "fn": "split",
+                "kind": "call"
+              }
+            },
+            "kind": "expr",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        },
+        "kind": "task",
+        "manifest": {
+          "capabilities": [
+            "network",
+            "credentials",
+            "tools"
+          ],
+          "configSchema": {
+            "additionalProperties": false,
+            "properties": {
+              "serverId": {
+                "minLength": 1,
+                "type": "string",
+                "x-ui": {
+                  "optionsProvider": "mcpServers",
+                  "widget": "select"
+                }
+              },
+              "timeoutMs": {
+                "default": 60000,
+                "maximum": 600000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "tool": {
+                "pattern": "^[A-Za-z0-9_-]{1,64}$",
+                "type": "string",
+                "x-ui": {
+                  "optionsProvider": "mcpTools",
+                  "widget": "select"
+                }
+              }
+            },
+            "required": [
+              "serverId",
+              "tool"
+            ],
+            "type": "object"
+          },
+          "controlPorts": [],
+          "credentials": [
+            {
+              "description": "Credential sent to the MCP server, if it needs one.",
+              "name": "mcp",
+              "required": false,
+              "types": [
+                "mcp.headers",
+                "mcp.oauth",
+                "http.bearer"
+              ]
+            }
+          ],
+          "defaultPolicy": {
+            "timeoutMs": 60000
+          },
+          "generation": false,
+          "id": "flowaid.tools.mcp",
+          "idempotency": "none",
+          "inputs": [],
+          "metadata": {
+            "category": "tool",
+            "description": "Calls one tool of a connected MCP server. Input ports are the tool's arguments; `result` is its structured result and `content` its text content.",
+            "icon": "plug",
+            "name": "MCP tool",
+            "summary": "{{ config.tool }}",
+            "tags": [
+              "tool",
+              "mcp"
+            ]
+          },
+          "migrations": [],
+          "optionProviders": [
+            "mcpServers",
+            "mcpTools"
+          ],
+          "outputs": [
+            {
+              "name": "result",
+              "required": true,
+              "schema": {}
+            },
+            {
+              "name": "content",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "pool": "general",
+          "portRules": [
+            {
+              "kind": "toolSignature",
+              "source": "mcp"
+            }
+          ],
+          "streams": false,
+          "version": "1.0.0"
+        },
+        "tool": {
+          "approvalRequired": false,
+          "capability": "github.write",
+          "description": "Add a comment to an issue.",
+          "idempotency": "none",
+          "inputSchema": {
+            "additionalProperties": false,
+            "properties": {
+              "body": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "issue_number": {
+                "minimum": 1,
+                "type": "integer"
+              },
+              "owner": {
+                "type": "string"
+              },
+              "repo": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "owner",
+              "repo",
+              "issue_number",
+              "body"
+            ],
+            "type": "object"
+          },
+          "name": "add_issue_comment",
+          "outputSchema": {
+            "properties": {
+              "html_url": {
+                "type": "string"
+              },
+              "id": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "id",
+              "html_url"
+            ],
+            "type": "object"
+          },
+          "source": {
+            "kind": "mcp",
+            "serverId": "00000000-0000-4000-8000-676974687562",
+            "tool": "add_issue_comment"
+          }
+        },
+        "type": "flowaid.tools.mcp",
+        "typeVersion": "1.0.0"
+      },
+      "outputs": {
+        "content": {
+          "type": "string"
+        },
+        "result": {
+          "properties": {
+            "html_url": {
+              "type": "string"
+            },
+            "id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "id",
+            "html_url"
+          ],
+          "type": "object"
+        }
+      },
+      "policy": {
+        "maxCostUsd": null,
+        "maxTokens": null,
+        "onError": "fail",
+        "privacy": {
+          "containsPII": false,
+          "doNotPersist": false,
+          "redactFields": [],
+          "sensitive": false
+        },
+        "retry": {
+          "allowOnIrreversible": false,
+          "backoff": {
+            "factor": 2,
+            "initialMs": 500,
+            "jitter": true,
+            "maxMs": 30000,
+            "type": "exponential"
+          },
+          "maxAttempts": 1
+        },
+        "timeoutMs": 60000
+      },
+      "pool": "general",
+      "redact": [],
+      "scope": "",
+      "successors": [
+        "out_dup"
+      ]
+    },
+    "gh_label": {
+      "batchGroup": null,
+      "controlIn": [
+        {
+          "edgeId": "c9",
+          "from": {
+            "node": "labels",
+            "port": "done"
+          },
+          "group": 0
+        }
+      ],
+      "controlOut": [
+        "done"
+      ],
+      "dataIn": [
+        {
+          "from": {
+            "node": "start",
+            "port": "issue"
+          },
+          "optional": false,
+          "path": "/number",
+          "to": {
+            "node": "gh_label",
+            "port": "issue_number"
+          },
+          "via": "ref"
+        },
+        {
+          "from": {
+            "node": "labels",
+            "port": "result"
+          },
+          "optional": false,
+          "to": {
+            "node": "gh_label",
+            "port": "labels"
+          },
+          "via": "ref"
+        },
+        {
+          "from": {
+            "node": "start",
+            "port": "repository"
+          },
+          "optional": false,
+          "path": "/full_name",
+          "to": {
+            "node": "gh_label",
+            "port": "owner"
+          },
+          "via": "expr"
+        },
+        {
+          "from": {
+            "node": "start",
+            "port": "repository"
+          },
+          "optional": false,
+          "path": "/full_name",
+          "to": {
+            "node": "gh_label",
+            "port": "repo"
+          },
+          "via": "expr"
+        }
+      ],
+      "guard": [
+        [
+          {
+            "node": "opened",
+            "port": "yes"
+          },
+          {
+            "node": "act_gate",
+            "port": "yes"
+          },
+          {
+            "node": "is_dup",
+            "port": "new"
+          }
+        ]
+      ],
+      "id": "gh_label",
+      "idempotency": "keyed",
+      "kind": "task",
+      "name": "Apply labels",
+      "op": {
+        "config": {
+          "serverId": "00000000-0000-4000-8000-676974687562",
+          "tool": "add_issue_labels"
+        },
+        "configBindings": {},
+        "configTemplates": {},
+        "credentials": {
+          "mcp": "GITHUB_MCP"
+        },
+        "inputs": {
+          "issue_number": {
+            "kind": "ref",
+            "optional": false,
+            "ref": {
+              "kind": "port",
+              "node": "start",
+              "path": "/number",
+              "port": "issue"
+            },
+            "schema": {
+              "type": "integer"
+            }
+          },
+          "labels": {
+            "kind": "ref",
+            "optional": false,
+            "ref": {
+              "kind": "port",
+              "node": "labels",
+              "port": "result"
+            },
+            "schema": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "owner": {
+            "ast": {
+              "index": {
+                "kind": "literal",
+                "value": 0
+              },
+              "kind": "index",
+              "object": {
+                "args": [
+                  {
+                    "kind": "ref",
+                    "ref": {
+                      "kind": "port",
+                      "node": "start",
+                      "path": "/full_name",
+                      "port": "repository"
+                    }
+                  },
+                  {
+                    "kind": "literal",
+                    "value": "/"
+                  }
+                ],
+                "fn": "split",
+                "kind": "call"
+              }
+            },
+            "kind": "expr",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "repo": {
+            "ast": {
+              "index": {
+                "kind": "literal",
+                "value": 1
+              },
+              "kind": "index",
+              "object": {
+                "args": [
+                  {
+                    "kind": "ref",
+                    "ref": {
+                      "kind": "port",
+                      "node": "start",
+                      "path": "/full_name",
+                      "port": "repository"
+                    }
+                  },
+                  {
+                    "kind": "literal",
+                    "value": "/"
+                  }
+                ],
+                "fn": "split",
+                "kind": "call"
+              }
+            },
+            "kind": "expr",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        },
+        "kind": "task",
+        "manifest": {
+          "capabilities": [
+            "network",
+            "credentials",
+            "tools"
+          ],
+          "configSchema": {
+            "additionalProperties": false,
+            "properties": {
+              "serverId": {
+                "minLength": 1,
+                "type": "string",
+                "x-ui": {
+                  "optionsProvider": "mcpServers",
+                  "widget": "select"
+                }
+              },
+              "timeoutMs": {
+                "default": 60000,
+                "maximum": 600000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "tool": {
+                "pattern": "^[A-Za-z0-9_-]{1,64}$",
+                "type": "string",
+                "x-ui": {
+                  "optionsProvider": "mcpTools",
+                  "widget": "select"
+                }
+              }
+            },
+            "required": [
+              "serverId",
+              "tool"
+            ],
+            "type": "object"
+          },
+          "controlPorts": [],
+          "credentials": [
+            {
+              "description": "Credential sent to the MCP server, if it needs one.",
+              "name": "mcp",
+              "required": false,
+              "types": [
+                "mcp.headers",
+                "mcp.oauth",
+                "http.bearer"
+              ]
+            }
+          ],
+          "defaultPolicy": {
+            "timeoutMs": 60000
+          },
+          "generation": false,
+          "id": "flowaid.tools.mcp",
+          "idempotency": "none",
+          "inputs": [],
+          "metadata": {
+            "category": "tool",
+            "description": "Calls one tool of a connected MCP server. Input ports are the tool's arguments; `result` is its structured result and `content` its text content.",
+            "icon": "plug",
+            "name": "MCP tool",
+            "summary": "{{ config.tool }}",
+            "tags": [
+              "tool",
+              "mcp"
+            ]
+          },
+          "migrations": [],
+          "optionProviders": [
+            "mcpServers",
+            "mcpTools"
+          ],
+          "outputs": [
+            {
+              "name": "result",
+              "required": true,
+              "schema": {}
+            },
+            {
+              "name": "content",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "pool": "general",
+          "portRules": [
+            {
+              "kind": "toolSignature",
+              "source": "mcp"
+            }
+          ],
+          "streams": false,
+          "version": "1.0.0"
+        },
+        "tool": {
+          "approvalRequired": false,
+          "capability": "github.write",
+          "description": "Add labels to an issue.",
+          "idempotency": "keyed",
+          "inputSchema": {
+            "additionalProperties": false,
+            "properties": {
+              "issue_number": {
+                "minimum": 1,
+                "type": "integer"
+              },
+              "labels": {
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              "owner": {
+                "type": "string"
+              },
+              "repo": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "owner",
+              "repo",
+              "issue_number",
+              "labels"
+            ],
+            "type": "object"
+          },
+          "name": "add_issue_labels",
+          "outputSchema": {
+            "items": {
+              "properties": {
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "source": {
+            "kind": "mcp",
+            "serverId": "00000000-0000-4000-8000-676974687562",
+            "tool": "add_issue_labels"
+          }
+        },
+        "type": "flowaid.tools.mcp",
+        "typeVersion": "1.0.0"
+      },
+      "outputs": {
+        "content": {
+          "type": "string"
+        },
+        "result": {
+          "items": {
+            "properties": {
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "policy": {
+        "maxCostUsd": null,
+        "maxTokens": null,
+        "onError": "fail",
+        "privacy": {
+          "containsPII": false,
+          "doNotPersist": false,
+          "redactFields": [],
+          "sensitive": false
+        },
+        "retry": {
+          "allowOnIrreversible": false,
+          "backoff": {
+            "factor": 2,
+            "initialMs": 500,
+            "jitter": true,
+            "maxMs": 30000,
+            "type": "exponential"
+          },
+          "maxAttempts": 3
+        },
+        "timeoutMs": 60000
+      },
+      "pool": "general",
+      "redact": [],
+      "scope": "",
+      "successors": [
+        "route"
+      ]
+    },
+    "is_dup": {
+      "batchGroup": null,
+      "controlIn": [],
+      "controlOut": [
+        "dup",
+        "new"
+      ],
+      "dataIn": [
+        {
+          "from": {
+            "node": "similar",
+            "port": "result"
+          },
+          "optional": false,
+          "path": "/items",
+          "to": {
+            "node": "is_dup",
+            "port": "dup"
+          },
+          "via": "expr"
+        },
+        {
+          "from": {
+            "node": "dup_judge",
+            "port": "decision"
+          },
+          "optional": false,
+          "path": "/value",
+          "to": {
+            "node": "is_dup",
+            "port": "dup"
+          },
+          "via": "expr"
+        },
+        {
+          "from": {
+            "node": "dup_judge",
+            "port": "decision"
+          },
+          "optional": false,
+          "path": "/confidence",
+          "to": {
+            "node": "is_dup",
+            "port": "dup"
+          },
+          "via": "expr"
+        }
+      ],
+      "guard": [
+        [
+          {
+            "node": "opened",
+            "port": "yes"
+          },
+          {
+            "node": "act_gate",
+            "port": "yes"
+          }
+        ]
+      ],
+      "id": "is_dup",
+      "idempotency": "safe",
+      "kind": "branch",
+      "name": "Duplicate?",
+      "op": {
+        "cases": [
+          {
+            "port": "dup",
+            "source": "len(similar.result.items) > 0 && dup_judge.decision.value && dup_judge.decision.confidence >= 0.8",
+            "when": {
+              "kind": "binary",
+              "left": {
+                "kind": "binary",
+                "left": {
+                  "kind": "binary",
+                  "left": {
+                    "args": [
+                      {
+                        "kind": "ref",
+                        "ref": {
+                          "kind": "port",
+                          "node": "similar",
+                          "path": "/items",
+                          "port": "result"
+                        }
+                      }
+                    ],
+                    "fn": "len",
+                    "kind": "call"
+                  },
+                  "op": ">",
+                  "right": {
+                    "kind": "literal",
+                    "value": 0
+                  }
+                },
+                "op": "&&",
+                "right": {
+                  "kind": "ref",
+                  "ref": {
+                    "kind": "port",
+                    "node": "dup_judge",
+                    "path": "/value",
+                    "port": "decision"
+                  }
+                }
+              },
+              "op": "&&",
+              "right": {
+                "kind": "binary",
+                "left": {
+                  "kind": "ref",
+                  "ref": {
+                    "kind": "port",
+                    "node": "dup_judge",
+                    "path": "/confidence",
+                    "port": "decision"
+                  }
+                },
+                "op": ">=",
+                "right": {
+                  "kind": "literal",
+                  "value": 0.8
+                }
+              }
+            }
+          }
+        ],
+        "defaultPort": "new",
+        "kind": "branch",
+        "mode": "first"
+      },
+      "outputs": {
+        "taken": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "policy": {
+        "maxCostUsd": null,
+        "maxTokens": null,
+        "onError": "fail",
+        "privacy": {
+          "containsPII": false,
+          "doNotPersist": false,
+          "redactFields": [],
+          "sensitive": false
+        },
+        "retry": {
+          "allowOnIrreversible": false,
+          "backoff": {
+            "factor": 2,
+            "initialMs": 500,
+            "jitter": true,
+            "maxMs": 30000,
+            "type": "exponential"
+          },
+          "maxAttempts": 1
+        },
+        "timeoutMs": 120000
+      },
+      "pool": "general",
+      "redact": [],
+      "scope": "",
+      "successors": [
+        "gh_dup_comment",
+        "labels"
+      ]
+    },
+    "labels": {
+      "batchGroup": null,
+      "controlIn": [
+        {
+          "edgeId": "c8",
+          "from": {
+            "node": "is_dup",
+            "port": "new"
+          },
+          "group": 0
+        }
+      ],
+      "controlOut": [
+        "done"
+      ],
+      "dataIn": [
+        {
+          "from": {
+            "node": "classify",
+            "port": "answers"
+          },
+          "optional": false,
+          "path": "/kind/value",
+          "to": {
+            "node": "labels",
+            "port": "expr"
+          },
+          "via": "expr"
+        },
+        {
+          "from": {
+            "node": "classify",
+            "port": "answers"
+          },
+          "optional": false,
+          "path": "/severity/levelLabel",
+          "to": {
+            "node": "labels",
+            "port": "expr"
+          },
+          "via": "expr"
+        }
+      ],
+      "guard": [
+        [
+          {
+            "node": "opened",
+            "port": "yes"
+          },
+          {
+            "node": "act_gate",
+            "port": "yes"
+          },
+          {
+            "node": "is_dup",
+            "port": "new"
+          }
+        ]
+      ],
+      "id": "labels",
+      "idempotency": "safe",
+      "kind": "task",
+      "name": "Compute labels",
+      "op": {
+        "config": {
+          "output": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "configBindings": {
+          "/expr": {
+            "ast": {
+              "items": [
+                {
+                  "kind": "ref",
+                  "ref": {
+                    "kind": "port",
+                    "node": "classify",
+                    "path": "/kind/value",
+                    "port": "answers"
+                  }
+                },
+                {
+                  "kind": "binary",
+                  "left": {
+                    "kind": "literal",
+                    "value": "severity:"
+                  },
+                  "op": "+",
+                  "right": {
+                    "args": [
+                      {
+                        "kind": "ref",
+                        "ref": {
+                          "kind": "port",
+                          "node": "classify",
+                          "path": "/severity/levelLabel",
+                          "port": "answers"
+                        }
+                      }
+                    ],
+                    "fn": "lower",
+                    "kind": "call"
+                  }
+                }
+              ],
+              "kind": "array"
+            },
+            "kind": "expr",
+            "schema": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          }
+        },
+        "configTemplates": {},
+        "credentials": {},
+        "inputs": {},
+        "kind": "task",
+        "manifest": {
+          "capabilities": [],
+          "configSchema": {
+            "additionalProperties": false,
+            "properties": {
+              "expr": {
+                "maxLength": 4000,
+                "minLength": 1,
+                "type": "string",
+                "x-ui": {
+                  "language": "flowexpr",
+                  "widget": "code"
+                }
+              },
+              "output": {
+                "type": "object",
+                "x-ui": {
+                  "help": "JSON Schema of the result; the compiler checks the expression against it.",
+                  "widget": "schema"
+                }
+              }
+            },
+            "required": [
+              "expr"
+            ],
+            "type": "object"
+          },
+          "controlPorts": [],
+          "credentials": [],
+          "defaultPolicy": {
+            "timeoutMs": 10000
+          },
+          "generation": false,
+          "id": "flowaid.data.transform",
+          "idempotency": "safe",
+          "inputs": [],
+          "metadata": {
+            "category": "data",
+            "description": "Computes a value with a FlowExpr expression over other nodes' outputs. `output` optionally declares the result's JSON Schema.",
+            "icon": "function-square",
+            "name": "Transform",
+            "summary": "{{ config.expr }}",
+            "tags": [
+              "data",
+              "expression"
+            ]
+          },
+          "migrations": [],
+          "optionProviders": [],
+          "outputs": [
+            {
+              "name": "result",
+              "required": true,
+              "schema": {}
+            }
+          ],
+          "pool": "general",
+          "portRules": [
+            {
+              "kind": "outputSchemaFromConfig",
+              "path": "/output",
+              "port": "result"
+            }
+          ],
+          "streams": false,
+          "version": "1.0.0"
+        },
+        "tool": null,
+        "type": "flowaid.data.transform",
+        "typeVersion": "1.0.0"
+      },
+      "outputs": {
+        "result": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "policy": {
+        "maxCostUsd": null,
+        "maxTokens": null,
+        "onError": "fail",
+        "privacy": {
+          "containsPII": false,
+          "doNotPersist": false,
+          "redactFields": [],
+          "sensitive": false
+        },
+        "retry": {
+          "allowOnIrreversible": false,
+          "backoff": {
+            "factor": 2,
+            "initialMs": 500,
+            "jitter": true,
+            "maxMs": 30000,
+            "type": "exponential"
+          },
+          "maxAttempts": 1
+        },
+        "timeoutMs": 10000
+      },
+      "pool": "general",
+      "redact": [],
+      "scope": "",
+      "successors": [
+        "gh_label",
+        "out_routed"
+      ]
+    },
+    "opened": {
+      "batchGroup": null,
+      "controlIn": [],
+      "controlOut": [
+        "yes",
+        "no"
+      ],
+      "dataIn": [
+        {
+          "from": {
+            "node": "start",
+            "port": "action"
+          },
+          "optional": false,
+          "to": {
+            "node": "opened",
+            "port": "yes"
+          },
+          "via": "expr"
+        }
+      ],
+      "guard": [
+        []
+      ],
+      "id": "opened",
+      "idempotency": "safe",
+      "kind": "branch",
+      "name": "Opened?",
+      "op": {
+        "cases": [
+          {
+            "port": "yes",
+            "source": "start.action == 'opened' || start.action == 'reopened'",
+            "when": {
+              "kind": "binary",
+              "left": {
+                "kind": "binary",
+                "left": {
+                  "kind": "ref",
+                  "ref": {
+                    "kind": "port",
+                    "node": "start",
+                    "port": "action"
+                  }
+                },
+                "op": "==",
+                "right": {
+                  "kind": "literal",
+                  "value": "opened"
+                }
+              },
+              "op": "||",
+              "right": {
+                "kind": "binary",
+                "left": {
+                  "kind": "ref",
+                  "ref": {
+                    "kind": "port",
+                    "node": "start",
+                    "port": "action"
+                  }
+                },
+                "op": "==",
+                "right": {
+                  "kind": "literal",
+                  "value": "reopened"
+                }
+              }
+            }
+          }
+        ],
+        "defaultPort": "no",
+        "kind": "branch",
+        "mode": "first"
+      },
+      "outputs": {
+        "taken": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "policy": {
+        "maxCostUsd": null,
+        "maxTokens": null,
+        "onError": "fail",
+        "privacy": {
+          "containsPII": false,
+          "doNotPersist": false,
+          "redactFields": [],
+          "sensitive": false
+        },
+        "retry": {
+          "allowOnIrreversible": false,
+          "backoff": {
+            "factor": 2,
+            "initialMs": 500,
+            "jitter": true,
+            "maxMs": 30000,
+            "type": "exponential"
+          },
+          "maxAttempts": 1
+        },
+        "timeoutMs": 120000
+      },
+      "pool": "general",
+      "redact": [],
+      "scope": "",
+      "successors": [
+        "actionable",
+        "out_ignored"
+      ]
+    },
+    "out_dup": {
+      "batchGroup": null,
+      "controlIn": [
+        {
+          "edgeId": "c7",
+          "from": {
+            "node": "gh_dup_comment",
+            "port": "done"
+          },
+          "group": 0
+        }
+      ],
+      "controlOut": [],
+      "dataIn": [
+        {
+          "from": {
+            "node": "similar",
+            "port": "result"
+          },
+          "optional": false,
+          "path": "/items",
+          "to": {
+            "node": "out_dup",
+            "port": "value"
+          },
+          "via": "expr"
+        }
+      ],
+      "guard": [
+        [
+          {
+            "node": "opened",
+            "port": "yes"
+          },
+          {
+            "node": "act_gate",
+            "port": "yes"
+          },
+          {
+            "node": "is_dup",
+            "port": "dup"
+          }
+        ]
+      ],
+      "id": "out_dup",
+      "idempotency": "safe",
+      "kind": "output",
+      "name": "Duplicate",
+      "op": {
+        "earlyExit": false,
+        "kind": "output",
+        "outcome": "duplicate",
+        "value": {
+          "fields": {
+            "duplicate_of": {
+              "ast": {
+                "key": "number",
+                "kind": "member",
+                "object": {
+                  "args": [
+                    {
+                      "kind": "ref",
+                      "ref": {
+                        "kind": "port",
+                        "node": "similar",
+                        "path": "/items",
+                        "port": "result"
+                      }
+                    }
+                  ],
+                  "fn": "first",
+                  "kind": "call"
+                }
+              },
+              "kind": "expr",
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "handled": {
+              "kind": "literal",
+              "schema": {
+                "const": true,
+                "type": "boolean"
+              },
+              "value": true
+            },
+            "route": {
+              "kind": "literal",
+              "schema": {
+                "const": "duplicate",
+                "type": "string"
+              },
+              "value": "duplicate"
+            }
+          },
+          "kind": "object",
+          "schema": {
+            "additionalProperties": false,
+            "properties": {
+              "duplicate_of": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "handled": {
+                "const": true,
+                "type": "boolean"
+              },
+              "route": {
+                "const": "duplicate",
+                "type": "string"
+              }
+            },
+            "required": [
+              "duplicate_of",
+              "handled",
+              "route"
+            ],
+            "type": "object"
+          }
+        }
+      },
+      "outputs": {},
+      "policy": {
+        "maxCostUsd": null,
+        "maxTokens": null,
+        "onError": "fail",
+        "privacy": {
+          "containsPII": false,
+          "doNotPersist": false,
+          "redactFields": [],
+          "sensitive": false
+        },
+        "retry": {
+          "allowOnIrreversible": false,
+          "backoff": {
+            "factor": 2,
+            "initialMs": 500,
+            "jitter": true,
+            "maxMs": 30000,
+            "type": "exponential"
+          },
+          "maxAttempts": 1
+        },
+        "timeoutMs": 120000
+      },
+      "pool": "general",
+      "redact": [],
+      "scope": "",
+      "successors": []
+    },
+    "out_ignored": {
+      "batchGroup": null,
+      "controlIn": [
+        {
+          "edgeId": "c1",
+          "from": {
+            "node": "opened",
+            "port": "no"
+          },
+          "group": 0
+        },
+        {
+          "edgeId": "c3",
+          "from": {
+            "node": "act_gate",
+            "port": "no"
+          },
+          "group": 0
+        }
+      ],
+      "controlOut": [],
+      "dataIn": [],
+      "guard": [
+        [
+          {
+            "node": "opened",
+            "port": "no"
+          }
+        ],
+        [
+          {
+            "node": "opened",
+            "port": "yes"
+          },
+          {
+            "node": "act_gate",
+            "port": "no"
+          }
+        ]
+      ],
+      "id": "out_ignored",
+      "idempotency": "safe",
+      "kind": "output",
+      "name": "Ignored",
+      "op": {
+        "earlyExit": false,
+        "kind": "output",
+        "outcome": "ignored",
+        "value": {
+          "fields": {
+            "handled": {
+              "kind": "literal",
+              "schema": {
+                "const": false,
+                "type": "boolean"
+              },
+              "value": false
+            },
+            "route": {
+              "kind": "literal",
+              "schema": {
+                "const": "ignored",
+                "type": "string"
+              },
+              "value": "ignored"
+            }
+          },
+          "kind": "object",
+          "schema": {
+            "additionalProperties": false,
+            "properties": {
+              "handled": {
+                "const": false,
+                "type": "boolean"
+              },
+              "route": {
+                "const": "ignored",
+                "type": "string"
+              }
+            },
+            "required": [
+              "handled",
+              "route"
+            ],
+            "type": "object"
+          }
+        }
+      },
+      "outputs": {},
+      "policy": {
+        "maxCostUsd": null,
+        "maxTokens": null,
+        "onError": "fail",
+        "privacy": {
+          "containsPII": false,
+          "doNotPersist": false,
+          "redactFields": [],
+          "sensitive": false
+        },
+        "retry": {
+          "allowOnIrreversible": false,
+          "backoff": {
+            "factor": 2,
+            "initialMs": 500,
+            "jitter": true,
+            "maxMs": 30000,
+            "type": "exponential"
+          },
+          "maxAttempts": 1
+        },
+        "timeoutMs": 120000
+      },
+      "pool": "general",
+      "redact": [],
+      "scope": "",
+      "successors": []
+    },
+    "out_routed": {
+      "batchGroup": null,
+      "controlIn": [
+        {
+          "edgeId": "c12",
+          "from": {
+            "node": "page",
+            "port": "done"
+          },
+          "group": 0
+        },
+        {
+          "edgeId": "c13",
+          "from": {
+            "node": "route",
+            "port": "product"
+          },
+          "group": 0
+        },
+        {
+          "edgeId": "c14",
+          "from": {
+            "node": "route",
+            "port": "backlog"
+          },
+          "group": 0
+        }
+      ],
+      "controlOut": [],
+      "dataIn": [
+        {
+          "from": {
+            "node": "labels",
+            "port": "result"
+          },
+          "optional": false,
+          "to": {
+            "node": "out_routed",
+            "port": "value"
+          },
+          "via": "ref"
+        },
+        {
+          "from": {
+            "node": "route",
+            "port": "taken"
+          },
+          "optional": false,
+          "to": {
+            "node": "out_routed",
+            "port": "value"
+          },
+          "via": "expr"
+        }
+      ],
+      "guard": [
+        [
+          {
+            "node": "opened",
+            "port": "yes"
+          },
+          {
+            "node": "act_gate",
+            "port": "yes"
+          },
+          {
+            "node": "is_dup",
+            "port": "new"
+          }
+        ]
+      ],
+      "id": "out_routed",
+      "idempotency": "safe",
+      "kind": "output",
+      "name": "Routed",
+      "op": {
+        "earlyExit": false,
+        "kind": "output",
+        "outcome": "routed",
+        "value": {
+          "fields": {
+            "handled": {
+              "kind": "literal",
+              "schema": {
+                "const": true,
+                "type": "boolean"
+              },
+              "value": true
+            },
+            "labels": {
+              "kind": "ref",
+              "optional": false,
+              "ref": {
+                "kind": "port",
+                "node": "labels",
+                "port": "result"
+              },
+              "schema": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "route": {
+              "ast": {
+                "args": [
+                  {
+                    "kind": "ref",
+                    "ref": {
+                      "kind": "port",
+                      "node": "route",
+                      "port": "taken"
+                    }
+                  }
+                ],
+                "fn": "first",
+                "kind": "call"
+              },
+              "kind": "expr",
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          },
+          "kind": "object",
+          "schema": {
+            "additionalProperties": false,
+            "properties": {
+              "handled": {
+                "const": true,
+                "type": "boolean"
+              },
+              "labels": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "route": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "handled",
+              "labels",
+              "route"
+            ],
+            "type": "object"
+          }
+        }
+      },
+      "outputs": {},
+      "policy": {
+        "maxCostUsd": null,
+        "maxTokens": null,
+        "onError": "fail",
+        "privacy": {
+          "containsPII": false,
+          "doNotPersist": false,
+          "redactFields": [],
+          "sensitive": false
+        },
+        "retry": {
+          "allowOnIrreversible": false,
+          "backoff": {
+            "factor": 2,
+            "initialMs": 500,
+            "jitter": true,
+            "maxMs": 30000,
+            "type": "exponential"
+          },
+          "maxAttempts": 1
+        },
+        "timeoutMs": 120000
+      },
+      "pool": "general",
+      "redact": [],
+      "scope": "",
+      "successors": []
+    },
+    "page": {
+      "batchGroup": null,
+      "controlIn": [
+        {
+          "edgeId": "c11",
+          "from": {
+            "node": "route",
+            "port": "oncall"
+          },
+          "group": 0
+        }
+      ],
+      "controlOut": [
+        "done"
+      ],
+      "dataIn": [
+        {
+          "from": {
+            "node": "start",
+            "port": "issue"
+          },
+          "optional": false,
+          "path": "/html_url",
+          "to": {
+            "node": "page",
+            "port": "body"
+          },
+          "via": "template"
+        },
+        {
+          "from": {
+            "node": "classify",
+            "port": "answers"
+          },
+          "optional": false,
+          "path": "/severity/value",
+          "to": {
+            "node": "page",
+            "port": "body"
+          },
+          "via": "template"
+        }
+      ],
+      "guard": [
+        [
+          {
+            "node": "opened",
+            "port": "yes"
+          },
+          {
+            "node": "act_gate",
+            "port": "yes"
+          },
+          {
+            "node": "is_dup",
+            "port": "new"
+          },
+          {
+            "node": "route",
+            "port": "oncall"
+          }
+        ]
+      ],
+      "id": "page",
+      "idempotency": "none",
+      "kind": "task",
+      "name": "Notify on-call",
+      "op": {
+        "config": {
+          "method": "POST",
+          "responseType": "json",
+          "url": "https://hooks.slack.com/services/T000/B000/XXXX"
+        },
+        "configBindings": {
+          "/body": {
+            "fields": {
+              "text": {
+                "kind": "template",
+                "schema": {
+                  "type": "string"
+                },
+                "template": {
+                  "parts": [
+                    {
+                      "kind": "text",
+                      "text": ":rotating_light: Critical bug "
+                    },
+                    {
+                      "expr": {
+                        "kind": "ref",
+                        "ref": {
+                          "kind": "port",
+                          "node": "start",
+                          "path": "/html_url",
+                          "port": "issue"
+                        }
+                      },
+                      "filter": "string",
+                      "kind": "hole",
+                      "range": {
+                        "end": 56,
+                        "start": 30
+                      }
+                    },
+                    {
+                      "kind": "text",
+                      "text": " (sev "
+                    },
+                    {
+                      "expr": {
+                        "args": [
+                          {
+                            "kind": "ref",
+                            "ref": {
+                              "kind": "port",
+                              "node": "classify",
+                              "path": "/severity/value",
+                              "port": "answers"
+                            }
+                          },
+                          {
+                            "kind": "literal",
+                            "value": 1
+                          }
+                        ],
+                        "fn": "round",
+                        "kind": "call"
+                      },
+                      "filter": "string",
+                      "kind": "hole",
+                      "range": {
+                        "end": 109,
+                        "start": 62
+                      }
+                    },
+                    {
+                      "kind": "text",
+                      "text": ")"
+                    }
+                  ]
+                }
+              }
+            },
+            "kind": "object",
+            "schema": {
+              "additionalProperties": false,
+              "properties": {
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "text"
+              ],
+              "type": "object"
+            }
+          }
+        },
+        "configTemplates": {},
+        "credentials": {},
+        "inputs": {},
+        "kind": "task",
+        "manifest": {
+          "capabilities": [
+            "network",
+            "credentials",
+            "artifacts"
+          ],
+          "configSchema": {
+            "additionalProperties": false,
+            "properties": {
+              "body": {
+                "x-ui": {
+                  "bindable": true,
+                  "showWhen": {
+                    "oneOf": [
+                      "POST",
+                      "PUT",
+                      "PATCH"
+                    ],
+                    "path": "/method"
+                  },
+                  "widget": "json"
+                }
+              },
+              "headers": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "default": {},
+                "type": "object",
+                "x-ui": {
+                  "widget": "keyvalue"
+                }
+              },
+              "method": {
+                "default": "GET",
+                "enum": [
+                  "GET",
+                  "HEAD",
+                  "OPTIONS",
+                  "POST",
+                  "PUT",
+                  "PATCH",
+                  "DELETE"
+                ],
+                "type": "string",
+                "x-ui": {
+                  "widget": "select"
+                }
+              },
+              "query": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "default": {},
+                "type": "object",
+                "x-ui": {
+                  "widget": "keyvalue"
+                }
+              },
+              "responseType": {
+                "default": "json",
+                "enum": [
+                  "json",
+                  "text",
+                  "binary"
+                ],
+                "type": "string"
+              },
+              "timeoutMs": {
+                "default": 30000,
+                "maximum": 120000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "url": {
+                "minLength": 1,
+                "type": "string",
+                "x-ui": {
+                  "placeholder": "https://api.example.com/items/{{ start.id }}",
+                  "widget": "template"
+                }
+              }
+            },
+            "required": [
+              "method",
+              "url"
+            ],
+            "type": "object"
+          },
+          "controlPorts": [],
+          "credentials": [
+            {
+              "description": "Applied as Authorization or a custom header.",
+              "name": "auth",
+              "required": false,
+              "types": [
+                "http.bearer",
+                "http.basic",
+                "http.header",
+                "http.api_key"
+              ]
+            }
+          ],
+          "defaultPolicy": {
+            "timeoutMs": 30000
+          },
+          "generation": false,
+          "id": "flowaid.tools.http",
+          "idempotency": {
+            "byConfig": "/method",
+            "cases": {
+              "DELETE": "keyed",
+              "GET": "safe",
+              "HEAD": "safe",
+              "OPTIONS": "safe",
+              "PATCH": "none",
+              "POST": "none",
+              "PUT": "keyed"
+            },
+            "default": "none"
+          },
+          "inputs": [],
+          "metadata": {
+            "category": "tool",
+            "description": "Calls an HTTP endpoint through the safe fetch (private-network, redirect and size limits) and returns status, headers and the parsed body.",
+            "icon": "globe",
+            "name": "HTTP request",
+            "summary": "{{ config.method }} {{ config.url }}",
+            "tags": [
+              "http",
+              "tool",
+              "network"
+            ]
+          },
+          "migrations": [],
+          "optionProviders": [],
+          "outputs": [
+            {
+              "name": "status",
+              "required": true,
+              "schema": {
+                "maximum": 599,
+                "minimum": 100,
+                "type": "integer"
+              }
+            },
+            {
+              "name": "headers",
+              "required": true,
+              "schema": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              }
+            },
+            {
+              "description": "Parsed JSON or text; { \"$artifact\": id } for binary responses; null for empty bodies.",
+              "name": "body",
+              "required": false,
+              "schema": {}
+            }
+          ],
+          "pool": "general",
+          "portRules": [],
+          "streams": false,
+          "version": "1.0.0"
+        },
+        "tool": null,
+        "type": "flowaid.tools.http",
+        "typeVersion": "1.0.0"
+      },
+      "outputs": {
+        "body": {},
+        "headers": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "status": {
+          "maximum": 599,
+          "minimum": 100,
+          "type": "integer"
+        }
+      },
+      "policy": {
+        "maxCostUsd": null,
+        "maxTokens": null,
+        "onError": "fail",
+        "privacy": {
+          "containsPII": false,
+          "doNotPersist": false,
+          "redactFields": [],
+          "sensitive": false
+        },
+        "retry": {
+          "allowOnIrreversible": false,
+          "backoff": {
+            "factor": 2,
+            "initialMs": 500,
+            "jitter": true,
+            "maxMs": 30000,
+            "type": "exponential"
+          },
+          "maxAttempts": 1
+        },
+        "timeoutMs": 30000
+      },
+      "pool": "general",
+      "redact": [],
+      "scope": "",
+      "successors": [
+        "out_routed"
+      ]
+    },
+    "route": {
+      "batchGroup": null,
+      "controlIn": [
+        {
+          "edgeId": "c10",
+          "from": {
+            "node": "gh_label",
+            "port": "done"
+          },
+          "group": 0
+        }
+      ],
+      "controlOut": [
+        "oncall",
+        "product",
+        "backlog"
+      ],
+      "dataIn": [
+        {
+          "from": {
+            "node": "classify",
+            "port": "answers"
+          },
+          "optional": false,
+          "path": "/kind/value",
+          "to": {
+            "node": "route",
+            "port": "oncall"
+          },
+          "via": "expr"
+        },
+        {
+          "from": {
+            "node": "classify",
+            "port": "answers"
+          },
+          "optional": false,
+          "path": "/severity/value",
+          "to": {
+            "node": "route",
+            "port": "oncall"
+          },
+          "via": "expr"
+        },
+        {
+          "from": {
+            "node": "classify",
+            "port": "answers"
+          },
+          "optional": false,
+          "path": "/kind/value",
+          "to": {
+            "node": "route",
+            "port": "product"
+          },
+          "via": "expr"
+        }
+      ],
+      "guard": [
+        [
+          {
+            "node": "opened",
+            "port": "yes"
+          },
+          {
+            "node": "act_gate",
+            "port": "yes"
+          },
+          {
+            "node": "is_dup",
+            "port": "new"
+          }
+        ]
+      ],
+      "id": "route",
+      "idempotency": "safe",
+      "kind": "branch",
+      "name": "Route",
+      "op": {
+        "cases": [
+          {
+            "port": "oncall",
+            "source": "classify.answers.kind.value == 'bug' && classify.answers.severity.value >= 3",
+            "when": {
+              "kind": "binary",
+              "left": {
+                "kind": "binary",
+                "left": {
+                  "kind": "ref",
+                  "ref": {
+                    "kind": "port",
+                    "node": "classify",
+                    "path": "/kind/value",
+                    "port": "answers"
+                  }
+                },
+                "op": "==",
+                "right": {
+                  "kind": "literal",
+                  "value": "bug"
+                }
+              },
+              "op": "&&",
+              "right": {
+                "kind": "binary",
+                "left": {
+                  "kind": "ref",
+                  "ref": {
+                    "kind": "port",
+                    "node": "classify",
+                    "path": "/severity/value",
+                    "port": "answers"
+                  }
+                },
+                "op": ">=",
+                "right": {
+                  "kind": "literal",
+                  "value": 3
+                }
+              }
+            }
+          },
+          {
+            "port": "product",
+            "source": "classify.answers.kind.value == 'feature'",
+            "when": {
+              "kind": "binary",
+              "left": {
+                "kind": "ref",
+                "ref": {
+                  "kind": "port",
+                  "node": "classify",
+                  "path": "/kind/value",
+                  "port": "answers"
+                }
+              },
+              "op": "==",
+              "right": {
+                "kind": "literal",
+                "value": "feature"
+              }
+            }
+          }
+        ],
+        "defaultPort": "backlog",
+        "kind": "branch",
+        "mode": "first"
+      },
+      "outputs": {
+        "taken": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "policy": {
+        "maxCostUsd": null,
+        "maxTokens": null,
+        "onError": "fail",
+        "privacy": {
+          "containsPII": false,
+          "doNotPersist": false,
+          "redactFields": [],
+          "sensitive": false
+        },
+        "retry": {
+          "allowOnIrreversible": false,
+          "backoff": {
+            "factor": 2,
+            "initialMs": 500,
+            "jitter": true,
+            "maxMs": 30000,
+            "type": "exponential"
+          },
+          "maxAttempts": 1
+        },
+        "timeoutMs": 120000
+      },
+      "pool": "general",
+      "redact": [],
+      "scope": "",
+      "successors": [
+        "out_routed",
+        "page"
+      ]
+    },
+    "similar": {
+      "batchGroup": null,
+      "controlIn": [
+        {
+          "edgeId": "c5",
+          "from": {
+            "node": "act_gate",
+            "port": "yes"
+          },
+          "group": 0
+        }
+      ],
+      "controlOut": [
+        "done"
+      ],
+      "dataIn": [
+        {
+          "from": {
+            "node": "start",
+            "port": "repository"
+          },
+          "optional": false,
+          "path": "/full_name",
+          "to": {
+            "node": "similar",
+            "port": "q"
+          },
+          "via": "template"
+        },
+        {
+          "from": {
+            "node": "start",
+            "port": "issue"
+          },
+          "optional": false,
+          "path": "/title",
+          "to": {
+            "node": "similar",
+            "port": "q"
+          },
+          "via": "template"
+        }
+      ],
+      "guard": [
+        [
+          {
+            "node": "opened",
+            "port": "yes"
+          },
+          {
+            "node": "act_gate",
+            "port": "yes"
+          }
+        ]
+      ],
+      "id": "similar",
+      "idempotency": "safe",
+      "kind": "task",
+      "name": "Similar issues",
+      "op": {
+        "config": {
+          "serverId": "00000000-0000-4000-8000-676974687562",
+          "tool": "search_issues"
+        },
+        "configBindings": {},
+        "configTemplates": {},
+        "credentials": {
+          "mcp": "GITHUB_MCP"
+        },
+        "inputs": {
+          "per_page": {
+            "kind": "literal",
+            "schema": {
+              "const": 5,
+              "type": "integer"
+            },
+            "value": 5
+          },
+          "q": {
+            "kind": "template",
+            "schema": {
+              "type": "string"
+            },
+            "template": {
+              "parts": [
+                {
+                  "kind": "text",
+                  "text": "repo:"
+                },
+                {
+                  "expr": {
+                    "kind": "ref",
+                    "ref": {
+                      "kind": "port",
+                      "node": "start",
+                      "path": "/full_name",
+                      "port": "repository"
+                    }
+                  },
+                  "filter": "string",
+                  "kind": "hole",
+                  "range": {
+                    "end": 37,
+                    "start": 5
+                  }
+                },
+                {
+                  "kind": "text",
+                  "text": " is:issue "
+                },
+                {
+                  "expr": {
+                    "kind": "ref",
+                    "ref": {
+                      "kind": "port",
+                      "node": "start",
+                      "path": "/title",
+                      "port": "issue"
+                    }
+                  },
+                  "filter": "string",
+                  "kind": "hole",
+                  "range": {
+                    "end": 70,
+                    "start": 47
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "kind": "task",
+        "manifest": {
+          "capabilities": [
+            "network",
+            "credentials",
+            "tools"
+          ],
+          "configSchema": {
+            "additionalProperties": false,
+            "properties": {
+              "serverId": {
+                "minLength": 1,
+                "type": "string",
+                "x-ui": {
+                  "optionsProvider": "mcpServers",
+                  "widget": "select"
+                }
+              },
+              "timeoutMs": {
+                "default": 60000,
+                "maximum": 600000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "tool": {
+                "pattern": "^[A-Za-z0-9_-]{1,64}$",
+                "type": "string",
+                "x-ui": {
+                  "optionsProvider": "mcpTools",
+                  "widget": "select"
+                }
+              }
+            },
+            "required": [
+              "serverId",
+              "tool"
+            ],
+            "type": "object"
+          },
+          "controlPorts": [],
+          "credentials": [
+            {
+              "description": "Credential sent to the MCP server, if it needs one.",
+              "name": "mcp",
+              "required": false,
+              "types": [
+                "mcp.headers",
+                "mcp.oauth",
+                "http.bearer"
+              ]
+            }
+          ],
+          "defaultPolicy": {
+            "timeoutMs": 60000
+          },
+          "generation": false,
+          "id": "flowaid.tools.mcp",
+          "idempotency": "none",
+          "inputs": [],
+          "metadata": {
+            "category": "tool",
+            "description": "Calls one tool of a connected MCP server. Input ports are the tool's arguments; `result` is its structured result and `content` its text content.",
+            "icon": "plug",
+            "name": "MCP tool",
+            "summary": "{{ config.tool }}",
+            "tags": [
+              "tool",
+              "mcp"
+            ]
+          },
+          "migrations": [],
+          "optionProviders": [
+            "mcpServers",
+            "mcpTools"
+          ],
+          "outputs": [
+            {
+              "name": "result",
+              "required": true,
+              "schema": {}
+            },
+            {
+              "name": "content",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "pool": "general",
+          "portRules": [
+            {
+              "kind": "toolSignature",
+              "source": "mcp"
+            }
+          ],
+          "streams": false,
+          "version": "1.0.0"
+        },
+        "tool": {
+          "approvalRequired": false,
+          "capability": "github.read",
+          "description": "Search issues and pull requests with GitHub search syntax.",
+          "idempotency": "safe",
+          "inputSchema": {
+            "additionalProperties": false,
+            "properties": {
+              "page": {
+                "minimum": 1,
+                "type": "integer"
+              },
+              "per_page": {
+                "maximum": 100,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "q": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "q"
+            ],
+            "type": "object"
+          },
+          "name": "search_issues",
+          "outputSchema": {
+            "properties": {
+              "items": {
+                "items": {
+                  "properties": {
+                    "body": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "html_url": {
+                      "type": "string"
+                    },
+                    "number": {
+                      "type": "integer"
+                    },
+                    "state": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "number",
+                    "title",
+                    "state",
+                    "html_url"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "total_count": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "total_count",
+              "items"
+            ],
+            "type": "object"
+          },
+          "source": {
+            "kind": "mcp",
+            "serverId": "00000000-0000-4000-8000-676974687562",
+            "tool": "search_issues"
+          }
+        },
+        "type": "flowaid.tools.mcp",
+        "typeVersion": "1.0.0"
+      },
+      "outputs": {
+        "content": {
+          "type": "string"
+        },
+        "result": {
+          "properties": {
+            "items": {
+              "items": {
+                "properties": {
+                  "body": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "html_url": {
+                    "type": "string"
+                  },
+                  "number": {
+                    "type": "integer"
+                  },
+                  "state": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "number",
+                  "title",
+                  "state",
+                  "html_url"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "total_count": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "total_count",
+            "items"
+          ],
+          "type": "object"
+        }
+      },
+      "policy": {
+        "maxCostUsd": null,
+        "maxTokens": null,
+        "onError": "fail",
+        "privacy": {
+          "containsPII": false,
+          "doNotPersist": false,
+          "redactFields": [],
+          "sensitive": false
+        },
+        "retry": {
+          "allowOnIrreversible": false,
+          "backoff": {
+            "factor": 2,
+            "initialMs": 500,
+            "jitter": true,
+            "maxMs": 30000,
+            "type": "exponential"
+          },
+          "maxAttempts": 1
+        },
+        "timeoutMs": 60000
+      },
+      "pool": "general",
+      "redact": [],
+      "scope": "",
+      "successors": [
+        "dup_judge",
+        "gh_dup_comment",
+        "is_dup",
+        "out_dup"
+      ]
+    },
+    "start": {
+      "batchGroup": null,
+      "controlIn": [],
+      "controlOut": [
+        "done"
+      ],
+      "dataIn": [],
+      "guard": [
+        []
+      ],
+      "id": "start",
+      "idempotency": "safe",
+      "kind": "input",
+      "name": "Webhook",
+      "op": {
+        "kind": "input"
+      },
+      "outputs": {
+        "action": {
+          "type": "string"
+        },
+        "issue": {
+          "properties": {
+            "body": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "html_url": {
+              "type": "string"
+            },
+            "number": {
+              "type": "integer"
+            },
+            "title": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "number",
+            "title",
+            "html_url"
+          ],
+          "type": "object"
+        },
+        "repository": {
+          "properties": {
+            "full_name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "full_name"
+          ],
+          "type": "object"
+        }
+      },
+      "policy": {
+        "maxCostUsd": null,
+        "maxTokens": null,
+        "onError": "fail",
+        "privacy": {
+          "containsPII": false,
+          "doNotPersist": false,
+          "redactFields": [],
+          "sensitive": false
+        },
+        "retry": {
+          "allowOnIrreversible": false,
+          "backoff": {
+            "factor": 2,
+            "initialMs": 500,
+            "jitter": true,
+            "maxMs": 30000,
+            "type": "exponential"
+          },
+          "maxAttempts": 1
+        },
+        "timeoutMs": 120000
+      },
+      "pool": "general",
+      "redact": [],
+      "scope": "",
+      "successors": [
+        "actionable",
+        "classify",
+        "dup_judge",
+        "gh_dup_comment",
+        "gh_label",
+        "opened",
+        "page",
+        "similar"
+      ]
+    }
+  },
+  "outputs": {
+    "properties": {
+      "duplicate_of": {
+        "type": [
+          "integer",
+          "null"
+        ]
+      },
+      "handled": {
+        "type": "boolean"
+      },
+      "labels": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "route": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "handled"
+    ],
+    "type": "object"
+  },
+  "planHash": "9cb6f32e48b23884f590134067183844de45d6ebb55b2ec8c4f74d127e488652",
+  "planVersion": 1,
+  "pools": [
+    "general"
+  ],
+  "requiredCapabilities": [
+    "artifacts",
+    "credentials",
+    "decision",
+    "network",
+    "tools"
+  ],
+  "scopes": {
+    "": {
+      "container": null,
+      "entries": [
+        "start"
+      ],
+      "id": "",
+      "kind": "root",
+      "nodes": [
+        "start",
+        "opened",
+        "actionable",
+        "act_gate",
+        "classify",
+        "similar",
+        "dup_judge",
+        "is_dup",
+        "gh_dup_comment",
+        "labels",
+        "gh_label",
+        "route",
+        "page",
+        "out_ignored",
+        "out_dup",
+        "out_routed"
+      ],
+      "order": [
+        "start",
+        "opened",
+        "actionable",
+        "act_gate",
+        "classify",
+        "out_ignored",
+        "similar",
+        "dup_judge",
+        "is_dup",
+        "gh_dup_comment",
+        "labels",
+        "gh_label",
+        "out_dup",
+        "route",
+        "page",
+        "out_routed"
+      ],
+      "outputs": [
+        "out_ignored",
+        "out_dup",
+        "out_routed"
+      ],
+      "parent": null
+    }
+  },
+  "secrets": [
+    {
+      "credentialType": "typesafe.api_key",
+      "name": "TYPESAFE_API_KEY",
+      "required": true
+    },
+    {
+      "credentialType": "mcp.headers",
+      "name": "GITHUB_MCP",
+      "required": true
+    }
+  ],
+  "subflows": [],
+  "triggers": [
+    {
+      "allowedHeaders": [
+        "x-github-event",
+        "x-github-delivery"
+      ],
+      "inputPointer": "/body",
+      "path": "github-issues",
+      "responseMode": "async",
+      "signature": "hmac_sha256",
+      "type": "webhook"
+    }
+  ],
+  "variables": [],
+  "workflowId": "3e7a1c9b-8d2f-4b6e-9a0c-5f4d3e2b1a09"
+}
