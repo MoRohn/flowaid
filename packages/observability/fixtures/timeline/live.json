@@ -1,0 +1,104 @@
+[
+  {
+    "id": "00000000-0000-4000-8000-000000000040",
+    "nodeId": "input",
+    "scope": "",
+    "attempt": 1,
+    "kind": "input",
+    "nodeType": null,
+    "status": "completed",
+    "startedAt": "2026-09-23T10:00:00.100Z",
+    "endedAt": "2026-09-23T10:00:00.150Z",
+    "latencyMs": 50,
+    "queueLatencyMs": 5,
+    "costUsd": 0,
+    "usage": null,
+    "decision": null,
+    "firedPorts": [
+      "done"
+    ],
+    "reused": false,
+    "parentId": null,
+    "name": "input",
+    "category": "flow",
+    "markers": [],
+    "children": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000041",
+    "nodeId": "classify",
+    "scope": "",
+    "attempt": 1,
+    "kind": "task",
+    "nodeType": "flowaid.decision.choice",
+    "status": "completed",
+    "startedAt": "2026-09-23T10:00:00.300Z",
+    "endedAt": "2026-09-23T10:00:00.600Z",
+    "latencyMs": 180,
+    "queueLatencyMs": 5,
+    "costUsd": 0.0004,
+    "usage": {
+      "inputTokens": 300,
+      "outputTokens": 4
+    },
+    "decision": {
+      "kind": "choice",
+      "value": "billing",
+      "probabilities": {
+        "billing": 0.82,
+        "bug": 0.18
+      },
+      "confidence": 0.82,
+      "provider": "typesafe",
+      "model": "jev-1.13.0",
+      "latencyMs": 180,
+      "costUsd": 0.0004,
+      "attempts": [
+        {
+          "provider": "typesafe",
+          "model": "jev-1.13.0",
+          "outcome": "ok",
+          "latencyMs": 180
+        }
+      ]
+    },
+    "firedPorts": [
+      "billing"
+    ],
+    "reused": false,
+    "parentId": null,
+    "name": "classify",
+    "category": "decision",
+    "markers": [],
+    "children": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000042",
+    "nodeId": "approve",
+    "scope": "",
+    "attempt": 1,
+    "kind": "human",
+    "nodeType": "flowaid.human.approval",
+    "status": "waiting",
+    "startedAt": "2026-09-23T10:00:00.800Z",
+    "endedAt": null,
+    "latencyMs": null,
+    "queueLatencyMs": 100,
+    "costUsd": 0,
+    "usage": null,
+    "decision": null,
+    "firedPorts": [],
+    "reused": false,
+    "parentId": null,
+    "name": "approve",
+    "category": "human",
+    "markers": [
+      {
+        "seq": 9,
+        "type": "NODE_WAITING",
+        "at": "2026-09-23T10:00:00.900Z"
+      }
+    ],
+    "children": []
+  }
+]

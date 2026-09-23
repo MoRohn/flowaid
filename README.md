@@ -15,7 +15,7 @@
   <img alt="Status: pre-alpha" src="https://img.shields.io/badge/status-pre--alpha-c98a12">
   <img alt="TypeScript 5.9 strict" src="https://img.shields.io/badge/TypeScript-5.9%20strict-17171c">
   <img alt="Node.js 24+" src="https://img.shields.io/badge/node-%E2%89%A524-17171c">
-  <img alt="Tests: 4,132 passing" src="https://img.shields.io/badge/tests-4%2C132%20passing-1f9d64">
+  <img alt="Tests: 4,189 passing" src="https://img.shields.io/badge/tests-4%2C189%20passing-1f9d64">
 </p>
 
 ---
@@ -124,6 +124,7 @@ deployments by environment, and how its decisions were routed.
 | `@flowaid/node-sdk`                                  | **Built.** `defineNode`, `toManifest` (reproduces the fixture manifests exactly), capability-scoped context and a runtime-faithful test harness. 23 tests                                               |
 | `@flowaid/providers`                                 | **Built.** Registry, sourced model catalog and pricing, failover with circuit breaking, LLM and rule decision providers, OpenAI-compatible client, record/replay. 80 tests                              |
 | `@flowaid/credentials`                               | **Built.** AES-256-GCM envelope with per-credential keys, KEK versions under env/file/KMS/Vault master keys with KCV and rotation, external references, the Redactor and the credential types. 56 tests |
+| `@flowaid/observability`                             | **Built.** Redacting pino logger, OpenTelemetry tracing and metrics (OTLP, Prometheus), the metric registry, run timelines and the TraceReviewer. 57 tests                                              |
 | `@flowaid/shared`, `@flowaid/env`, `@flowaid/config` | **Built.** Primitives, environment schema and tooling presets. 136 tests                                                                                                                                |
 | Runtime, database, API, worker, web app              | **Not started.** Planned in [`docs/UPGRADE_PLAN.md`](docs/UPGRADE_PLAN.md), phases P1–P5                                                                                                                |
 | CI                                                   | **Running.** GitHub Actions runs the audit, boundary, format, lint, typecheck, build and test gates on every push and pull request                                                                      |
@@ -341,6 +342,7 @@ packages/
   node-sdk/             Write nodes: schemas, manifests, scoped context, test harness
   providers/            Provider registry, pricing catalog, failover, health, LLM client
   credentials/          Envelope encryption, master keys, external secrets, redaction
+  observability/        Redacting logger, tracing, metrics, run timelines, trace review
   jev/                  Jev engineering library and harness templates
   ui/                   React component library and playground
 scripts/                Repository checks: boundaries, browser bundle, compose, env, UI inventory

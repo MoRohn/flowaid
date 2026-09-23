@@ -1,0 +1,195 @@
+[
+  {
+    "id": "00000000-0000-4000-8000-000000000010",
+    "nodeId": "call_api",
+    "scope": "",
+    "attempt": 1,
+    "kind": "task",
+    "nodeType": "flowaid.tools.http",
+    "status": "failed",
+    "startedAt": "2026-09-23T10:00:00.200Z",
+    "endedAt": "2026-09-23T10:00:00.250Z",
+    "latencyMs": 50,
+    "queueLatencyMs": 5,
+    "costUsd": 0,
+    "usage": null,
+    "decision": null,
+    "firedPorts": [
+      "done"
+    ],
+    "reused": false,
+    "parentId": "00000000-0000-4000-8000-000000000012",
+    "name": "call api",
+    "category": "tool",
+    "markers": [
+      {
+        "seq": 3,
+        "type": "TOOL_CALLED",
+        "at": "2026-09-23T10:00:00.300Z"
+      },
+      {
+        "seq": 4,
+        "type": "NODE_RETRIED",
+        "at": "2026-09-23T10:00:00.400Z"
+      }
+    ],
+    "children": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000011",
+    "nodeId": "call_api",
+    "scope": "",
+    "attempt": 2,
+    "kind": "task",
+    "nodeType": "flowaid.tools.http",
+    "status": "failed",
+    "startedAt": "2026-09-23T10:00:00.600Z",
+    "endedAt": "2026-09-23T10:00:00.650Z",
+    "latencyMs": 50,
+    "queueLatencyMs": 5,
+    "costUsd": 0,
+    "usage": null,
+    "decision": null,
+    "firedPorts": [
+      "done"
+    ],
+    "reused": false,
+    "parentId": "00000000-0000-4000-8000-000000000012",
+    "name": "call api",
+    "category": "tool",
+    "markers": [
+      {
+        "seq": 7,
+        "type": "TOOL_CALLED",
+        "at": "2026-09-23T10:00:00.700Z"
+      },
+      {
+        "seq": 8,
+        "type": "NODE_RETRIED",
+        "at": "2026-09-23T10:00:00.800Z"
+      }
+    ],
+    "children": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000012",
+    "nodeId": "call_api",
+    "scope": "",
+    "attempt": 3,
+    "kind": "task",
+    "nodeType": "flowaid.tools.http",
+    "status": "completed",
+    "startedAt": "2026-09-23T10:00:01.000Z",
+    "endedAt": "2026-09-23T10:00:01.050Z",
+    "latencyMs": 50,
+    "queueLatencyMs": 5,
+    "costUsd": 0,
+    "usage": null,
+    "decision": null,
+    "firedPorts": [
+      "done"
+    ],
+    "reused": false,
+    "parentId": null,
+    "name": "call api",
+    "category": "tool",
+    "markers": [
+      {
+        "seq": 11,
+        "type": "TOOL_CALLED",
+        "at": "2026-09-23T10:00:01.100Z"
+      }
+    ],
+    "children": [
+      "00000000-0000-4000-8000-000000000010",
+      "00000000-0000-4000-8000-000000000011"
+    ]
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000020",
+    "nodeId": "refine",
+    "scope": "",
+    "attempt": 1,
+    "kind": "loop",
+    "nodeType": null,
+    "status": "failed",
+    "startedAt": "2026-09-23T10:00:01.400Z",
+    "endedAt": "2026-09-23T10:00:01.450Z",
+    "latencyMs": 50,
+    "queueLatencyMs": 5,
+    "costUsd": 0,
+    "usage": null,
+    "decision": null,
+    "firedPorts": [
+      "done"
+    ],
+    "reused": false,
+    "parentId": "00000000-0000-4000-8000-000000000021",
+    "name": "refine",
+    "category": "flow",
+    "markers": [],
+    "children": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000021",
+    "nodeId": "refine",
+    "scope": "",
+    "attempt": 2,
+    "kind": "loop",
+    "nodeType": null,
+    "status": "completed",
+    "startedAt": "2026-09-23T10:00:01.700Z",
+    "endedAt": "2026-09-23T10:00:01.750Z",
+    "latencyMs": 50,
+    "queueLatencyMs": 5,
+    "costUsd": 0,
+    "usage": null,
+    "decision": null,
+    "firedPorts": [
+      "done"
+    ],
+    "reused": false,
+    "parentId": null,
+    "name": "refine",
+    "category": "flow",
+    "markers": [],
+    "children": [
+      "00000000-0000-4000-8000-000000000020",
+      "00000000-0000-4000-8000-000000000022"
+    ]
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000022",
+    "nodeId": "draft",
+    "scope": "refine#0",
+    "attempt": 1,
+    "kind": "task",
+    "nodeType": "flowaid.ai.generate",
+    "status": "completed",
+    "startedAt": "2026-09-23T10:00:01.900Z",
+    "endedAt": "2026-09-23T10:00:01.950Z",
+    "latencyMs": 50,
+    "queueLatencyMs": 5,
+    "costUsd": 0.002,
+    "usage": {
+      "inputTokens": 900,
+      "outputTokens": 120
+    },
+    "decision": null,
+    "firedPorts": [
+      "done"
+    ],
+    "reused": false,
+    "parentId": "00000000-0000-4000-8000-000000000021",
+    "name": "draft",
+    "category": "generation",
+    "markers": [
+      {
+        "seq": 20,
+        "type": "PROVIDER_FAILOVER",
+        "at": "2026-09-23T10:00:02.000Z"
+      }
+    ],
+    "children": []
+  }
+]

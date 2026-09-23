@@ -29,6 +29,7 @@ describe("Redactor: learned secrets", () => {
   it("ignores values shorter than 4 characters and learns variants once", () => {
     expect(redactor.redactText("ab cd")).toBe("ab cd");
     expect(secretVariants("hello")).toContain(Buffer.from("hello").toString("base64url"));
+    expect(secretVariants('pa"ss\\word')).toContain('pa\\"ss\\\\word');
     const size = redactor.size;
     redactor.learn(["sk-live-4f9a"]);
     expect(redactor.size).toBe(size);

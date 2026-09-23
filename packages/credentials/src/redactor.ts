@@ -21,7 +21,10 @@ function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-/** The forms a secret can appear in: raw, base64 (padded and not), base64url and URL-encoded. */
+/**
+ * The forms a secret can appear in: raw, base64 (padded and not), base64url, URL-encoded and
+ * JSON-escaped (as it appears inside a serialised log line or event).
+ */
 export function secretVariants(secret: string): string[] {
   const base64 = Buffer.from(secret, "utf8").toString("base64");
   const variants = new Set([
@@ -30,6 +33,7 @@ export function secretVariants(secret: string): string[] {
     base64.replace(/=+$/, ""),
     Buffer.from(secret, "utf8").toString("base64url"),
     encodeURIComponent(secret),
+    JSON.stringify(secret).slice(1, -1),
   ]);
   return [...variants].filter((v) => v.length >= MIN_SECRET_LENGTH);
 }

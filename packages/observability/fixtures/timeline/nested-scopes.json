@@ -1,0 +1,210 @@
+[
+  {
+    "id": "00000000-0000-4000-8000-000000000001",
+    "nodeId": "input",
+    "scope": "",
+    "attempt": 1,
+    "kind": "input",
+    "nodeType": null,
+    "status": "completed",
+    "startedAt": "2026-09-23T10:00:00.100Z",
+    "endedAt": "2026-09-23T10:00:00.150Z",
+    "latencyMs": 50,
+    "queueLatencyMs": 5,
+    "costUsd": 0,
+    "usage": null,
+    "decision": null,
+    "firedPorts": [
+      "done"
+    ],
+    "reused": false,
+    "parentId": null,
+    "name": "input",
+    "category": "flow",
+    "markers": [],
+    "children": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000002",
+    "nodeId": "research",
+    "scope": "",
+    "attempt": 1,
+    "kind": "loop",
+    "nodeType": null,
+    "status": "completed",
+    "startedAt": "2026-09-23T10:00:00.300Z",
+    "endedAt": "2026-09-23T10:00:03.900Z",
+    "latencyMs": 3600,
+    "queueLatencyMs": 5,
+    "costUsd": 0,
+    "usage": null,
+    "decision": null,
+    "firedPorts": [
+      "done"
+    ],
+    "reused": false,
+    "parentId": null,
+    "name": "research",
+    "category": "flow",
+    "markers": [],
+    "children": [
+      "00000000-0000-4000-8000-000000000003",
+      "00000000-0000-4000-8000-000000000006"
+    ]
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000003",
+    "nodeId": "search_all",
+    "scope": "research#0",
+    "attempt": 1,
+    "kind": "foreach",
+    "nodeType": null,
+    "status": "completed",
+    "startedAt": "2026-09-23T10:00:00.500Z",
+    "endedAt": "2026-09-23T10:00:00.550Z",
+    "latencyMs": 50,
+    "queueLatencyMs": 5,
+    "costUsd": 0,
+    "usage": null,
+    "decision": null,
+    "firedPorts": [
+      "done"
+    ],
+    "reused": false,
+    "parentId": "00000000-0000-4000-8000-000000000002",
+    "name": "search all",
+    "category": "flow",
+    "markers": [],
+    "children": [
+      "00000000-0000-4000-8000-000000000004",
+      "00000000-0000-4000-8000-000000000005"
+    ]
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000004",
+    "nodeId": "fetch",
+    "scope": "research#0/search_all#0",
+    "attempt": 1,
+    "kind": "task",
+    "nodeType": "flowaid.tools.http",
+    "status": "completed",
+    "startedAt": "2026-09-23T10:00:00.700Z",
+    "endedAt": "2026-09-23T10:00:00.750Z",
+    "latencyMs": 50,
+    "queueLatencyMs": 5,
+    "costUsd": 0,
+    "usage": null,
+    "decision": null,
+    "firedPorts": [
+      "done"
+    ],
+    "reused": false,
+    "parentId": "00000000-0000-4000-8000-000000000003",
+    "name": "fetch",
+    "category": "tool",
+    "markers": [],
+    "children": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000005",
+    "nodeId": "fetch",
+    "scope": "research#0/search_all#1",
+    "attempt": 1,
+    "kind": "task",
+    "nodeType": "flowaid.tools.http",
+    "status": "completed",
+    "startedAt": "2026-09-23T10:00:00.800Z",
+    "endedAt": "2026-09-23T10:00:00.850Z",
+    "latencyMs": 50,
+    "queueLatencyMs": 5,
+    "costUsd": 0,
+    "usage": null,
+    "decision": null,
+    "firedPorts": [
+      "done"
+    ],
+    "reused": false,
+    "parentId": "00000000-0000-4000-8000-000000000003",
+    "name": "fetch",
+    "category": "tool",
+    "markers": [],
+    "children": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000006",
+    "nodeId": "search_all",
+    "scope": "research#1",
+    "attempt": 1,
+    "kind": "foreach",
+    "nodeType": null,
+    "status": "completed",
+    "startedAt": "2026-09-23T10:00:02.000Z",
+    "endedAt": "2026-09-23T10:00:02.050Z",
+    "latencyMs": 50,
+    "queueLatencyMs": 5,
+    "costUsd": 0,
+    "usage": null,
+    "decision": null,
+    "firedPorts": [
+      "done"
+    ],
+    "reused": false,
+    "parentId": "00000000-0000-4000-8000-000000000002",
+    "name": "search all",
+    "category": "flow",
+    "markers": [],
+    "children": [
+      "00000000-0000-4000-8000-000000000007"
+    ]
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000007",
+    "nodeId": "fetch",
+    "scope": "research#1/search_all#0",
+    "attempt": 1,
+    "kind": "task",
+    "nodeType": "flowaid.tools.http",
+    "status": "completed",
+    "startedAt": "2026-09-23T10:00:02.200Z",
+    "endedAt": "2026-09-23T10:00:02.250Z",
+    "latencyMs": 50,
+    "queueLatencyMs": 5,
+    "costUsd": 0,
+    "usage": null,
+    "decision": null,
+    "firedPorts": [
+      "done"
+    ],
+    "reused": false,
+    "parentId": "00000000-0000-4000-8000-000000000006",
+    "name": "fetch",
+    "category": "tool",
+    "markers": [],
+    "children": []
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000008",
+    "nodeId": "output",
+    "scope": "",
+    "attempt": 1,
+    "kind": "output",
+    "nodeType": null,
+    "status": "completed",
+    "startedAt": "2026-09-23T10:00:04.100Z",
+    "endedAt": "2026-09-23T10:00:04.150Z",
+    "latencyMs": 50,
+    "queueLatencyMs": 5,
+    "costUsd": 0,
+    "usage": null,
+    "decision": null,
+    "firedPorts": [
+      "done"
+    ],
+    "reused": false,
+    "parentId": null,
+    "name": "output",
+    "category": "flow",
+    "markers": [],
+    "children": []
+  }
+]
