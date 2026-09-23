@@ -1,0 +1,27 @@
+{
+  "recordedAt": "2026-09-23",
+  "request": {
+    "model": "jev-latest",
+    "state": "Customer (gold plan): I was charged twice for my subscription this month and I want the duplicate refunded.",
+    "questions": {
+      "refund": {
+        "type": "noul",
+        "instructions": "Is the customer asking for a refund?",
+        "criteria": {
+          "true": "They want money back",
+          "false": "Anything else"
+        }
+      }
+    }
+  },
+  "status": 401,
+  "headers": {
+    "x-typesafe-request-id": "req_01a0cfd34bf67008b86e11f97610f638"
+  },
+  "body": {
+    "detail": {
+      "error_type": "authentication_error",
+      "message": "Cannot authenticate with the server. Please check your API key and try again."
+    }
+  }
+}

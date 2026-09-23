@@ -1,0 +1,34 @@
+{
+  "recordedAt": "2026-09-23",
+  "request": {
+    "model": "jev-latest",
+    "state": "Customer (gold plan): I was charged twice for my subscription this month and I want the duplicate refunded.",
+    "questions": {
+      "refund": {
+        "type": "noul",
+        "instructions": "Is the customer asking for a refund?",
+        "criteria": {
+          "true": "They want money back",
+          "false": "Anything else"
+        }
+      }
+    }
+  },
+  "status": 200,
+  "headers": {
+    "x-typesafe-request-id": "req_01a0cfd348c2732b832d120665313d4d"
+  },
+  "body": {
+    "model": "jev-1.13.0",
+    "answers": {
+      "refund": {
+        "type": "noul",
+        "noul": 0.99
+      }
+    },
+    "usage": {
+      "input_tokens": 317,
+      "output_tokens": 20
+    }
+  }
+}

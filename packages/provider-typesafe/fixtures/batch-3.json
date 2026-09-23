@@ -1,0 +1,82 @@
+{
+  "recordedAt": "2026-09-23",
+  "request": {
+    "model": "jev-latest",
+    "state": {
+      "message": "Customer (gold plan): I was charged twice for my subscription this month and I want the duplicate refunded.",
+      "tier": "gold"
+    },
+    "questions": {
+      "refund": {
+        "type": "noul",
+        "instructions": "Is the customer asking for a refund?",
+        "criteria": {
+          "true": "They want money back",
+          "false": "Anything else"
+        }
+      },
+      "team": {
+        "type": "choice",
+        "instructions": "Which team should handle this ticket?",
+        "criteria": {
+          "billing": "Invoices, charges, refunds",
+          "technical": "Bugs, outages",
+          "security": "Fraud, account takeover",
+          "general": "Anything else"
+        }
+      },
+      "urgency": {
+        "type": "score",
+        "instructions": "How urgent is this ticket?",
+        "criteria": ["Not urgent", "Low", "Medium", "High", "Critical"]
+      }
+    }
+  },
+  "status": 200,
+  "headers": {
+    "x-typesafe-request-id": "req_01a0cfd34ae57b9db2a7cfeb780eea78"
+  },
+  "body": {
+    "model": "jev-1.13.0",
+    "answers": {
+      "refund": {
+        "type": "noul",
+        "noul": 0.99
+      },
+      "team": {
+        "type": "choice",
+        "choice": "billing",
+        "confidence": 1,
+        "probabilities": {
+          "technical": 0,
+          "billing": 1,
+          "general": 0,
+          "security": 0
+        }
+      },
+      "urgency": {
+        "type": "score",
+        "score": 2.34,
+        "confidence": 0.55,
+        "legend": {
+          "0": "Not urgent",
+          "1": "Low",
+          "2": "Medium",
+          "3": "High",
+          "4": "Critical"
+        },
+        "probabilities": {
+          "0": 0,
+          "1": 0.1,
+          "2": 0.47,
+          "3": 0.43,
+          "4": 0
+        }
+      }
+    },
+    "usage": {
+      "input_tokens": 468,
+      "output_tokens": 76
+    }
+  }
+}

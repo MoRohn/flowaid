@@ -1,0 +1,15 @@
+{
+  "synthetic": true,
+  "note": "429 cannot be provoked on demand; shape from the TypeSafe docs (Retry-After in seconds).",
+  "status": 429,
+  "headers": {
+    "retry-after": "2",
+    "x-typesafe-request-id": ""
+  },
+  "body": {
+    "detail": {
+      "error_type": "rate_limit_error",
+      "message": "Rate limit exceeded"
+    }
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "recordedAt": "2026-09-23",
+  "request": {
+    "model": "jev-latest",
+    "state": 123,
+    "questions": {
+      "refund": {
+        "type": "noul",
+        "instructions": "Is the customer asking for a refund?",
+        "criteria": {
+          "true": "They want money back",
+          "false": "Anything else"
+        }
+      }
+    }
+  },
+  "status": 422,
+  "headers": {
+    "x-typesafe-request-id": "req_01a0cfd35a8c786196e950c8dae9f08b"
+  },
+  "body": {
+    "detail": [
+      {
+        "type": "string_type",
+        "loc": ["body", "state", "str"],
+        "msg": "Input should be a valid string",
+        "input": 123
+      },
+      {
+        "type": "dict_type",
+        "loc": ["body", "state", "dict[any,any]"],
+        "msg": "Input should be a valid dictionary",
+        "input": 123
+      },
+      {
+        "type": "list_type",
+        "loc": ["body", "state", "list[any]"],
+        "msg": "Input should be a valid list",
+        "input": 123
+      }
+    ]
+  }
+}

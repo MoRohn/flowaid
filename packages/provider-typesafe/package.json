@@ -1,0 +1,40 @@
+{
+  "name": "@flowaid/provider-typesafe",
+  "version": "0.1.0",
+  "private": true,
+  "description": "TypeSafe (Jev) System One decision provider for flowaid: the exact request/response mapping of the verified API, typed decisions with full distributions, client-side size guards, rate-limit retries and the error taxonomy (ARCHITECTURE.md §6.3).",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src",
+    "dist",
+    "fixtures",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src",
+    "test": "vitest run",
+    "record": "FLOWAID_TYPESAFE_RECORD=1 vitest run src/live.test.ts",
+    "clean": "rm -rf dist .turbo *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@flowaid/providers": "workspace:*",
+    "@flowaid/shared": "workspace:*",
+    "@flowaid/workflow-core": "workspace:*",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@flowaid/config": "workspace:*",
+    "@types/node": "24.13.6",
+    "eslint": "9.39.5",
+    "typescript": "5.9.3",
+    "vite": "8.3.0",
+    "vitest": "4.1.11"
+  }
+}

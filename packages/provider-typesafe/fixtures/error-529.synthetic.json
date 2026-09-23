@@ -1,0 +1,14 @@
+{
+  "synthetic": true,
+  "note": "529 (overloaded) cannot be provoked on demand; shape from the TypeSafe docs.",
+  "status": 529,
+  "headers": {
+    "x-typesafe-request-id": ""
+  },
+  "body": {
+    "detail": {
+      "error_type": "overloaded_error",
+      "message": "Overloaded"
+    }
+  }
+}
