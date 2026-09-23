@@ -15,7 +15,7 @@
   <img alt="Status: pre-alpha" src="https://img.shields.io/badge/status-pre--alpha-c98a12">
   <img alt="TypeScript 5.9 strict" src="https://img.shields.io/badge/TypeScript-5.9%20strict-17171c">
   <img alt="Node.js 24+" src="https://img.shields.io/badge/node-%E2%89%A524-17171c">
-  <img alt="Tests: 3,973 passing" src="https://img.shields.io/badge/tests-3%2C973%20passing-1f9d64">
+  <img alt="Tests: 3,996 passing" src="https://img.shields.io/badge/tests-3%2C996%20passing-1f9d64">
 </p>
 
 ---
@@ -121,6 +121,7 @@ deployments by environment, and how its decisions were routed.
 | `@flowaid/jev`                                       | **Built (library core).** Decision contracts, state packets, bundles, confidence × consequence routing, live menus, receipts, calibration and shadow comparison. 183 tests  |
 | `@flowaid/ui`                                        | **Built (components).** 13 groups of React components: canvas, nodes, trace viewer, inspector, forms, decision visuals, dashboards. 829 tests, with a playground            |
 | `@flowaid/workflow-compiler`                         | **Built.** Definition → content-hashed execution plan: 8 passes, 94 diagnostics, guard analysis, batching, redaction, diff and migrate. 160 tests                           |
+| `@flowaid/node-sdk`                                  | **Built.** `defineNode`, `toManifest` (reproduces the fixture manifests exactly), capability-scoped context and a runtime-faithful test harness. 23 tests                   |
 | `@flowaid/shared`, `@flowaid/env`, `@flowaid/config` | **Built.** Primitives, environment schema and tooling presets. 136 tests                                                                                                    |
 | Runtime, database, providers, API, worker, web app   | **Not started.** Planned in [`docs/UPGRADE_PLAN.md`](docs/UPGRADE_PLAN.md), phases P1–P5                                                                                    |
 | CI                                                   | **Running.** GitHub Actions runs the audit, boundary, format, lint, typecheck, build and test gates on every push and pull request                                          |
@@ -335,6 +336,7 @@ packages/
   env/                  Environment variable schema and loader
   workflow-core/        Portable contracts, FlowExpr, templates, schema checker
   workflow-compiler/    Definition → content-hashed execution plan, with diagnostics
+  node-sdk/             Write nodes: schemas, manifests, scoped context, test harness
   jev/                  Jev engineering library and harness templates
   ui/                   React component library and playground
 scripts/                Repository checks: boundaries, browser bundle, compose, env, UI inventory
