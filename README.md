@@ -63,7 +63,7 @@ What that makes possible:
 ## Product tour
 
 These screenshots come from the `@flowaid/ui` component playground
-(`pnpm --filter @flowaid/ui dev`), which renders every component against sample data. They
+(`pnpm start`), which renders every component against sample data. They
 follow your GitHub theme, light or dark.
 
 **Workflow canvas.** Typed ports, decision nodes that show their probability distribution
@@ -151,21 +151,88 @@ The live snapshot is always [`docs/STATUS.md`](docs/STATUS.md).
    Events · receipts · traces · evaluation · Lean certificates
 ```
 
-## Getting started
+## Quick start
 
-FlowAId is a pnpm monorepo. Today you can build and test the libraries and explore the UI
-components.
+FlowAId is a pnpm monorepo. Today you can run the UI, build and test the libraries, and use
+`@flowaid/workflow-core` and `@flowaid/jev` from code. The API server, worker and web app are
+not built yet (see [Project status](#project-status)).
 
-**Requirements:** Node.js 24+ and pnpm 12.
+### 1. Prerequisites
+
+| Tool    | Version                   | Install                                                                   |
+| ------- | ------------------------- | ------------------------------------------------------------------------- |
+| Node.js | 24 or newer (`.nvmrc`)    | [nodejs.org](https://nodejs.org) or `nvm install` in the repository       |
+| pnpm    | 12.5.1 (`packageManager`) | `corepack enable && corepack prepare pnpm@12.5.1 --activate`              |
+| Git     | any recent version        | [git-scm.com](https://git-scm.com)                                        |
+| Docker  | optional                  | Only needed for the application stack (`docker compose`) once it is built |
+
+### 2. Start
 
 ```sh
-git clone https://github.com/MoRohn/flowaid.git && cd flowaid
-pnpm install
-
-pnpm typecheck && pnpm lint && pnpm test   # every package
-pnpm boundaries                            # the dependency-graph check
-pnpm --filter @flowaid/ui dev              # UI playground at http://127.0.0.1:5178
+git clone https://github.com/MoRohn/flowaid.git
+cd flowaid
+pnpm start
 ```
+
+`pnpm start` takes a fresh clone to a running UI in one command. It:
+
+1. **Checks your machine**: Node.js, pnpm, installed dependencies and the port. Anything wrong
+   is reported with the exact command that fixes it.
+2. **Installs dependencies** when they are missing, or older than `pnpm-lock.yaml` after a
+   pull, from the lockfile exactly (`--frozen-lockfile`).
+3. **Builds the workspace packages** the UI depends on (cached by Turborepo, so a second start
+   is instant).
+4. **Serves the UI playground** at <http://127.0.0.1:5178> and stops cleanly on Ctrl+C.
+
+```text
+FlowAId · starting the UI playground
+
+[1/4] Preflight
+  ✓ Node.js          v25.2.1 (requires >=24.0.0)
+  ✓ pnpm             12.5.1
+  ✓ Dependencies     installed and in sync with pnpm-lock.yaml
+  ✓ Playground port  127.0.0.1:5178 is free
+  · Docker           Compose 5.3.0; daemon running
+
+[2/4] Dependencies
+✓ already installed
+
+[3/4] Build workspace packages
+✓ Workspace packages built (1.4 s)
+
+[4/4] Start the dev server
+→ http://127.0.0.1:5178   (Ctrl+C to stop)
+```
+
+On a fresh clone pnpm itself installs the dependencies before the script runs; step 2 covers
+the case where they are stale, such as after a pull that changed `pnpm-lock.yaml`.
+
+### 3. Options
+
+| Command                          | What it does                                                                |
+| -------------------------------- | --------------------------------------------------------------------------- |
+| `pnpm start --open`              | Also opens the browser                                                      |
+| `pnpm start --port 5200`         | Serves on another port                                                      |
+| `pnpm start --host 0.0.0.0`      | Serves on every interface, so other devices on your network can reach it    |
+| `pnpm start --prod`              | Builds an optimised bundle and serves that instead of the dev server        |
+| `pnpm start --verify`            | Runs every CI gate first (`pnpm check`), then starts                        |
+| `pnpm start --skip-install`      | Never installs, even when dependencies are missing or stale                 |
+| `pnpm start -- --help`           | Lists the options                                                           |
+| `pnpm preflight`                 | Only the machine checks; exits 1 when something must be fixed               |
+| `pnpm check`                     | Every CI gate: audit, boundaries, formatting, lint, typecheck, build, tests |
+| `pnpm test`                      | Every package's tests                                                       |
+| `pnpm --filter @flowaid/ui test` | One package's tests                                                         |
+
+### 4. Troubleshooting
+
+- **`Node.js … is older than the required >=24.0.0`**: run `nvm install` (it reads `.nvmrc`) or
+  install Node.js 24 or newer, then open a new terminal.
+- **`pnpm … not found` or a major version mismatch**: run
+  `corepack enable && corepack prepare pnpm@12.5.1 --activate`.
+- **`Playground port … is already in use`**: stop the other process, or run
+  `pnpm start --port 5179`.
+- **Install refuses a very new package release**: pnpm's minimum release age policy is
+  deliberate; the pinned exceptions live in `pnpm-workspace.yaml`.
 
 ### Validate a workflow and evaluate an expression
 

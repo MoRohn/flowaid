@@ -34,7 +34,9 @@ Useful commands:
 | `pnpm boundaries`                   | The dependency-graph check: `boundaries.json` against every package and the design |
 | `pnpm format` / `pnpm format:check` | Prettier                                                                           |
 | `pnpm env:check`                    | `.env.example` and `packages/env/README.md` match the environment schema           |
-| `pnpm --filter @flowaid/ui dev`     | The UI component playground at http://127.0.0.1:5178                               |
+| `pnpm start`                        | Preflight, install, build, then the UI playground at http://127.0.0.1:5178         |
+| `pnpm preflight`                    | Check Node.js, pnpm, dependencies and the playground port                          |
+| `pnpm check`                        | Every CI gate in one command                                                       |
 
 ## Rules every change follows
 
@@ -59,7 +61,7 @@ Useful commands:
 
 1. Branch from `main`.
 2. Keep the change focused on one plan item or issue, and reference it in the description.
-3. Make `pnpm typecheck && pnpm lint && pnpm test && pnpm boundaries && pnpm format:check` pass.
+3. Make `pnpm check` pass (every gate CI runs).
 4. Update the docs the change affects: the package README, a guide page, `docs/STATUS.md`.
 5. A contract change needs an accepted RFC first.
 

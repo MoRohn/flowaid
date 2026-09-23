@@ -34,6 +34,9 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - name: Startup preflight
+        run: pnpm preflight
+
       - name: Audit production dependencies
         run: pnpm audit --prod --audit-level=high
 

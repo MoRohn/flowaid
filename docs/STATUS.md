@@ -48,6 +48,8 @@ restart from a known state. The repository is published at
 - README gained a product tour with light and dark screenshots from the UI playground (`docs/assets/screenshots/`).
 - UI fixes: decision contract cards stack zones and authority when the card is narrow, and `environmentShortLabel` abbreviates "Development" to "Dev" as documented.
 
+- `pnpm start` (preflight, install when stale, build, serve the playground; `--prod`, `--verify`, `--open`, `--port`, `--host`), `pnpm preflight` and `pnpm check` (every CI gate), with a README Quick start.
+
 ## Loose ends
 
 None open from the 2026-09-23 list. The natural next steps are Phase 0's remaining items (the rest of P0-05 first), then Phase 1, with tracks J and L running alongside where they are buildable now.

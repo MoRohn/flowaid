@@ -10,6 +10,9 @@
     "node": ">=24.0.0"
   },
   "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning scripts/start.ts",
+    "preflight": "node --disable-warning=ExperimentalWarning scripts/preflight-cli.ts",
+    "check": "pnpm audit --prod --audit-level=high && pnpm boundaries && pnpm env:check && pnpm ui:inventory:check && pnpm format:check && pnpm lint:root && pnpm typecheck:root && turbo run typecheck lint build test",
     "build": "turbo run build",
     "dev": "turbo run dev --parallel",
     "lint": "turbo run lint",
