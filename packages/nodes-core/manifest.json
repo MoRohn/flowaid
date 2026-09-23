@@ -1,0 +1,4840 @@
+{
+  "nodes": [
+    {
+      "capabilities": [
+        "generation",
+        "credentials"
+      ],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "batchSize": {
+            "default": 96,
+            "maximum": 2048,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "model": {
+            "properties": {
+              "model": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "provider": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "provider",
+              "model"
+            ],
+            "type": "object",
+            "x-ui": {
+              "widget": "model"
+            }
+          }
+        },
+        "required": [
+          "model"
+        ],
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [
+        {
+          "name": "llm",
+          "required": true,
+          "types": [
+            "openai.api_key",
+            "ollama.none"
+          ]
+        }
+      ],
+      "defaultPolicy": {
+        "timeoutMs": 60000
+      },
+      "generation": true,
+      "id": "flowaid.ai.embeddings",
+      "idempotency": "safe",
+      "inputs": [
+        {
+          "name": "texts",
+          "required": true,
+          "schema": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ]
+          }
+        }
+      ],
+      "metadata": {
+        "category": "generation",
+        "description": "Embeds one text or a list of texts with an embedding model; returns one vector per text.",
+        "icon": "binary",
+        "name": "Embeddings",
+        "summary": "{{ config.model.provider }}/{{ config.model.model }}",
+        "tags": [
+          "ai",
+          "embeddings",
+          "retrieval"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [
+        "models"
+      ],
+      "outputs": [
+        {
+          "name": "vectors",
+          "required": true,
+          "schema": {
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "name": "dimensions",
+          "required": true,
+          "schema": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        {
+          "name": "usage",
+          "required": true,
+          "schema": {
+            "additionalProperties": false,
+            "properties": {
+              "inputTokens": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "outputTokens": {
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "inputTokens",
+              "outputTokens"
+            ],
+            "type": "object"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [
+        "generation",
+        "credentials",
+        "streaming"
+      ],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "maxOutputTokens": {
+            "default": 1024,
+            "maximum": 65536,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "model": {
+            "properties": {
+              "model": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "provider": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "provider",
+              "model"
+            ],
+            "type": "object",
+            "x-ui": {
+              "widget": "model"
+            }
+          },
+          "stream": {
+            "default": true,
+            "type": "boolean"
+          },
+          "system": {
+            "maxLength": 32000,
+            "type": "string",
+            "x-ui": {
+              "widget": "template"
+            }
+          },
+          "temperature": {
+            "default": 1,
+            "maximum": 2,
+            "minimum": 0,
+            "type": "number"
+          }
+        },
+        "required": [
+          "model"
+        ],
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [
+        {
+          "name": "llm",
+          "required": true,
+          "types": [
+            "openai.api_key",
+            "anthropic.api_key",
+            "ollama.none"
+          ]
+        }
+      ],
+      "defaultPolicy": {
+        "timeoutMs": 120000
+      },
+      "generation": true,
+      "id": "flowaid.ai.generate",
+      "idempotency": "safe",
+      "inputs": [
+        {
+          "name": "prompt",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "metadata": {
+        "category": "generation",
+        "description": "Generates text from a prompt with a chat model; streams deltas when `stream` is on.",
+        "icon": "sparkles",
+        "name": "Generate text",
+        "summary": "{{ config.model.provider }}/{{ config.model.model }}",
+        "tags": [
+          "llm",
+          "generation"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [
+        "models"
+      ],
+      "outputs": [
+        {
+          "name": "text",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "finish_reason",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "usage",
+          "required": true,
+          "schema": {
+            "properties": {
+              "inputTokens": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "outputTokens": {
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "inputTokens",
+              "outputTokens"
+            ],
+            "type": "object"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": true,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [
+        "generation",
+        "credentials"
+      ],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "maxOutputTokens": {
+            "default": 1024,
+            "maximum": 65536,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "model": {
+            "properties": {
+              "model": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "provider": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "provider",
+              "model"
+            ],
+            "type": "object",
+            "x-ui": {
+              "widget": "model"
+            }
+          },
+          "schema": {
+            "type": "object",
+            "x-ui": {
+              "help": "JSON Schema the model's answer must match; it types the `structured` output.",
+              "widget": "schema"
+            }
+          },
+          "system": {
+            "maxLength": 32000,
+            "type": "string",
+            "x-ui": {
+              "widget": "template"
+            }
+          },
+          "temperature": {
+            "default": 1,
+            "maximum": 2,
+            "minimum": 0,
+            "type": "number"
+          }
+        },
+        "required": [
+          "model",
+          "schema"
+        ],
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [
+        {
+          "name": "llm",
+          "required": true,
+          "types": [
+            "openai.api_key",
+            "anthropic.api_key",
+            "ollama.none"
+          ]
+        }
+      ],
+      "defaultPolicy": {
+        "timeoutMs": 120000
+      },
+      "generation": true,
+      "id": "flowaid.ai.structured_generate",
+      "idempotency": "safe",
+      "inputs": [
+        {
+          "name": "prompt",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "metadata": {
+        "category": "generation",
+        "description": "Asks a chat model for a JSON answer that matches `schema` (native structured output where the provider supports it, validated either way).",
+        "icon": "braces",
+        "name": "Structured generation",
+        "summary": "{{ config.model.provider }}/{{ config.model.model }}",
+        "tags": [
+          "ai",
+          "generation",
+          "json"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [
+        "models"
+      ],
+      "outputs": [
+        {
+          "name": "structured",
+          "required": true,
+          "schema": {
+            "type": "object"
+          }
+        },
+        {
+          "name": "usage",
+          "required": true,
+          "schema": {
+            "properties": {
+              "inputTokens": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "outputTokens": {
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "inputTokens",
+              "outputTokens"
+            ],
+            "type": "object"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [
+        {
+          "kind": "outputSchemaFromConfig",
+          "path": "/schema",
+          "port": "structured"
+        }
+      ],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "all": {
+            "default": false,
+            "type": "boolean",
+            "x-ui": {
+              "help": "Collect every match as a list under `matches`.",
+              "widget": "switch"
+            }
+          },
+          "fields": {
+            "additionalProperties": {
+              "pattern": "^(\\/.*)?$",
+              "type": "string"
+            },
+            "default": {},
+            "propertyNames": {
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$"
+            },
+            "type": "object",
+            "x-ui": {
+              "help": "Output field → JSON Pointer into `value` (e.g. /customer/email).",
+              "widget": "keyvalue"
+            }
+          },
+          "flags": {
+            "default": "",
+            "pattern": "^[imsu]*$",
+            "type": "string"
+          },
+          "pattern": {
+            "maxLength": 1000,
+            "type": "string",
+            "x-ui": {
+              "help": "Regular expression applied to text `value`; its named groups become fields."
+            }
+          },
+          "required": {
+            "default": false,
+            "type": "boolean",
+            "x-ui": {
+              "help": "Fail when a field is missing.",
+              "widget": "switch"
+            }
+          }
+        },
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [],
+      "defaultPolicy": {
+        "timeoutMs": 10000
+      },
+      "generation": false,
+      "id": "flowaid.data.extract",
+      "idempotency": "safe",
+      "inputs": [
+        {
+          "name": "value",
+          "required": true,
+          "schema": {}
+        }
+      ],
+      "metadata": {
+        "category": "data",
+        "description": "Pulls named fields out of a value with JSON Pointers, and named groups out of text with a regular expression. Missing fields are null (or fail with `required`).",
+        "icon": "pickaxe",
+        "name": "Extract",
+        "summary": "extract fields",
+        "tags": [
+          "data",
+          "extract",
+          "regex"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "fields",
+          "required": true,
+          "schema": {
+            "type": "object"
+          }
+        },
+        {
+          "name": "matches",
+          "required": true,
+          "schema": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "array"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "limit": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "predicate": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string",
+            "x-ui": {
+              "help": "Evaluated once per item with `$scope.item` and `$scope.index`.",
+              "language": "flowexpr-item",
+              "widget": "code"
+            }
+          }
+        },
+        "required": [
+          "predicate"
+        ],
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [],
+      "defaultPolicy": {
+        "timeoutMs": 10000
+      },
+      "generation": false,
+      "id": "flowaid.data.filter",
+      "idempotency": "safe",
+      "inputs": [
+        {
+          "name": "items",
+          "required": true,
+          "schema": {
+            "items": {},
+            "type": "array"
+          }
+        }
+      ],
+      "metadata": {
+        "category": "data",
+        "description": "Keeps the items for which a FlowExpr predicate is true (`$scope.item`, `$scope.index`); the rest go to `rejected`.",
+        "icon": "filter",
+        "name": "Filter",
+        "summary": "{{ config.predicate }}",
+        "tags": [
+          "data",
+          "array",
+          "expression"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "items",
+          "required": true,
+          "schema": {
+            "items": {},
+            "type": "array"
+          }
+        },
+        {
+          "name": "rejected",
+          "required": true,
+          "schema": {
+            "items": {},
+            "type": "array"
+          }
+        },
+        {
+          "name": "count",
+          "required": true,
+          "schema": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "mode": {
+            "default": "parse",
+            "enum": [
+              "parse",
+              "stringify"
+            ],
+            "type": "string",
+            "x-ui": {
+              "widget": "select"
+            }
+          },
+          "pretty": {
+            "default": false,
+            "type": "boolean",
+            "x-ui": {
+              "showWhen": {
+                "oneOf": [
+                  "stringify"
+                ],
+                "path": "/mode"
+              },
+              "widget": "switch"
+            }
+          },
+          "sortKeys": {
+            "default": false,
+            "type": "boolean",
+            "x-ui": {
+              "showWhen": {
+                "oneOf": [
+                  "stringify"
+                ],
+                "path": "/mode"
+              },
+              "widget": "switch"
+            }
+          }
+        },
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [],
+      "defaultPolicy": {
+        "timeoutMs": 10000
+      },
+      "generation": false,
+      "id": "flowaid.data.json",
+      "idempotency": "safe",
+      "inputs": [
+        {
+          "name": "value",
+          "required": true,
+          "schema": {}
+        }
+      ],
+      "metadata": {
+        "category": "data",
+        "description": "Parses JSON text into a value, or serialises a value to JSON text (optionally pretty or with sorted keys).",
+        "icon": "braces",
+        "name": "JSON",
+        "summary": "{{ config.mode }}",
+        "tags": [
+          "data",
+          "json"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "result",
+          "required": true,
+          "schema": {}
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "dropNulls": {
+            "default": false,
+            "type": "boolean",
+            "x-ui": {
+              "widget": "switch"
+            }
+          },
+          "expr": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string",
+            "x-ui": {
+              "help": "Evaluated once per item with `$scope.item` and `$scope.index`.",
+              "language": "flowexpr-item",
+              "widget": "code"
+            }
+          }
+        },
+        "required": [
+          "expr"
+        ],
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [],
+      "defaultPolicy": {
+        "timeoutMs": 10000
+      },
+      "generation": false,
+      "id": "flowaid.data.map",
+      "idempotency": "safe",
+      "inputs": [
+        {
+          "name": "items",
+          "required": true,
+          "schema": {
+            "items": {},
+            "type": "array"
+          }
+        }
+      ],
+      "metadata": {
+        "category": "data",
+        "description": "Transforms every item with a FlowExpr expression (`$scope.item`, `$scope.index`). For per-item nodes use a loop container.",
+        "icon": "list-restart",
+        "name": "Map",
+        "summary": "{{ config.expr }}",
+        "tags": [
+          "data",
+          "array",
+          "expression"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "items",
+          "required": true,
+          "schema": {
+            "items": {},
+            "type": "array"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "arrays": {
+            "default": "replace",
+            "enum": [
+              "replace",
+              "concat"
+            ],
+            "type": "string",
+            "x-ui": {
+              "showWhen": {
+                "oneOf": [
+                  "deep"
+                ],
+                "path": "/strategy"
+              },
+              "widget": "select"
+            }
+          },
+          "strategy": {
+            "default": "shallow",
+            "enum": [
+              "shallow",
+              "deep",
+              "concat",
+              "first"
+            ],
+            "type": "string",
+            "x-ui": {
+              "widget": "select"
+            }
+          }
+        },
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [],
+      "defaultPolicy": {
+        "timeoutMs": 10000
+      },
+      "generation": false,
+      "id": "flowaid.data.merge",
+      "idempotency": "safe",
+      "inputs": [
+        {
+          "name": "values",
+          "required": true,
+          "schema": {
+            "description": "Values to combine, in order (later values win).",
+            "items": {},
+            "type": "array"
+          }
+        }
+      ],
+      "metadata": {
+        "category": "data",
+        "description": "Combines a list of values: objects merge (shallow or deep, later wins), arrays concatenate, or `first` takes the first non-null value.",
+        "icon": "merge",
+        "name": "Merge",
+        "summary": "{{ config.strategy }}",
+        "tags": [
+          "data",
+          "merge",
+          "join"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "result",
+          "required": true,
+          "schema": {}
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "failOnInvalid": {
+            "default": false,
+            "type": "boolean",
+            "x-ui": {
+              "help": "Fail the node instead of routing to `invalid`.",
+              "widget": "switch"
+            }
+          },
+          "schema": {
+            "type": "object",
+            "x-ui": {
+              "help": "The JSON Schema `value` must match.",
+              "widget": "schema"
+            }
+          }
+        },
+        "required": [
+          "schema"
+        ],
+        "type": "object"
+      },
+      "controlPorts": [
+        {
+          "description": "The value matches the schema.",
+          "label": "Valid",
+          "name": "valid"
+        },
+        {
+          "description": "The value violates the schema.",
+          "label": "Invalid",
+          "name": "invalid"
+        }
+      ],
+      "credentials": [],
+      "defaultPolicy": {
+        "timeoutMs": 10000
+      },
+      "generation": false,
+      "id": "flowaid.data.schema_validate",
+      "idempotency": "safe",
+      "inputs": [
+        {
+          "name": "value",
+          "required": true,
+          "schema": {}
+        }
+      ],
+      "metadata": {
+        "category": "data",
+        "description": "Checks a value against a JSON Schema (draft 2020-12). Fires `valid` or `invalid` and reports every violation.",
+        "icon": "file-check",
+        "name": "Validate schema",
+        "summary": "validate against schema",
+        "tags": [
+          "data",
+          "validation",
+          "schema"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "valid",
+          "required": true,
+          "schema": {
+            "type": "boolean"
+          }
+        },
+        {
+          "name": "value",
+          "required": true,
+          "schema": {}
+        },
+        {
+          "name": "errors",
+          "required": true,
+          "schema": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "message": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path",
+                "message"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "chunkOverlap": {
+            "default": 200,
+            "maximum": 50000,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "chunkSize": {
+            "default": 1000,
+            "maximum": 100000,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "separators": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 16,
+            "minItems": 1,
+            "type": "array",
+            "x-ui": {
+              "help": "Separators to try, coarsest first. The empty string splits characters."
+            }
+          }
+        },
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [],
+      "defaultPolicy": {
+        "timeoutMs": 30000
+      },
+      "generation": false,
+      "id": "flowaid.data.split",
+      "idempotency": "safe",
+      "inputs": [
+        {
+          "name": "text",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "metadata": {
+        "category": "data",
+        "description": "Splits text into chunks of at most `chunkSize` characters with `chunkOverlap` characters of shared context, breaking on paragraphs, lines, sentences and words in that order.",
+        "icon": "scissors",
+        "name": "Split text",
+        "summary": "{{ config.chunkSize }} chars",
+        "tags": [
+          "data",
+          "text",
+          "chunking",
+          "retrieval"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "chunks",
+          "required": true,
+          "schema": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "name": "count",
+          "required": true,
+          "schema": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "template": {
+            "maxLength": 100000,
+            "type": "string",
+            "x-ui": {
+              "placeholder": "Hello {{ start.name }}",
+              "widget": "template"
+            }
+          }
+        },
+        "required": [
+          "template"
+        ],
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [],
+      "defaultPolicy": {
+        "timeoutMs": 10000
+      },
+      "generation": false,
+      "id": "flowaid.data.template",
+      "idempotency": "safe",
+      "inputs": [],
+      "metadata": {
+        "category": "data",
+        "description": "Renders text from a template with `{{ node.port }}` holes and filters (`json`, `upper`, `trim`, …).",
+        "icon": "text-cursor-input",
+        "name": "Template",
+        "summary": "{{ config.template }}",
+        "tags": [
+          "data",
+          "text",
+          "template"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "text",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "expr": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string",
+            "x-ui": {
+              "language": "flowexpr",
+              "widget": "code"
+            }
+          },
+          "output": {
+            "type": "object",
+            "x-ui": {
+              "help": "JSON Schema of the result; the compiler checks the expression against it.",
+              "widget": "schema"
+            }
+          }
+        },
+        "required": [
+          "expr"
+        ],
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [],
+      "defaultPolicy": {
+        "timeoutMs": 10000
+      },
+      "generation": false,
+      "id": "flowaid.data.transform",
+      "idempotency": "safe",
+      "inputs": [],
+      "metadata": {
+        "category": "data",
+        "description": "Computes a value with a FlowExpr expression over other nodes' outputs. `output` optionally declares the result's JSON Schema.",
+        "icon": "function-square",
+        "name": "Transform",
+        "summary": "{{ config.expr }}",
+        "tags": [
+          "data",
+          "expression"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "result",
+          "required": true,
+          "schema": {}
+        }
+      ],
+      "pool": "general",
+      "portRules": [
+        {
+          "kind": "outputSchemaFromConfig",
+          "path": "/output",
+          "port": "result"
+        }
+      ],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [
+        "decision",
+        "credentials"
+      ],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "questions": {
+            "additionalProperties": {
+              "oneOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "criteria": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "false": {
+                          "type": "string"
+                        },
+                        "true": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "true",
+                        "false"
+                      ],
+                      "type": "object"
+                    },
+                    "instructions": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "kind": {
+                      "const": "boolean"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "instructions"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "instructions": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "kind": {
+                      "const": "choice"
+                    },
+                    "options": {
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "maxProperties": 255,
+                      "minProperties": 2,
+                      "propertyNames": {
+                        "pattern": "^[a-z0-9_]{1,64}$"
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "instructions",
+                    "options"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "instructions": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "kind": {
+                      "const": "score"
+                    },
+                    "levels": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "maxItems": 10,
+                      "minItems": 2,
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "instructions",
+                    "levels"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "maxProperties": 32,
+            "minProperties": 1,
+            "propertyNames": {
+              "pattern": "^[a-z][a-z0-9_]{0,63}$"
+            },
+            "type": "object",
+            "x-ui": {
+              "help": "Question id → question. Ids become the keys of `answers`.",
+              "widget": "questions"
+            }
+          }
+        },
+        "required": [
+          "questions"
+        ],
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [
+        {
+          "name": "typesafe",
+          "required": true,
+          "types": [
+            "typesafe.api_key"
+          ]
+        },
+        {
+          "description": "Optional LLM decision provider used when a failover hop (or the workspace chain) routes decisions to a chat model.",
+          "name": "llm",
+          "required": false,
+          "types": [
+            "openai.api_key",
+            "anthropic.api_key",
+            "ollama.none"
+          ]
+        }
+      ],
+      "decision": {
+        "kind": "batch"
+      },
+      "defaultPolicy": {
+        "timeoutMs": 30000
+      },
+      "generation": false,
+      "id": "flowaid.decision.batch",
+      "idempotency": "safe",
+      "inputs": [
+        {
+          "name": "state",
+          "required": true,
+          "schema": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ],
+            "description": "TypeSafe state: text, an object (sent verbatim) or an array of text."
+          }
+        }
+      ],
+      "metadata": {
+        "category": "decision",
+        "description": "Asks several typed questions (boolean, choice, score) about one `state` in a single TypeSafe request. Output `answers` holds one DecisionResult per question id.",
+        "icon": "list-checks",
+        "name": "Decision batch",
+        "summary": "{{ config.questions | json }}",
+        "tags": [
+          "decision",
+          "typesafe",
+          "batch"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "answers",
+          "required": true,
+          "schema": {
+            "description": "One DecisionResult per question id (typed per question by the compiler).",
+            "type": "object"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [
+        {
+          "kind": "decisionAnswersFromConfig",
+          "path": "/questions",
+          "port": "answers"
+        }
+      ],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [
+        "decision",
+        "credentials"
+      ],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "criteria": {
+            "additionalProperties": false,
+            "properties": {
+              "false": {
+                "type": "string"
+              },
+              "true": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "true",
+              "false"
+            ],
+            "type": "object",
+            "x-ui": {
+              "help": "Optional descriptions of what makes the answer true or false (both or none).",
+              "widget": "criteria"
+            }
+          },
+          "instructions": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string",
+            "x-ui": {
+              "widget": "textarea"
+            }
+          }
+        },
+        "required": [
+          "instructions"
+        ],
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [
+        {
+          "name": "typesafe",
+          "required": true,
+          "types": [
+            "typesafe.api_key"
+          ]
+        }
+      ],
+      "decision": {
+        "kind": "boolean"
+      },
+      "defaultPolicy": {
+        "timeoutMs": 30000
+      },
+      "generation": false,
+      "id": "flowaid.decision.boolean",
+      "idempotency": "safe",
+      "inputs": [
+        {
+          "name": "state",
+          "required": true,
+          "schema": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ],
+            "description": "TypeSafe state: text, an object (sent verbatim) or an array of text."
+          }
+        }
+      ],
+      "metadata": {
+        "category": "decision",
+        "description": "Answers a yes/no question about `state` with `pYes` and `confidence = max(pYes, 1 - pYes)` (TypeSafe boolean decision).",
+        "icon": "toggle-left",
+        "name": "Boolean",
+        "summary": "{{ config.instructions }}",
+        "tags": [
+          "decision",
+          "typesafe"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "decision",
+          "required": true,
+          "schema": {
+            "$defs": {
+              "__schema0": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "items": {
+                      "$ref": "#/$defs/__schema0"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "additionalProperties": {
+                      "$ref": "#/$defs/__schema0"
+                    },
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "type": "object"
+                  }
+                ]
+              }
+            },
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "properties": {
+              "attempts": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "errorCode": {
+                      "enum": [
+                        "WORKFLOW_VALIDATION_ERROR",
+                        "SCHEMA_VALIDATION_ERROR",
+                        "NODE_EXECUTION_ERROR",
+                        "TOOL_EXECUTION_ERROR",
+                        "PROVIDER_ERROR",
+                        "PROVIDER_RATE_LIMITED",
+                        "PROVIDER_OVERLOADED",
+                        "CREDENTIAL_ERROR",
+                        "TIMEOUT_ERROR",
+                        "RATE_LIMIT_ERROR",
+                        "CANCELLED_ERROR",
+                        "BOUNDS_EXCEEDED",
+                        "INPUT_MISSING",
+                        "OUTPUT_SCHEMA_MISMATCH",
+                        "EXPRESSION_ERROR",
+                        "SANDBOX_ERROR",
+                        "WORKER_LOST",
+                        "NONIDEMPOTENT_INTERRUPTED",
+                        "HUMAN_APPROVAL_REQUIRED",
+                        "HUMAN_TASK_EXPIRED",
+                        "SUBFLOW_ERROR",
+                        "NO_OUTPUT",
+                        "NETWORK_ERROR",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "UNAUTHORIZED",
+                        "FORBIDDEN",
+                        "BAD_REQUEST",
+                        "PAYLOAD_TOO_LARGE",
+                        "INTERNAL"
+                      ],
+                      "type": "string"
+                    },
+                    "latencyMs": {
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "model": {
+                      "type": "string"
+                    },
+                    "outcome": {
+                      "enum": [
+                        "ok",
+                        "error",
+                        "skipped_unhealthy"
+                      ],
+                      "type": "string"
+                    },
+                    "provider": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "provider",
+                    "model",
+                    "outcome",
+                    "latencyMs"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "confidence": {
+                "maximum": 1,
+                "minimum": 0,
+                "type": "number"
+              },
+              "costUsd": {
+                "minimum": 0,
+                "type": "number"
+              },
+              "kind": {
+                "const": "boolean",
+                "type": "string"
+              },
+              "latencyMs": {
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "model": {
+                "type": "string"
+              },
+              "pYes": {
+                "maximum": 1,
+                "minimum": 0,
+                "type": "number"
+              },
+              "probabilities": {
+                "additionalProperties": false,
+                "properties": {
+                  "false": {
+                    "maximum": 1,
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  "true": {
+                    "maximum": 1,
+                    "minimum": 0,
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "true",
+                  "false"
+                ],
+                "type": "object"
+              },
+              "provider": {
+                "type": "string"
+              },
+              "raw": {
+                "$ref": "#/$defs/__schema0"
+              },
+              "requestId": {
+                "type": "string"
+              },
+              "usage": {
+                "additionalProperties": false,
+                "properties": {
+                  "cacheReadTokens": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "cacheWriteTokens": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "inputTokens": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "outputTokens": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "inputTokens",
+                  "outputTokens"
+                ],
+                "type": "object"
+              },
+              "value": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "confidence",
+              "provider",
+              "model",
+              "latencyMs",
+              "costUsd",
+              "attempts",
+              "kind",
+              "value",
+              "pYes",
+              "probabilities"
+            ],
+            "type": "object"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [
+        "decision",
+        "credentials"
+      ],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "instructions": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string",
+            "x-ui": {
+              "help": "The question the model answers about `state`.",
+              "widget": "textarea"
+            }
+          },
+          "options": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "maxProperties": 255,
+            "minProperties": 2,
+            "propertyNames": {
+              "pattern": "^[a-z0-9_]{1,64}$"
+            },
+            "type": "object",
+            "x-ui": {
+              "help": "Option id → description. Each id becomes a control-out port.",
+              "widget": "keyvalue"
+            }
+          }
+        },
+        "required": [
+          "instructions",
+          "options"
+        ],
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [
+        {
+          "description": "TypeSafe API key used by the primary hop.",
+          "name": "typesafe",
+          "required": true,
+          "types": [
+            "typesafe.api_key"
+          ]
+        }
+      ],
+      "decision": {
+        "kind": "choice"
+      },
+      "defaultPolicy": {
+        "timeoutMs": 30000
+      },
+      "generation": false,
+      "id": "flowaid.decision.choice",
+      "idempotency": "safe",
+      "inputs": [
+        {
+          "description": "What the decision is about.",
+          "name": "state",
+          "required": true,
+          "schema": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ],
+            "description": "TypeSafe state: text, an object (sent verbatim) or an array of text."
+          }
+        }
+      ],
+      "metadata": {
+        "category": "decision",
+        "description": "Classifies `state` into one of the configured options and returns a probability per option (TypeSafe choice decision). Every option id is also a control-out port.",
+        "icon": "list-checks",
+        "name": "Choice",
+        "summary": "{{ config.instructions }}",
+        "tags": [
+          "decision",
+          "typesafe",
+          "classification"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "description": "The full DecisionResult (kind = choice).",
+          "name": "decision",
+          "required": true,
+          "schema": {
+            "$defs": {
+              "__schema0": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "items": {
+                      "$ref": "#/$defs/__schema0"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "additionalProperties": {
+                      "$ref": "#/$defs/__schema0"
+                    },
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "type": "object"
+                  }
+                ]
+              }
+            },
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "properties": {
+              "attempts": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "errorCode": {
+                      "enum": [
+                        "WORKFLOW_VALIDATION_ERROR",
+                        "SCHEMA_VALIDATION_ERROR",
+                        "NODE_EXECUTION_ERROR",
+                        "TOOL_EXECUTION_ERROR",
+                        "PROVIDER_ERROR",
+                        "PROVIDER_RATE_LIMITED",
+                        "PROVIDER_OVERLOADED",
+                        "CREDENTIAL_ERROR",
+                        "TIMEOUT_ERROR",
+                        "RATE_LIMIT_ERROR",
+                        "CANCELLED_ERROR",
+                        "BOUNDS_EXCEEDED",
+                        "INPUT_MISSING",
+                        "OUTPUT_SCHEMA_MISMATCH",
+                        "EXPRESSION_ERROR",
+                        "SANDBOX_ERROR",
+                        "WORKER_LOST",
+                        "NONIDEMPOTENT_INTERRUPTED",
+                        "HUMAN_APPROVAL_REQUIRED",
+                        "HUMAN_TASK_EXPIRED",
+                        "SUBFLOW_ERROR",
+                        "NO_OUTPUT",
+                        "NETWORK_ERROR",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "UNAUTHORIZED",
+                        "FORBIDDEN",
+                        "BAD_REQUEST",
+                        "PAYLOAD_TOO_LARGE",
+                        "INTERNAL"
+                      ],
+                      "type": "string"
+                    },
+                    "latencyMs": {
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "model": {
+                      "type": "string"
+                    },
+                    "outcome": {
+                      "enum": [
+                        "ok",
+                        "error",
+                        "skipped_unhealthy"
+                      ],
+                      "type": "string"
+                    },
+                    "provider": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "provider",
+                    "model",
+                    "outcome",
+                    "latencyMs"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "confidence": {
+                "maximum": 1,
+                "minimum": 0,
+                "type": "number"
+              },
+              "costUsd": {
+                "minimum": 0,
+                "type": "number"
+              },
+              "kind": {
+                "const": "choice",
+                "type": "string"
+              },
+              "latencyMs": {
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "model": {
+                "type": "string"
+              },
+              "probabilities": {
+                "additionalProperties": {
+                  "maximum": 1,
+                  "minimum": 0,
+                  "type": "number"
+                },
+                "propertyNames": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "provider": {
+                "type": "string"
+              },
+              "raw": {
+                "$ref": "#/$defs/__schema0"
+              },
+              "requestId": {
+                "type": "string"
+              },
+              "usage": {
+                "additionalProperties": false,
+                "properties": {
+                  "cacheReadTokens": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "cacheWriteTokens": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "inputTokens": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "outputTokens": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "inputTokens",
+                  "outputTokens"
+                ],
+                "type": "object"
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "confidence",
+              "provider",
+              "model",
+              "latencyMs",
+              "costUsd",
+              "attempts",
+              "kind",
+              "value",
+              "probabilities"
+            ],
+            "type": "object"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [
+        {
+          "kind": "controlPortsFromConfig",
+          "path": "/options"
+        }
+      ],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [],
+      "configSchema": {
+        "additionalProperties": false,
+        "description": "`pass` iff `confidence ≥ threshold` and (`requireValue` is false or the decision is boolean with `value === true`); otherwise `fail` iff `reviewBand` is set and `confidence < threshold − reviewBand`; otherwise `review`. Without `reviewBand` the gate is two-way (`pass`/`review`, as in §2.9); with it the band `[threshold − reviewBand, threshold)` goes to review and everything below to `fail`; a `requireValue` failure routes `fail` when `reviewBand` is set, else `review`. The UI's two-threshold model maps onto this as `auto := threshold`, `review := threshold − (reviewBand ?? threshold)`, with outcome names `pass | review | fail`.",
+        "properties": {
+          "requireValue": {
+            "default": false,
+            "type": "boolean",
+            "x-ui": {
+              "help": "Also require a boolean decision value of true to pass.",
+              "widget": "switch"
+            }
+          },
+          "reviewBand": {
+            "maximum": 1,
+            "minimum": 0,
+            "type": "number",
+            "x-ui": {
+              "help": "Optional. Width of the review band below the threshold: confidences in [threshold − reviewBand, threshold) go to review, lower ones to fail. Unset, the gate is two-way (pass/review).",
+              "max": 1,
+              "min": 0,
+              "step": 0.01,
+              "widget": "slider"
+            }
+          },
+          "threshold": {
+            "maximum": 1,
+            "minimum": 0,
+            "type": "number",
+            "x-ui": {
+              "bindable": true,
+              "max": 1,
+              "min": 0,
+              "step": 0.01,
+              "widget": "slider"
+            }
+          }
+        },
+        "required": [
+          "threshold"
+        ],
+        "type": "object"
+      },
+      "controlPorts": [
+        {
+          "description": "confidence ≥ threshold (and, with requireValue, a boolean value of true).",
+          "label": "Pass",
+          "name": "pass"
+        },
+        {
+          "description": "Below threshold; with reviewBand only within [threshold − reviewBand, threshold).",
+          "label": "Needs review",
+          "name": "review"
+        },
+        {
+          "description": "Only with reviewBand: confidence < threshold − reviewBand, or a requireValue failure.",
+          "label": "Fail",
+          "name": "fail"
+        }
+      ],
+      "credentials": [],
+      "decision": {
+        "kind": "gate"
+      },
+      "defaultPolicy": {},
+      "generation": false,
+      "id": "flowaid.decision.confidence_gate",
+      "idempotency": "safe",
+      "inputs": [
+        {
+          "name": "decision",
+          "required": true,
+          "schema": {
+            "properties": {
+              "confidence": {
+                "maximum": 1,
+                "minimum": 0,
+                "type": "number"
+              },
+              "kind": {
+                "enum": [
+                  "boolean",
+                  "choice",
+                  "score"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "value",
+              "confidence"
+            ],
+            "type": "object"
+          }
+        }
+      ],
+      "metadata": {
+        "category": "safety",
+        "description": "Routes a decision by confidence: `pass` when it reaches `threshold` (and, with `requireValue`, a boolean value is true); otherwise `review` — or, with `reviewBand`, `review` only inside `[threshold − reviewBand, threshold)` and `fail` below it. Passes the decision through and reports `passed` and `outcome`.",
+        "icon": "shield-check",
+        "name": "Confidence gate",
+        "summary": "threshold {{ config.threshold }}",
+        "tags": [
+          "decision",
+          "safety",
+          "routing"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "description": "The input decision, unchanged.",
+          "name": "decision",
+          "required": true,
+          "schema": {
+            "properties": {
+              "confidence": {
+                "maximum": 1,
+                "minimum": 0,
+                "type": "number"
+              },
+              "kind": {
+                "enum": [
+                  "boolean",
+                  "choice",
+                  "score"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "value",
+              "confidence"
+            ],
+            "type": "object"
+          }
+        },
+        {
+          "description": "`true` iff `outcome` is `pass`.",
+          "name": "passed",
+          "required": true,
+          "schema": {
+            "type": "boolean"
+          }
+        },
+        {
+          "description": "The control port the gate fired: `pass`, `review` or `fail` (§6.3 gate semantics).",
+          "name": "outcome",
+          "required": true,
+          "schema": {
+            "enum": [
+              "pass",
+              "review",
+              "fail"
+            ],
+            "type": "string"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [
+        "decision",
+        "credentials"
+      ],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "method": {
+            "default": "majority",
+            "enum": [
+              "majority",
+              "confidence_weighted",
+              "unanimous"
+            ],
+            "type": "string"
+          },
+          "minAgreement": {
+            "default": 0.6,
+            "maximum": 1,
+            "minimum": 0,
+            "type": "number"
+          },
+          "question": {
+            "oneOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "criteria": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "false": {
+                        "type": "string"
+                      },
+                      "true": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "true",
+                      "false"
+                    ],
+                    "type": "object"
+                  },
+                  "instructions": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "kind": {
+                    "const": "boolean",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "instructions"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "instructions": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "kind": {
+                    "const": "choice",
+                    "type": "string"
+                  },
+                  "options": {
+                    "additionalProperties": {
+                      "type": "string"
+                    },
+                    "propertyNames": {
+                      "pattern": "^[a-z0-9_]{1,64}$"
+                    },
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "instructions",
+                  "options"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "instructions": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "kind": {
+                    "const": "score",
+                    "type": "string"
+                  },
+                  "levels": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 10,
+                    "minItems": 2,
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "instructions",
+                  "levels"
+                ],
+                "type": "object"
+              }
+            ],
+            "x-ui": {
+              "widget": "questions"
+            }
+          },
+          "voters": {
+            "items": {
+              "oneOf": [
+                {
+                  "properties": {
+                    "model": {
+                      "default": "jev-latest",
+                      "type": "string"
+                    },
+                    "provider": {
+                      "const": "typesafe",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "provider"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "properties": {
+                    "model": {
+                      "properties": {
+                        "model": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "provider": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "provider",
+                        "model"
+                      ],
+                      "type": "object"
+                    },
+                    "provider": {
+                      "const": "llm",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "provider",
+                    "model"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "properties": {
+                    "provider": {
+                      "const": "rule",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "provider"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "properties": {
+                    "provider": {
+                      "const": "human",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "provider"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "properties": {
+                    "id": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "model": {
+                      "type": "string"
+                    },
+                    "provider": {
+                      "const": "custom",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "provider",
+                    "id"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "maxItems": 5,
+            "minItems": 2,
+            "type": "array"
+          }
+        },
+        "required": [
+          "question",
+          "voters"
+        ],
+        "type": "object"
+      },
+      "controlPorts": [
+        {
+          "description": "Agreement ≥ minAgreement (unanimous: all voters agree).",
+          "label": "Agreed",
+          "name": "agreed"
+        },
+        {
+          "description": "The voters did not agree enough.",
+          "label": "Disagreed",
+          "name": "disagreed"
+        }
+      ],
+      "credentials": [
+        {
+          "name": "typesafe",
+          "required": false,
+          "types": [
+            "typesafe.api_key"
+          ]
+        },
+        {
+          "description": "Optional LLM decision provider used when a failover hop (or the workspace chain) routes decisions to a chat model.",
+          "name": "llm",
+          "required": false,
+          "types": [
+            "openai.api_key",
+            "anthropic.api_key",
+            "ollama.none"
+          ]
+        }
+      ],
+      "decision": {
+        "kind": "consensus"
+      },
+      "defaultPolicy": {
+        "timeoutMs": 60000
+      },
+      "generation": false,
+      "id": "flowaid.decision.consensus",
+      "idempotency": "safe",
+      "inputs": [
+        {
+          "name": "state",
+          "required": true,
+          "schema": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ],
+            "description": "TypeSafe state: text, an object (sent verbatim) or an array of text."
+          }
+        }
+      ],
+      "metadata": {
+        "category": "decision",
+        "description": "Asks the same question of 2–5 distinct providers and combines their answers (majority, confidence-weighted or unanimous). Fires `agreed` when enough voters agree, else `disagreed`.",
+        "icon": "users",
+        "name": "Consensus",
+        "summary": "{{ config.method }} of {{ config.voters | json }}",
+        "tags": [
+          "decision",
+          "ensemble",
+          "reliability"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "decision",
+          "required": true,
+          "schema": {}
+        },
+        {
+          "name": "agreement",
+          "required": true,
+          "schema": {
+            "maximum": 1,
+            "minimum": 0,
+            "type": "number"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [
+        "decision",
+        "credentials"
+      ],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "instructions": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string",
+            "x-ui": {
+              "help": "How to pick a route for `state`.",
+              "widget": "textarea"
+            }
+          },
+          "minConfidence": {
+            "default": 0,
+            "maximum": 1,
+            "minimum": 0,
+            "type": "number",
+            "x-ui": {
+              "max": 1,
+              "min": 0,
+              "step": 0.01,
+              "widget": "slider"
+            }
+          },
+          "routes": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "maxProperties": 255,
+            "minProperties": 2,
+            "propertyNames": {
+              "pattern": "^[a-z0-9_]{1,64}$"
+            },
+            "type": "object",
+            "x-ui": {
+              "help": "Route id → when to take it. Each id is a control-out.",
+              "widget": "keyvalue"
+            }
+          }
+        },
+        "required": [
+          "instructions",
+          "routes"
+        ],
+        "type": "object"
+      },
+      "controlPorts": [
+        {
+          "description": "The chosen route's confidence is below minConfidence.",
+          "label": "Needs review",
+          "name": "review"
+        }
+      ],
+      "credentials": [
+        {
+          "name": "typesafe",
+          "required": false,
+          "types": [
+            "typesafe.api_key"
+          ]
+        },
+        {
+          "description": "Optional LLM decision provider used when a failover hop (or the workspace chain) routes decisions to a chat model.",
+          "name": "llm",
+          "required": false,
+          "types": [
+            "openai.api_key",
+            "anthropic.api_key",
+            "ollama.none"
+          ]
+        }
+      ],
+      "decision": {
+        "kind": "router"
+      },
+      "defaultPolicy": {
+        "timeoutMs": 30000
+      },
+      "generation": false,
+      "id": "flowaid.decision.router",
+      "idempotency": "safe",
+      "inputs": [
+        {
+          "name": "state",
+          "required": true,
+          "schema": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ],
+            "description": "TypeSafe state: text, an object (sent verbatim) or an array of text."
+          }
+        }
+      ],
+      "metadata": {
+        "category": "decision",
+        "description": "Routes to the control-out of the chosen option. Below `minConfidence` it fires `review` instead, so an uncertain classification is looked at rather than acted on.",
+        "icon": "split",
+        "name": "Router",
+        "summary": "{{ config.instructions }}",
+        "tags": [
+          "decision",
+          "typesafe",
+          "routing"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "decision",
+          "required": true,
+          "schema": {
+            "$defs": {
+              "__schema0": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "items": {
+                      "$ref": "#/$defs/__schema0"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "additionalProperties": {
+                      "$ref": "#/$defs/__schema0"
+                    },
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "type": "object"
+                  }
+                ]
+              }
+            },
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "properties": {
+              "attempts": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "errorCode": {
+                      "enum": [
+                        "WORKFLOW_VALIDATION_ERROR",
+                        "SCHEMA_VALIDATION_ERROR",
+                        "NODE_EXECUTION_ERROR",
+                        "TOOL_EXECUTION_ERROR",
+                        "PROVIDER_ERROR",
+                        "PROVIDER_RATE_LIMITED",
+                        "PROVIDER_OVERLOADED",
+                        "CREDENTIAL_ERROR",
+                        "TIMEOUT_ERROR",
+                        "RATE_LIMIT_ERROR",
+                        "CANCELLED_ERROR",
+                        "BOUNDS_EXCEEDED",
+                        "INPUT_MISSING",
+                        "OUTPUT_SCHEMA_MISMATCH",
+                        "EXPRESSION_ERROR",
+                        "SANDBOX_ERROR",
+                        "WORKER_LOST",
+                        "NONIDEMPOTENT_INTERRUPTED",
+                        "HUMAN_APPROVAL_REQUIRED",
+                        "HUMAN_TASK_EXPIRED",
+                        "SUBFLOW_ERROR",
+                        "NO_OUTPUT",
+                        "NETWORK_ERROR",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "UNAUTHORIZED",
+                        "FORBIDDEN",
+                        "BAD_REQUEST",
+                        "PAYLOAD_TOO_LARGE",
+                        "INTERNAL"
+                      ],
+                      "type": "string"
+                    },
+                    "latencyMs": {
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "model": {
+                      "type": "string"
+                    },
+                    "outcome": {
+                      "enum": [
+                        "ok",
+                        "error",
+                        "skipped_unhealthy"
+                      ],
+                      "type": "string"
+                    },
+                    "provider": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "provider",
+                    "model",
+                    "outcome",
+                    "latencyMs"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "confidence": {
+                "maximum": 1,
+                "minimum": 0,
+                "type": "number"
+              },
+              "costUsd": {
+                "minimum": 0,
+                "type": "number"
+              },
+              "kind": {
+                "const": "choice",
+                "type": "string"
+              },
+              "latencyMs": {
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "model": {
+                "type": "string"
+              },
+              "probabilities": {
+                "additionalProperties": {
+                  "maximum": 1,
+                  "minimum": 0,
+                  "type": "number"
+                },
+                "propertyNames": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "provider": {
+                "type": "string"
+              },
+              "raw": {
+                "$ref": "#/$defs/__schema0"
+              },
+              "requestId": {
+                "type": "string"
+              },
+              "usage": {
+                "additionalProperties": false,
+                "properties": {
+                  "cacheReadTokens": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "cacheWriteTokens": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "inputTokens": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "outputTokens": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "inputTokens",
+                  "outputTokens"
+                ],
+                "type": "object"
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "confidence",
+              "provider",
+              "model",
+              "latencyMs",
+              "costUsd",
+              "attempts",
+              "kind",
+              "value",
+              "probabilities"
+            ],
+            "type": "object"
+          }
+        },
+        {
+          "description": "The route fired (`review` when below minConfidence).",
+          "name": "route",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [
+        {
+          "kind": "controlPortsFromConfig",
+          "path": "/routes"
+        }
+      ],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [
+        "decision",
+        "credentials"
+      ],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "instructions": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string",
+            "x-ui": {
+              "widget": "textarea"
+            }
+          },
+          "levels": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 10,
+            "minItems": 2,
+            "type": "array",
+            "x-ui": {
+              "help": "Level descriptions, lowest first.",
+              "widget": "levels"
+            }
+          }
+        },
+        "required": [
+          "instructions",
+          "levels"
+        ],
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [
+        {
+          "name": "typesafe",
+          "required": false,
+          "types": [
+            "typesafe.api_key"
+          ]
+        },
+        {
+          "description": "Optional LLM decision provider used when a failover hop (or the workspace chain) routes decisions to a chat model.",
+          "name": "llm",
+          "required": false,
+          "types": [
+            "openai.api_key",
+            "anthropic.api_key",
+            "ollama.none"
+          ]
+        }
+      ],
+      "decision": {
+        "kind": "score"
+      },
+      "defaultPolicy": {
+        "timeoutMs": 30000
+      },
+      "generation": false,
+      "id": "flowaid.decision.score",
+      "idempotency": "safe",
+      "inputs": [
+        {
+          "name": "state",
+          "required": true,
+          "schema": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ],
+            "description": "TypeSafe state: text, an object (sent verbatim) or an array of text."
+          }
+        }
+      ],
+      "metadata": {
+        "category": "decision",
+        "description": "Rates `state` on an ordered scale of 2–10 described levels; returns the probability-weighted `value`, its `normalized` form, the nearest `level` and its label (TypeSafe score decision).",
+        "icon": "gauge",
+        "name": "Score",
+        "summary": "{{ config.instructions }}",
+        "tags": [
+          "decision",
+          "typesafe",
+          "rating"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "decision",
+          "required": true,
+          "schema": {
+            "$defs": {
+              "__schema0": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "items": {
+                      "$ref": "#/$defs/__schema0"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "additionalProperties": {
+                      "$ref": "#/$defs/__schema0"
+                    },
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "type": "object"
+                  }
+                ]
+              }
+            },
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "properties": {
+              "attempts": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "errorCode": {
+                      "enum": [
+                        "WORKFLOW_VALIDATION_ERROR",
+                        "SCHEMA_VALIDATION_ERROR",
+                        "NODE_EXECUTION_ERROR",
+                        "TOOL_EXECUTION_ERROR",
+                        "PROVIDER_ERROR",
+                        "PROVIDER_RATE_LIMITED",
+                        "PROVIDER_OVERLOADED",
+                        "CREDENTIAL_ERROR",
+                        "TIMEOUT_ERROR",
+                        "RATE_LIMIT_ERROR",
+                        "CANCELLED_ERROR",
+                        "BOUNDS_EXCEEDED",
+                        "INPUT_MISSING",
+                        "OUTPUT_SCHEMA_MISMATCH",
+                        "EXPRESSION_ERROR",
+                        "SANDBOX_ERROR",
+                        "WORKER_LOST",
+                        "NONIDEMPOTENT_INTERRUPTED",
+                        "HUMAN_APPROVAL_REQUIRED",
+                        "HUMAN_TASK_EXPIRED",
+                        "SUBFLOW_ERROR",
+                        "NO_OUTPUT",
+                        "NETWORK_ERROR",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "UNAUTHORIZED",
+                        "FORBIDDEN",
+                        "BAD_REQUEST",
+                        "PAYLOAD_TOO_LARGE",
+                        "INTERNAL"
+                      ],
+                      "type": "string"
+                    },
+                    "latencyMs": {
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "model": {
+                      "type": "string"
+                    },
+                    "outcome": {
+                      "enum": [
+                        "ok",
+                        "error",
+                        "skipped_unhealthy"
+                      ],
+                      "type": "string"
+                    },
+                    "provider": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "provider",
+                    "model",
+                    "outcome",
+                    "latencyMs"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "confidence": {
+                "maximum": 1,
+                "minimum": 0,
+                "type": "number"
+              },
+              "costUsd": {
+                "minimum": 0,
+                "type": "number"
+              },
+              "kind": {
+                "const": "score",
+                "type": "string"
+              },
+              "latencyMs": {
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "level": {
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "levelLabel": {
+                "type": "string"
+              },
+              "levels": {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 10,
+                "minItems": 2,
+                "type": "array"
+              },
+              "model": {
+                "type": "string"
+              },
+              "normalized": {
+                "maximum": 1,
+                "minimum": 0,
+                "type": "number"
+              },
+              "probabilities": {
+                "additionalProperties": {
+                  "maximum": 1,
+                  "minimum": 0,
+                  "type": "number"
+                },
+                "propertyNames": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "provider": {
+                "type": "string"
+              },
+              "raw": {
+                "$ref": "#/$defs/__schema0"
+              },
+              "requestId": {
+                "type": "string"
+              },
+              "usage": {
+                "additionalProperties": false,
+                "properties": {
+                  "cacheReadTokens": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "cacheWriteTokens": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "inputTokens": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "outputTokens": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "inputTokens",
+                  "outputTokens"
+                ],
+                "type": "object"
+              },
+              "value": {
+                "minimum": 0,
+                "type": "number"
+              }
+            },
+            "required": [
+              "confidence",
+              "provider",
+              "model",
+              "latencyMs",
+              "costUsd",
+              "attempts",
+              "kind",
+              "value",
+              "normalized",
+              "level",
+              "levelLabel",
+              "levels",
+              "probabilities"
+            ],
+            "type": "object"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [
+        "decision",
+        "credentials"
+      ],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "criteria": {
+            "additionalProperties": false,
+            "properties": {
+              "false": {
+                "type": "string"
+              },
+              "true": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "true",
+              "false"
+            ],
+            "type": "object",
+            "x-ui": {
+              "widget": "criteria"
+            }
+          },
+          "rubric": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string",
+            "x-ui": {
+              "widget": "textarea"
+            }
+          },
+          "threshold": {
+            "default": 0.5,
+            "maximum": 1,
+            "minimum": 0,
+            "type": "number",
+            "x-ui": {
+              "max": 1,
+              "min": 0,
+              "step": 0.01,
+              "widget": "slider"
+            }
+          }
+        },
+        "required": [
+          "rubric"
+        ],
+        "type": "object"
+      },
+      "controlPorts": [
+        {
+          "description": "pYes ≥ threshold.",
+          "label": "Valid",
+          "name": "valid"
+        },
+        {
+          "description": "pYes < threshold.",
+          "label": "Invalid",
+          "name": "invalid"
+        }
+      ],
+      "credentials": [
+        {
+          "name": "typesafe",
+          "required": false,
+          "types": [
+            "typesafe.api_key"
+          ]
+        },
+        {
+          "description": "Optional LLM decision provider used when a failover hop (or the workspace chain) routes decisions to a chat model.",
+          "name": "llm",
+          "required": false,
+          "types": [
+            "openai.api_key",
+            "anthropic.api_key",
+            "ollama.none"
+          ]
+        }
+      ],
+      "decision": {
+        "kind": "validator"
+      },
+      "defaultPolicy": {
+        "timeoutMs": 30000
+      },
+      "generation": false,
+      "id": "flowaid.decision.validator",
+      "idempotency": "safe",
+      "inputs": [
+        {
+          "name": "value",
+          "required": true,
+          "schema": {}
+        },
+        {
+          "name": "reference",
+          "required": false,
+          "schema": {}
+        }
+      ],
+      "metadata": {
+        "category": "safety",
+        "description": "Asks whether `value` satisfies the rubric (optionally against a `reference`) as a boolean decision; fires `valid` when pYes ≥ threshold, else `invalid`. Passes the value through.",
+        "icon": "badge-check",
+        "name": "Validator",
+        "summary": "{{ config.rubric }}",
+        "tags": [
+          "decision",
+          "quality",
+          "guardrail"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "decision",
+          "required": true,
+          "schema": {
+            "$defs": {
+              "__schema0": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "items": {
+                      "$ref": "#/$defs/__schema0"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "additionalProperties": {
+                      "$ref": "#/$defs/__schema0"
+                    },
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "type": "object"
+                  }
+                ]
+              }
+            },
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "properties": {
+              "attempts": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "errorCode": {
+                      "enum": [
+                        "WORKFLOW_VALIDATION_ERROR",
+                        "SCHEMA_VALIDATION_ERROR",
+                        "NODE_EXECUTION_ERROR",
+                        "TOOL_EXECUTION_ERROR",
+                        "PROVIDER_ERROR",
+                        "PROVIDER_RATE_LIMITED",
+                        "PROVIDER_OVERLOADED",
+                        "CREDENTIAL_ERROR",
+                        "TIMEOUT_ERROR",
+                        "RATE_LIMIT_ERROR",
+                        "CANCELLED_ERROR",
+                        "BOUNDS_EXCEEDED",
+                        "INPUT_MISSING",
+                        "OUTPUT_SCHEMA_MISMATCH",
+                        "EXPRESSION_ERROR",
+                        "SANDBOX_ERROR",
+                        "WORKER_LOST",
+                        "NONIDEMPOTENT_INTERRUPTED",
+                        "HUMAN_APPROVAL_REQUIRED",
+                        "HUMAN_TASK_EXPIRED",
+                        "SUBFLOW_ERROR",
+                        "NO_OUTPUT",
+                        "NETWORK_ERROR",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "UNAUTHORIZED",
+                        "FORBIDDEN",
+                        "BAD_REQUEST",
+                        "PAYLOAD_TOO_LARGE",
+                        "INTERNAL"
+                      ],
+                      "type": "string"
+                    },
+                    "latencyMs": {
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "model": {
+                      "type": "string"
+                    },
+                    "outcome": {
+                      "enum": [
+                        "ok",
+                        "error",
+                        "skipped_unhealthy"
+                      ],
+                      "type": "string"
+                    },
+                    "provider": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "provider",
+                    "model",
+                    "outcome",
+                    "latencyMs"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "confidence": {
+                "maximum": 1,
+                "minimum": 0,
+                "type": "number"
+              },
+              "costUsd": {
+                "minimum": 0,
+                "type": "number"
+              },
+              "kind": {
+                "const": "boolean",
+                "type": "string"
+              },
+              "latencyMs": {
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "model": {
+                "type": "string"
+              },
+              "pYes": {
+                "maximum": 1,
+                "minimum": 0,
+                "type": "number"
+              },
+              "probabilities": {
+                "additionalProperties": false,
+                "properties": {
+                  "false": {
+                    "maximum": 1,
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  "true": {
+                    "maximum": 1,
+                    "minimum": 0,
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "true",
+                  "false"
+                ],
+                "type": "object"
+              },
+              "provider": {
+                "type": "string"
+              },
+              "raw": {
+                "$ref": "#/$defs/__schema0"
+              },
+              "requestId": {
+                "type": "string"
+              },
+              "usage": {
+                "additionalProperties": false,
+                "properties": {
+                  "cacheReadTokens": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "cacheWriteTokens": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "inputTokens": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "outputTokens": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "inputTokens",
+                  "outputTokens"
+                ],
+                "type": "object"
+              },
+              "value": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "confidence",
+              "provider",
+              "model",
+              "latencyMs",
+              "costUsd",
+              "attempts",
+              "kind",
+              "value",
+              "pYes",
+              "probabilities"
+            ],
+            "type": "object"
+          }
+        },
+        {
+          "name": "value",
+          "required": true,
+          "schema": {}
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "condition": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string",
+            "x-ui": {
+              "language": "flowexpr",
+              "widget": "code"
+            }
+          },
+          "message": {
+            "default": "assertion failed",
+            "maxLength": 1000,
+            "minLength": 1,
+            "type": "string",
+            "x-ui": {
+              "widget": "template"
+            }
+          }
+        },
+        "required": [
+          "condition"
+        ],
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [],
+      "defaultPolicy": {
+        "timeoutMs": 5000
+      },
+      "generation": false,
+      "id": "flowaid.dev.assert",
+      "idempotency": "safe",
+      "inputs": [
+        {
+          "name": "value",
+          "required": false,
+          "schema": {}
+        }
+      ],
+      "metadata": {
+        "category": "developer",
+        "description": "Fails the run with `message` unless `condition` (a FlowExpr) is true. Use it to pin invariants in flows and evaluations.",
+        "icon": "badge-alert",
+        "name": "Assert",
+        "summary": "{{ config.condition }}",
+        "tags": [
+          "developer",
+          "test",
+          "invariant"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "value",
+          "required": true,
+          "schema": {}
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "includeValue": {
+            "default": true,
+            "type": "boolean",
+            "x-ui": {
+              "widget": "switch"
+            }
+          },
+          "level": {
+            "default": "info",
+            "enum": [
+              "debug",
+              "info",
+              "warn",
+              "error"
+            ],
+            "type": "string",
+            "x-ui": {
+              "widget": "select"
+            }
+          },
+          "message": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string",
+            "x-ui": {
+              "widget": "template"
+            }
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [],
+      "defaultPolicy": {
+        "timeoutMs": 5000
+      },
+      "generation": false,
+      "id": "flowaid.dev.log",
+      "idempotency": "safe",
+      "inputs": [
+        {
+          "name": "value",
+          "required": false,
+          "schema": {}
+        }
+      ],
+      "metadata": {
+        "category": "developer",
+        "description": "Writes a message (and optionally the input value) to the run log at the chosen level, then passes the value through.",
+        "icon": "scroll-text",
+        "name": "Log",
+        "summary": "{{ config.level }}: {{ config.message }}",
+        "tags": [
+          "developer",
+          "debug",
+          "log"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "value",
+          "required": true,
+          "schema": {}
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "labels": {
+            "additionalProperties": {
+              "maxLength": 256,
+              "type": "string"
+            },
+            "default": {},
+            "propertyNames": {
+              "pattern": "^[a-z][a-z0-9_]{0,63}$"
+            },
+            "type": "object",
+            "x-ui": {
+              "widget": "keyvalue"
+            }
+          },
+          "name": {
+            "pattern": "^[a-z][a-z0-9_.]{0,127}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [],
+      "defaultPolicy": {
+        "timeoutMs": 5000
+      },
+      "generation": false,
+      "id": "flowaid.dev.metric",
+      "idempotency": "safe",
+      "inputs": [
+        {
+          "name": "value",
+          "required": true,
+          "schema": {
+            "type": "number"
+          }
+        },
+        {
+          "name": "passthrough",
+          "required": false,
+          "schema": {}
+        }
+      ],
+      "metadata": {
+        "category": "developer",
+        "description": "Records a numeric metric (name, value, labels) on the run timeline and the metrics pipeline, then passes the input through.",
+        "icon": "chart-line",
+        "name": "Metric",
+        "summary": "{{ config.name }}",
+        "tags": [
+          "developer",
+          "observability",
+          "metric"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "value",
+          "required": true,
+          "schema": {
+            "type": "number"
+          }
+        },
+        {
+          "name": "passthrough",
+          "required": true,
+          "schema": {}
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "delayMs": {
+            "default": 0,
+            "maximum": 60000,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "fail": {
+            "additionalProperties": false,
+            "properties": {
+              "message": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "retryable": {
+                "default": false,
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "type": "object",
+            "x-ui": {
+              "help": "Fail with this message instead of returning `output`."
+            }
+          },
+          "output": {
+            "x-ui": {
+              "widget": "json"
+            }
+          },
+          "ports": {
+            "default": [],
+            "items": {
+              "pattern": "^[a-z][a-z0-9_]{0,63}$",
+              "type": "string"
+            },
+            "maxItems": 32,
+            "type": "array"
+          },
+          "route": {
+            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+            "type": "string",
+            "x-ui": {
+              "help": "A control port to fire (declare it in `ports`)."
+            }
+          }
+        },
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [],
+      "defaultPolicy": {
+        "timeoutMs": 70000
+      },
+      "generation": false,
+      "id": "flowaid.dev.mock",
+      "idempotency": "safe",
+      "inputs": [],
+      "metadata": {
+        "category": "developer",
+        "description": "Returns a fixed value (optionally after a delay, or as a failure) — a stand-in for a node you have not built yet, or for tests.",
+        "icon": "flask-conical",
+        "name": "Mock",
+        "summary": "mock",
+        "tags": [
+          "developer",
+          "test",
+          "stub"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "output",
+          "required": true,
+          "schema": {}
+        }
+      ],
+      "pool": "general",
+      "portRules": [
+        {
+          "kind": "controlPortsFromConfig",
+          "path": "/ports"
+        }
+      ],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "allow": {
+            "default": [],
+            "items": {
+              "maxLength": 1000,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 100,
+            "type": "array",
+            "x-ui": {
+              "help": "When set, the text must match at least one."
+            }
+          },
+          "blockPii": {
+            "default": false,
+            "type": "boolean",
+            "x-ui": {
+              "widget": "switch"
+            }
+          },
+          "caseInsensitive": {
+            "default": true,
+            "type": "boolean",
+            "x-ui": {
+              "widget": "switch"
+            }
+          },
+          "deny": {
+            "default": [],
+            "items": {
+              "maxLength": 1000,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 100,
+            "type": "array",
+            "x-ui": {
+              "help": "Regular expressions that block when they match."
+            }
+          },
+          "detectInjection": {
+            "default": true,
+            "type": "boolean",
+            "x-ui": {
+              "widget": "switch"
+            }
+          },
+          "maxLength": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "minLength": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "controlPorts": [
+        {
+          "description": "No rule was violated.",
+          "label": "Pass",
+          "name": "pass"
+        },
+        {
+          "description": "At least one rule was violated.",
+          "label": "Block",
+          "name": "block"
+        }
+      ],
+      "credentials": [],
+      "defaultPolicy": {
+        "timeoutMs": 10000
+      },
+      "generation": false,
+      "id": "flowaid.safety.guard",
+      "idempotency": "safe",
+      "inputs": [
+        {
+          "name": "text",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "metadata": {
+        "category": "safety",
+        "description": "Deterministic input/output checks: length bounds, deny and allow patterns, prompt-injection heuristics and PII presence. Fires `pass` or `block` with every violation listed.",
+        "icon": "shield",
+        "name": "Guard",
+        "summary": "guard",
+        "tags": [
+          "safety",
+          "guardrail",
+          "injection"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "text",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "passed",
+          "required": true,
+          "schema": {
+            "type": "boolean"
+          }
+        },
+        {
+          "name": "violations",
+          "required": true,
+          "schema": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "detail": {
+                  "type": "string"
+                },
+                "rule": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "rule",
+                "detail"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [
+        "decision",
+        "credentials"
+      ],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "categories": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "default": {
+              "harassment": "Threatens, bullies or targets a specific person.",
+              "hate": "Attacks or demeans people for a protected attribute.",
+              "illegal": "Instructions or solicitation for clearly illegal activity.",
+              "self_harm": "Encourages or describes self-harm or suicide.",
+              "sexual": "Sexually explicit content.",
+              "violence": "Graphic violence or credible threats of violence."
+            },
+            "propertyNames": {
+              "pattern": "^[a-z0-9_]{1,64}$"
+            },
+            "type": "object",
+            "x-ui": {
+              "help": "Category id → what it covers. `safe` is added automatically.",
+              "widget": "keyvalue"
+            }
+          },
+          "maxHarmProbability": {
+            "default": 0.2,
+            "maximum": 1,
+            "minimum": 0,
+            "type": "number",
+            "x-ui": {
+              "help": "Flag when the combined probability of the harm categories exceeds this.",
+              "max": 1,
+              "min": 0,
+              "step": 0.01,
+              "widget": "slider"
+            }
+          }
+        },
+        "type": "object"
+      },
+      "controlPorts": [
+        {
+          "description": "Harm probability ≤ maxHarmProbability.",
+          "label": "Safe",
+          "name": "safe"
+        },
+        {
+          "description": "Harm probability > maxHarmProbability.",
+          "label": "Flagged",
+          "name": "flagged"
+        }
+      ],
+      "credentials": [
+        {
+          "name": "typesafe",
+          "required": false,
+          "types": [
+            "typesafe.api_key"
+          ]
+        },
+        {
+          "description": "Optional LLM decision provider used when a failover hop (or the workspace chain) routes decisions to a chat model.",
+          "name": "llm",
+          "required": false,
+          "types": [
+            "openai.api_key",
+            "anthropic.api_key",
+            "ollama.none"
+          ]
+        }
+      ],
+      "decision": {
+        "kind": "choice"
+      },
+      "defaultPolicy": {
+        "timeoutMs": 30000
+      },
+      "generation": false,
+      "id": "flowaid.safety.moderation",
+      "idempotency": "safe",
+      "inputs": [
+        {
+          "name": "text",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "metadata": {
+        "category": "safety",
+        "description": "Classifies text as `safe` or one of the harm categories with calibrated probabilities (TypeSafe choice decision). Fires `safe` or `flagged`; `category` names the most likely one.",
+        "icon": "shield-alert",
+        "name": "Moderation",
+        "summary": "moderation",
+        "tags": [
+          "safety",
+          "moderation",
+          "decision"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "decision",
+          "required": true,
+          "schema": {
+            "$defs": {
+              "__schema0": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "items": {
+                      "$ref": "#/$defs/__schema0"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "additionalProperties": {
+                      "$ref": "#/$defs/__schema0"
+                    },
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "type": "object"
+                  }
+                ]
+              }
+            },
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "additionalProperties": false,
+            "properties": {
+              "attempts": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "errorCode": {
+                      "enum": [
+                        "WORKFLOW_VALIDATION_ERROR",
+                        "SCHEMA_VALIDATION_ERROR",
+                        "NODE_EXECUTION_ERROR",
+                        "TOOL_EXECUTION_ERROR",
+                        "PROVIDER_ERROR",
+                        "PROVIDER_RATE_LIMITED",
+                        "PROVIDER_OVERLOADED",
+                        "CREDENTIAL_ERROR",
+                        "TIMEOUT_ERROR",
+                        "RATE_LIMIT_ERROR",
+                        "CANCELLED_ERROR",
+                        "BOUNDS_EXCEEDED",
+                        "INPUT_MISSING",
+                        "OUTPUT_SCHEMA_MISMATCH",
+                        "EXPRESSION_ERROR",
+                        "SANDBOX_ERROR",
+                        "WORKER_LOST",
+                        "NONIDEMPOTENT_INTERRUPTED",
+                        "HUMAN_APPROVAL_REQUIRED",
+                        "HUMAN_TASK_EXPIRED",
+                        "SUBFLOW_ERROR",
+                        "NO_OUTPUT",
+                        "NETWORK_ERROR",
+                        "NOT_FOUND",
+                        "CONFLICT",
+                        "UNAUTHORIZED",
+                        "FORBIDDEN",
+                        "BAD_REQUEST",
+                        "PAYLOAD_TOO_LARGE",
+                        "INTERNAL"
+                      ],
+                      "type": "string"
+                    },
+                    "latencyMs": {
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "model": {
+                      "type": "string"
+                    },
+                    "outcome": {
+                      "enum": [
+                        "ok",
+                        "error",
+                        "skipped_unhealthy"
+                      ],
+                      "type": "string"
+                    },
+                    "provider": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "provider",
+                    "model",
+                    "outcome",
+                    "latencyMs"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "confidence": {
+                "maximum": 1,
+                "minimum": 0,
+                "type": "number"
+              },
+              "costUsd": {
+                "minimum": 0,
+                "type": "number"
+              },
+              "kind": {
+                "const": "choice",
+                "type": "string"
+              },
+              "latencyMs": {
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "model": {
+                "type": "string"
+              },
+              "probabilities": {
+                "additionalProperties": {
+                  "maximum": 1,
+                  "minimum": 0,
+                  "type": "number"
+                },
+                "propertyNames": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "provider": {
+                "type": "string"
+              },
+              "raw": {
+                "$ref": "#/$defs/__schema0"
+              },
+              "requestId": {
+                "type": "string"
+              },
+              "usage": {
+                "additionalProperties": false,
+                "properties": {
+                  "cacheReadTokens": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "cacheWriteTokens": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "inputTokens": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "outputTokens": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "inputTokens",
+                  "outputTokens"
+                ],
+                "type": "object"
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "confidence",
+              "provider",
+              "model",
+              "latencyMs",
+              "costUsd",
+              "attempts",
+              "kind",
+              "value",
+              "probabilities"
+            ],
+            "type": "object"
+          }
+        },
+        {
+          "name": "flagged",
+          "required": true,
+          "schema": {
+            "type": "boolean"
+          }
+        },
+        {
+          "name": "category",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "harm_probability",
+          "required": true,
+          "schema": {
+            "maximum": 1,
+            "minimum": 0,
+            "type": "number"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "default": "redact",
+            "enum": [
+              "detect",
+              "redact"
+            ],
+            "type": "string",
+            "x-ui": {
+              "widget": "select"
+            }
+          },
+          "kinds": {
+            "default": [
+              "email",
+              "phone",
+              "credit_card",
+              "ssn",
+              "ip_address",
+              "iban",
+              "api_key"
+            ],
+            "items": {
+              "enum": [
+                "email",
+                "phone",
+                "credit_card",
+                "ssn",
+                "ip_address",
+                "iban",
+                "api_key"
+              ],
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array",
+            "x-ui": {
+              "widget": "list"
+            }
+          },
+          "style": {
+            "default": "label",
+            "enum": [
+              "label",
+              "mask"
+            ],
+            "type": "string",
+            "x-ui": {
+              "showWhen": {
+                "oneOf": [
+                  "redact"
+                ],
+                "path": "/action"
+              },
+              "widget": "select"
+            }
+          }
+        },
+        "type": "object"
+      },
+      "controlPorts": [
+        {
+          "description": "No personal data found.",
+          "label": "Clean",
+          "name": "clean"
+        },
+        {
+          "description": "At least one finding.",
+          "label": "Found",
+          "name": "found"
+        }
+      ],
+      "credentials": [],
+      "defaultPolicy": {
+        "timeoutMs": 10000
+      },
+      "generation": false,
+      "id": "flowaid.safety.pii_detector",
+      "idempotency": "safe",
+      "inputs": [
+        {
+          "name": "text",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "metadata": {
+        "category": "safety",
+        "description": "Finds personal data (emails, phone numbers, card numbers with a Luhn check, SSNs, IBANs with a mod-97 check, IP addresses, API keys) and optionally redacts it. Fires `clean` or `found`.",
+        "icon": "scan-eye",
+        "name": "PII detector",
+        "summary": "{{ config.action }}",
+        "tags": [
+          "safety",
+          "privacy",
+          "pii",
+          "redaction"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "description": "The input, redacted when action = redact.",
+          "name": "text",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "found",
+          "required": true,
+          "schema": {
+            "type": "boolean"
+          }
+        },
+        {
+          "name": "findings",
+          "required": true,
+          "schema": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "end": {
+                  "type": "integer"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "preview": {
+                  "type": "string"
+                },
+                "start": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "kind",
+                "start",
+                "end",
+                "preview"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "name": "counts",
+          "required": true,
+          "schema": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [
+        "state"
+      ],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "default": {
+            "x-ui": {
+              "widget": "json"
+            }
+          },
+          "key": {
+            "pattern": "^[A-Za-z0-9_.:-]{1,200}$",
+            "type": "string",
+            "x-ui": {
+              "widget": "template"
+            }
+          },
+          "namespace": {
+            "default": "session",
+            "enum": [
+              "run",
+              "session",
+              "workspace"
+            ],
+            "type": "string",
+            "x-ui": {
+              "help": "run: this run only; session: the conversation/session; workspace: shared across runs.",
+              "widget": "select"
+            }
+          }
+        },
+        "required": [
+          "key"
+        ],
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [],
+      "defaultPolicy": {
+        "timeoutMs": 10000
+      },
+      "generation": false,
+      "id": "flowaid.state.get",
+      "idempotency": "safe",
+      "inputs": [],
+      "metadata": {
+        "category": "state",
+        "description": "Reads a value from durable key/value state (run, session or workspace scope). Missing keys return `default`.",
+        "icon": "database",
+        "name": "Get state",
+        "summary": "{{ config.namespace }}:{{ config.key }}",
+        "tags": [
+          "state",
+          "memory"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "value",
+          "required": true,
+          "schema": {}
+        },
+        {
+          "name": "found",
+          "required": true,
+          "schema": {
+            "type": "boolean"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [
+        "state"
+      ],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "pattern": "^[A-Za-z0-9_.:-]{1,200}$",
+            "type": "string",
+            "x-ui": {
+              "widget": "template"
+            }
+          },
+          "namespace": {
+            "default": "session",
+            "enum": [
+              "run",
+              "session",
+              "workspace"
+            ],
+            "type": "string",
+            "x-ui": {
+              "help": "run: this run only; session: the conversation/session; workspace: shared across runs.",
+              "widget": "select"
+            }
+          },
+          "ttlMs": {
+            "maximum": 31536000000,
+            "minimum": 1000,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "key"
+        ],
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [],
+      "defaultPolicy": {
+        "timeoutMs": 10000
+      },
+      "generation": false,
+      "id": "flowaid.state.set",
+      "idempotency": "safe",
+      "inputs": [
+        {
+          "name": "value",
+          "required": true,
+          "schema": {}
+        }
+      ],
+      "metadata": {
+        "category": "state",
+        "description": "Writes a value to durable key/value state (run, session or workspace scope), optionally with a time-to-live.",
+        "icon": "database-zap",
+        "name": "Set state",
+        "summary": "{{ config.namespace }}:{{ config.key }}",
+        "tags": [
+          "state",
+          "memory"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "value",
+          "required": true,
+          "schema": {}
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [
+        "network",
+        "credentials",
+        "artifacts"
+      ],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "body": {
+            "x-ui": {
+              "bindable": true,
+              "showWhen": {
+                "oneOf": [
+                  "POST",
+                  "PUT",
+                  "PATCH"
+                ],
+                "path": "/method"
+              },
+              "widget": "json"
+            }
+          },
+          "headers": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "default": {},
+            "type": "object",
+            "x-ui": {
+              "widget": "keyvalue"
+            }
+          },
+          "method": {
+            "default": "GET",
+            "enum": [
+              "GET",
+              "HEAD",
+              "OPTIONS",
+              "POST",
+              "PUT",
+              "PATCH",
+              "DELETE"
+            ],
+            "type": "string",
+            "x-ui": {
+              "widget": "select"
+            }
+          },
+          "query": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "default": {},
+            "type": "object",
+            "x-ui": {
+              "widget": "keyvalue"
+            }
+          },
+          "responseType": {
+            "default": "json",
+            "enum": [
+              "json",
+              "text",
+              "binary"
+            ],
+            "type": "string"
+          },
+          "timeoutMs": {
+            "default": 30000,
+            "maximum": 120000,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "url": {
+            "minLength": 1,
+            "type": "string",
+            "x-ui": {
+              "placeholder": "https://api.example.com/items/{{ start.id }}",
+              "widget": "template"
+            }
+          }
+        },
+        "required": [
+          "method",
+          "url"
+        ],
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [
+        {
+          "description": "Applied as Authorization or a custom header.",
+          "name": "auth",
+          "required": false,
+          "types": [
+            "http.bearer",
+            "http.basic",
+            "http.header",
+            "http.api_key"
+          ]
+        }
+      ],
+      "defaultPolicy": {
+        "timeoutMs": 30000
+      },
+      "generation": false,
+      "id": "flowaid.tools.http",
+      "idempotency": {
+        "byConfig": "/method",
+        "cases": {
+          "DELETE": "keyed",
+          "GET": "safe",
+          "HEAD": "safe",
+          "OPTIONS": "safe",
+          "PATCH": "none",
+          "POST": "none",
+          "PUT": "keyed"
+        },
+        "default": "none"
+      },
+      "inputs": [],
+      "metadata": {
+        "category": "tool",
+        "description": "Calls an HTTP endpoint through the safe fetch (private-network, redirect and size limits) and returns status, headers and the parsed body.",
+        "icon": "globe",
+        "name": "HTTP request",
+        "summary": "{{ config.method }} {{ config.url }}",
+        "tags": [
+          "http",
+          "tool",
+          "network"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "status",
+          "required": true,
+          "schema": {
+            "maximum": 599,
+            "minimum": 100,
+            "type": "integer"
+          }
+        },
+        {
+          "name": "headers",
+          "required": true,
+          "schema": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          }
+        },
+        {
+          "description": "Parsed JSON or text; { \"$artifact\": id } for binary responses; null for empty bodies.",
+          "name": "body",
+          "required": false,
+          "schema": {}
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    }
+  ],
+  "package": "@flowaid/nodes-core",
+  "version": "0.1.0"
+}

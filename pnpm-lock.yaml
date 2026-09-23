@@ -380,6 +380,46 @@ importers:
         specifier: 4.1.11
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(@vitest/coverage-v8@4.1.11)(happy-dom@20.14.5)(vite@8.3.0(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
+  packages/nodes-core:
+    dependencies:
+      '@flowaid/node-sdk':
+        specifier: workspace:*
+        version: link:../node-sdk
+      '@flowaid/providers':
+        specifier: workspace:*
+        version: link:../providers
+      '@flowaid/shared':
+        specifier: workspace:*
+        version: link:../shared
+      '@flowaid/workflow-core':
+        specifier: workspace:*
+        version: link:../workflow-core
+      ajv:
+        specifier: 8.20.0
+        version: 8.20.0
+      zod:
+        specifier: 4.6.5
+        version: 4.6.5
+    devDependencies:
+      '@flowaid/config':
+        specifier: workspace:*
+        version: link:../config
+      '@types/node':
+        specifier: 24.13.6
+        version: 24.13.6
+      eslint:
+        specifier: 9.39.5
+        version: 9.39.5(jiti@2.7.0)(supports-color@7.2.0)
+      tsx:
+        specifier: 4.23.15
+        version: 4.23.15
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: 4.1.11
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(@vitest/coverage-v8@4.1.11)(happy-dom@20.14.5)(vite@8.3.0(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+
   packages/observability:
     dependencies:
       '@flowaid/credentials':

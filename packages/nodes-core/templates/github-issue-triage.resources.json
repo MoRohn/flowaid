@@ -1,0 +1,160 @@
+{
+  "$comment": "Resources this template needs bound on instantiate: each `$template.<kind>.<key>` sentinel in the definition is replaced by the chosen resource id. `tools` are the signatures the template calls, used to type-check it before binding.",
+  "id": "github-issue-triage",
+  "name": "GitHub issue triage",
+  "description": "Labels new GitHub issues, detects duplicates with a similarity search and comments on them.",
+  "category": "engineering",
+  "requiredResources": [
+    {
+      "kind": "mcp",
+      "key": "github",
+      "name": "GitHub",
+      "description": "An MCP server exposing the GitHub issue tools (search_issues, add_issue_comment, add_issue_labels).",
+      "tools": [
+        {
+          "name": "search_issues",
+          "description": "Search issues and pull requests with GitHub search syntax.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "q": {
+                "type": "string",
+                "minLength": 1
+              },
+              "per_page": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100
+              },
+              "page": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "required": ["q"],
+            "additionalProperties": false
+          },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "total_count": {
+                "type": "integer"
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "number": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string"
+                    },
+                    "html_url": {
+                      "type": "string"
+                    },
+                    "body": {
+                      "type": ["string", "null"]
+                    }
+                  },
+                  "required": ["number", "title", "state", "html_url"]
+                }
+              }
+            },
+            "required": ["total_count", "items"]
+          },
+          "capability": "github.read",
+          "idempotency": "safe",
+          "approvalRequired": false
+        },
+        {
+          "name": "add_issue_comment",
+          "description": "Add a comment to an issue.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "owner": {
+                "type": "string"
+              },
+              "repo": {
+                "type": "string"
+              },
+              "issue_number": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "body": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": ["owner", "repo", "issue_number", "body"],
+            "additionalProperties": false
+          },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "html_url": {
+                "type": "string"
+              }
+            },
+            "required": ["id", "html_url"]
+          },
+          "capability": "github.write",
+          "idempotency": "none",
+          "approvalRequired": false
+        },
+        {
+          "name": "add_issue_labels",
+          "description": "Add labels to an issue.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "owner": {
+                "type": "string"
+              },
+              "repo": {
+                "type": "string"
+              },
+              "issue_number": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "labels": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1
+              }
+            },
+            "required": ["owner", "repo", "issue_number", "labels"],
+            "additionalProperties": false
+          },
+          "outputSchema": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": ["name"]
+            }
+          },
+          "capability": "github.write",
+          "idempotency": "keyed",
+          "approvalRequired": false
+        }
+      ]
+    }
+  ]
+}

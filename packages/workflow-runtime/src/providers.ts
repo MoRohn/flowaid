@@ -73,7 +73,9 @@ export function registryProviderAccess(
   };
   const emit = (e: NodeEmitted) => call.emit(e);
 
-  const decision = (chain: readonly ProviderHop[]): DecisionProvider => {
+  const decision = (requested: readonly ProviderHop[]): DecisionProvider => {
+    // An empty chain means "the workflow's chain" (execution.decisions).
+    const chain = requested.length > 0 ? requested : (call.decisions ?? []);
     let resolved: Promise<DecisionProvider> | null = null;
     const get = () =>
       (resolved ??= registry.chain(chain, resolveCtx, {

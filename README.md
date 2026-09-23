@@ -15,7 +15,7 @@
   <img alt="Status: pre-alpha" src="https://img.shields.io/badge/status-pre--alpha-c98a12">
   <img alt="TypeScript 5.9 strict" src="https://img.shields.io/badge/TypeScript-5.9%20strict-17171c">
   <img alt="Node.js 24+" src="https://img.shields.io/badge/node-%E2%89%A524-17171c">
-  <img alt="Tests: 4,401 passing" src="https://img.shields.io/badge/tests-4%2C401%20passing-1f9d64">
+  <img alt="Tests: 4,519 passing" src="https://img.shields.io/badge/tests-4%2C519%20passing-1f9d64">
 </p>
 
 ---
@@ -125,6 +125,7 @@ deployments by environment, and how its decisions were routed.
 | `@flowaid/providers`                                 | **Built.** Registry, sourced model catalog and pricing, failover with circuit breaking, LLM and rule decision providers, OpenAI-compatible client, record/replay. 80 tests                                                                                                                                                                       |
 | `@flowaid/provider-typesafe`                         | **Built.** TypeSafe Jev System One provider: exact boolean/choice/score mapping with full distributions, batching, size guards, rate-limit retries, error taxonomy; contract tests on fixtures recorded from the live API. 19 tests                                                                                                              |
 | `@flowaid/provider-openai`, `-anthropic`, `-ollama`  | **Built.** Generation (and embedding) providers: OpenAI plus Gemini, Groq, Mistral, xAI, OpenRouter, Together and vLLM presets; Claude Messages API with thinking, tools, forced-tool structured output and prompt caching; Ollama NDJSON with JSON-schema format. 22 tests                                                                      |
+| `@flowaid/nodes-core`                                | **Built.** 30 core nodes: typed decisions (boolean, choice, score, batch, confidence gate, router, consensus, validator) with human failover, text/structured generation and embeddings, HTTP, data shaping, state, safety (guard, moderation, PII redaction) and developer nodes; the three demo templates. 79 tests                            |
 | `@flowaid/credentials`                               | **Built.** AES-256-GCM envelope with per-credential keys, KEK versions under env/file/KMS/Vault master keys with KCV and rotation, external references, the Redactor and the credential types. 56 tests                                                                                                                                          |
 | `@flowaid/observability`                             | **Built.** Redacting pino logger, OpenTelemetry tracing and metrics (OTLP, Prometheus), the metric registry, run timelines and the TraceReviewer. 57 tests                                                                                                                                                                                       |
 | `@flowaid/database`                                  | **Built.** PostgreSQL 16 schema (45 tables), migrations with forced row-level security, fenced event-sourced run store with projections and reprojection, Postgres queue and event bus, repositories, retention sweep. 54 tests against a real Postgres in CI                                                                                    |
@@ -349,6 +350,7 @@ packages/
   provider-openai/      OpenAI + compatible endpoints (Gemini, Groq, Mistral, xAI, …)
   provider-anthropic/   Claude Messages API
   provider-ollama/      Local models through Ollama
+  nodes-core/           Built-in nodes: decisions, generation, HTTP, data, state, safety
   credentials/          Envelope encryption, master keys, external secrets, redaction
   observability/        Redacting logger, tracing, metrics, run timelines, trace review
   database/             PostgreSQL schema, migrations, RLS, run store, queue, repositories

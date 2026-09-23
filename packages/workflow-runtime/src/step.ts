@@ -95,6 +95,8 @@ export type ExecutorOutcome =
       kind: "suspend";
       wait: SuspendWait;
       state: JsonValue;
+      /** A decision node's failover chain ended in `human` (origin `decision_failover`). */
+      failover?: boolean;
       latencyMs: number;
       events?: NodeEmitted[];
     }
@@ -688,7 +690,10 @@ class Stepper {
       case "suspend": {
         if (result.wait.kind === "human") {
           const humanTaskId = this.ctx.ids.uuid();
-          const request: HumanRequest = { ...result.wait.request, origin: "task_suspend" };
+          const request: HumanRequest = {
+            ...result.wait.request,
+            origin: result.failover ? "decision_failover" : "task_suspend",
+          };
           this.emit({ type: "HUMAN_APPROVAL_REQUESTED", ...a, humanTaskId, request } as AnyEvent);
           this.emit({
             type: "NODE_WAITING",

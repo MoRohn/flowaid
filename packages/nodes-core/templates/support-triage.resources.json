@@ -1,0 +1,63 @@
+{
+  "$comment": "Resources this template needs bound on instantiate: each `$template.<kind>.<key>` sentinel in the definition is replaced by the chosen resource id. `tools` are the signatures the template calls, used to type-check it before binding.",
+  "id": "support-triage",
+  "name": "Support triage",
+  "description": "Classifies an incoming support message with one batched decision, gates on confidence, drafts a reply and escalates security issues with playbook context.",
+  "category": "support",
+  "requiredResources": [
+    {
+      "kind": "mcp",
+      "key": "security_kb",
+      "name": "Security knowledge base",
+      "description": "An MCP server that searches the security playbooks (search_playbooks).",
+      "tools": [
+        {
+          "name": "search_playbooks",
+          "description": "Search the security team's incident playbooks.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "query": {
+                "type": "string",
+                "minLength": 1
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 20
+              }
+            },
+            "required": ["query"],
+            "additionalProperties": false
+          },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "playbooks": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "title": {
+                      "type": "string"
+                    },
+                    "url": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["title", "url", "summary"]
+                }
+              }
+            },
+            "required": ["playbooks"]
+          },
+          "idempotency": "safe",
+          "approvalRequired": false
+        }
+      ]
+    }
+  ]
+}

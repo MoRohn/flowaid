@@ -164,6 +164,30 @@ describe("executeTask", () => {
     expect(allowed).toMatchObject({ kind: "suspend", state: { s: 1 } });
   });
 
+  it("lets a decision node suspend for its human failover hop without the capability", async () => {
+    const request = {
+      title: "Decide",
+      context: {},
+      mode: { type: "approval" as const },
+      assignees: [],
+      expiresAt: null,
+      externalReview: false,
+    };
+    const decisionDef = (wait: Parameters<typeof suspend>[0]) =>
+      transformDef(() => Promise.resolve(suspend(wait, { q: 1 })), {
+        decision: { kind: "boolean" },
+      });
+    expect(await run(decisionDef({ kind: "human", request }))).toMatchObject({
+      kind: "suspend",
+      failover: true,
+      state: { q: 1 },
+    });
+    // Only the human hop: waiting for an event still needs the capability.
+    expect(await run(decisionDef({ kind: "event", eventName: "x" }))).toMatchObject({
+      kind: "error",
+    });
+  });
+
   it("denies services a node did not declare", async () => {
     const r = await run(
       transformDef(async (ctx) => {

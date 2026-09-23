@@ -482,6 +482,42 @@ describe("human tasks", () => {
     await sim.respond("agent", { action: "approve" });
     expect(sim.of("RUN_COMPLETED")[0]?.output).toEqual({ approved: "approve", state: { step: 3 } });
   });
+
+  it("a decision failover suspension is tagged decision_failover", async () => {
+    const plan = planOf({
+      nodes: [start, transform("agent", "start.x"), out("out", ref("agent", "result"))],
+    });
+    const sim = await simulate({
+      plan,
+      input,
+      executors: {
+        agent: (c: FakeCall): ExecutorOutcome =>
+          c.resume?.kind === "human"
+            ? okResult({ result: { approved: c.resume.response.action, state: c.resume.state } })
+            : {
+                kind: "suspend",
+                wait: {
+                  kind: "human",
+                  request: {
+                    title: "Run the refund tool?",
+                    context: {},
+                    mode: { type: "approval" },
+                    assignees: [],
+                    expiresAt: null,
+                    externalReview: false,
+                  },
+                },
+                state: { step: 3 },
+                failover: true,
+                latencyMs: 2,
+              },
+      },
+    });
+    expect(sim.status).toBe("waiting_for_human");
+    expect([...sim.humanTasks.values()][0]?.request.origin).toBe("decision_failover");
+    await sim.respond("agent", { action: "approve" });
+    expect(sim.of("RUN_COMPLETED")[0]?.output).toEqual({ approved: "approve", state: { step: 3 } });
+  });
 });
 
 describe("cancellation, deadlines and early exit", () => {

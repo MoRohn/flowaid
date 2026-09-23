@@ -29,6 +29,7 @@ import {
   type JsonObject,
   type JsonValue,
   type PlanNode,
+  type ProviderHop,
   type RunOrigin,
   type SafeFetch,
   type ScopePath,
@@ -91,6 +92,8 @@ export interface ExecutionCall {
     remainingTokens: number | null;
     deadlineAt: string | null;
   };
+  /** The workflow's decision chain ([primary, ...failover]); used when a node passes an empty chain. */
+  decisions?: readonly ProviderHop[];
 }
 
 /** Services the host (worker, CLI, tests) supplies. Missing services behave as undeclared. */
@@ -287,8 +290,13 @@ export async function executeTask(
     switch (result.kind) {
       case "error":
         return fail(result.error);
-      case "suspend":
-        if (!def.capabilities.includes("suspend"))
+      case "suspend": {
+        // Decision nodes may suspend without the capability: that is the human hop of their chain.
+        const failover =
+          def.decision !== undefined &&
+          result.wait.kind === "human" &&
+          !def.capabilities.includes("suspend");
+        if (!failover && !def.capabilities.includes("suspend"))
           return fail(
             new SchemaValidationError(
               `${call.node.id} suspended without the 'suspend' capability`,
@@ -299,9 +307,11 @@ export async function executeTask(
           kind: "suspend",
           wait: result.wait,
           state: result.state,
+          ...(failover ? { failover: true } : {}),
           latencyMs: latency(),
           events,
         };
+      }
       case "ok": {
         const output = def.outputSchema.safeParse(result.output);
         if (!output.success)

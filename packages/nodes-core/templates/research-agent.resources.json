@@ -1,0 +1,8 @@
+{
+  "$comment": "Resources this template needs bound on instantiate: each `$template.<kind>.<key>` sentinel in the definition is replaced by the chosen resource id. `tools` are the signatures the template calls, used to type-check it before binding.",
+  "id": "research-agent",
+  "name": "Research agent",
+  "description": "Plans search queries, fans out web searches, and synthesises a structured, cited answer.",
+  "category": "research",
+  "requiredResources": []
+}

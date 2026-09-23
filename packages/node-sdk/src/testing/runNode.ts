@@ -97,7 +97,10 @@ export async function runNode(
     return done({ kind: "error", error: toFlowaidError(thrown) });
   }
 
-  if (result.kind === "suspend" && !def.capabilities.includes("suspend")) {
+  // A decision node may suspend without the capability: the human hop of its failover chain.
+  const failover =
+    def.decision !== undefined && result.kind === "suspend" && result.wait.kind === "human";
+  if (result.kind === "suspend" && !failover && !def.capabilities.includes("suspend")) {
     return done({
       kind: "error",
       error: new ForbiddenError("returning suspend needs the 'suspend' capability"),
