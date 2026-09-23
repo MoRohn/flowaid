@@ -77,5 +77,7 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # Three packages at a time: each Vitest run already uses every core, and running all
+      # packages at once starved CPU-heavy property tests past their timeouts.
       - name: Unit and component tests
-        run: pnpm test
+        run: pnpm turbo run test --concurrency=3
