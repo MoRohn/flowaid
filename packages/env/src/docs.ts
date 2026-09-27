@@ -547,7 +547,7 @@ const docs = {
   S3_ENDPOINT: {
     group: "storage",
     description:
-      "S3-compatible endpoint for artifacts and uploads (MinIO in the default compose stack). Set all of `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY` and `S3_SECRET_KEY` to enable object storage; when none are set artifacts are stored inline in Postgres up to the size limit.",
+      "S3-compatible endpoint for artifacts and uploads (AWS S3, Cloudflare R2 or a self-hosted store), reserved for object storage. Set all of `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY` and `S3_SECRET_KEY` or none; when none are set, run artifacts and code-export packages are stored in `<data>/artifacts` beside the master key file (the `flowaid-data` volume in compose), shared by the api and the worker.",
     required: false,
     example: "http://localhost:9000",
     secret: false,
@@ -568,16 +568,14 @@ const docs = {
   },
   S3_SECRET_KEY: {
     group: "storage",
-    description:
-      "Secret access key for the S3 endpoint. The compose stack requires it: it is the MinIO root password and has no default. Generate with `openssl rand -hex 16`.",
+    description: "Secret access key for the S3 endpoint.",
     required: false,
-    example: "<openssl rand -hex 16>",
+    example: "<secret access key>",
     secret: true,
-    composeRequired: true,
   },
   S3_REGION: {
     group: "storage",
-    description: "Region sent with signed requests. MinIO accepts any value.",
+    description: "Region sent with signed requests.",
     default: "us-east-1",
     required: false,
     example: "eu-central-1",
@@ -586,7 +584,7 @@ const docs = {
   S3_FORCE_PATH_STYLE: {
     group: "storage",
     description:
-      "Use path-style bucket addressing (`endpoint/bucket/key`). Required for MinIO; set to `false` for AWS S3.",
+      "Use path-style bucket addressing (`endpoint/bucket/key`), which most self-hosted S3 servers need; set to `false` for AWS S3.",
     default: "true",
     required: false,
     example: "false",
@@ -704,7 +702,7 @@ const docs = {
   POSTGRES_CODE_PASSWORD: {
     group: "compose",
     description:
-      "Password of the `flowaid_code` role the sandbox host `worker-code` connects with (queue tables only). Required by the compose stack and must differ from `POSTGRES_PASSWORD`: a sandbox escape must not yield the owner's credentials. Generate with `openssl rand -hex 16`.",
+      "Password of the restricted `flowaid_code` role (queue tables only) that migrations grant to, reserved for a separate sandbox host of the `code` pool. Required by the compose stack and must differ from `POSTGRES_PASSWORD`. Generate with `openssl rand -hex 16`.",
     required: false,
     example: "<openssl rand -hex 16>",
     secret: true,
@@ -723,7 +721,7 @@ const docs = {
   BIND_ADDRESS: {
     group: "compose",
     description:
-      "Host interface the compose stack publishes its ports on (api, web, postgres, minio, redis, minio console). Loopback by default so a laptop does not expose the stack on its network; `0.0.0.0` publishes on every interface (put a TLS reverse proxy in front of api and web).",
+      "Host interface the compose stack publishes its ports on (api, web, postgres, redis). Loopback by default so a laptop does not expose the stack on its network; `0.0.0.0` publishes on every interface (put a TLS reverse proxy in front of api and web).",
     default: "127.0.0.1",
     required: false,
     example: "0.0.0.0",
@@ -736,25 +734,6 @@ const docs = {
     default: "5432",
     required: false,
     example: "5432",
-    secret: false,
-    composeOnly: true,
-  },
-  MINIO_PORT: {
-    group: "compose",
-    description: "Host port of the compose `minio` S3 endpoint.",
-    default: "9000",
-    required: false,
-    example: "9000",
-    secret: false,
-    composeOnly: true,
-  },
-  MINIO_CONSOLE_PORT: {
-    group: "compose",
-    description:
-      "Host port of the MinIO console, published only by `docker compose --profile tools up minio-console`.",
-    default: "9001",
-    required: false,
-    example: "9001",
     secret: false,
     composeOnly: true,
   },
@@ -773,15 +752,6 @@ const docs = {
     default: "3001",
     required: false,
     example: "3001",
-    secret: false,
-    composeOnly: true,
-  },
-  WORKER_CODE_CONCURRENCY: {
-    group: "compose",
-    description: "`WORKER_CONCURRENCY` of the sandbox host `worker-code`.",
-    default: "4",
-    required: false,
-    example: "4",
     secret: false,
     composeOnly: true,
   },

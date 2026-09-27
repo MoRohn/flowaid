@@ -3,18 +3,14 @@
  * needed: it parses the YAML (anchors and merge keys resolved) and asserts the security
  * properties the stack relies on.
  *
- * 1. Secret scope: `web` and the sandbox host `worker-code` have no `env_file` and receive only
- *    their allowed variables; neither sees `FLOWAID_MASTER_KEY*`, `*_API_KEY`, `S3_SECRET_KEY`
- *    or the owner's database password. `worker-code` connects as the `flowaid_code` role and
- *    has no `/data` mount.
- * 2. Hardening: `worker` and `worker-code` drop every capability and run with
- *    `no-new-privileges`; `worker-code` keeps its read-only root, tmpfs, pid and memory limits.
- * 3. Exposure: every published port binds `${BIND_ADDRESS:-127.0.0.1}`, the MinIO console is
- *    only published under the `tools` profile, `web` is only on the `edge` network and the
- *    `internal` network is `internal: true`.
- * 4. Defaults: no default password (`:?` for POSTGRES_PASSWORD, POSTGRES_CODE_PASSWORD and
- *    S3_SECRET_KEY; Redis checks REDIS_PASSWORD at start), `DB_RLS` defaults to true,
- *    `NODE_ENV` to production.
+ * 1. Secret scope: `web` has no `env_file` and receives only its allowed variables; it never
+ *    sees `FLOWAID_MASTER_KEY*`, `*_API_KEY`, `S3_SECRET_KEY` or the owner's database password.
+ * 2. Hardening: `worker` drops every capability and runs with `no-new-privileges`, as do
+ *    `api` and `web`.
+ * 3. Exposure: every published port binds `${BIND_ADDRESS:-127.0.0.1}`, `web` is only on the
+ *    `edge` network and the `internal` network is `internal: true`.
+ * 4. Defaults: no default password (`:?` for POSTGRES_PASSWORD and POSTGRES_CODE_PASSWORD;
+ *    Redis checks REDIS_PASSWORD at start), `DB_RLS` defaults to true, `NODE_ENV` to production.
  * 5. Every image is pinned to a release tag and a sha256 digest, and every build uses the one
  *    docker/Dockerfile with a target.
  */
@@ -133,18 +129,6 @@ const WEB_ALLOWED = new Set([
   "NEXT_PUBLIC_FLOWAID_BASE_URL",
 ]);
 
-/** Exactly the variables the sandbox host receives. */
-const WORKER_CODE_ALLOWED = [
-  "DATABASE_URL",
-  "DB_RLS",
-  "LOG_LEVEL",
-  "NODE_ENV",
-  "REDIS_URL",
-  "SANDBOX_MODE",
-  "WORKER_CONCURRENCY",
-  "WORKER_POOLS",
-];
-
 const IMAGE_RE = /^[a-z0-9.\-/]+:[A-Za-z0-9._-]+@sha256:[0-9a-f]{64}$/;
 const PUBLISHED_PORT_RE = /^\$\{BIND_ADDRESS:-127\.0\.0\.1\}:\$\{[A-Z_]+:-\d+\}:\d+$/;
 
@@ -157,21 +141,6 @@ describe("compose secret scope", () => {
     expect(names.filter((name) => !WEB_ALLOWED.has(name))).toEqual([]);
     expect(names.filter((name) => SECRET_NAME_RE.test(name))).toEqual([]);
     expect(stringList(web["volumes"])).toEqual([]);
-  });
-
-  it("worker-code has no env_file, no /data mount and exactly its allowed variables", () => {
-    const code = service("worker-code");
-    expect(code["env_file"]).toBeUndefined();
-    const env = environmentOf(code);
-    expect(Object.keys(env).sort()).toEqual(WORKER_CODE_ALLOWED);
-    expect(Object.keys(env).filter((name) => SECRET_NAME_RE.test(name))).toEqual([]);
-    expect(env["WORKER_POOLS"]).toBe("code");
-    expect(env["DATABASE_URL"]).toMatch(/^postgres:\/\/flowaid_code:\$\{POSTGRES_CODE_PASSWORD:\?/);
-    // the owner's password is never interpolated into the sandbox host's connection string
-    expect(env["DATABASE_URL"]).not.toContain("${POSTGRES_PASSWORD");
-    expect(env["DATABASE_URL"]).not.toContain("${POSTGRES_APP_PASSWORD");
-    expect(env["DB_RLS"]).toBe("${DB_RLS:-true}");
-    expect(stringList(code["volumes"])).toEqual([]);
   });
 
   it("api and worker connect as flowaid_app; only the api holds the owner connection", () => {
@@ -191,25 +160,13 @@ describe("compose secret scope", () => {
 });
 
 describe("compose hardening", () => {
-  it("workers drop every capability and forbid privilege escalation", () => {
-    for (const name of ["worker", "worker-code"]) {
+  it("the worker drops every capability and forbids privilege escalation", () => {
+    for (const name of ["worker"]) {
       const svc = service(name);
       expect(stringList(svc["cap_drop"]), name).toEqual(["ALL"]);
       expect(stringList(svc["security_opt"]), name).toContain("no-new-privileges:true");
     }
     expect(service("worker")["pids_limit"]).toBe(1024);
-  });
-
-  it("worker-code keeps its read-only root, tmpfs and resource limits", () => {
-    const code = service("worker-code");
-    expect(code["read_only"]).toBe(true);
-    expect(stringList(code["tmpfs"]).some((mount) => mount.startsWith("/tmp"))).toBe(true);
-    const deploy = code["deploy"];
-    const resources = isRecord(deploy) ? deploy["resources"] : undefined;
-    const limits = isRecord(resources) ? resources["limits"] : undefined;
-    expect(isRecord(limits) ? limits["memory"] : undefined).toBe("1g");
-    const pids = code["pids_limit"] ?? (isRecord(limits) ? limits["pids"] : undefined);
-    expect(pids).toBe(256);
   });
 
   it("api and web forbid privilege escalation", () => {
@@ -228,16 +185,7 @@ describe("compose exposure", () => {
         expect(port, `${name} port`).toMatch(PUBLISHED_PORT_RE);
       }
     }
-    expect(published.length).toBeGreaterThanOrEqual(6);
-  });
-
-  it("publishes the MinIO console only under the tools profile", () => {
-    expect(stringList(service("minio")["ports"]).some((port) => port.endsWith(":9001"))).toBe(
-      false,
-    );
-    const console = service("minio-console");
-    expect(stringList(console["profiles"])).toEqual(["tools"]);
-    expect(stringList(console["ports"]).some((port) => port.endsWith(":9001"))).toBe(true);
+    expect(published.length).toBeGreaterThanOrEqual(4);
   });
 
   it("isolates web on the edge network and keeps the internal network internal", () => {
@@ -245,11 +193,10 @@ describe("compose exposure", () => {
     expect(isRecord(networks) ? networks["internal"] : undefined).toEqual({ internal: true });
     expect(networksOf(service("web"))).toEqual(["edge"]);
     expect(networksOf(service("api"))).toEqual(["edge", "internal"]);
-    for (const name of ["postgres", "minio", "redis"]) {
+    for (const name of ["postgres", "redis"]) {
       expect(networksOf(service(name)), name).not.toContain("edge");
       expect(networksOf(service(name)), name).toContain("internal");
     }
-    expect(networksOf(service("minio-init"))).toEqual(["internal"]);
   });
 });
 
@@ -261,8 +208,8 @@ describe("compose defaults", () => {
     expect(postgres["POSTGRES_APP_PASSWORD"]).toBe(
       "${POSTGRES_APP_PASSWORD:-${POSTGRES_PASSWORD}}",
     );
-    expect(environmentOf(service("minio"))["MINIO_ROOT_PASSWORD"]).toMatch(/^\$\{S3_SECRET_KEY:\?/);
-    expect(environmentOf(service("api"))["S3_SECRET_KEY"]).toMatch(/^\$\{S3_SECRET_KEY:\?/);
+    // object storage is optional (artifacts live in the flowaid-data volume); no S3 by default
+    expect(environmentOf(service("api"))["S3_SECRET_KEY"]).toBeUndefined();
     const redis = service("redis");
     expect(environmentOf(redis)["REDIS_PASSWORD"]).toBe("${REDIS_PASSWORD:-}");
     const command = stringList(redis["command"]).join("\n");
@@ -284,7 +231,7 @@ describe("compose defaults", () => {
   });
 
   it("defaults NODE_ENV to production and DB_RLS to true for every flowaid process", () => {
-    for (const name of ["api", "worker", "worker-code"]) {
+    for (const name of ["api", "worker"]) {
       const env = environmentOf(service(name));
       expect(env["NODE_ENV"], name).toBe("${NODE_ENV:-production}");
       expect(env["DB_RLS"], name).toBe("${DB_RLS:-true}");
@@ -298,17 +245,13 @@ describe("compose images and builds", () => {
     const images = Object.entries(STACK)
       .filter(([, svc]) => svc["build"] === undefined)
       .map(([name, svc]) => [name, text(svc["image"])] as const);
-    expect(images.map(([name]) => name).sort()).toEqual(
-      ["minio", "minio-console", "minio-init", "postgres", "redis"].sort(),
-    );
+    expect(images.map(([name]) => name).sort()).toEqual(["postgres", "redis"].sort());
     for (const [name, image] of images) {
       expect(image, name).toMatch(IMAGE_RE);
       expect(image, name).not.toMatch(/:latest@/);
     }
     expect(text(service("postgres")["image"])).toMatch(/^pgvector\/pgvector:\d+\.\d+\.\d+-pg16@/);
     expect(text(service("redis")["image"])).toMatch(/^redis:7\.\d+\.\d+-alpine@/);
-    expect(text(service("minio")["image"])).toMatch(/\/minio:RELEASE\.\d{4}-\d{2}-\d{2}T/);
-    expect(text(service("minio-init")["image"])).toMatch(/\/mc:RELEASE\.\d{4}-\d{2}-\d{2}T/);
   });
 
   it("builds every app from docker/Dockerfile with a target", () => {
@@ -322,7 +265,7 @@ describe("compose images and builds", () => {
       expect(build["dockerfile"], name).toBe("docker/Dockerfile");
       targets[name] = text(build["target"]);
     }
-    expect(targets).toEqual({ api: "api", worker: "worker", "worker-code": "worker", web: "web" });
+    expect(targets).toEqual({ api: "api", worker: "worker", web: "web" });
     const dockerfile = readFileSync(join(DOCKER_DIR, "Dockerfile"), "utf8");
     for (const target of ["api", "worker", "web", "vendor", "build"]) {
       expect(dockerfile).toMatch(new RegExp(`^FROM \\S+ AS ${target}$`, "m"));

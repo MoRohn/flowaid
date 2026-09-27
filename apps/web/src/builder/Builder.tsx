@@ -661,10 +661,7 @@ function BuilderView({
       saveState={saveState}
       {...(saveError ? { saveError } : {})}
       onRun={() => setBottomTab("run")}
-      running={
-        starting ||
-        (live !== null && !["completed", "failed", "cancelled", "timed_out"].includes(live.status))
-      }
+      running={starting || live?.status === "running" || live?.status === "queued"}
       {...(s.can("workflows:publish")
         ? { onPublish: () => setPublishOpen(true), publishDisabled: errors.length > 0 }
         : {})}
@@ -729,7 +726,14 @@ function BuilderView({
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
-            {...(runView ? { run: runView, followRun: true } : {})}
+            {...(runView
+              ? {
+                  run: runView,
+                  // pan with the run while nodes execute; once it waits for a person or ends,
+                  // the canvas is the person's again
+                  followRun: runView.status === "running" || runView.status === "queued",
+                }
+              : {})}
             {...(!readOnly ? { catalog: palette, onAddNode: addNode } : {})}
             onSetParent={(ids, parent, positions) =>
               store.getState().setParent(ids, parent, positions)

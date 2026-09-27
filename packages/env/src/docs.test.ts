@@ -103,11 +103,7 @@ describe("environment variable documentation", () => {
         expect(doc.composeOnly, `${name} in the compose group must be compose-only`).toBe(true);
       }
     }
-    expect(ENV_COMPOSE_REQUIRED_VAR_NAMES).toEqual([
-      "S3_SECRET_KEY",
-      "POSTGRES_PASSWORD",
-      "POSTGRES_CODE_PASSWORD",
-    ]);
+    expect(ENV_COMPOSE_REQUIRED_VAR_NAMES).toEqual(["POSTGRES_PASSWORD", "POSTGRES_CODE_PASSWORD"]);
     for (const name of ENV_COMPOSE_REQUIRED_VAR_NAMES) {
       const doc = envVarDoc(name);
       expect(doc.default, `${name} has no default`).toBeUndefined();
@@ -208,7 +204,8 @@ describe("environment variable documentation", () => {
     // compose-required passwords are present, uncommented and empty
     expect(text).toContain("\nPOSTGRES_PASSWORD=\n");
     expect(text).toContain("\nPOSTGRES_CODE_PASSWORD=\n");
-    expect(text).toContain("\nS3_SECRET_KEY=\n");
+    // object storage is optional: its secret is commented out like any optional
+    expect(text).not.toContain("\nS3_SECRET_KEY=\n");
     expect(text).toContain("\n# REDIS_PASSWORD=<openssl rand -hex 16>\n");
     expect(text).toContain("\nBIND_ADDRESS=127.0.0.1\n");
     expect(text).toContain("\nHOST=127.0.0.1\n");

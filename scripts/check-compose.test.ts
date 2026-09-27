@@ -3,10 +3,10 @@
  * (the same code path `docker compose up` uses) and checks what a Docker parse alone cannot:
  *
  * 1. The stack resolves with its pinned digests and the `:?` passwords provided.
- * 2. The environment of every flowaid process (`api`, `worker`, `worker-code`) passes
+ * 2. The environment of every flowaid process (`api`, `worker`) passes
  *    `safeLoadEnv()` from @flowaid/env, so a variable that compose sets and the schema rejects
  *    (or the reverse) fails here instead of at container start.
- * 3. `web` and `worker-code` receive no secret.
+ * 3. `web` receives no secret.
  * 4. The build context of docker/Dockerfile excludes `.git`, `node_modules` and every `.env*`
  *    file except `.env.example` (.dockerignore), verified by exporting the context.
  *
@@ -28,7 +28,6 @@ const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const REQUIRED = {
   POSTGRES_PASSWORD: "test-owner-password",
   POSTGRES_CODE_PASSWORD: "test-code-password",
-  S3_SECRET_KEY: "test-s3-secret",
 };
 
 /**
@@ -140,10 +139,9 @@ describe.skipIf(!HAS_DOCKER)("docker compose config", () => {
 
   it("resolves the default stack and the scale/tools profiles with pinned digests", () => {
     expect(Object.keys(project.services).sort()).toEqual(
-      ["api", "minio", "minio-init", "postgres", "web", "worker", "worker-code"].sort(),
+      ["api", "postgres", "web", "worker"].sort(),
     );
     expect(Object.keys(scaleProject.services)).toContain("redis");
-    expect(Object.keys(scaleProject.services)).toContain("minio-console");
     for (const [name, svc] of Object.entries(scaleProject.services)) {
       if (svc.image !== undefined && !svc.image.startsWith("flowaid/")) {
         expect(svc.image, name).toMatch(/@sha256:[0-9a-f]{64}$/);
@@ -154,10 +152,10 @@ describe.skipIf(!HAS_DOCKER)("docker compose config", () => {
   it("refuses to start without the passwords", () => {
     const result = docker(["compose", "--env-file", "/dev/null", "config", "--quiet"]);
     expect(result.ok).toBe(false);
-    expect(result.stderr).toMatch(/POSTGRES_PASSWORD|POSTGRES_CODE_PASSWORD|S3_SECRET_KEY/);
+    expect(result.stderr).toMatch(/POSTGRES_PASSWORD|POSTGRES_CODE_PASSWORD/);
   });
 
-  it.each(["api", "worker", "worker-code"])("%s environment passes safeLoadEnv()", (name) => {
+  it.each(["api", "worker"])("%s environment passes safeLoadEnv()", (name) => {
     const svc = project.services[name];
     expect(svc, name).toBeDefined();
     const env = environmentOf(svc ?? {});
@@ -168,20 +166,14 @@ describe.skipIf(!HAS_DOCKER)("docker compose config", () => {
     }
     expect(result.value.flags.isProduction).toBe(true);
     expect(result.value.DB_RLS).toBe(true);
-    if (name === "worker-code") {
-      expect(result.value.WORKER_POOLS).toEqual(["code"]);
-      expect(result.value.flags.hasMasterKeyInEnv).toBe(false);
-      expect(result.value.flags.hasS3).toBe(false);
-      expect(result.value.DATABASE_URL).toContain("flowaid_code:");
-    } else {
-      expect(result.value.flags.hasS3).toBe(true);
-      expect(result.value.DATABASE_URL).toContain("flowaid_app:");
-    }
+    // artifacts live in the shared flowaid-data volume; object storage is opt-in
+    expect(result.value.flags.hasS3).toBe(false);
+    expect(result.value.DATABASE_URL).toContain("flowaid_app:");
   });
 
-  it("gives web and worker-code no secret", () => {
+  it("gives web no secret", () => {
     const secret = /MASTER_KEY|_API_KEY$|S3_SECRET_KEY|ADMIN_PASSWORD|CLIENT_SECRET|JWT_PRIVATE/;
-    for (const name of ["web", "worker-code"]) {
+    for (const name of ["web"]) {
       const svc = project.services[name];
       expect(svc?.env_file, `${name} env_file`).toBeUndefined();
       const names = Object.keys(environmentOf(svc ?? {}));
@@ -191,9 +183,7 @@ describe.skipIf(!HAS_DOCKER)("docker compose config", () => {
       ).toEqual([]);
       const values = Object.values(environmentOf(svc ?? {}));
       for (const value of Object.values(REQUIRED)) {
-        if (value !== REQUIRED.POSTGRES_CODE_PASSWORD || name === "web") {
-          expect(values.join("\n"), `${name} holds ${value}`).not.toContain(value);
-        }
+        expect(values.join("\n"), `${name} holds ${value}`).not.toContain(value);
       }
     }
   });

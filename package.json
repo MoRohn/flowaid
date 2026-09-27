@@ -33,7 +33,8 @@
     "typecheck:root": "tsc -p tsconfig.json --noEmit",
     "sdk:types": "tsx --conditions=development scripts/gen-sdk-types.ts",
     "sdk:check": "tsx --conditions=development scripts/gen-sdk-types.ts --check",
-    "test:acceptance": "playwright test"
+    "test:acceptance": "playwright test",
+    "flowaid": "tsx --conditions=development packages/cli/src/main.ts"
   },
   "devDependencies": {
     "@flowaid/config": "workspace:*",

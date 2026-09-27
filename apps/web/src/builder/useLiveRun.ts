@@ -17,6 +17,8 @@ export interface LiveRun {
 }
 
 const POLL_MS = 400;
+/** A run waiting for a person or an event changes rarely; poll it gently. */
+const IDLE_POLL_MS = 3000;
 
 export function useLiveRun(
   runId: string | null,
@@ -57,7 +59,8 @@ export function useLiveRun(
         const folded = fold(events);
         setLive({ runId, status: run.status, folded, run });
         const terminal = TERMINAL_RUN_STATUSES.has(run.status);
-        if (!terminal) timer = setTimeout(() => void tick(), POLL_MS);
+        const idle = run.status === "waiting_for_human" || run.status === "waiting";
+        if (!terminal) timer = setTimeout(() => void tick(), idle ? IDLE_POLL_MS : POLL_MS);
       } catch {
         if (!cancelled) timer = setTimeout(() => void tick(), POLL_MS * 5);
       }

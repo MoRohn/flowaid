@@ -198,12 +198,12 @@ lists them empty for you to generate (`openssl rand -hex 16`).
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `S3_ENDPOINT` | no | — | S3-compatible endpoint for artifacts and uploads (MinIO in the default compose stack). Set all of `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY` and `S3_SECRET_KEY` to enable object storage; when none are set artifacts are stored inline in Postgres up to the size limit. Example: `http://localhost:9000`. |
+| `S3_ENDPOINT` | no | — | S3-compatible endpoint for artifacts and uploads (AWS S3, Cloudflare R2 or a self-hosted store), reserved for object storage. Set all of `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY` and `S3_SECRET_KEY` or none; when none are set, run artifacts and code-export packages are stored in `<data>/artifacts` beside the master key file (the `flowaid-data` volume in compose), shared by the api and the worker. Example: `http://localhost:9000`. |
 | `S3_BUCKET` | no | — | Bucket that holds artifacts, prefixed `ws/<workspaceId>/`. Example: `flowaid`. |
 | `S3_ACCESS_KEY` | no | — | Access key id for the S3 endpoint. Example: `flowaid`. Secret. |
-| `S3_SECRET_KEY` | compose | — | Secret access key for the S3 endpoint. The compose stack requires it: it is the MinIO root password and has no default. Generate with `openssl rand -hex 16`. Example: `<openssl rand -hex 16>`. Secret. |
-| `S3_REGION` | no | `us-east-1` | Region sent with signed requests. MinIO accepts any value. |
-| `S3_FORCE_PATH_STYLE` | no | `true` | Use path-style bucket addressing (`endpoint/bucket/key`). Required for MinIO; set to `false` for AWS S3. |
+| `S3_SECRET_KEY` | no | — | Secret access key for the S3 endpoint. Example: `<secret access key>`. Secret. |
+| `S3_REGION` | no | `us-east-1` | Region sent with signed requests. |
+| `S3_FORCE_PATH_STYLE` | no | `true` | Use path-style bucket addressing (`endpoint/bucket/key`), which most self-hosted S3 servers need; set to `false` for AWS S3. |
 
 ### AI providers
 
@@ -231,15 +231,12 @@ lists them empty for you to generate (`openssl rand -hex 16`).
 | `POSTGRES_PASSWORD` | compose | — | Password of `POSTGRES_USER`. Required by the compose stack, which has no default password. Generate with `openssl rand -hex 16`. Example: `<openssl rand -hex 16>`. Secret. Compose only: not read by the api. |
 | `POSTGRES_DB` | no | `flowaid` | Name of the database the compose stack creates and connects to. Compose only: not read by the api. |
 | `POSTGRES_APP_PASSWORD` | no | — | Password of the `flowaid_app` role that api and worker connect with (created by `docker/postgres-init/01-roles.sql` on the first start). Unset means `POSTGRES_PASSWORD`; set it to keep the owner's password out of the worker. Example: `<openssl rand -hex 16>`. Secret. Compose only: not read by the api. |
-| `POSTGRES_CODE_PASSWORD` | compose | — | Password of the `flowaid_code` role the sandbox host `worker-code` connects with (queue tables only). Required by the compose stack and must differ from `POSTGRES_PASSWORD`: a sandbox escape must not yield the owner's credentials. Generate with `openssl rand -hex 16`. Example: `<openssl rand -hex 16>`. Secret. Compose only: not read by the api. |
+| `POSTGRES_CODE_PASSWORD` | compose | — | Password of the restricted `flowaid_code` role (queue tables only) that migrations grant to, reserved for a separate sandbox host of the `code` pool. Required by the compose stack and must differ from `POSTGRES_PASSWORD`. Generate with `openssl rand -hex 16`. Example: `<openssl rand -hex 16>`. Secret. Compose only: not read by the api. |
 | `REDIS_PASSWORD` | no | — | Password the compose `redis` service (scale profile) requires (`--requirepass`); the container refuses to start without it. Reference it from `REDIS_URL` as `redis://:${REDIS_PASSWORD}@redis:6379` (compose expands it inside `.env`). Example: `<openssl rand -hex 16>`. Secret. Compose only: not read by the api. |
-| `BIND_ADDRESS` | no | `127.0.0.1` | Host interface the compose stack publishes its ports on (api, web, postgres, minio, redis, minio console). Loopback by default so a laptop does not expose the stack on its network; `0.0.0.0` publishes on every interface (put a TLS reverse proxy in front of api and web). Compose only: not read by the api. |
+| `BIND_ADDRESS` | no | `127.0.0.1` | Host interface the compose stack publishes its ports on (api, web, postgres, redis). Loopback by default so a laptop does not expose the stack on its network; `0.0.0.0` publishes on every interface (put a TLS reverse proxy in front of api and web). Compose only: not read by the api. |
 | `POSTGRES_PORT` | no | `5432` | Host port of the compose `postgres` service. Compose only: not read by the api. |
-| `MINIO_PORT` | no | `9000` | Host port of the compose `minio` S3 endpoint. Compose only: not read by the api. |
-| `MINIO_CONSOLE_PORT` | no | `9001` | Host port of the MinIO console, published only by `docker compose --profile tools up minio-console`. Compose only: not read by the api. |
 | `REDIS_PORT` | no | `6379` | Host port of the compose `redis` service (scale profile). Compose only: not read by the api. |
 | `WEB_PORT` | no | `3001` | Host port of the compose `web` service (the api uses `PORT`). Compose only: not read by the api. |
-| `WORKER_CODE_CONCURRENCY` | no | `4` | `WORKER_CONCURRENCY` of the sandbox host `worker-code`. Compose only: not read by the api. |
 | `WORKER_REPLICAS` | no | `1` | Number of `worker` containers started by the scale profile. Compose only: not read by the api. |
 
 <!-- env-table:end -->
