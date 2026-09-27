@@ -678,6 +678,7 @@ export const WaitNodeSchema = z.object({
       eventName: z.string().regex(/^[a-z][a-z0-9_.-]{0,63}$/),
       timeoutMs: z.int().min(1),
       payloadSchema: JsonSchemaSchema.optional(),
+      correlation: BindingSchema.optional(), // RFC-0006: only events published with this key resume the node
     }),
   ]),
 });
@@ -760,7 +761,7 @@ export const TriggerSchema = z.discriminatedUnion('type', [
   }),
   z.object({ type: z.literal('schedule'), cron: z.string().min(9), timezone: z.string().default('UTC'), input: JsonValueSchema.default({}) }),
   z.object({ type: z.literal('mcp'), toolName: ToolNameSchema, description: z.string().max(1000) }),
-  z.object({ type: z.literal('event'), eventName: z.string().regex(/^[a-z][a-z0-9_.-]{0,63}$/) }),
+  z.object({ type: z.literal('event'), eventName: z.string().regex(/^[a-z][a-z0-9_.-]{0,63}$/), correlationKey: JsonPointerSchema.optional() }), // RFC-0006: pointer into the payload → the run's sessionId
 ]);
 export type Trigger = z.infer<typeof TriggerSchema>;
 
@@ -1304,7 +1305,7 @@ export const RunEventSchema = z.discriminatedUnion('type', [
   z.object({ ...NodeEventBase, type: z.literal('NODE_RETRIED'), error: ErrorInfoSchema, nextAttempt: z.int().min(2), delayMs: z.int().min(0), timerId: z.uuid() }),
   z.object({ ...NodeEventBase, type: z.literal('NODE_SKIPPED'), reason: z.enum(['pruned', 'race_lost', 'parent_failed', 'disabled', 'early_exit']) }),
   z.object({ ...NodeEventBase, type: z.literal('NODE_CANCELLED'), reason: z.enum(['run_cancelled', 'race_lost', 'early_exit', 'parent_failed']) }),
-  z.object({ ...NodeEventBase, type: z.literal('NODE_WAITING'), reason: WaitReasonSchema, ref: z.string(), state: JsonValueSchema.nullable() }),
+  z.object({ ...NodeEventBase, type: z.literal('NODE_WAITING'), reason: WaitReasonSchema, ref: z.string(), state: JsonValueSchema.nullable(), correlationKey: z.string().max(200).optional() }), // RFC-0006
   z.object({ ...NodeEventBase, type: z.literal('NODE_DELEGATED'), pool: WorkerPoolSchema, jobId: z.string() }),
 
   // ── control flow ──
@@ -1569,7 +1570,7 @@ export const PlanOpSchema = z.discriminatedUnion('kind', [
     until: z.discriminatedUnion('type', [
       z.object({ type: z.literal('delay'), ms: z.int().min(1) }),
       z.object({ type: z.literal('timestamp'), at: CompiledBindingSchema }),
-      z.object({ type: z.literal('event'), eventName: z.string(), timeoutMs: z.int().min(1), payloadSchema: JsonSchemaSchema.nullable() }),
+      z.object({ type: z.literal('event'), eventName: z.string(), timeoutMs: z.int().min(1), payloadSchema: JsonSchemaSchema.nullable(), correlation: CompiledBindingSchema.optional() }), // RFC-0006
     ]),
   }),
   z.object({
@@ -2147,7 +2148,7 @@ export type Job =
   | { type: 'run.start'; runId: string }
   | { type: 'run.resume'; runId: string; reason: WaitReason | 'manual_retry' | 'recovery' }
   | { type: 'run.control'; runId: string; action: 'cancel'; by: string; reason: string | null }
-  | { type: 'run.signal'; runId: string; signal: { type: 'subflow_completed'; childRunId: string } | { type: 'delegated_result'; nodeRunId: string } | { type: 'event'; eventName: string; payload: JsonValue } }
+  | { type: 'run.signal'; runId: string; signal: { type: 'subflow_completed'; childRunId: string } | { type: 'delegated_result'; nodeRunId: string } | { type: 'event'; eventName: string; payload: JsonValue; correlationKey?: string } }
   | { type: 'node.exec'; runId: string; nodeRunId: string; pool: WorkerPool }
   | { type: 'timer.fire'; runId: string; timerId: string }
   | { type: 'schedule.tick'; scheduleId: string; at: string }

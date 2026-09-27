@@ -373,6 +373,9 @@ export function createWorker(deps: WorkerDeps): Worker {
             type: "event",
             eventName: job.signal.eventName,
             payload: job.signal.payload,
+            ...(job.signal.correlationKey !== undefined
+              ? { correlationKey: job.signal.correlationKey }
+              : {}),
           });
         else if (job.signal.type === "subflow_completed")
           await completeChild(job.signal.childRunId);

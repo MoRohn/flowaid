@@ -155,6 +155,8 @@ export const WaitNodeSchema = z.object({
       eventName: z.string().regex(/^[a-z][a-z0-9_.-]{0,63}$/),
       timeoutMs: z.int().min(1),
       payloadSchema: JsonSchemaSchema.optional(),
+      /** RFC-0006: evaluated when the node starts waiting; only events published with this key resume it */
+      correlation: BindingSchema.optional(),
     }),
   ]),
 });

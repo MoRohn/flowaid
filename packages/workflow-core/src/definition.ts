@@ -60,7 +60,12 @@ export const TriggerSchema = z.discriminatedUnion("type", [
     input: JsonValueSchema.default({}),
   }),
   z.object({ type: z.literal("mcp"), toolName: ToolNameSchema, description: z.string().max(1000) }),
-  z.object({ type: z.literal("event"), eventName: z.string().regex(/^[a-z][a-z0-9_.-]{0,63}$/) }),
+  z.object({
+    type: z.literal("event"),
+    eventName: z.string().regex(/^[a-z][a-z0-9_.-]{0,63}$/),
+    /** RFC-0006: pointer into the payload whose value correlates the started run (its sessionId) */
+    correlationKey: JsonPointerSchema.optional(),
+  }),
 ]);
 export type Trigger = z.infer<typeof TriggerSchema>;
 

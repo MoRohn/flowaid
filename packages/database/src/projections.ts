@@ -303,7 +303,7 @@ export async function applyProjection(
           .values({
             workspaceId: run.workspaceId,
             eventName: event.ref,
-            correlationKey: null,
+            correlationKey: event.correlationKey ?? null,
             runId: run.id,
             nodeRunId: event.nodeRunId,
             createdAt: at,

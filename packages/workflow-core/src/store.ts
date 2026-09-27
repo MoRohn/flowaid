@@ -149,7 +149,7 @@ export type Job =
       signal:
         | { type: "subflow_completed"; childRunId: string }
         | { type: "delegated_result"; nodeRunId: string }
-        | { type: "event"; eventName: string; payload: JsonValue };
+        | { type: "event"; eventName: string; payload: JsonValue; correlationKey?: string };
     }
   | { type: "node.exec"; runId: string; nodeRunId: string; pool: WorkerPool }
   | { type: "timer.fire"; runId: string; timerId: string }

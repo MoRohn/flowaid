@@ -171,6 +171,9 @@ function opOf(ctx: CompileContext, info: NodeInfo, flow: ControlFlow): PlanOp {
                   eventName: until.eventName,
                   timeoutMs: until.timeoutMs,
                   payloadSchema: until.payloadSchema ?? null,
+                  ...(info.compiled.has("correlation")
+                    ? { correlation: compiled(info, "correlation") }
+                    : {}),
                 },
       };
     }

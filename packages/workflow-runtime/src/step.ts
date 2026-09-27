@@ -77,7 +77,7 @@ export type NodeEmitted = { [T in Emittable]: Omit<RunEventOf<T>, Addr> }[Emitta
 
 export type SuspendWait =
   | { kind: "human"; request: Omit<HumanRequest, "origin"> }
-  | { kind: "event"; eventName: string; timeoutMs?: number };
+  | { kind: "event"; eventName: string; timeoutMs?: number; correlationKey?: string };
 
 /** What an executor reports for one node run. */
 export type ExecutorOutcome =
@@ -109,7 +109,7 @@ export type Trigger =
   | { type: "batch_result"; batchId: string; results: Record<string, ExecutorOutcome> }
   | { type: "timer"; timerId: string }
   | { type: "human_response"; humanTaskId: string; response: HumanResponse; by: string }
-  | { type: "event"; eventName: string; payload: JsonValue }
+  | { type: "event"; eventName: string; payload: JsonValue; correlationKey?: string }
   | {
       type: "subflow_completed";
       childRunId: string;
@@ -732,6 +732,9 @@ class Stepper {
             reason: "event",
             ref: result.wait.eventName,
             state: result.state,
+            ...(result.wait.correlationKey !== undefined
+              ? { correlationKey: result.wait.correlationKey }
+              : {}),
           } as AnyEvent);
           if (result.wait.timeoutMs)
             this.setTimer(scope, nodeId, "wait", addMs(this.ctx.now, result.wait.timeoutMs));
@@ -951,14 +954,19 @@ class Stepper {
     );
   }
 
-  event(eventName: string, payload: JsonValue) {
+  /**
+   * Delivers a published event. A wait with a correlation key (RFC-0006) takes only events
+   * published with the same key; a wait without one takes every event of that name.
+   */
+  event(eventName: string, payload: JsonValue, correlationKey?: string) {
     for (const sc of Object.values(this.s.scopes)) {
       for (const [nodeId, n] of Object.entries(sc.nodes)) {
         if (
           n.status !== "waiting" ||
           n.waiting?.reason !== "event" ||
           n.waiting.ref !== eventName ||
-          !n.nodeRunId
+          !n.nodeRunId ||
+          (n.waiting.correlationKey !== undefined && n.waiting.correlationKey !== correlationKey)
         )
           continue;
         const a = this.addr(sc.path, nodeId);
@@ -1337,13 +1345,20 @@ class Stepper {
         guarded(() => {
           this.schedule(scope, nodeId);
           if (op.until.type === "event") {
-            this.started(scope, nodeId, { eventName: op.until.eventName });
+            const correlationKey = op.until.correlation
+              ? correlationKeyOf(evaluateBinding(op.until.correlation, this.scopeOf(scope)))
+              : undefined;
+            this.started(scope, nodeId, {
+              eventName: op.until.eventName,
+              ...(correlationKey !== undefined ? { correlationKey } : {}),
+            });
             this.emit({
               type: "NODE_WAITING",
               ...this.addr(scope, nodeId),
               reason: "event",
               ref: op.until.eventName,
               state: null,
+              ...(correlationKey !== undefined ? { correlationKey } : {}),
             } as AnyEvent);
             this.setTimer(scope, nodeId, "wait", addMs(this.ctx.now, op.until.timeoutMs));
             return;
@@ -2007,7 +2022,7 @@ export function step(
         st.humanResponse(trigger.humanTaskId, trigger.response, trigger.by);
         break;
       case "event":
-        st.event(trigger.eventName, trigger.payload);
+        st.event(trigger.eventName, trigger.payload, trigger.correlationKey);
         break;
       case "subflow_completed":
         st.subflowCompleted(trigger.childRunId, trigger.status, trigger.output, trigger.error);
@@ -2047,4 +2062,31 @@ export function downstreamOf(plan: ExecutionPlan, nodeId: NodeId): Set<NodeId> {
     for (const sc of Object.values(plan.scopes)) if (sc.container === id) stack.push(...sc.nodes);
   }
   return out;
+}
+
+/** Max length of a correlation key (the `NODE_WAITING.correlationKey` bound). */
+export const MAX_CORRELATION_KEY_LENGTH = 200;
+
+/**
+ * A wait's correlation value as the key events must carry (RFC-0006): strings as they are,
+ * numbers and booleans as their text. Anything else (null included, which would otherwise match
+ * every event) fails the node.
+ */
+export function correlationKeyOf(value: unknown): string {
+  const key =
+    typeof value === "string"
+      ? value
+      : typeof value === "number" || typeof value === "boolean"
+        ? String(value)
+        : null;
+  if (key === null || key.length === 0)
+    throw new SchemaValidationError(
+      "the wait's correlation must be a non-empty string, number or boolean",
+      [{ path: "/until/correlation", message: `got ${value === null ? "null" : typeof value}` }],
+    );
+  if (key.length > MAX_CORRELATION_KEY_LENGTH)
+    throw new SchemaValidationError("the wait's correlation key is longer than 200 characters", [
+      { path: "/until/correlation", message: `${key.length} characters` },
+    ]);
+  return key;
 }
