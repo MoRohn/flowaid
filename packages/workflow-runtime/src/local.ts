@@ -27,6 +27,7 @@ import {
   type SafeFetch,
   type TokenUsage,
   type WorkflowDefinition,
+  type SandboxExecutor,
 } from "@flowaid/workflow-core";
 import { NodeRegistry, type NodeServices } from "./executor.js";
 import { Orchestrator } from "./orchestrator.js";
@@ -53,7 +54,9 @@ export interface LocalRunOptions {
   /** Network access for nodes and providers (default: the global fetch). */
   http?: SafeFetch;
   /** Other services (state, artifacts, tools). */
-  services?: Omit<NodeServices, "providers" | "credentials" | "http">;
+  services?: Omit<NodeServices, "providers" | "credentials" | "http" | "sandbox">;
+  /** Runs `code`/`shell` nodes (e.g. `new IsolatedVmSandbox()` from @flowaid/sandbox); without it they fail with SANDBOX_UNAVAILABLE. */
+  sandbox?: SandboxExecutor;
   /** Plans of subflows by workflow id (and version id when pinned). */
   subflows?: (
     workflowId: string,
@@ -138,6 +141,7 @@ export async function runLocally(
 
   const services: NodeServices = {
     ...opts.services,
+    ...(opts.sandbox ? { sandbox: opts.sandbox } : {}),
     http: () => http,
     credentials: (call) => {
       const op = call.node.op;

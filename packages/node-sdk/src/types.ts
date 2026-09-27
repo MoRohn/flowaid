@@ -33,6 +33,10 @@ import type {
   ProviderHop,
   RunOrigin,
   SafeFetch,
+  SandboxRunRequest,
+  SandboxRunResult,
+  SandboxShellRequest,
+  SandboxShellResult,
   ScopePath,
   Semver,
   TokenUsage,
@@ -166,6 +170,13 @@ export interface ExecutionContext<TConfig = JsonObject> {
   readonly http: SafeFetch;
   readonly clock: { now(): Date };
   readonly resume?: ResumeInfo;
+  /** RFC-0019: present for nodes declaring 'sandbox' when the pool has a sandbox executor */
+  readonly sandbox?: SandboxAccess;
+}
+/** RFC-0019: the sandbox bound to the calling node (bridges already scoped). Without an executor: SandboxError SANDBOX_UNAVAILABLE. */
+export interface SandboxAccess {
+  run(req: SandboxRunRequest): Promise<SandboxRunResult>;
+  shell(req: SandboxShellRequest): Promise<SandboxShellResult>;
 }
 
 export type NodeResult<TOutput> =

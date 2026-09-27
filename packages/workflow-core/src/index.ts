@@ -23,4 +23,5 @@ export * from "./diagnostics.js";
 export * from "./plan.js";
 export * from "./tools.js";
 export * from "./providers.js";
+export * from "./sandbox.js";
 export * from "./store.js";

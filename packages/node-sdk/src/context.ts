@@ -11,6 +11,7 @@ import type {
   ExecutionContext,
   ProviderAccess,
   SafeFetch,
+  SandboxAccess,
   StateAccess,
   ToolAccess,
 } from "./types.js";
@@ -42,6 +43,7 @@ export const CAPABILITY_SERVICES: Readonly<Record<string, NodeCapability>> = {
   "providers.decision": "decision",
   "providers.generation": "generation",
   "providers.embedding": "generation",
+  sandbox: "sandbox",
 };
 
 /** Wraps a full context so that services of undeclared capabilities throw `ForbiddenError`. */
@@ -94,5 +96,21 @@ export function scopeContext<C>(
       ? (ref, opts) => ctx.providers.embedding(ref, opts)
       : () => forbidden("generation", "ctx.providers.embedding"),
   };
-  return { ...ctx, credentials, http, tools, state, artifacts, events, providers };
+  const sandbox: SandboxAccess | undefined = has("sandbox")
+    ? ctx.sandbox
+    : {
+        run: () => rejected("sandbox", "ctx.sandbox.run"),
+        shell: () => rejected("sandbox", "ctx.sandbox.shell"),
+      };
+  return {
+    ...ctx,
+    credentials,
+    http,
+    tools,
+    state,
+    artifacts,
+    events,
+    providers,
+    ...(sandbox ? { sandbox } : {}),
+  };
 }

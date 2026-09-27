@@ -1836,6 +1836,36 @@ export interface ModelCatalog {
   price(provider: string, model: string, usage: TokenUsage): { costUsd: number; snapshot: PriceSnapshot | null };
 }
 
+/* Sandbox (RFC-0019; workflow-core/src/sandbox.ts). The runtime binds an executor and the node's bridges into ExecutionContext.sandbox. */
+export interface SandboxRunRequest {
+  language: 'javascript' | 'typescript';
+  /** async function body receiving `inputs`; its return value is the output */
+  code: string;
+  inputs: JsonObject;
+  timeoutMs: number;
+  memoryMb?: number; // default 128
+  allowNetwork: boolean;
+  allowedHosts: string[]; // exact names or `*.suffix`
+  tools: string[]; // callable tool names (no approval required)
+  outputSchema?: JsonSchema;
+}
+export interface SandboxLogLine { level: 'debug' | 'info' | 'warn' | 'error'; message: string }
+export interface SandboxRunResult { output: JsonValue; logs: SandboxLogLine[]; durationMs: number }
+export interface SandboxShellRequest { script: string; image?: string; stdin?: string; env?: Record<string, string>; timeoutMs: number; memoryMb?: number }
+export interface SandboxShellResult { exitCode: number; stdout: string; stderr: string; durationMs: number }
+export interface SandboxBridges {
+  signal: AbortSignal;
+  fetch?: SafeFetch;
+  callTool?(name: string, args: JsonValue): Promise<JsonValue>;
+  stateGet?(key: string): Promise<JsonValue | null>;
+  stateSet?(key: string, value: JsonValue): Promise<void>;
+}
+export interface SandboxExecutor {
+  readonly kind: 'isolated-vm' | 'container';
+  run(req: SandboxRunRequest, bridges: SandboxBridges): Promise<SandboxRunResult>;
+  shell?(req: SandboxShellRequest, signal: AbortSignal): Promise<SandboxShellResult>;
+}
+
 /* ────────────────────────────────────────────────────────────────────────────
  * §16  Node SDK                                       (node-sdk/src/index.ts)
  * ──────────────────────────────────────────────────────────────────────────── */
@@ -1919,6 +1949,13 @@ export interface ExecutionContext<TConfig = JsonObject> {
   readonly http: SafeFetch;
   readonly clock: { now(): Date };
   readonly resume?: ResumeInfo;
+  /** RFC-0019: present for nodes declaring 'sandbox' when the pool has a sandbox executor */
+  readonly sandbox?: SandboxAccess;
+}
+/** RFC-0019: the sandbox bound to the calling node (bridges already scoped). Without an executor: SandboxError SANDBOX_UNAVAILABLE. */
+export interface SandboxAccess {
+  run(req: SandboxRunRequest): Promise<SandboxRunResult>;
+  shell(req: SandboxShellRequest): Promise<SandboxShellResult>;
 }
 
 export type NodeResult<TOutput> =

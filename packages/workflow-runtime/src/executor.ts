@@ -6,7 +6,7 @@
  * executors never see scheduler state.
  */
 import type { z } from "zod";
-import { scopeContext } from "@flowaid/node-sdk";
+import { bindSandbox, scopeContext } from "@flowaid/node-sdk";
 import type {
   AnyNodeDefinition,
   ArtifactAccess,
@@ -33,6 +33,7 @@ import {
   type RunOrigin,
   type SafeFetch,
   type ScopePath,
+  type SandboxExecutor,
 } from "@flowaid/workflow-core";
 import type { ExecutorOutcome, NodeEmitted, ResumeInfo } from "./step.js";
 
@@ -104,6 +105,8 @@ export interface NodeServices {
   state?: (call: ExecutionCall) => StateAccess;
   artifacts?: (call: ExecutionCall) => ArtifactAccess;
   http?: (call: ExecutionCall) => SafeFetch;
+  /** RFC-0019: the pool's sandbox; bound per node to its own http/tools/state as bridges. */
+  sandbox?: SandboxExecutor;
   clock?: () => Date;
 }
 
@@ -273,7 +276,10 @@ export async function executeTask(
 
   try {
     const result = await Promise.race([
-      def.execute(scopeContext(ctx, def.capabilities), input.data),
+      def.execute(
+        scopeContext({ ...ctx, sandbox: bindSandbox(services.sandbox, ctx) }, def.capabilities),
+        input.data,
+      ),
       new Promise<never>((_, reject) => {
         const onAbort = () =>
           reject(

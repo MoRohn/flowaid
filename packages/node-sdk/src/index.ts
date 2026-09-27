@@ -13,3 +13,4 @@ export {
 } from "./normalizePackage.js";
 export { scopeContext, CAPABILITY_SERVICES } from "./context.js";
 export { ok, suspend, fail } from "./result.js";
+export { bindSandbox, sandboxBridges, hostAllowed } from "./sandbox.js";

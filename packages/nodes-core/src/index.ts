@@ -20,6 +20,8 @@ import { mcpNode } from "./tools/mcp.js";
 import { mcpResourceNode } from "./tools/mcp_resource.js";
 import { mcpPromptNode } from "./tools/mcp_prompt.js";
 import { openapiNode } from "./tools/openapi.js";
+import { codeNode } from "./tools/code.js";
+import { shellNode } from "./tools/shell.js";
 import { transformNode } from "./data/transform.js";
 import { templateNode } from "./data/template.js";
 import { jsonNode } from "./data/json.js";
@@ -56,6 +58,8 @@ export {
   mcpResourceNode,
   mcpPromptNode,
   openapiNode,
+  codeNode,
+  shellNode,
   transformNode,
   templateNode,
   jsonNode,
@@ -99,6 +103,8 @@ export const CORE_NODES: readonly AnyNodeDefinition[] = [
   mcpResourceNode,
   mcpPromptNode,
   openapiNode,
+  codeNode,
+  shellNode,
   transformNode,
   templateNode,
   jsonNode,

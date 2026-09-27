@@ -5,7 +5,7 @@ import { ProviderRegistry, DefaultModelCatalog } from "@flowaid/providers";
 import { Redactor } from "@flowaid/credentials";
 import type { ExecutionPlan, GenerationProvider, JsonObject } from "@flowaid/workflow-core";
 import { evalScope, evaluateBinding, evaluateRecord, portValue, setPointer } from "./bindings.js";
-import { executeTask, NodeRegistry, type ExecutionCall } from "./executor.js";
+import { executeTask, NodeRegistry, type ExecutionCall, type NodeServices } from "./executor.js";
 import { registryProviderAccess } from "./providers.js";
 import { createEventRedactor } from "./redaction.js";
 import { initialState } from "./state.js";
@@ -185,6 +185,55 @@ describe("executeTask", () => {
     // Only the human hop: waiting for an event still needs the capability.
     expect(await run(decisionDef({ kind: "event", eventName: "x" }))).toMatchObject({
       kind: "error",
+    });
+  });
+
+  it("binds ctx.sandbox for nodes declaring the capability (RFC-0019)", async () => {
+    const executor = {
+      kind: "isolated-vm" as const,
+      run: (req: { inputs: JsonObject }, bridges: { stateGet?: unknown }) =>
+        Promise.resolve({
+          output: {
+            doubled: (req.inputs.n as number) * 2,
+            bridged: typeof bridges.stateGet === "function",
+          },
+          logs: [],
+          durationMs: 1,
+        }),
+    };
+    const codeDef = (capabilities: AnyNodeDefinition["capabilities"]) =>
+      transformDef(
+        async (ctx) => {
+          const r = await ctx.sandbox?.run({
+            language: "javascript",
+            code: "return inputs.n * 2",
+            inputs: { n: 21 },
+            timeoutMs: 1000,
+            allowNetwork: false,
+            allowedHosts: [],
+            tools: [],
+          });
+          return ok({ result: (r?.output as { doubled: number }).doubled });
+        },
+        { capabilities },
+      );
+    const withSandbox = (def: AnyNodeDefinition, services: NodeServices) =>
+      executeTask(plan, new NodeRegistry([], [def]), services, {
+        call: callFor(),
+        input: {},
+        config: { expr: 1 },
+      });
+    expect(await withSandbox(codeDef(["sandbox"]), { sandbox: executor })).toMatchObject({
+      kind: "ok",
+      output: { result: 42 },
+    });
+    expect(await withSandbox(codeDef([]), { sandbox: executor })).toMatchObject({
+      kind: "error",
+      error: { code: "FORBIDDEN" },
+    });
+    expect(await withSandbox(codeDef(["sandbox"]), {})).toMatchObject({
+      kind: "error",
+      error: { code: "SANDBOX_ERROR", message: expect.stringContaining("SANDBOX_UNAVAILABLE") },
     });
   });
 

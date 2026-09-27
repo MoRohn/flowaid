@@ -4668,6 +4668,205 @@
     },
     {
       "capabilities": [
+        "sandbox"
+      ],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "allowNetwork": {
+            "default": false,
+            "type": "boolean",
+            "x-ui": {
+              "widget": "switch"
+            }
+          },
+          "allowedHosts": {
+            "default": [],
+            "items": {
+              "pattern": "^(?:\\*\\.)?[a-z0-9.-]+$",
+              "type": "string"
+            },
+            "maxItems": 50,
+            "type": "array",
+            "x-ui": {
+              "help": "Exact host names or *.suffix.",
+              "showWhen": {
+                "path": "/allowNetwork",
+                "truthy": true
+              },
+              "widget": "list"
+            }
+          },
+          "code": {
+            "maxLength": 100000,
+            "minLength": 1,
+            "type": "string",
+            "x-ui": {
+              "language": "typescript",
+              "placeholder": "return { total: inputs.items.length };",
+              "widget": "code"
+            }
+          },
+          "idempotent": {
+            "default": false,
+            "type": "boolean",
+            "x-ui": {
+              "help": "Declare the code free of side effects so it may be retried.",
+              "widget": "switch"
+            }
+          },
+          "inputs": {
+            "type": "object",
+            "x-ui": {
+              "help": "JSON Schema of `inputs`; it types the input port.",
+              "widget": "schema"
+            }
+          },
+          "language": {
+            "default": "typescript",
+            "enum": [
+              "typescript",
+              "javascript"
+            ],
+            "type": "string",
+            "x-ui": {
+              "widget": "select"
+            }
+          },
+          "memoryMb": {
+            "default": 128,
+            "maximum": 512,
+            "minimum": 16,
+            "type": "integer"
+          },
+          "output": {
+            "type": "object",
+            "x-ui": {
+              "help": "JSON Schema of the return value; checked at run time and it types `result`.",
+              "widget": "schema"
+            }
+          },
+          "timeoutMs": {
+            "default": 10000,
+            "maximum": 120000,
+            "minimum": 100,
+            "type": "integer"
+          },
+          "tools": {
+            "default": [],
+            "items": {
+              "pattern": "^[A-Za-z0-9_-]{1,64}$",
+              "type": "string"
+            },
+            "maxItems": 20,
+            "type": "array",
+            "x-ui": {
+              "help": "Tools the code may call (tools that need approval are refused).",
+              "widget": "list"
+            }
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [],
+      "defaultPolicy": {
+        "timeoutMs": 30000
+      },
+      "generation": false,
+      "id": "flowaid.tools.code",
+      "idempotency": {
+        "byConfig": "/idempotent",
+        "cases": {
+          "false": "none",
+          "true": "safe"
+        },
+        "default": "none"
+      },
+      "inputs": [
+        {
+          "name": "inputs",
+          "required": false,
+          "schema": {
+            "default": {},
+            "type": "object"
+          }
+        }
+      ],
+      "metadata": {
+        "category": "tool",
+        "description": "Runs JavaScript or TypeScript in the sandbox: the code is an async function body that receives `inputs` and returns `result`. It has no Node APIs; `fetch` only with allowNetwork to allow-listed hosts, `tools.call` only for the listed tools, and `state.get/set` scoped to the run.",
+        "icon": "code",
+        "name": "Code",
+        "summary": "{{ config.language }}",
+        "tags": [
+          "code",
+          "sandbox",
+          "javascript",
+          "typescript"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "result",
+          "required": true,
+          "schema": {}
+        },
+        {
+          "name": "logs",
+          "required": true,
+          "schema": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "level": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "level",
+                "message"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "name": "duration_ms",
+          "required": true,
+          "schema": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        }
+      ],
+      "pool": "code",
+      "portRules": [
+        {
+          "kind": "inputSchemaFromConfig",
+          "path": "/inputs",
+          "port": "inputs"
+        },
+        {
+          "kind": "outputSchemaFromConfig",
+          "path": "/output",
+          "port": "result"
+        }
+      ],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [
         "network",
         "credentials",
         "artifacts"
@@ -5276,6 +5475,140 @@
           "source": "openapi"
         }
       ],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [
+        "sandbox"
+      ],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "allowNonZeroExit": {
+            "default": false,
+            "type": "boolean",
+            "x-ui": {
+              "widget": "switch"
+            }
+          },
+          "env": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "default": {},
+            "propertyNames": {
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+            },
+            "type": "object",
+            "x-ui": {
+              "widget": "keyvalue"
+            }
+          },
+          "image": {
+            "pattern": "^[a-z0-9][a-z0-9._/-]*(?::[A-Za-z0-9._-]+)?(?:@sha256:[a-f0-9]{64})?$",
+            "type": "string",
+            "x-ui": {
+              "help": "Container image (must be on the operator's allow-list); the executor's default otherwise."
+            }
+          },
+          "memoryMb": {
+            "default": 128,
+            "maximum": 1024,
+            "minimum": 16,
+            "type": "integer"
+          },
+          "script": {
+            "maxLength": 100000,
+            "minLength": 1,
+            "type": "string",
+            "x-ui": {
+              "language": "shell",
+              "widget": "code"
+            }
+          },
+          "timeoutMs": {
+            "default": 30000,
+            "maximum": 120000,
+            "minimum": 100,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "script"
+        ],
+        "type": "object"
+      },
+      "controlPorts": [
+        {
+          "description": "The script exited with a non-zero code (only with allowNonZeroExit).",
+          "label": "Non-zero exit",
+          "name": "nonzero"
+        }
+      ],
+      "credentials": [],
+      "defaultPolicy": {
+        "timeoutMs": 60000
+      },
+      "generation": false,
+      "id": "flowaid.tools.shell",
+      "idempotency": "none",
+      "inputs": [
+        {
+          "name": "stdin",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "metadata": {
+        "category": "tool",
+        "description": "Runs a shell script in a throwaway container (no network, read-only root, bounded memory and processes). Requires SANDBOX_MODE=container. Non-zero exits fail the node unless `allowNonZeroExit`.",
+        "icon": "terminal",
+        "name": "Shell script",
+        "summary": "{{ config.image }}",
+        "tags": [
+          "shell",
+          "sandbox",
+          "container"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "exit_code",
+          "required": true,
+          "schema": {
+            "type": "integer"
+          }
+        },
+        {
+          "name": "stdout",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "stderr",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "duration_ms",
+          "required": true,
+          "schema": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        }
+      ],
+      "pool": "code",
+      "portRules": [],
       "streams": false,
       "version": "1.0.0"
     }

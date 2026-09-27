@@ -19,11 +19,13 @@ import {
   type NodeCapability,
   type ProviderHop,
   type RunOrigin,
+  type SandboxExecutor,
   type ToolDefinition,
   type ToolResult,
   type ToolSource,
 } from "@flowaid/workflow-core";
 import { scopeContext } from "../context.js";
+import { bindSandbox } from "../sandbox.js";
 import type { ExecutionContext, NodeEmittable, ResumeInfo, SafeFetch } from "../types.js";
 
 export interface RecordedToolCall {
@@ -66,6 +68,8 @@ export interface TestContextOptions<C = JsonObject> {
   now?: () => Date;
   signal?: AbortSignal;
   resume?: ResumeInfo;
+  /** RFC-0019: bound to the test context's http/tools/state like the runtime does */
+  sandbox?: SandboxExecutor;
   budget?: Partial<ExecutionContext["budget"]>;
   node?: Partial<ExecutionContext["node"]>;
   run?: Partial<ExecutionContext["run"]>;
@@ -229,5 +233,6 @@ export function createTestContext<C = JsonObject>(
     clock: { now },
     ...(options.resume ? { resume: options.resume } : {}),
   };
-  return { ctx: scopeContext(ctx, options.capabilities ?? ALL_CAPABILITIES), recorder };
+  const full: ExecutionContext<C> = { ...ctx, sandbox: bindSandbox(options.sandbox, ctx) };
+  return { ctx: scopeContext(full, options.capabilities ?? ALL_CAPABILITIES), recorder };
 }
