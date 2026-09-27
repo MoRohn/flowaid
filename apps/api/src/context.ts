@@ -22,6 +22,8 @@ export interface ApiConfig {
   hasOidc: boolean;
   /** Development and tests only: outbound calls may reach private addresses. Never in production. */
   allowPrivateNetwork: boolean;
+  /** Local artifact storage shared with the worker (`<data>/artifacts`); null when artifacts live in S3. */
+  artifactsDir: string | null;
 }
 
 export interface Clock {
@@ -63,6 +65,7 @@ export function configFromEnv(env: Env): ApiConfig {
     hasRedis: env.flags.hasRedis,
     hasOidc: env.flags.hasOidc,
     allowPrivateNetwork: false,
+    artifactsDir: `${String(env.FLOWAID_MASTER_KEY_FILE ?? "/data/master.key").replace(/\/[^/]*$/, "")}/artifacts`,
   };
 }
 
@@ -81,6 +84,7 @@ export function defaultConfig(over: Partial<ApiConfig> = {}): ApiConfig {
     hasRedis: false,
     hasOidc: false,
     allowPrivateNetwork: false,
+    artifactsDir: null,
     ...over,
   };
 }

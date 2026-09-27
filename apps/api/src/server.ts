@@ -25,6 +25,8 @@ import { versionRoutes } from "./routes/versions.js";
 import { runRoutes } from "./routes/runs.js";
 import { credentialRoutes } from "./routes/credentials.js";
 import { toolRoutes } from "./routes/tools.js";
+import { ingressRoutes } from "./routes/ingress.js";
+import { triggerRoutes } from "./routes/triggers.js";
 import { workflowRoutes } from "./routes/workflows.js";
 import "./types.js";
 
@@ -97,6 +99,8 @@ export async function buildServer(ctx: ApiContext, o: BuildOptions = {}): Promis
   runRoutes(app, ctx);
   credentialRoutes(app, ctx);
   toolRoutes(app, ctx);
+  triggerRoutes(app, ctx);
+  ingressRoutes(app, ctx);
   for (const register of o.routes ?? []) register(app, ctx);
   return app;
 }
