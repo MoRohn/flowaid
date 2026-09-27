@@ -5206,6 +5206,1573 @@
       "configSchema": {
         "additionalProperties": false,
         "properties": {
+          "chunkTokens": {
+            "default": 400,
+            "maximum": 8000,
+            "minimum": 16,
+            "type": "integer"
+          },
+          "overlapTokens": {
+            "default": 60,
+            "maximum": 2000,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "strategy": {
+            "default": "recursive",
+            "enum": [
+              "recursive",
+              "markdown",
+              "fixed"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [],
+      "defaultPolicy": {
+        "timeoutMs": 60000
+      },
+      "generation": false,
+      "id": "flowaid.retrieval.chunker",
+      "idempotency": "safe",
+      "inputs": [
+        {
+          "name": "documents",
+          "required": false,
+          "schema": {
+            "items": {
+              "properties": {
+                "externalId": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "metadata": {
+                  "default": {},
+                  "type": "object"
+                },
+                "mimeType": {
+                  "default": "text/plain",
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "uri": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "externalId",
+                "text"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "name": "text",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "metadata": {
+        "category": "retrieval",
+        "description": "Splits documents into chunks by tokens with overlap: recursive (paragraphs, lines, sentences, words), markdown-aware (by heading) or fixed windows.",
+        "icon": "scissors",
+        "name": "Chunk text",
+        "summary": "{{ config.strategy }} · {{ config.chunkTokens }} tokens",
+        "tags": [
+          "retrieval",
+          "rag",
+          "chunker",
+          "splitter"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "chunks",
+          "required": true,
+          "schema": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "content": {
+                  "type": "string"
+                },
+                "embedding": {
+                  "items": {
+                    "type": "number"
+                  },
+                  "type": "array"
+                },
+                "externalId": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "metadata": {
+                  "default": {},
+                  "type": "object"
+                },
+                "ordinal": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "tokens": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "externalId",
+                "ordinal",
+                "content",
+                "tokens",
+                "metadata"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "name": "count",
+          "required": true,
+          "schema": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [
+        "generation",
+        "credentials"
+      ],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "batchSize": {
+            "default": 64,
+            "maximum": 2048,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "model": {
+            "properties": {
+              "model": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "provider": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "provider",
+              "model"
+            ],
+            "type": "object",
+            "x-ui": {
+              "widget": "model"
+            }
+          }
+        },
+        "required": [
+          "model"
+        ],
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [
+        {
+          "name": "llm",
+          "required": true,
+          "types": [
+            "openai.api_key",
+            "ollama.none"
+          ]
+        }
+      ],
+      "defaultPolicy": {
+        "timeoutMs": 300000
+      },
+      "generation": true,
+      "id": "flowaid.retrieval.embed",
+      "idempotency": "safe",
+      "inputs": [
+        {
+          "name": "chunks",
+          "required": true,
+          "schema": {
+            "items": {
+              "properties": {
+                "content": {
+                  "type": "string"
+                },
+                "embedding": {
+                  "items": {
+                    "type": "number"
+                  },
+                  "type": "array"
+                },
+                "externalId": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "metadata": {
+                  "default": {},
+                  "type": "object"
+                },
+                "ordinal": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "tokens": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "externalId",
+                "ordinal",
+                "content",
+                "tokens"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        }
+      ],
+      "metadata": {
+        "category": "retrieval",
+        "description": "Adds an embedding vector to each chunk with an embedding model (batched).",
+        "icon": "binary",
+        "name": "Embed chunks",
+        "summary": "{{ config.model.provider }}/{{ config.model.model }}",
+        "tags": [
+          "retrieval",
+          "rag",
+          "embeddings"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "chunks",
+          "required": true,
+          "schema": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "content": {
+                  "type": "string"
+                },
+                "embedding": {
+                  "items": {
+                    "type": "number"
+                  },
+                  "type": "array"
+                },
+                "externalId": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "metadata": {
+                  "default": {},
+                  "type": "object"
+                },
+                "ordinal": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "tokens": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "externalId",
+                "ordinal",
+                "content",
+                "tokens",
+                "metadata"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "name": "dimensions",
+          "required": true,
+          "schema": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        {
+          "name": "usage",
+          "required": true,
+          "schema": {
+            "additionalProperties": false,
+            "properties": {
+              "inputTokens": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "outputTokens": {
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "inputTokens",
+              "outputTokens"
+            ],
+            "type": "object"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [
+        "knowledge"
+      ],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "filter": {
+            "additionalProperties": {
+              "type": [
+                "string",
+                "number",
+                "boolean"
+              ]
+            },
+            "type": "object",
+            "x-ui": {
+              "help": "Only chunks whose metadata has these values.",
+              "widget": "keyvalue"
+            }
+          },
+          "k": {
+            "default": 5,
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "minScore": {
+            "type": "number"
+          },
+          "mode": {
+            "default": "hybrid",
+            "enum": [
+              "hybrid",
+              "vector",
+              "keyword"
+            ],
+            "type": "string"
+          },
+          "sourceIds": {
+            "default": [],
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 50,
+            "type": "array",
+            "x-ui": {
+              "help": "Knowledge sources to search (ids from Knowledge). Empty: every ready source of the workspace."
+            }
+          }
+        },
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [],
+      "defaultPolicy": {
+        "timeoutMs": 60000
+      },
+      "generation": false,
+      "id": "flowaid.retrieval.hybrid_search",
+      "idempotency": "safe",
+      "inputs": [
+        {
+          "name": "query",
+          "required": true,
+          "schema": {
+            "minLength": 1,
+            "type": "string"
+          }
+        }
+      ],
+      "metadata": {
+        "category": "retrieval",
+        "description": "Searches by embedding similarity and by keywords at once and fuses the two rankings (reciprocal rank fusion): exact terms and meaning both count.",
+        "icon": "search-check",
+        "name": "Hybrid search",
+        "summary": "{{ config.mode }} · top {{ config.k }}",
+        "tags": [
+          "retrieval",
+          "rag",
+          "hybrid",
+          "bm25",
+          "full-text"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "hits",
+          "required": true,
+          "schema": {
+            "items": {
+              "properties": {
+                "chunkId": {
+                  "type": "string"
+                },
+                "content": {
+                  "type": "string"
+                },
+                "documentId": {
+                  "type": "string"
+                },
+                "metadata": {
+                  "type": "object"
+                },
+                "ordinal": {
+                  "type": "integer"
+                },
+                "score": {
+                  "type": "number"
+                },
+                "sourceId": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "uri": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "chunkId",
+                "documentId",
+                "sourceId",
+                "ordinal",
+                "content",
+                "metadata",
+                "score",
+                "title",
+                "uri"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "name": "mode",
+          "required": true,
+          "schema": {
+            "enum": [
+              "vector",
+              "keyword",
+              "hybrid"
+            ],
+            "type": "string"
+          }
+        },
+        {
+          "name": "count",
+          "required": true,
+          "schema": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [
+        "knowledge",
+        "generation",
+        "credentials"
+      ],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "filter": {
+            "additionalProperties": {
+              "type": [
+                "string",
+                "number",
+                "boolean"
+              ]
+            },
+            "type": "object",
+            "x-ui": {
+              "help": "Only chunks whose metadata has these values.",
+              "widget": "keyvalue"
+            }
+          },
+          "k": {
+            "default": 5,
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "maxContextTokens": {
+            "default": 3000,
+            "maximum": 100000,
+            "minimum": 100,
+            "type": "integer"
+          },
+          "minScore": {
+            "type": "number"
+          },
+          "mode": {
+            "default": "hybrid",
+            "enum": [
+              "hybrid",
+              "vector",
+              "keyword"
+            ],
+            "type": "string"
+          },
+          "rerank": {
+            "properties": {
+              "model": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "provider": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "provider",
+              "model"
+            ],
+            "type": "object",
+            "x-ui": {
+              "help": "Optional: rerank the hits with this model.",
+              "widget": "model"
+            }
+          },
+          "sourceIds": {
+            "default": [],
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 50,
+            "type": "array",
+            "x-ui": {
+              "help": "Knowledge sources to search (ids from Knowledge). Empty: every ready source of the workspace."
+            }
+          }
+        },
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [
+        {
+          "description": "Key for the rerank provider (openai.api_key with a baseUrl for rerank-compatible servers).",
+          "name": "rerank",
+          "required": false,
+          "types": [
+            "cohere.api_key",
+            "jina.api_key",
+            "openai.api_key"
+          ]
+        }
+      ],
+      "defaultPolicy": {
+        "timeoutMs": 60000
+      },
+      "generation": false,
+      "id": "flowaid.retrieval.knowledge_base",
+      "idempotency": "safe",
+      "inputs": [
+        {
+          "name": "query",
+          "required": true,
+          "schema": {
+            "minLength": 1,
+            "type": "string"
+          }
+        }
+      ],
+      "metadata": {
+        "category": "retrieval",
+        "description": "Answers a query from your knowledge sources in one step: hybrid search, an optional rerank, and a numbered, cited context block sized for a prompt.",
+        "icon": "library",
+        "name": "Knowledge base",
+        "summary": "{{ config.mode }} · top {{ config.k }}",
+        "tags": [
+          "retrieval",
+          "rag",
+          "knowledge",
+          "context"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "context",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "hits",
+          "required": true,
+          "schema": {
+            "items": {
+              "properties": {
+                "chunkId": {
+                  "type": "string"
+                },
+                "content": {
+                  "type": "string"
+                },
+                "documentId": {
+                  "type": "string"
+                },
+                "metadata": {
+                  "type": "object"
+                },
+                "ordinal": {
+                  "type": "integer"
+                },
+                "score": {
+                  "type": "number"
+                },
+                "sourceId": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "uri": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "chunkId",
+                "documentId",
+                "sourceId",
+                "ordinal",
+                "content",
+                "metadata",
+                "score",
+                "title",
+                "uri"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "name": "citations",
+          "required": true,
+          "schema": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "documentId": {
+                  "type": "string"
+                },
+                "n": {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "sourceId": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "uri": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "n",
+                "title",
+                "uri",
+                "sourceId",
+                "documentId"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "name": "found",
+          "required": true,
+          "schema": {
+            "type": "boolean"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [
+        "network",
+        "credentials"
+      ],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "extensions": {
+            "items": {
+              "maxLength": 20,
+              "type": "string"
+            },
+            "maxItems": 30,
+            "type": "array",
+            "x-ui": {
+              "showWhen": {
+                "equals": "github",
+                "path": "/kind"
+              }
+            }
+          },
+          "include": {
+            "items": {
+              "maxLength": 200,
+              "type": "string"
+            },
+            "maxItems": 50,
+            "type": "array",
+            "x-ui": {
+              "help": "Sitemap: only pages whose path starts with one of these.",
+              "showWhen": {
+                "equals": "sitemap",
+                "path": "/kind"
+              }
+            }
+          },
+          "kind": {
+            "default": "url",
+            "enum": [
+              "url",
+              "sitemap",
+              "github",
+              "text"
+            ],
+            "type": "string"
+          },
+          "maxFiles": {
+            "default": 500,
+            "maximum": 5000,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "maxPages": {
+            "default": 200,
+            "maximum": 2000,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "path": {
+            "maxLength": 500,
+            "type": "string",
+            "x-ui": {
+              "showWhen": {
+                "equals": "github",
+                "path": "/kind"
+              }
+            }
+          },
+          "ref": {
+            "maxLength": 200,
+            "type": "string",
+            "x-ui": {
+              "showWhen": {
+                "equals": "github",
+                "path": "/kind"
+              }
+            }
+          },
+          "repo": {
+            "maxLength": 200,
+            "type": "string",
+            "x-ui": {
+              "help": "owner/name",
+              "showWhen": {
+                "equals": "github",
+                "path": "/kind"
+              }
+            }
+          },
+          "url": {
+            "maxLength": 2000,
+            "type": "string",
+            "x-ui": {
+              "showWhen": {
+                "oneOf": [
+                  "url",
+                  "sitemap"
+                ],
+                "path": "/kind"
+              }
+            }
+          }
+        },
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [
+        {
+          "description": "A GitHub token: private repositories and a higher rate limit.",
+          "name": "github",
+          "required": false,
+          "types": [
+            "http.bearer"
+          ]
+        }
+      ],
+      "defaultPolicy": {
+        "timeoutMs": 300000
+      },
+      "generation": false,
+      "id": "flowaid.retrieval.loader",
+      "idempotency": "safe",
+      "inputs": [
+        {
+          "name": "url",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "text",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "title",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "external_id",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "metadata": {
+        "category": "retrieval",
+        "description": "Loads documents from a web page, a sitemap, a GitHub repository or inline text, normalised to markdown for chunking.",
+        "icon": "file-down",
+        "name": "Load documents",
+        "summary": "{{ config.kind }}",
+        "tags": [
+          "retrieval",
+          "rag",
+          "ingest",
+          "loader"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "documents",
+          "required": true,
+          "schema": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "externalId": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "metadata": {
+                  "default": {},
+                  "type": "object"
+                },
+                "mimeType": {
+                  "default": "text/plain",
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "uri": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "externalId",
+                "mimeType",
+                "text",
+                "metadata"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "name": "errors",
+          "required": true,
+          "schema": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "message": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "url",
+                "message"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [
+        "generation",
+        "credentials"
+      ],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "minScore": {
+            "type": "number"
+          },
+          "model": {
+            "properties": {
+              "model": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "provider": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "provider",
+              "model"
+            ],
+            "type": "object",
+            "x-ui": {
+              "widget": "model"
+            }
+          },
+          "topK": {
+            "default": 5,
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "model"
+        ],
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [
+        {
+          "description": "Key for the rerank provider (openai.api_key with a baseUrl for rerank-compatible servers).",
+          "name": "rerank",
+          "required": true,
+          "types": [
+            "cohere.api_key",
+            "jina.api_key",
+            "openai.api_key"
+          ]
+        }
+      ],
+      "defaultPolicy": {
+        "timeoutMs": 60000
+      },
+      "generation": true,
+      "id": "flowaid.retrieval.rerank",
+      "idempotency": "safe",
+      "inputs": [
+        {
+          "name": "query",
+          "required": true,
+          "schema": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        {
+          "name": "hits",
+          "required": true,
+          "schema": {
+            "items": {
+              "properties": {
+                "chunkId": {
+                  "type": "string"
+                },
+                "content": {
+                  "type": "string"
+                },
+                "documentId": {
+                  "type": "string"
+                },
+                "metadata": {
+                  "type": "object"
+                },
+                "ordinal": {
+                  "type": "integer"
+                },
+                "score": {
+                  "type": "number"
+                },
+                "sourceId": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "uri": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "chunkId",
+                "documentId",
+                "sourceId",
+                "ordinal",
+                "content",
+                "metadata",
+                "score",
+                "title",
+                "uri"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        }
+      ],
+      "metadata": {
+        "category": "retrieval",
+        "description": "Reorders search hits by relevance to the query with a rerank model and keeps the best; each hit keeps its search score as searchScore.",
+        "icon": "list-ordered",
+        "name": "Rerank hits",
+        "summary": "{{ config.model.provider }}/{{ config.model.model }}",
+        "tags": [
+          "retrieval",
+          "rag",
+          "rerank"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "hits",
+          "required": true,
+          "schema": {
+            "items": {
+              "properties": {
+                "chunkId": {
+                  "type": "string"
+                },
+                "content": {
+                  "type": "string"
+                },
+                "documentId": {
+                  "type": "string"
+                },
+                "metadata": {
+                  "type": "object"
+                },
+                "ordinal": {
+                  "type": "integer"
+                },
+                "score": {
+                  "type": "number"
+                },
+                "sourceId": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "uri": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "chunkId",
+                "documentId",
+                "sourceId",
+                "ordinal",
+                "content",
+                "metadata",
+                "score",
+                "title",
+                "uri"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "name": "count",
+          "required": true,
+          "schema": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [
+        "knowledge"
+      ],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "filter": {
+            "additionalProperties": {
+              "type": [
+                "string",
+                "number",
+                "boolean"
+              ]
+            },
+            "type": "object",
+            "x-ui": {
+              "help": "Only chunks whose metadata has these values.",
+              "widget": "keyvalue"
+            }
+          },
+          "k": {
+            "default": 5,
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "minScore": {
+            "type": "number"
+          },
+          "sourceIds": {
+            "default": [],
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 50,
+            "type": "array",
+            "x-ui": {
+              "help": "Knowledge sources to search (ids from Knowledge). Empty: every ready source of the workspace."
+            }
+          }
+        },
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [],
+      "defaultPolicy": {
+        "timeoutMs": 60000
+      },
+      "generation": false,
+      "id": "flowaid.retrieval.retriever",
+      "idempotency": "safe",
+      "inputs": [
+        {
+          "name": "query",
+          "required": true,
+          "schema": {
+            "minLength": 1,
+            "type": "string"
+          }
+        }
+      ],
+      "metadata": {
+        "category": "retrieval",
+        "description": "Finds the chunks most similar to a query by embedding similarity in the chosen knowledge sources.",
+        "icon": "search",
+        "name": "Retrieve",
+        "summary": "top {{ config.k }}",
+        "tags": [
+          "retrieval",
+          "rag",
+          "vector search"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "hits",
+          "required": true,
+          "schema": {
+            "items": {
+              "properties": {
+                "chunkId": {
+                  "type": "string"
+                },
+                "content": {
+                  "type": "string"
+                },
+                "documentId": {
+                  "type": "string"
+                },
+                "metadata": {
+                  "type": "object"
+                },
+                "ordinal": {
+                  "type": "integer"
+                },
+                "score": {
+                  "type": "number"
+                },
+                "sourceId": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "uri": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "chunkId",
+                "documentId",
+                "sourceId",
+                "ordinal",
+                "content",
+                "metadata",
+                "score",
+                "title",
+                "uri"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "name": "mode",
+          "required": true,
+          "schema": {
+            "enum": [
+              "vector",
+              "keyword",
+              "hybrid"
+            ],
+            "type": "string"
+          }
+        },
+        {
+          "name": "count",
+          "required": true,
+          "schema": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [
+        "knowledge"
+      ],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "force": {
+            "default": false,
+            "type": "boolean"
+          },
+          "sourceId": {
+            "minLength": 1,
+            "type": "string",
+            "x-ui": {
+              "help": "The knowledge source to index into (its id)."
+            }
+          }
+        },
+        "required": [
+          "sourceId"
+        ],
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [],
+      "defaultPolicy": {
+        "timeoutMs": 600000
+      },
+      "generation": false,
+      "id": "flowaid.retrieval.upsert",
+      "idempotency": "safe",
+      "inputs": [
+        {
+          "name": "documents",
+          "required": false,
+          "schema": {
+            "items": {
+              "properties": {
+                "externalId": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "metadata": {
+                  "default": {},
+                  "type": "object"
+                },
+                "mimeType": {
+                  "default": "text/plain",
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "uri": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "externalId",
+                "text"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "name": "chunks",
+          "required": false,
+          "schema": {
+            "items": {
+              "properties": {
+                "content": {
+                  "type": "string"
+                },
+                "embedding": {
+                  "items": {
+                    "type": "number"
+                  },
+                  "type": "array"
+                },
+                "externalId": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "metadata": {
+                  "default": {},
+                  "type": "object"
+                },
+                "ordinal": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "tokens": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "externalId",
+                "ordinal",
+                "content",
+                "tokens"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        }
+      ],
+      "metadata": {
+        "category": "retrieval",
+        "description": "Indexes documents (chunked and embedded by the source's pipeline) or ready-made chunks into a knowledge source. Unchanged documents are skipped by content hash, so re-running is cheap.",
+        "icon": "database-zap",
+        "name": "Index into knowledge",
+        "tags": [
+          "retrieval",
+          "rag",
+          "ingest",
+          "vector store"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "documents",
+          "required": true,
+          "schema": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "chunks": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "documentId": {
+                  "type": "string"
+                },
+                "externalId": {
+                  "type": "string"
+                },
+                "unchanged": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "externalId",
+                "documentId",
+                "chunks",
+                "unchanged"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "name": "indexed",
+          "required": true,
+          "schema": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        {
+          "name": "unchanged",
+          "required": true,
+          "schema": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
           "allow": {
             "default": [],
             "items": {

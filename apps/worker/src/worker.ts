@@ -56,6 +56,8 @@ import { stateAccessFor } from "./services/state.js";
 import { toolAccessFor } from "./services/tools.js";
 import { runEvaluationJob } from "./jobs/evaluation.js";
 import { runExportJob } from "./jobs/export.js";
+import { runIngestJob } from "./jobs/ingest.js";
+import { knowledgeServiceFor, type KnowledgeDeps } from "./services/knowledge.js";
 
 export interface WorkerLogger {
   info(data: Record<string, unknown>, msg: string): void;
@@ -133,6 +135,13 @@ export function createWorker(deps: WorkerDeps): Worker {
   const plans = new Map<string, ExecutionPlan>();
   const registry = new NodeRegistry([...(deps.nodes ?? [coreNodes])]);
   const serverKeys = deps.serverKeys ?? {};
+  const knowledge: KnowledgeDeps = {
+    db: deps.db,
+    credentials: deps.credentials,
+    registry: providers,
+    http: deps.http,
+    serverKeys,
+  };
 
   const planOf = async (run: Run): Promise<ExecutionPlan> => {
     const cached = plans.get(run.workflowVersionId);
@@ -178,6 +187,12 @@ export function createWorker(deps: WorkerDeps): Worker {
     artifacts: (call) => artifactAccessFor(deps.db, deps.artifactsDir, call),
     http: () => deps.http,
     ...(deps.sandbox ? { sandbox: deps.sandbox } : {}),
+    knowledge: (call) =>
+      knowledgeServiceFor(knowledge, call.workspaceId, {
+        signal: call.signal,
+        runId: call.runId,
+        nodeRunId: call.nodeRunId,
+      }),
   };
 
   const orchestrator = new Orchestrator({
@@ -419,7 +434,21 @@ export function createWorker(deps: WorkerDeps): Worker {
         },
         { concurrency: 1 },
       );
+      const ingest = await deps.queue.consume(
+        "ingest",
+        async (job) => {
+          if (job.type !== "ingest.source") return;
+          const r = await runIngestJob(knowledge, job.sourceId);
+          if (r)
+            log.info(
+              { sourceId: job.sourceId, ...r, failed: r.failed.length },
+              "knowledge source synced",
+            );
+        },
+        { concurrency: 2 },
+      );
       stops.push(
+        () => ingest.stop(),
         () => general.stop(),
         () => control.stop(),
         () => evaluation.stop(),

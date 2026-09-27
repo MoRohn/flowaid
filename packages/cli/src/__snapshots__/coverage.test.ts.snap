@@ -55,6 +55,18 @@ event
 event publish <eventName> {--payload --correlation-key --environment-id --body --out}
 job
 job get <id> {--out}
+knowledge
+knowledge chunks <id> {--out}
+knowledge create {--name --kind --config --pipeline --credential-id --body --out}
+knowledge delete <id> {--out}
+knowledge delete-document <id> {--out}
+knowledge documents <id> {--limit --cursor --order --out}
+knowledge get <id> {--out}
+knowledge list {--out}
+knowledge query <id> {--text --top-k --mode --hybrid --filter --body --out}
+knowledge sync <id> {--out}
+knowledge update <id> {--name --config --pipeline --credential-id --body --out}
+knowledge upload <id> {--documents --body --out}
 login
 logout
 mcp-exposure
@@ -215,6 +227,7 @@ Commands:
   evaluation|evaluations            evaluation operations
   event|events                      event operations
   job|jobs                          job operations
+  knowledge|knowledges              knowledge operations
   mcp-exposure|mcp-exposures        mcp-exposure operations
   mcp-server|mcp-servers            mcp-server operations
   mcp-token|mcp-tokens              mcp-token operations

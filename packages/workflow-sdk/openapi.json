@@ -7222,6 +7222,1039 @@
         "responses": { "200": { "description": "Default Response" } }
       }
     },
+    "/v1/knowledge/sources": {
+      "get": {
+        "summary": "Knowledge sources with document and chunk counts",
+        "tags": ["knowledge"],
+        "x-cli": { "noun": "knowledge", "verb": "list" },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["knowledge:read"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "name": { "type": "string" },
+                      "kind": { "type": "string" },
+                      "config": {
+                        "type": "object",
+                        "propertyNames": { "type": "string" },
+                        "additionalProperties": {}
+                      },
+                      "pipeline": {
+                        "type": "object",
+                        "propertyNames": { "type": "string" },
+                        "additionalProperties": {}
+                      },
+                      "credentialId": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          { "type": "null" }
+                        ]
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": ["new", "syncing", "ready", "stale", "error"]
+                      },
+                      "stats": {
+                        "type": "object",
+                        "propertyNames": { "type": "string" },
+                        "additionalProperties": {}
+                      },
+                      "documents": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "chunks": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "lastSyncAt": { "type": ["string", "null"] },
+                      "lastError": { "type": ["string", "null"] },
+                      "createdAt": { "type": "string" },
+                      "updatedAt": { "type": "string" }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "kind",
+                      "config",
+                      "pipeline",
+                      "credentialId",
+                      "status",
+                      "stats",
+                      "documents",
+                      "chunks",
+                      "lastSyncAt",
+                      "lastError",
+                      "createdAt",
+                      "updatedAt"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a knowledge source (remote kinds start syncing)",
+        "tags": ["knowledge"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+                  "kind": {
+                    "type": "string",
+                    "enum": ["files", "text", "url", "sitemap", "github"]
+                  },
+                  "config": {
+                    "default": {},
+                    "type": "object",
+                    "propertyNames": { "type": "string" },
+                    "additionalProperties": {}
+                  },
+                  "pipeline": {
+                    "default": {},
+                    "type": "object",
+                    "properties": {
+                      "chunker": {
+                        "type": "object",
+                        "properties": {
+                          "strategy": {
+                            "type": "string",
+                            "enum": ["recursive", "markdown", "fixed"]
+                          },
+                          "chunkTokens": { "type": "integer", "minimum": 20, "maximum": 4000 },
+                          "overlapTokens": { "type": "integer", "minimum": 0, "maximum": 1000 }
+                        }
+                      },
+                      "embedding": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "provider": { "type": "string", "minLength": 1 },
+                              "model": { "type": "string", "minLength": 1 }
+                            },
+                            "required": ["provider", "model"]
+                          },
+                          { "type": "null" }
+                        ]
+                      },
+                      "embeddingCredentialId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "index": {
+                        "type": "object",
+                        "properties": {
+                          "adapter": {
+                            "type": "string",
+                            "enum": [
+                              "pgvector",
+                              "qdrant",
+                              "pinecone",
+                              "weaviate",
+                              "milvus",
+                              "chroma",
+                              "elasticsearch",
+                              "opensearch"
+                            ]
+                          },
+                          "url": { "type": "string", "format": "uri" },
+                          "collection": { "type": "string", "minLength": 1, "maxLength": 200 },
+                          "dimensions": { "type": "integer", "minimum": 1, "maximum": 8192 }
+                        },
+                        "required": ["adapter"]
+                      }
+                    }
+                  },
+                  "credentialId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      { "type": "null" }
+                    ]
+                  }
+                },
+                "required": ["name", "kind"]
+              }
+            }
+          }
+        },
+        "x-cli": { "noun": "knowledge", "verb": "create" },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["knowledge:write"],
+        "responses": {
+          "201": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "name": { "type": "string" },
+                    "kind": { "type": "string" },
+                    "config": {
+                      "type": "object",
+                      "propertyNames": { "type": "string" },
+                      "additionalProperties": {}
+                    },
+                    "pipeline": {
+                      "type": "object",
+                      "propertyNames": { "type": "string" },
+                      "additionalProperties": {}
+                    },
+                    "credentialId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        { "type": "null" }
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["new", "syncing", "ready", "stale", "error"]
+                    },
+                    "stats": {
+                      "type": "object",
+                      "propertyNames": { "type": "string" },
+                      "additionalProperties": {}
+                    },
+                    "documents": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "chunks": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "lastSyncAt": { "type": ["string", "null"] },
+                    "lastError": { "type": ["string", "null"] },
+                    "createdAt": { "type": "string" },
+                    "updatedAt": { "type": "string" }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "kind",
+                    "config",
+                    "pipeline",
+                    "credentialId",
+                    "status",
+                    "stats",
+                    "documents",
+                    "chunks",
+                    "lastSyncAt",
+                    "lastError",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/knowledge/sources/{id}": {
+      "get": {
+        "tags": ["knowledge"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "x-cli": { "noun": "knowledge", "verb": "get", "positional": ["id"] },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["knowledge:read"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "name": { "type": "string" },
+                    "kind": { "type": "string" },
+                    "config": {
+                      "type": "object",
+                      "propertyNames": { "type": "string" },
+                      "additionalProperties": {}
+                    },
+                    "pipeline": {
+                      "type": "object",
+                      "propertyNames": { "type": "string" },
+                      "additionalProperties": {}
+                    },
+                    "credentialId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        { "type": "null" }
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["new", "syncing", "ready", "stale", "error"]
+                    },
+                    "stats": {
+                      "type": "object",
+                      "propertyNames": { "type": "string" },
+                      "additionalProperties": {}
+                    },
+                    "documents": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "chunks": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "lastSyncAt": { "type": ["string", "null"] },
+                    "lastError": { "type": ["string", "null"] },
+                    "createdAt": { "type": "string" },
+                    "updatedAt": { "type": "string" }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "kind",
+                    "config",
+                    "pipeline",
+                    "credentialId",
+                    "status",
+                    "stats",
+                    "documents",
+                    "chunks",
+                    "lastSyncAt",
+                    "lastError",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Rename or reconfigure a source; a pipeline change re-indexes it",
+        "tags": ["knowledge"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+                  "config": {
+                    "type": "object",
+                    "propertyNames": { "type": "string" },
+                    "additionalProperties": {}
+                  },
+                  "pipeline": {
+                    "type": "object",
+                    "properties": {
+                      "chunker": {
+                        "type": "object",
+                        "properties": {
+                          "strategy": {
+                            "type": "string",
+                            "enum": ["recursive", "markdown", "fixed"]
+                          },
+                          "chunkTokens": { "type": "integer", "minimum": 20, "maximum": 4000 },
+                          "overlapTokens": { "type": "integer", "minimum": 0, "maximum": 1000 }
+                        }
+                      },
+                      "embedding": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "provider": { "type": "string", "minLength": 1 },
+                              "model": { "type": "string", "minLength": 1 }
+                            },
+                            "required": ["provider", "model"]
+                          },
+                          { "type": "null" }
+                        ]
+                      },
+                      "embeddingCredentialId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "index": {
+                        "type": "object",
+                        "properties": {
+                          "adapter": {
+                            "type": "string",
+                            "enum": [
+                              "pgvector",
+                              "qdrant",
+                              "pinecone",
+                              "weaviate",
+                              "milvus",
+                              "chroma",
+                              "elasticsearch",
+                              "opensearch"
+                            ]
+                          },
+                          "url": { "type": "string", "format": "uri" },
+                          "collection": { "type": "string", "minLength": 1, "maxLength": 200 },
+                          "dimensions": { "type": "integer", "minimum": 1, "maximum": 8192 }
+                        },
+                        "required": ["adapter"]
+                      }
+                    }
+                  },
+                  "credentialId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      { "type": "null" }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "x-cli": { "noun": "knowledge", "verb": "update", "positional": ["id"] },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["knowledge:write"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "name": { "type": "string" },
+                    "kind": { "type": "string" },
+                    "config": {
+                      "type": "object",
+                      "propertyNames": { "type": "string" },
+                      "additionalProperties": {}
+                    },
+                    "pipeline": {
+                      "type": "object",
+                      "propertyNames": { "type": "string" },
+                      "additionalProperties": {}
+                    },
+                    "credentialId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        { "type": "null" }
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["new", "syncing", "ready", "stale", "error"]
+                    },
+                    "stats": {
+                      "type": "object",
+                      "propertyNames": { "type": "string" },
+                      "additionalProperties": {}
+                    },
+                    "documents": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "chunks": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "lastSyncAt": { "type": ["string", "null"] },
+                    "lastError": { "type": ["string", "null"] },
+                    "createdAt": { "type": "string" },
+                    "updatedAt": { "type": "string" }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "kind",
+                    "config",
+                    "pipeline",
+                    "credentialId",
+                    "status",
+                    "stats",
+                    "documents",
+                    "chunks",
+                    "lastSyncAt",
+                    "lastError",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["knowledge"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "x-cli": { "noun": "knowledge", "verb": "delete", "positional": ["id"] },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["knowledge:write"],
+        "responses": { "204": { "description": "No content" } }
+      }
+    },
+    "/v1/knowledge/sources/{id}/sync": {
+      "post": {
+        "summary": "Queue a sync: load, chunk, embed and index what changed",
+        "tags": ["knowledge"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "x-cli": { "noun": "knowledge", "verb": "sync", "positional": ["id"] },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["knowledge:write"],
+        "responses": {
+          "202": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "status": { "type": "string" }
+                  },
+                  "required": ["id", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/knowledge/sources/{id}/documents": {
+      "get": {
+        "tags": ["knowledge"],
+        "parameters": [
+          {
+            "schema": { "default": 50, "type": "integer", "minimum": 1, "maximum": 200 },
+            "in": "query",
+            "name": "limit",
+            "required": false
+          },
+          {
+            "schema": { "type": "string", "maxLength": 500 },
+            "in": "query",
+            "name": "cursor",
+            "required": false
+          },
+          {
+            "schema": { "default": "desc", "type": "string", "enum": ["asc", "desc"] },
+            "in": "query",
+            "name": "order",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "x-cli": { "noun": "knowledge", "verb": "documents", "positional": ["id"] },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["knowledge:read"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "sourceId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "externalId": { "type": "string" },
+                          "title": { "type": ["string", "null"] },
+                          "uri": { "type": ["string", "null"] },
+                          "mimeType": { "type": ["string", "null"] },
+                          "status": {
+                            "type": "string",
+                            "enum": ["pending", "indexed", "error", "deleted"]
+                          },
+                          "chunkCount": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "metadata": {
+                            "type": "object",
+                            "propertyNames": { "type": "string" },
+                            "additionalProperties": {}
+                          },
+                          "error": { "type": ["string", "null"] },
+                          "updatedAt": { "type": "string" }
+                        },
+                        "required": [
+                          "id",
+                          "sourceId",
+                          "externalId",
+                          "title",
+                          "uri",
+                          "mimeType",
+                          "status",
+                          "chunkCount",
+                          "metadata",
+                          "error",
+                          "updatedAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "next_cursor": { "type": ["string", "null"] }
+                  },
+                  "required": ["items", "next_cursor"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Upload text documents to a files or text source; they index on the next sync",
+        "tags": ["knowledge"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "documents": {
+                    "minItems": 1,
+                    "maxItems": 100,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "externalId": { "type": "string", "minLength": 1, "maxLength": 500 },
+                        "title": { "type": "string", "maxLength": 500 },
+                        "uri": { "type": "string", "maxLength": 2000 },
+                        "mimeType": {
+                          "default": "text/plain",
+                          "type": "string",
+                          "enum": ["text/plain", "text/markdown", "text/html", "application/json"]
+                        },
+                        "text": { "type": "string", "minLength": 1, "maxLength": 2000000 },
+                        "metadata": {
+                          "default": {},
+                          "type": "object",
+                          "propertyNames": { "type": "string" },
+                          "additionalProperties": { "type": ["string", "number", "boolean"] }
+                        }
+                      },
+                      "required": ["text"]
+                    }
+                  }
+                },
+                "required": ["documents"]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "x-cli": { "noun": "knowledge", "verb": "upload", "positional": ["id"] },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["knowledge:write"],
+        "responses": {
+          "202": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "documents": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "sourceId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "externalId": { "type": "string" },
+                          "title": { "type": ["string", "null"] },
+                          "uri": { "type": ["string", "null"] },
+                          "mimeType": { "type": ["string", "null"] },
+                          "status": {
+                            "type": "string",
+                            "enum": ["pending", "indexed", "error", "deleted"]
+                          },
+                          "chunkCount": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "metadata": {
+                            "type": "object",
+                            "propertyNames": { "type": "string" },
+                            "additionalProperties": {}
+                          },
+                          "error": { "type": ["string", "null"] },
+                          "updatedAt": { "type": "string" }
+                        },
+                        "required": [
+                          "id",
+                          "sourceId",
+                          "externalId",
+                          "title",
+                          "uri",
+                          "mimeType",
+                          "status",
+                          "chunkCount",
+                          "metadata",
+                          "error",
+                          "updatedAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["documents"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/knowledge/documents/{id}": {
+      "delete": {
+        "tags": ["knowledge"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "x-cli": { "noun": "knowledge", "verb": "delete-document", "positional": ["id"] },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["knowledge:write"],
+        "responses": { "204": { "description": "No content" } }
+      }
+    },
+    "/v1/knowledge/documents/{id}/chunks": {
+      "get": {
+        "summary": "A document's chunks (pgvector sources; remote indexes keep their own)",
+        "tags": ["knowledge"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "x-cli": { "noun": "knowledge", "verb": "chunks", "positional": ["id"] },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["knowledge:read"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "ordinal": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "content": { "type": "string" },
+                      "tokens": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "metadata": {
+                        "type": "object",
+                        "propertyNames": { "type": "string" },
+                        "additionalProperties": {}
+                      },
+                      "embedded": { "type": "boolean" }
+                    },
+                    "required": ["id", "ordinal", "content", "tokens", "metadata", "embedded"],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/knowledge/sources/{id}/query": {
+      "post": {
+        "summary": "Search a source (the playground): vector, keyword or hybrid",
+        "tags": ["knowledge"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "text": { "type": "string", "minLength": 1, "maxLength": 4000 },
+                  "topK": { "default": 5, "type": "integer", "minimum": 1, "maximum": 50 },
+                  "mode": { "type": "string", "enum": ["vector", "keyword", "hybrid"] },
+                  "hybrid": { "type": "boolean" },
+                  "filter": {
+                    "type": "object",
+                    "propertyNames": { "type": "string" },
+                    "additionalProperties": { "type": ["string", "number", "boolean"] }
+                  }
+                },
+                "required": ["text"]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "x-cli": { "noun": "knowledge", "verb": "query", "positional": ["id"] },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["knowledge:read"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "hits": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "chunkId": { "type": "string" },
+                          "documentId": { "type": "string" },
+                          "sourceId": { "type": "string" },
+                          "ordinal": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "content": { "type": "string" },
+                          "score": { "type": "number" },
+                          "title": { "type": ["string", "null"] },
+                          "uri": { "type": ["string", "null"] },
+                          "metadata": {
+                            "type": "object",
+                            "propertyNames": { "type": "string" },
+                            "additionalProperties": {}
+                          }
+                        },
+                        "required": [
+                          "chunkId",
+                          "documentId",
+                          "sourceId",
+                          "ordinal",
+                          "content",
+                          "score",
+                          "title",
+                          "uri",
+                          "metadata"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "mode": { "type": "string", "enum": ["vector", "keyword", "hybrid"] },
+                    "costUsd": { "type": "number" }
+                  },
+                  "required": ["hits", "mode", "costUsd"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/workflows/{id}/optimize": {
       "post": {
         "summary": "Cost suggestions from 30 days of the workflow's runs",

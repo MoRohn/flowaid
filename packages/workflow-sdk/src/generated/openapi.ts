@@ -1967,6 +1967,632 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/knowledge/documents/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description No content */
+        204: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/knowledge/documents/{id}/chunks": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** A document's chunks (pgvector sources; remote indexes keep their own) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              content: string;
+              embedded: boolean;
+              /** Format: uuid */
+              id: string;
+              metadata: {
+                [key: string]: unknown;
+              };
+              ordinal: number;
+              tokens: number;
+            }[];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/knowledge/sources": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Knowledge sources with document and chunk counts */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              chunks: number;
+              config: {
+                [key: string]: unknown;
+              };
+              createdAt: string;
+              credentialId: string | null;
+              documents: number;
+              /** Format: uuid */
+              id: string;
+              kind: string;
+              lastError: string | null;
+              lastSyncAt: string | null;
+              name: string;
+              pipeline: {
+                [key: string]: unknown;
+              };
+              stats: {
+                [key: string]: unknown;
+              };
+              /** @enum {string} */
+              status: "new" | "syncing" | "ready" | "stale" | "error";
+              updatedAt: string;
+            }[];
+          };
+        };
+      };
+    };
+    put?: never;
+    /** Create a knowledge source (remote kinds start syncing) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            /** @default {} */
+            config?: {
+              [key: string]: unknown;
+            };
+            credentialId?: string | null;
+            /** @enum {string} */
+            kind: "files" | "text" | "url" | "sitemap" | "github";
+            name: string;
+            /** @default {} */
+            pipeline?: {
+              chunker?: {
+                chunkTokens?: number;
+                overlapTokens?: number;
+                /** @enum {string} */
+                strategy?: "recursive" | "markdown" | "fixed";
+              };
+              embedding?: {
+                model: string;
+                provider: string;
+              } | null;
+              /** Format: uuid */
+              embeddingCredentialId?: string;
+              index?: {
+                /** @enum {string} */
+                adapter:
+                  | "pgvector"
+                  | "qdrant"
+                  | "pinecone"
+                  | "weaviate"
+                  | "milvus"
+                  | "chroma"
+                  | "elasticsearch"
+                  | "opensearch";
+                collection?: string;
+                dimensions?: number;
+                /** Format: uri */
+                url?: string;
+              };
+            };
+          };
+        };
+      };
+      responses: {
+        /** @description Default Response */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              chunks: number;
+              config: {
+                [key: string]: unknown;
+              };
+              createdAt: string;
+              credentialId: string | null;
+              documents: number;
+              /** Format: uuid */
+              id: string;
+              kind: string;
+              lastError: string | null;
+              lastSyncAt: string | null;
+              name: string;
+              pipeline: {
+                [key: string]: unknown;
+              };
+              stats: {
+                [key: string]: unknown;
+              };
+              /** @enum {string} */
+              status: "new" | "syncing" | "ready" | "stale" | "error";
+              updatedAt: string;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/knowledge/sources/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              chunks: number;
+              config: {
+                [key: string]: unknown;
+              };
+              createdAt: string;
+              credentialId: string | null;
+              documents: number;
+              /** Format: uuid */
+              id: string;
+              kind: string;
+              lastError: string | null;
+              lastSyncAt: string | null;
+              name: string;
+              pipeline: {
+                [key: string]: unknown;
+              };
+              stats: {
+                [key: string]: unknown;
+              };
+              /** @enum {string} */
+              status: "new" | "syncing" | "ready" | "stale" | "error";
+              updatedAt: string;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description No content */
+        204: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    /** Rename or reconfigure a source; a pipeline change re-indexes it */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            config?: {
+              [key: string]: unknown;
+            };
+            credentialId?: string | null;
+            name?: string;
+            pipeline?: {
+              chunker?: {
+                chunkTokens?: number;
+                overlapTokens?: number;
+                /** @enum {string} */
+                strategy?: "recursive" | "markdown" | "fixed";
+              };
+              embedding?: {
+                model: string;
+                provider: string;
+              } | null;
+              /** Format: uuid */
+              embeddingCredentialId?: string;
+              index?: {
+                /** @enum {string} */
+                adapter:
+                  | "pgvector"
+                  | "qdrant"
+                  | "pinecone"
+                  | "weaviate"
+                  | "milvus"
+                  | "chroma"
+                  | "elasticsearch"
+                  | "opensearch";
+                collection?: string;
+                dimensions?: number;
+                /** Format: uri */
+                url?: string;
+              };
+            };
+          };
+        };
+      };
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              chunks: number;
+              config: {
+                [key: string]: unknown;
+              };
+              createdAt: string;
+              credentialId: string | null;
+              documents: number;
+              /** Format: uuid */
+              id: string;
+              kind: string;
+              lastError: string | null;
+              lastSyncAt: string | null;
+              name: string;
+              pipeline: {
+                [key: string]: unknown;
+              };
+              stats: {
+                [key: string]: unknown;
+              };
+              /** @enum {string} */
+              status: "new" | "syncing" | "ready" | "stale" | "error";
+              updatedAt: string;
+            };
+          };
+        };
+      };
+    };
+    trace?: never;
+  };
+  "/v1/knowledge/sources/{id}/documents": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: {
+          cursor?: string;
+          limit?: number;
+          order?: "asc" | "desc";
+        };
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              items: {
+                chunkCount: number;
+                error: string | null;
+                externalId: string;
+                /** Format: uuid */
+                id: string;
+                metadata: {
+                  [key: string]: unknown;
+                };
+                mimeType: string | null;
+                /** Format: uuid */
+                sourceId: string;
+                /** @enum {string} */
+                status: "pending" | "indexed" | "error" | "deleted";
+                title: string | null;
+                updatedAt: string;
+                uri: string | null;
+              }[];
+              next_cursor: string | null;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    /** Upload text documents to a files or text source; they index on the next sync */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            documents: {
+              externalId?: string;
+              /** @default {} */
+              metadata?: {
+                [key: string]: string | number | boolean;
+              };
+              /**
+               * @default text/plain
+               * @enum {string}
+               */
+              mimeType?: "text/plain" | "text/markdown" | "text/html" | "application/json";
+              text: string;
+              title?: string;
+              uri?: string;
+            }[];
+          };
+        };
+      };
+      responses: {
+        /** @description Default Response */
+        202: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              documents: {
+                chunkCount: number;
+                error: string | null;
+                externalId: string;
+                /** Format: uuid */
+                id: string;
+                metadata: {
+                  [key: string]: unknown;
+                };
+                mimeType: string | null;
+                /** Format: uuid */
+                sourceId: string;
+                /** @enum {string} */
+                status: "pending" | "indexed" | "error" | "deleted";
+                title: string | null;
+                updatedAt: string;
+                uri: string | null;
+              }[];
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/knowledge/sources/{id}/query": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Search a source (the playground): vector, keyword or hybrid */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            filter?: {
+              [key: string]: string | number | boolean;
+            };
+            hybrid?: boolean;
+            /** @enum {string} */
+            mode?: "vector" | "keyword" | "hybrid";
+            text: string;
+            /** @default 5 */
+            topK?: number;
+          };
+        };
+      };
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              costUsd: number;
+              hits: {
+                chunkId: string;
+                content: string;
+                documentId: string;
+                metadata: {
+                  [key: string]: unknown;
+                };
+                ordinal: number;
+                score: number;
+                sourceId: string;
+                title: string | null;
+                uri: string | null;
+              }[];
+              /** @enum {string} */
+              mode: "vector" | "keyword" | "hybrid";
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/knowledge/sources/{id}/sync": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Queue a sync: load, chunk, embed and index what changed */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        202: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** Format: uuid */
+              id: string;
+              status: string;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/mcp/exposures": {
     parameters: {
       query?: never;

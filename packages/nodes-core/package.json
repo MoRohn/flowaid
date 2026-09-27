@@ -2,7 +2,7 @@
   "name": "@flowaid/nodes-core",
   "version": "0.1.0",
   "private": true,
-  "description": "flowaid's core nodes: typed decisions (boolean, choice, score, batch, confidence gate, router, consensus, validator), generation, HTTP, data, developer, state and safety nodes, the manifest build and the demo templates (ARCHITECTURE.md §3, §6.3).",
+  "description": "flowaid's core nodes: typed decisions (boolean, choice, score, batch, confidence gate, router, consensus, validator), generation, HTTP, data, developer, state and safety nodes, the manifest build and the demo templates (ARCHITECTURE.md \u00a73, \u00a76.3).",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
@@ -37,6 +37,7 @@
     "clean": "rm -rf dist .turbo *.tsbuildinfo"
   },
   "dependencies": {
+    "@flowaid/knowledge": "workspace:*",
     "@flowaid/mcp": "workspace:*",
     "@flowaid/node-sdk": "workspace:*",
     "@flowaid/providers": "workspace:*",

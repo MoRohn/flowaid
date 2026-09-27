@@ -343,13 +343,13 @@ describe("first-slice demos use first-slice nodes only (ARCHITECTURE §11)", () 
     expect(text).toContain("similar.result.items");
   });
 
-  it("the retrieval variant keeps the knowledge-slice retriever behind a knowledge sentinel", () => {
+  it("the retrieval variant searches a knowledge source behind a knowledge sentinel", () => {
     const variant = VARIANTS["github-issue-triage.retrieval"];
     const def = WorkflowDefinitionSchema.parse(variant);
     const similar = def.nodes.find((n) => n.id === "similar");
     if (similar?.kind !== "task") throw new Error("similar is a task node");
-    expect(similar.type).toBe("flowaid.retrieval.retriever");
-    expect(similar.config.sourceId).toBe("$template.knowledge.github_issues");
+    expect(similar.type).toBe("flowaid.retrieval.hybrid_search");
+    expect(similar.config.sourceIds).toEqual(["$template.knowledge.github_issues"]);
     expect(def.id).not.toBe(WorkflowDefinitionSchema.parse(githubIssueTriage).id);
   });
 });

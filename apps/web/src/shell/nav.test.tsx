@@ -8,6 +8,7 @@ describe("feature-keyed navigation", () => {
     expect(ids({ workflows: true, runs: true })).toEqual(["workflows", "runs"]);
     expect(ids({ integrations_openapi: true })).toEqual(["integrations"]);
     expect(ids({ evaluations: false, credentials: true })).toEqual(["credentials"]);
+    expect(ids({ knowledge: true, evaluations: true })).toEqual(["knowledge", "evaluations"]);
   });
   it("keeps settings reachable for every signed-in user", () => {
     expect(visibleNav(NAV_SECONDARY, {}).map((e) => e.id)).toEqual(["settings"]);

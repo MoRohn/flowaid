@@ -346,6 +346,7 @@ export type WorkerPool = z.infer<typeof WorkerPoolSchema>;
 
 export const NodeCapabilitySchema = z.enum([
   'network', 'credentials', 'tools', 'state', 'artifacts', 'streaming', 'decision', 'generation', 'sandbox', 'suspend',
+  'knowledge', // RFC-0021
 ]);
 export type NodeCapability = z.infer<typeof NodeCapabilitySchema>;
 
@@ -1891,6 +1892,30 @@ export interface SandboxExecutor {
   shell?(req: SandboxShellRequest, signal: AbortSignal): Promise<SandboxShellResult>;
 }
 
+/* Knowledge (RFC-0021; workflow-core/src/knowledge.ts; ARCHITECTURE.md §10.8). The runtime binds a workspace-scoped KnowledgeAccess into ExecutionContext.knowledge. */
+export type KnowledgeSearchMode = 'vector' | 'keyword' | 'hybrid';
+export type KnowledgeFilter = Record<string, string | number | boolean>; // equality on chunk metadata
+export interface IndexedChunk { id: string; documentId: string; ordinal: number; content: string; tokens: number; metadata: JsonObject; embedding: number[] | null }
+export interface IndexHit { chunkId: string; documentId: string; ordinal: number; content: string; metadata: JsonObject; score: number }
+export interface VectorIndexAdapter {
+  readonly kind: string; // 'pgvector' | 'qdrant' | 'pinecone' | 'weaviate' | 'milvus' | 'chroma' | 'elasticsearch' | 'opensearch' | 'memory'
+  readonly supportsKeyword: boolean;
+  upsert(sourceId: string, documentId: string, chunks: IndexedChunk[]): Promise<void>; // replaces the document's chunks
+  queryVector(sourceIds: readonly string[], vector: number[], k: number, filter?: KnowledgeFilter): Promise<IndexHit[]>;
+  queryKeyword?(sourceIds: readonly string[], text: string, k: number, filter?: KnowledgeFilter): Promise<IndexHit[]>;
+  deleteDocument(sourceId: string, documentId: string): Promise<void>;
+  deleteSource(sourceId: string): Promise<void>;
+  stats(sourceId: string): Promise<{ documents: number; chunks: number }>;
+}
+export interface KnowledgeSearchRequest { sourceIds: string[]; query: string; mode?: KnowledgeSearchMode; k?: number; filter?: KnowledgeFilter; minScore?: number }
+export interface KnowledgeHit extends IndexHit { sourceId: string; title: string | null; uri: string | null }
+export interface KnowledgeSearchResult { hits: KnowledgeHit[]; mode: KnowledgeSearchMode; usage: TokenUsage | null; costUsd: number }
+export interface KnowledgeChunkInput { content: string; tokens?: number; metadata?: JsonObject; embedding?: number[] }
+export interface KnowledgeDocumentInput { sourceId: string; externalId: string; title?: string; uri?: string; mimeType?: string; metadata?: JsonObject; text?: string; chunks?: KnowledgeChunkInput[] }
+export interface KnowledgeUpsertResult { documentId: string; chunks: number; unchanged: boolean; usage: TokenUsage | null; costUsd: number }
+export interface KnowledgeSourceSummary { id: string; name: string; kind: string; status: 'new' | 'syncing' | 'ready' | 'stale' | 'error'; embedding: { provider: string; model: string } | null; documents: number; chunks: number }
+export interface ChunkerConfig { strategy: 'recursive' | 'markdown' | 'fixed'; chunkTokens: number; overlapTokens: number }
+
 /* ────────────────────────────────────────────────────────────────────────────
  * §16  Node SDK                                       (node-sdk/src/index.ts)
  * ──────────────────────────────────────────────────────────────────────────── */
@@ -1979,11 +2004,20 @@ export interface ExecutionContext<TConfig = JsonObject> {
   readonly resume?: ResumeInfo;
   /** RFC-0019: present for nodes declaring 'sandbox' when the pool has a sandbox executor */
   readonly sandbox?: SandboxAccess;
+  /** RFC-0021: present for nodes declaring 'knowledge' when the host has a knowledge base */
+  readonly knowledge?: KnowledgeAccess;
 }
 /** RFC-0019: the sandbox bound to the calling node (bridges already scoped). Without an executor: SandboxError SANDBOX_UNAVAILABLE. */
 export interface SandboxAccess {
   run(req: SandboxRunRequest): Promise<SandboxRunResult>;
   shell(req: SandboxShellRequest): Promise<SandboxShellResult>;
+}
+/** RFC-0021: the workspace's knowledge base (sources, search, indexing), bound to the calling node's signal and credentials. */
+export interface KnowledgeAccess {
+  sources(): Promise<KnowledgeSourceSummary[]>;
+  search(req: KnowledgeSearchRequest): Promise<KnowledgeSearchResult>;
+  upsertDocument(doc: KnowledgeDocumentInput): Promise<KnowledgeUpsertResult>;
+  deleteDocument(sourceId: string, externalId: string): Promise<boolean>;
 }
 
 export type NodeResult<TOutput> =

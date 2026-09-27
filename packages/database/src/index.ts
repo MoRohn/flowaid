@@ -11,4 +11,5 @@ export * from "./stores/PgQueueDriver.js";
 export * from "./stores/PgEventBus.js";
 export * from "./stores/PgCredentialRepository.js";
 export * from "./stores/PgArtifactIndex.js";
+export * from "./stores/PgKnowledge.js";
 export * from "./repositories/index.js";

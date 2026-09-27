@@ -4,6 +4,7 @@
  */
 import type { ReactNode } from "react";
 import {
+  BookOpen,
   CheckSquare,
   FlaskConical,
   KeyRound,
@@ -65,6 +66,13 @@ export const NAV: NavEntry[] = [
     anyOf: ["integrations_mcp", "integrations_openapi", "integrations_providers"],
     icon: <Plug {...ICON} />,
     path: "integrations",
+  },
+  {
+    id: "knowledge",
+    label: "Knowledge",
+    feature: "knowledge",
+    icon: <BookOpen {...ICON} />,
+    path: "knowledge",
   },
   {
     id: "evaluations",

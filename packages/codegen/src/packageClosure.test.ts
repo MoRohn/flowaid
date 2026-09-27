@@ -17,6 +17,7 @@ describe("packageClosure", () => {
     expect(packageClosure(plan)).toEqual([
       "credentials",
       "env",
+      "knowledge",
       "mcp",
       "node-sdk",
       "nodes-core",

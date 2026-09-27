@@ -184,6 +184,7 @@ describeDb("workflows, versions and deployments (Postgres)", () => {
     const templates = (await call(t.app, jar, "GET", "/v1/templates")).json();
     expect(templates.map((x: { slug: string }) => x.slug).sort()).toEqual([
       "github-issue-triage",
+      "github-issue-triage.retrieval",
       "research-agent",
       "support-triage",
     ]);

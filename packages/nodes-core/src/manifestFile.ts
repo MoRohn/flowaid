@@ -6,6 +6,8 @@ import type { NodeManifest } from "@flowaid/workflow-core";
 import file from "../manifest.json" with { type: "json" };
 import githubIssueTriage from "../templates/github-issue-triage.json" with { type: "json" };
 import githubIssueTriageResources from "../templates/github-issue-triage.resources.json" with { type: "json" };
+import githubIssueTriageRetrieval from "../templates/github-issue-triage.retrieval.json" with { type: "json" };
+import githubIssueTriageRetrievalResources from "../templates/github-issue-triage.retrieval.resources.json" with { type: "json" };
 import researchAgent from "../templates/research-agent.json" with { type: "json" };
 import researchAgentResources from "../templates/research-agent.resources.json" with { type: "json" };
 import supportTriage from "../templates/support-triage.json" with { type: "json" };
@@ -34,6 +36,7 @@ export interface CoreTemplate {
 export const coreTemplates: readonly CoreTemplate[] = [
   [supportTriage, supportTriageResources],
   [githubIssueTriage, githubIssueTriageResources],
+  [githubIssueTriageRetrieval, githubIssueTriageRetrievalResources],
   [researchAgent, researchAgentResources],
 ].map(([definition, r]) => {
   const res = r as unknown as Omit<CoreTemplate, "definition">;
