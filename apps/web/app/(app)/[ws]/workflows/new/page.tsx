@@ -1,9 +1,11 @@
 "use client";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { FileUp, LayoutTemplate, SquarePlus } from "lucide-react";
+import type { NodeManifest } from "@flowaid/workflow-core";
+import { AIBuilderPanel } from "@flowaid/ui/builder";
 import { CodeEditor } from "@flowaid/ui/forms";
 import {
   Button,
@@ -19,7 +21,9 @@ import {
   Label,
 } from "@flowaid/ui/primitives";
 import { PageHeader } from "@flowaid/ui/shell";
-import { ApiError, post } from "~/api/client";
+import { ApiError, get, post } from "~/api/client";
+import { advisorAvailability } from "~/builder/advisor";
+import { planFromGenerated, type GeneratedWorkflow } from "~/builder/aiPlan";
 import { useSession } from "~/session";
 import { AppFrame, PageBody } from "~/shell/AppFrame";
 
@@ -67,6 +71,45 @@ export default function NewWorkflowPage() {
     onSuccess: done,
   });
 
+  // --- AI builder (features.ai_builder): nothing is saved until the plan is applied ---
+  const aiOn = advisorAvailability(s.features, s.can("workflows:write")).aiBuilder;
+  const [prompt, setPrompt] = useState("");
+  const nodes = useQuery({
+    queryKey: ["catalog", "nodes"],
+    queryFn: () => get<NodeManifest[]>("/v1/nodes"),
+    staleTime: 10 * 60_000,
+    enabled: aiOn,
+  });
+  const generate = useMutation({
+    mutationFn: (p: { prompt: string; base?: unknown }) =>
+      post<GeneratedWorkflow>("/v1/workflows/ai/generate", {
+        prompt: p.prompt,
+        ...(p.base ? { baseDefinition: p.base } : {}),
+      }),
+  });
+  const generated = generate.data;
+  const plan = generated ? planFromGenerated(generated, nodes.data ?? []) : null;
+  const applyGenerated = useMutation({
+    mutationFn: () => {
+      const def = generated?.definition;
+      if (!def) throw new Error("Nothing to apply");
+      return post<Created>("/v1/workflows", {
+        name: name.trim() || def.name,
+        ...(description ? { description } : {}),
+        definition: def,
+      });
+    },
+    onSuccess: done,
+  });
+  const aiError =
+    generate.error || applyGenerated.error
+      ? (generate.error ?? applyGenerated.error) instanceof ApiError
+        ? (generate.error ?? applyGenerated.error)?.message
+        : "The AI builder could not draft a workflow."
+      : generated && !generated.definition
+        ? "The model did not return a workflow. Try describing it differently."
+        : undefined;
+
   const readFile = async (file: File | undefined) => {
     if (file) setSource(await file.text());
   };
@@ -89,6 +132,38 @@ export default function NewWorkflowPage() {
           title="New workflow"
           description="Start from a blank canvas, a template, or a definition you already have."
         />
+        {aiOn ? (
+          <AIBuilderPanel
+            className="mt-6"
+            title="Describe it"
+            status={
+              generate.isPending || applyGenerated.isPending
+                ? "streaming"
+                : aiError
+                  ? "error"
+                  : plan
+                    ? "done"
+                    : "idle"
+            }
+            {...(aiError ? { error: aiError } : {})}
+            plan={plan}
+            {...(prompt ? { prompt } : {})}
+            onSubmit={(p) => {
+              setPrompt(p);
+              generate.mutate({ prompt: p });
+            }}
+            onRefine={(p) => {
+              setPrompt(p);
+              generate.mutate({ prompt: p, base: generated?.definition ?? undefined });
+            }}
+            onRetry={() => prompt && generate.mutate({ prompt })}
+            onDiscard={() => {
+              generate.reset();
+              setPrompt("");
+            }}
+            onApply={() => applyGenerated.mutate()}
+          />
+        ) : null}
         <div className="mt-6 grid gap-4 lg:grid-cols-3">
           <Card>
             <CardHeader>

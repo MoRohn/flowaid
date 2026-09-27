@@ -54,6 +54,8 @@ export const WorkspaceSettingsSchema = z
     maxQueuedRuns: z.int().min(1).max(1_000_000).optional(),
     defaultDecisionChain: z.array(z.unknown()).optional(),
     budgets: z.object({ monthlyCostUsd: z.number().min(0).optional() }).optional(),
+    /** the generation model the AI builder uses (default: the first provider with a key) */
+    advisorModel: z.object({ provider: z.string(), model: z.string() }).optional(),
   })
   .loose();
 

@@ -5026,6 +5026,75 @@ export interface paths {
     };
     trace?: never;
   };
+  "/v1/workflows/{id}/ai/critique": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Review a workflow against the rubric (and, optionally, a decision judge) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            definition?: unknown;
+            /** @default false */
+            judge?: boolean;
+          };
+        };
+      };
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              advice: {
+                /** @enum {string} */
+                category:
+                  "cost" | "safety" | "reliability" | "correctness" | "performance" | "style";
+                detail: string;
+                fix?: {
+                  patch: {
+                    [key: string]: unknown;
+                  }[];
+                  title: string;
+                };
+                id: string;
+                nodeIds: string[];
+                rule: string;
+                /** @enum {string} */
+                severity: "error" | "warning" | "suggestion";
+                /** @enum {string} */
+                source: "rubric" | "judge";
+                title: string;
+              }[];
+              checks: string[];
+              reviewedAt: string;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/workflows/{id}/clone": {
     parameters: {
       query?: never;
@@ -5525,6 +5594,83 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/workflows/{id}/optimize": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Cost suggestions from 30 days of the workflow's runs */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            /** @default 30 */
+            days?: number;
+            definition?: unknown;
+          };
+        };
+      };
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              diagnostics: ({
+                code: string;
+                message: string;
+                /** @enum {string} */
+                severity: "error" | "warning" | "info";
+              } & {
+                [key: string]: unknown;
+              })[];
+              suggestions: {
+                currentCostUsdPerRun: number;
+                estimatedSavingsUsdPerRun: number;
+                fix: {
+                  [key: string]: unknown;
+                }[];
+                id: string;
+                /** @enum {string} */
+                kind: "cheaper_model" | "batch_decisions" | "cache_safe_node" | "tighten_bounds";
+                latencyDeltaMs: number;
+                nodeIds: string[];
+                qualityImpact: string;
+                rationale: string;
+                /** @enum {string} */
+                risk: "low" | "medium" | "high";
+                title: string;
+              }[];
+              window: {
+                days: number;
+                from: string;
+                runs: number;
+              };
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/workflows/{id}/publish": {
     parameters: {
       query?: never;
@@ -5929,6 +6075,76 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/workflows/ai/generate": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Draft a workflow from a description (not saved until accepted) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            baseDefinition?: unknown;
+            catalogFilter?: {
+              categories?: string[];
+              types?: string[];
+            };
+            prompt: string;
+            /** Format: uuid */
+            workflowId?: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              costUsd: number;
+              definition: unknown | null;
+              diagnostics: ({
+                code: string;
+                message: string;
+                /** @enum {string} */
+                severity: "error" | "warning" | "info";
+              } & {
+                [key: string]: unknown;
+              })[];
+              iterations: number;
+              model: {
+                model: string;
+                provider: string;
+              };
+              rationale: string;
+              usage: {
+                inputTokens: number;
+                outputTokens: number;
+              };
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/workflows/import": {
     parameters: {
       query?: never;
@@ -6157,6 +6373,10 @@ export interface paths {
           "application/json": {
             name?: string;
             settings?: {
+              advisorModel?: {
+                model: string;
+                provider: string;
+              };
               budgets?: {
                 monthlyCostUsd?: number;
               };

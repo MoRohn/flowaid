@@ -58,6 +58,10 @@
       "dir": "packages/evaluation",
       "allow": ["workflow-core", "providers", "shared"]
     },
+    "advisor": {
+      "dir": "packages/advisor",
+      "allow": ["workflow-core", "workflow-compiler", "providers", "shared"]
+    },
     "workflow-sdk": { "dir": "packages/workflow-sdk", "allow": ["workflow-core", "shared"] },
     "cli": {
       "dir": "packages/cli",
@@ -115,6 +119,7 @@
         "workflow-sdk",
         "importer",
         "codegen",
+        "advisor",
         "nodes-core/manifest"
       ]
     },

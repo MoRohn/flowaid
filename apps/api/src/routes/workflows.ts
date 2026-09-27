@@ -88,7 +88,7 @@ function assertSaveable(diagnostics: Diagnostic[]): void {
 }
 
 /** Keeps the definition's `id` equal to the workflow's. */
-function withId(definition: unknown, id: string, name?: string): unknown {
+export function withId(definition: unknown, id: string, name?: string): unknown {
   if (typeof definition !== "object" || definition === null || Array.isArray(definition))
     return definition;
   return {

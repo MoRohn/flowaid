@@ -110,6 +110,7 @@ export const DiagnosticCodeSchema = z.enum([
   // publish-time & runtime
   "E_TRIGGER_CONFLICT",
   "W_COST_ESTIMATE",
+  "I_COST_SUGGESTION",
   "W_REGRESSION",
   "E_PLAN_HASH_MISMATCH",
   "E_IMPORT_UNSUPPORTED",
