@@ -6,8 +6,8 @@
  * `buildExportBundle` scrubs it once more. Never reads environment variables or secret values.
  */
 import { createHash } from "node:crypto";
-import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { readFile, readdir } from "node:fs/promises";
+import { join } from "node:path";
 import { and, eq } from "drizzle-orm";
 import { buildExportBundle, type RecordedRunInput } from "@flowaid/codegen";
 import {
@@ -20,14 +20,15 @@ import {
   type Database,
 } from "@flowaid/database";
 import { uuidv7 } from "@flowaid/shared";
+import type { ArtifactStorage } from "@flowaid/storage";
 import { NotFoundError, toFlowaidError, type JsonValue, type Job } from "@flowaid/workflow-core";
 
 export type ExportJob = Extract<Job, { type: "export.package" }>;
 
 export interface ExportJobDeps {
   db: Database;
-  /** `<data>/artifacts` (shared with the API, which serves the download) */
-  artifactsDir: string;
+  /** where the zip goes (S3 or `<data>/artifacts`, shared with the API, which serves it) */
+  storage: ArtifactStorage;
   /** FLOWAID_VENDOR_DIR: the packed runtime packages for vendored exports */
   vendorDir?: string | null;
   now?: () => number;
@@ -135,9 +136,7 @@ export async function runExportJob(deps: ExportJobDeps, job: ExportJob): Promise
 
     const artifactId = uuidv7();
     const key = `ws/${ws}/${artifactId}`;
-    const path = join(deps.artifactsDir, key);
-    await mkdir(dirname(path), { recursive: true, mode: 0o700 });
-    await writeFile(path, zip, { mode: 0o600 });
+    await deps.storage.primary.put(key, zip, "application/zip");
     await deps.db.tenant(ws, async (tx) => {
       await tx.insert(artifacts).values({
         id: artifactId,
@@ -147,7 +146,7 @@ export async function runExportJob(deps: ExportJobDeps, job: ExportJob): Promise
         mimeType: "application/zip",
         bytes: zip.byteLength,
         sha256: createHash("sha256").update(zip).digest("hex"),
-        storage: "local",
+        storage: deps.storage.primary.kind,
         storageKey: key,
         kind: "export",
         dataClass: "internal",

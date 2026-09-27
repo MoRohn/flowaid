@@ -5,18 +5,29 @@ needs. The root `docker-compose.yml` only includes the files in this directory.
 
 ## Services (`compose.yml`)
 
-| Service    | Image                                     | Port (host, loopback by default) | Role                                                                                                                                                                                                     |
-| ---------- | ----------------------------------------- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `postgres` | `pgvector/pgvector:0.8.6-pg16@sha256:…`   | 5432                             | The only source of truth: run event log, projections, queue (`queue_jobs`), timers, credentials, pgvector. `postgres-init/01-roles.sql` creates the login roles.                                         |
-| `api`      | `flowaid/api` (`Dockerfile` target `api`) | 3000                             | Fastify 5: HTTP, SSE, webhooks, MCP server endpoint. Applies migrations at start (as the owner), creates the first owner from `FLOWAID_ADMIN_EMAIL/PASSWORD`. Never executes nodes.                      |
-| `worker`   | `flowaid/worker` (target `worker`)        | —                                | Orchestrator and node executors, code nodes in isolated-vm isolates, the bundled LangChain plugin, the scheduler and the export job. The trusted tier: holds the master key file and every provider key. |
-| `web`      | `flowaid/web` (target `web`)              | 3001                             | Next.js 16 app (standalone server). Browsers talk only to it; it forwards `/v1`, `/hooks` and `/mcp` to the api at request time. On the `edge` network alone, it reaches nothing but `api`.              |
+| Service                 | Image                                     | Port (host, loopback by default) | Role                                                                                                                                                                                                                                                             |
+| ----------------------- | ----------------------------------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `postgres`              | `pgvector/pgvector:0.8.6-pg16@sha256:…`   | 5432                             | The only source of truth: run event log, projections, queue (`queue_jobs`), timers, credentials, pgvector. `postgres-init/01-roles.sql` creates the login roles.                                                                                                 |
+| `api`                   | `flowaid/api` (`Dockerfile` target `api`) | 3000                             | Fastify 5: HTTP, SSE, webhooks, MCP server endpoint. Applies migrations at start (as the owner), creates the first owner from `FLOWAID_ADMIN_EMAIL/PASSWORD`. Never executes nodes.                                                                              |
+| `worker`                | `flowaid/worker` (target `worker`)        | —                                | Orchestrator and node executors for `general,retrieval,browser,high_memory`, the plugin host process (the bundled LangChain package), the scheduler and the export job. The trusted tier: holds the master key file and every provider key.                      |
+| `worker-code`           | same image                                | —                                | Sandbox host for the `code` pool: claims code-node executions the worker delegates and runs them in isolated-vm isolates. No `.env`, no `/data`, no master key, restricted database role `flowaid_code`, read-only root, no capabilities, pid and memory limits. |
+| `web`                   | `flowaid/web` (target `web`)              | 3001                             | Next.js 16 app (standalone server). Browsers talk only to it; it forwards `/v1`, `/hooks` and `/mcp` to the api at request time. On the `edge` network alone, it reaches nothing but `api`.                                                                      |
+| `rustfs`, `rustfs-init` | `rustfs/rustfs:1.0.0@sha256:…`            | 9000 (`--profile s3`)            | Optional S3-compatible artifact store and a one-shot that creates the bucket. See [Object storage](#object-storage-profile-s3).                                                                                                                                  |
 
 Every image is pinned to a release tag **and** its `sha256` digest (`docker/compose.test.ts`
 fails on a floating tag); renovate proposes bumps.
 
 Health checks gate `depends_on`: `postgres` (pg_isready) → `api` (`GET /v1/health`) →
-`worker` (`node dist/health.js`, exits 0 while the heartbeat is fresh), `web` (`GET /`).
+`worker`, `worker-code` (`node dist/health.js`, exits 0 while the heartbeat is fresh),
+`web` (`GET /`).
+
+Code nodes never run in the trusted worker when `worker-code` is up: the worker records the
+execution in `delegated_nodes`, queues it on `run:code`, and the sandbox host claims it through
+the `flowaid_delegated_claim` / `flowaid_delegated_complete` functions (the only way
+`flowaid_code` reaches workflow data) and hands the result back over the queue. A worker whose
+`WORKER_POOLS` includes `code` runs code nodes in process instead (the default outside compose).
+On the sandbox host code nodes get `fetch` (with `allowNetwork`) but not the tool and state
+bridges, which need the trusted tier.
 
 Named volumes: `postgres-data`, `redis-data` (scale profile) and `flowaid-data`, which holds
 the generated master key file (`/data/master.key`), the auto-generated JWT key pair
@@ -37,8 +48,7 @@ and `postgres-data`: without the master key stored credentials cannot be decrypt
    ```
 
    `POSTGRES_PASSWORD` is the owner's (`POSTGRES_USER`) password and `POSTGRES_CODE_PASSWORD`
-   the restricted `flowaid_code` role's (created for the sandboxed code pool; migrations grant
-   to it). Optional: `POSTGRES_APP_PASSWORD` gives `flowaid_app` (api and worker) its own
+   the restricted `flowaid_code` role's, which `worker-code` connects with. Optional: `POSTGRES_APP_PASSWORD` gives `flowaid_app` (api and worker) its own
    password.
 
 3. Values that must differ inside the compose network are pinned per service in
@@ -50,29 +60,32 @@ and `postgres-data`: without the master key stored credentials cannot be decrypt
 4. Compose-only variables (documented in the last section of `packages/env/README.md`):
    `BIND_ADDRESS` (host interface of every published port, `127.0.0.1` by default;
    `0.0.0.0` publishes on every interface, which you want only behind a TLS reverse proxy),
-   `POSTGRES_USER`, `POSTGRES_DB`, the host ports (`POSTGRES_PORT`, `REDIS_PORT`, `WEB_PORT`;
-   the api uses `PORT`), `WORKER_REPLICAS`, `REDIS_PASSWORD`.
+   `POSTGRES_USER`, `POSTGRES_DB`, the host ports (`POSTGRES_PORT`, `REDIS_PORT`, `WEB_PORT`,
+   `RUSTFS_PORT`; the api uses `PORT`), `WORKER_CODE_CONCURRENCY`, `WORKER_REPLICAS`,
+   `REDIS_PASSWORD`.
 
 ### Who receives what
 
-| Service  | Reads `.env` (`env_file`) | Explicit variables                                                                         |
-| -------- | ------------------------- | ------------------------------------------------------------------------------------------ |
-| `api`    | yes                       | the shared map above, `HOST`, `PORT`, `CORS_ORIGINS`, `DATABASE_ADMIN_URL`                 |
-| `worker` | yes                       | the shared map above, `WORKER_POOLS`, `WORKER_CONCURRENCY`, `MCP_STDIO_ENABLED`            |
-| `web`    | **no**                    | `NODE_ENV`, `HOSTNAME`, `PORT`, `FLOWAID_API_INTERNAL_URL`, `NEXT_PUBLIC_FLOWAID_BASE_URL` |
+| Service       | Reads `.env` (`env_file`) | Explicit variables                                                                                                                              |
+| ------------- | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `api`         | yes                       | the shared map above, `HOST`, `PORT`, `CORS_ORIGINS`, `DATABASE_ADMIN_URL`                                                                      |
+| `worker`      | yes                       | the shared map above, `WORKER_POOLS`, `WORKER_CONCURRENCY`, `MCP_STDIO_ENABLED`                                                                 |
+| `worker-code` | **no**                    | `NODE_ENV`, `LOG_LEVEL`, `DATABASE_URL` (role `flowaid_code`), `DB_RLS`, `REDIS_URL`, `WORKER_POOLS=code`, `WORKER_CONCURRENCY`, `SANDBOX_MODE` |
+| `web`         | **no**                    | `NODE_ENV`, `HOSTNAME`, `PORT`, `FLOWAID_API_INTERNAL_URL`, `NEXT_PUBLIC_FLOWAID_BASE_URL`                                                      |
 
 `docker/compose.test.ts` asserts these sets (no `FLOWAID_MASTER_KEY*`, `*_API_KEY` or
-`S3_SECRET_KEY` ever reaches `web`); `scripts/check-compose.test.ts` resolves
+`S3_SECRET_KEY` ever reaches `worker-code` or `web`); `scripts/check-compose.test.ts` resolves
 the stack with `docker compose config` and feeds every flowaid process's environment to
 `loadEnv()`, so compose and the schema cannot drift apart.
 
 ### Networks
 
-- `internal` (`internal: true`, no egress): `postgres`, `redis`, `api`, `worker`. `web` is not
-  on it.
-- `edge`: `api`, `web`, `worker` — the published api/web ports and outbound access (providers,
-  webhooks, MCP servers, `allowNetwork` code nodes).
-- `admin`: `postgres`, `redis` — publishes the databases on `BIND_ADDRESS` for local
+- `internal` (`internal: true`, no egress): `postgres`, `redis`, `rustfs`, `api`, `worker`,
+  `worker-code`. `web` is not on it.
+- `edge`: `api`, `web`, `worker`, `worker-code` — the published api/web ports and outbound
+  access (providers, webhooks, MCP servers, `allowNetwork` code nodes). Remove `worker-code`
+  from `edge` for a sandbox host without egress; `code` nodes then cannot `fetch`.
+- `admin`: `postgres`, `redis`, `rustfs` — publishes the databases on `BIND_ADDRESS` for local
   development and administration (published ports do not work on an internal-only network).
 
 ## Scaling (`compose.scale.yml`, profile `scale`)
@@ -91,6 +104,28 @@ runs `WORKER_REPLICAS` workers. With `REDIS_URL` set the api and workers switch 
 queue driver and Redis pub/sub event bus; timers stay authoritative in Postgres, so semantics
 are identical with and without Redis (ARCHITECTURE.md §5.11). Without the profile the file is
 inert (`WORKER_REPLICAS` defaults to 1, `REDIS_URL` empty, `REDIS_PASSWORD` unused).
+
+## Object storage (profile `s3`)
+
+Without S3 settings, artifacts and code-export packages live in `flowaid-data`
+(`/data/artifacts`). With `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY` and `S3_SECRET_KEY` all set
+in `.env`, the worker writes them to the bucket and the api streams downloads from it (the
+bucket need not be reachable from browsers; artifacts written locally before stay readable).
+Any S3-compatible store works; the `s3` profile bundles one:
+
+```sh
+# .env
+S3_ENDPOINT=http://rustfs:9000
+S3_BUCKET=flowaid
+S3_ACCESS_KEY=flowaid
+S3_SECRET_KEY=<openssl rand -hex 16>
+
+docker compose --profile s3 up -d
+```
+
+`rustfs` keeps its objects in the `s3-data` volume and publishes the S3 port on
+`${BIND_ADDRESS}:${RUSTFS_PORT}` (default `127.0.0.1:9000`); `rustfs-init` creates the bucket
+with a signed `PUT` and exits. `rustfs` refuses to start with an empty `S3_SECRET_KEY`.
 
 ## Images (`Dockerfile`)
 

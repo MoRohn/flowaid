@@ -38,6 +38,7 @@
     "@flowaid/openapi-tools": "workspace:*",
     "@flowaid/providers": "workspace:*",
     "@flowaid/shared": "workspace:*",
+    "@flowaid/storage": "workspace:*",
     "@flowaid/workflow-compiler": "workspace:*",
     "@flowaid/workflow-core": "workspace:*",
     "@flowaid/workflow-runtime": "workspace:*",

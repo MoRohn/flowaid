@@ -39,6 +39,7 @@
     "@flowaid/providers": "workspace:*",
     "@flowaid/sandbox": "workspace:*",
     "@flowaid/shared": "workspace:*",
+    "@flowaid/storage": "workspace:*",
     "@flowaid/workflow-compiler": "workspace:*",
     "@flowaid/workflow-core": "workspace:*",
     "@flowaid/workflow-runtime": "workspace:*",
@@ -51,6 +52,7 @@
     "eslint": "9.39.5",
     "tsx": "4.23.15",
     "typescript": "5.9.3",
-    "vitest": "4.1.11"
+    "vitest": "4.1.11",
+    "zod": "4.6.5"
   }
 }

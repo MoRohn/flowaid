@@ -21,10 +21,13 @@ import {
   type DurableRunEvent,
   type EventBus,
   type ExecutionPlan,
+  type JsonObject,
   type JsonValue,
+  type PlanNode,
   type QueueDriver,
   type Run,
   type RunStore,
+  type ScopePath,
   type WorkerPool,
 } from "@flowaid/workflow-core";
 import { uuidv7 } from "@flowaid/shared";
@@ -40,6 +43,7 @@ import {
   idempotencyKeyOf,
   step,
   type Effect,
+  type ExecutorOutcome,
   type IdSource,
   type StepContext,
   type Trigger,
@@ -59,6 +63,8 @@ export interface OrchestratorOptions {
   services?: NodeServices;
   workerId?: string;
   pool?: WorkerPool;
+  /** Pools besides `pool` this worker serves; their nodes execute here without delegation. */
+  localPools?: ReadonlySet<WorkerPool>;
   /** The compiled plan of a run's version. */
   loadPlan: (run: Run) => Promise<ExecutionPlan>;
   /** Per-run step context: variables, recorded outputs, subflow resolution, depth, run metadata. */
@@ -71,6 +77,13 @@ export interface OrchestratorOptions {
     parent: Run,
   ) => Promise<void>;
   onCancelChild?: (childRunId: string) => Promise<void>;
+  /**
+   * Hands a node of another pool to that pool's workers (ARCHITECTURE.md §10.7). Without it the
+   * orchestrator only enqueues `node.exec` on `run:<pool>`; with it the host persists the call
+   * (see `DelegatedNode`) and enqueues the job itself. The result comes back as a
+   * `delegated_result` trigger.
+   */
+  delegate?: (node: DelegatedNode) => Promise<void>;
   /** Ephemeral GENERATION_DELTA fan-out. */
   onDelta?: (runId: string, nodeRunId: string, channel: string, delta: string) => void;
   onError?: (error: unknown, context: { runId?: string; phase: string }) => void;
@@ -78,6 +91,39 @@ export interface OrchestratorOptions {
   ids?: IdSource;
   leaseTtlMs?: number;
   checkpointEvery?: number;
+}
+
+/** An `ExecutionCall` as plain JSON: what another pool's worker needs to execute one node. */
+export type SerializedCall = Omit<ExecutionCall, "signal" | "emit" | "onDelta">;
+
+/** One node execution delegated to another pool. */
+export interface DelegatedNode {
+  pool: WorkerPool;
+  jobId: string;
+  runId: string;
+  workspaceId: string;
+  nodeRunId: string;
+  call: SerializedCall;
+  input: JsonObject;
+  config: JsonObject;
+}
+
+/**
+ * Executes a delegated node on the pool's worker with that pool's registry and services; the
+ * outcome goes back to the orchestrator as a `delegated_result` trigger.
+ */
+export function executeDelegated(
+  registry: NodeRegistry,
+  services: NodeServices,
+  node: Pick<DelegatedNode, "call" | "input" | "config">,
+  signal: AbortSignal,
+): Promise<ExecutorOutcome> {
+  const call: ExecutionCall = { ...node.call, signal, emit: () => undefined };
+  return executeTask({} as ExecutionPlan, registry, services, {
+    call,
+    input: node.input,
+    config: node.config,
+  });
 }
 
 interface Held {
@@ -274,6 +320,7 @@ export class Orchestrator {
       now: this.now().toISOString(),
       workerId: this.workerId,
       pool: this.o.pool ?? "general",
+      ...(this.o.localPools ? { localPools: this.o.localPools } : {}),
     });
     if (result.events.length > 0) {
       await this.o.store.appendEvents(
@@ -323,6 +370,30 @@ export class Orchestrator {
       case "execute_batch":
         return;
       case "delegate":
+        if (this.o.delegate) {
+          const {
+            signal: _signal,
+            emit: _emit,
+            ...call
+          } = this.buildCall(
+            held,
+            effect.scope,
+            effect.nodeId,
+            effect.nodeRunId,
+            new AbortController().signal,
+          );
+          await this.o.delegate({
+            pool: effect.pool,
+            jobId: effect.jobId,
+            runId,
+            workspaceId: held.run.workspaceId,
+            nodeRunId: effect.nodeRunId,
+            call,
+            input: effect.input,
+            config: effect.config,
+          });
+          return;
+        }
         await this.o.queue.enqueue(
           `run:${effect.pool}`,
           { type: "node.exec", runId, nodeRunId: effect.nodeRunId, pool: effect.pool },
@@ -355,15 +426,19 @@ export class Orchestrator {
     }
   }
 
-  private startExecution(held: Held, effect: Extract<Effect, { type: "execute" }>): void {
-    if (this.active.has(effect.nodeRunId)) return;
-    const node = held.plan.nodes[effect.nodeId];
-    if (!node) return;
+  /** The `ExecutionCall` of one node run. */
+  private buildCall(
+    held: Held,
+    scope: ScopePath,
+    nodeId: string,
+    nodeRunId: string,
+    signal: AbortSignal,
+  ): ExecutionCall {
+    const node = held.plan.nodes[nodeId] as PlanNode;
     const runId = held.run.id;
-    const n = nodeState(held.state, effect.scope, effect.nodeId);
-    const controller = new AbortController();
+    const n = nodeState(held.state, scope, nodeId);
     const ex = held.plan.execution;
-    const call: ExecutionCall = {
+    return {
       runId,
       workspaceId: held.run.workspaceId,
       workflowId: held.run.workflowId,
@@ -373,13 +448,13 @@ export class Orchestrator {
       origin: held.run.origin,
       startedAt: held.state.run.startedAt ?? this.now().toISOString(),
       sessionId: held.run.sessionId,
-      nodeRunId: effect.nodeRunId,
+      nodeRunId: nodeRunId,
       node,
-      scope: effect.scope,
+      scope: scope,
       attempt: n.attempt,
       idempotencyKey:
         node.idempotency === "keyed" && n.inputHash
-          ? idempotencyKeyOf(runId, effect.scope, node.id, n.inputHash)
+          ? idempotencyKeyOf(runId, scope, node.id, n.inputHash)
           : null,
       vars: {
         ...Object.fromEntries(
@@ -389,11 +464,11 @@ export class Orchestrator {
         ),
         ...held.ctx.vars,
       },
-      iteration: held.state.scopes[effect.scope]?.iteration ?? {},
-      signal: controller.signal,
+      iteration: held.state.scopes[scope]?.iteration ?? {},
+      signal,
       emit: () => undefined,
       ...(this.o.onDelta
-        ? { onDelta: (channel, delta) => this.o.onDelta?.(runId, effect.nodeRunId, channel, delta) }
+        ? { onDelta: (channel, delta) => this.o.onDelta?.(runId, nodeRunId, channel, delta) }
         : {}),
       budget: {
         remainingCostUsd:
@@ -410,6 +485,21 @@ export class Orchestrator {
       // A node that passes an empty chain gets the workflow's (execution.decisions).
       decisions: [ex.decisions.primary, ...ex.decisions.failover],
     };
+  }
+
+  private startExecution(held: Held, effect: Extract<Effect, { type: "execute" }>): void {
+    if (this.active.has(effect.nodeRunId)) return;
+    const node = held.plan.nodes[effect.nodeId];
+    if (!node) return;
+    const runId = held.run.id;
+    const controller = new AbortController();
+    const call = this.buildCall(
+      held,
+      effect.scope,
+      effect.nodeId,
+      effect.nodeRunId,
+      controller.signal,
+    );
     const done = (async () => {
       const result = await executeTask(held.plan, this.o.registry, this.o.services ?? {}, {
         call,

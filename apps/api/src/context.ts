@@ -8,6 +8,7 @@ import type { RunEventHub } from "./services/hub.js";
 import type { Env } from "@flowaid/env";
 import type { AuthService } from "./auth/service.js";
 import type { JwtKeys } from "./auth/jwt.js";
+import type { S3Options } from "@flowaid/storage";
 
 export interface ApiConfig {
   production: boolean;
@@ -24,8 +25,10 @@ export interface ApiConfig {
   hasOidc: boolean;
   /** Development and tests only: outbound calls may reach private addresses. Never in production. */
   allowPrivateNetwork: boolean;
-  /** Local artifact storage shared with the worker (`<data>/artifacts`); null when artifacts live in S3. */
+  /** Local artifact storage shared with the worker (`<data>/artifacts`); null when unavailable. */
   artifactsDir: string | null;
+  /** S3-compatible artifact storage (all four S3_ variables set); new artifacts go there. */
+  s3: S3Options | null;
   /** Code export: default dependency mode (FLOWAID_EXPORT_MODE). */
   exportMode: "npm" | "vendored";
   /** The packed runtime packages exist (FLOWAID_VENDOR_DIR/SHA256SUMS), so vendored exports work. */
@@ -72,6 +75,17 @@ export function configFromEnv(env: Env): ApiConfig {
     hasOidc: env.flags.hasOidc,
     allowPrivateNetwork: false,
     artifactsDir: `${String(env.FLOWAID_MASTER_KEY_FILE ?? "/data/master.key").replace(/\/[^/]*$/, "")}/artifacts`,
+    s3:
+      env.S3_ENDPOINT && env.S3_BUCKET && env.S3_ACCESS_KEY && env.S3_SECRET_KEY
+        ? {
+            endpoint: env.S3_ENDPOINT,
+            bucket: env.S3_BUCKET,
+            accessKey: env.S3_ACCESS_KEY,
+            secretKey: env.S3_SECRET_KEY,
+            region: env.S3_REGION,
+            forcePathStyle: env.S3_FORCE_PATH_STYLE,
+          }
+        : null,
     exportMode: env.FLOWAID_EXPORT_MODE === "npm" ? "npm" : "vendored",
     vendorAvailable: existsSync(
       join(String(env.FLOWAID_VENDOR_DIR ?? "/opt/flowaid/vendor"), "SHA256SUMS"),
@@ -95,6 +109,7 @@ export function defaultConfig(over: Partial<ApiConfig> = {}): ApiConfig {
     hasOidc: false,
     allowPrivateNetwork: false,
     artifactsDir: null,
+    s3: null,
     exportMode: "npm",
     vendorAvailable: false,
     ...over,

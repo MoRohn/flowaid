@@ -21,6 +21,7 @@ import { createTestDatabase, type TestDatabase } from "@flowaid/database/testing
 import { coreManifests } from "@flowaid/nodes-core/manifest";
 import { DefaultModelCatalog, ProviderRegistry, booleanDecision } from "@flowaid/providers";
 import { uuidv7 } from "@flowaid/shared";
+import type { ArtifactStorage } from "@flowaid/storage";
 import { compile } from "@flowaid/workflow-compiler";
 import {
   WORKFLOW_SCHEMA_URI,
@@ -29,6 +30,8 @@ import {
   type JsonValue,
   type NodeCatalog,
   type Run,
+  type SandboxExecutor,
+  type WorkerPool,
 } from "@flowaid/workflow-core";
 import { and, eq } from "drizzle-orm";
 import { createWorker, type Worker } from "../worker.js";
@@ -91,7 +94,14 @@ export interface Harness {
   close(): Promise<void>;
 }
 
-export async function createHarness(o: { registry?: ProviderRegistry } = {}): Promise<Harness> {
+export async function createHarness(
+  o: {
+    registry?: ProviderRegistry;
+    pools?: readonly WorkerPool[];
+    sandbox?: SandboxExecutor;
+    storage?: ArtifactStorage;
+  } = {},
+): Promise<Harness> {
   const db = await createTestDatabase();
   const credentials = new CredentialService({
     repository: new PgCredentialRepository(db.app),
@@ -126,6 +136,9 @@ export async function createHarness(o: { registry?: ProviderRegistry } = {}): Pr
     artifactsDir,
     registry: o.registry ?? fakeTypesafeRegistry(),
     maintenance: { timerPollMs: 100 },
+    ...(o.pools ? { pools: o.pools } : {}),
+    ...(o.sandbox ? { sandbox: o.sandbox } : {}),
+    ...(o.storage ? { storage: o.storage } : {}),
   });
   await worker.start();
   const store = new PgRunStore(db.app);

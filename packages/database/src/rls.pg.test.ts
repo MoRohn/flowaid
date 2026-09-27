@@ -68,7 +68,7 @@ describeDb("row-level security", () => {
       "run_timers",
       "evaluation_results",
     ];
-    expect(tenantTables).toHaveLength(34);
+    expect(tenantTables).toHaveLength(35);
     for (const table of expected)
       expect(secured.get(table), table).toMatchObject({ rls: true, force: true, policies: 1 });
     for (const table of [

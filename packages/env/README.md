@@ -151,7 +151,7 @@ lists them empty for you to generate (`openssl rand -hex 16`).
 | Variable | Required | Default | Description |
 |---|---|---|---|
 | `REDIS_URL` | no | — | Redis 7 connection string. When set, jobs use BullMQ, the event bus uses Redis pub/sub and rate limits are shared across api replicas. When unset, everything runs over Postgres (`SKIP LOCKED` + `LISTEN/NOTIFY`) with identical semantics (ARCHITECTURE.md D10). Example: `redis://localhost:6379`. Secret. |
-| `WORKER_POOLS` | no | `general` | Comma-separated worker pools this worker process consumes. A run's orchestration always happens on `general`; nodes declaring another pool are delegated to a worker that serves it. Values: `general`, `code`, `browser`, `gpu`, `retrieval`, `high_memory`. |
+| `WORKER_POOLS` | no | `general,code,browser,gpu,retrieval,high_memory` | Comma-separated worker pools this worker process consumes. A run's orchestration always happens on `general`; nodes of another pool the same process serves run in-process, the others are delegated to a worker that serves that pool (compose runs `code` in the locked-down `worker-code` container). The default serves every pool in one process. Values: `general`, `code`, `browser`, `gpu`, `retrieval`, `high_memory`. |
 | `WORKER_CONCURRENCY` | no | `10` | Maximum number of jobs one worker process executes concurrently across its pools. |
 | `FLOWAID_QUEUE_UI` | no | `false` | Mount Bull Board at `/admin/queues` (BullMQ driver only) behind session auth with the `admin` scope. Off by default because job payloads show run inputs. |
 
@@ -198,7 +198,7 @@ lists them empty for you to generate (`openssl rand -hex 16`).
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `S3_ENDPOINT` | no | — | S3-compatible endpoint for artifacts and uploads (AWS S3, Cloudflare R2 or a self-hosted store), reserved for object storage. Set all of `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY` and `S3_SECRET_KEY` or none; when none are set, run artifacts and code-export packages are stored in `<data>/artifacts` beside the master key file (the `flowaid-data` volume in compose), shared by the api and the worker. Example: `http://localhost:9000`. |
+| `S3_ENDPOINT` | no | — | S3-compatible endpoint for artifacts (AWS S3, Cloudflare R2 or a self-hosted store). Set all of `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY` and `S3_SECRET_KEY` or none. When all are set, the worker writes run artifacts and code-export packages to the bucket and the api streams downloads from it (artifacts written earlier to the local directory stay readable); when none are set, they are stored in `<data>/artifacts` beside the master key file (the `flowaid-data` volume in compose), shared by the api and the worker. Example: `http://localhost:9000`. |
 | `S3_BUCKET` | no | — | Bucket that holds artifacts, prefixed `ws/<workspaceId>/`. Example: `flowaid`. |
 | `S3_ACCESS_KEY` | no | — | Access key id for the S3 endpoint. Example: `flowaid`. Secret. |
 | `S3_SECRET_KEY` | no | — | Secret access key for the S3 endpoint. Example: `<secret access key>`. Secret. |
@@ -231,12 +231,14 @@ lists them empty for you to generate (`openssl rand -hex 16`).
 | `POSTGRES_PASSWORD` | compose | — | Password of `POSTGRES_USER`. Required by the compose stack, which has no default password. Generate with `openssl rand -hex 16`. Example: `<openssl rand -hex 16>`. Secret. Compose only: not read by the api. |
 | `POSTGRES_DB` | no | `flowaid` | Name of the database the compose stack creates and connects to. Compose only: not read by the api. |
 | `POSTGRES_APP_PASSWORD` | no | — | Password of the `flowaid_app` role that api and worker connect with (created by `docker/postgres-init/01-roles.sql` on the first start). Unset means `POSTGRES_PASSWORD`; set it to keep the owner's password out of the worker. Example: `<openssl rand -hex 16>`. Secret. Compose only: not read by the api. |
-| `POSTGRES_CODE_PASSWORD` | compose | — | Password of the restricted `flowaid_code` role (queue tables only) that migrations grant to, reserved for a separate sandbox host of the `code` pool. Required by the compose stack and must differ from `POSTGRES_PASSWORD`. Generate with `openssl rand -hex 16`. Example: `<openssl rand -hex 16>`. Secret. Compose only: not read by the api. |
+| `POSTGRES_CODE_PASSWORD` | compose | — | Password of the restricted `flowaid_code` role that the sandbox host `worker-code` connects with (queue tables and the delegated-node claim/complete functions only; no credentials, no workflow data). Required by the compose stack and must differ from `POSTGRES_PASSWORD`. Generate with `openssl rand -hex 16`. Example: `<openssl rand -hex 16>`. Secret. Compose only: not read by the api. |
 | `REDIS_PASSWORD` | no | — | Password the compose `redis` service (scale profile) requires (`--requirepass`); the container refuses to start without it. Reference it from `REDIS_URL` as `redis://:${REDIS_PASSWORD}@redis:6379` (compose expands it inside `.env`). Example: `<openssl rand -hex 16>`. Secret. Compose only: not read by the api. |
 | `BIND_ADDRESS` | no | `127.0.0.1` | Host interface the compose stack publishes its ports on (api, web, postgres, redis). Loopback by default so a laptop does not expose the stack on its network; `0.0.0.0` publishes on every interface (put a TLS reverse proxy in front of api and web). Compose only: not read by the api. |
 | `POSTGRES_PORT` | no | `5432` | Host port of the compose `postgres` service. Compose only: not read by the api. |
 | `REDIS_PORT` | no | `6379` | Host port of the compose `redis` service (scale profile). Compose only: not read by the api. |
 | `WEB_PORT` | no | `3001` | Host port of the compose `web` service (the api uses `PORT`). Compose only: not read by the api. |
+| `WORKER_CODE_CONCURRENCY` | no | `4` | `WORKER_CONCURRENCY` of the sandbox host `worker-code`. Compose only: not read by the api. |
+| `RUSTFS_PORT` | no | `9000` | Host port of the bundled S3-compatible store (`rustfs`, profile `s3`), published on `BIND_ADDRESS`. Compose only: not read by the api. |
 | `WORKER_REPLICAS` | no | `1` | Number of `worker` containers started by the scale profile. Compose only: not read by the api. |
 
 <!-- env-table:end -->

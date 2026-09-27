@@ -72,7 +72,14 @@ describe("EnvSchema", () => {
     expect(env.DATABASE_ADMIN_URL).toBeUndefined();
     expect(env.RETENTION_SWEEP_CRON).toBe("0 3 * * *");
     expect(env.REDIS_URL).toBeUndefined();
-    expect(env.WORKER_POOLS).toEqual(["general"]);
+    expect(env.WORKER_POOLS).toEqual([
+      "general",
+      "code",
+      "browser",
+      "gpu",
+      "retrieval",
+      "high_memory",
+    ]);
     expect(env.WORKER_CONCURRENCY).toBe(10);
     expect(env.FLOWAID_QUEUE_UI).toBe(false);
     expect(env.FLOWAID_MASTER_KEY).toBeUndefined();

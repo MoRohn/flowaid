@@ -14,16 +14,10 @@ import type { ProviderRegistry } from "@flowaid/providers";
 import { uuidv7 } from "@flowaid/shared";
 import type { WorkerLogger } from "../worker.js";
 
-type Loader = () => Promise<{ module: Record<string, unknown>; version: string }>;
+import { BUNDLED_LOADERS } from "./loaders.js";
 
 /** The packages the worker image bundles; anything else in FLOWAID_BUNDLED_PLUGINS is refused. */
-export const BUNDLED_LOADERS: Readonly<Record<string, Loader>> = {
-  "@flowaid/nodes-langchain": async () => {
-    const module = (await import("@flowaid/nodes-langchain")) as unknown as Record<string, unknown>;
-    const version = typeof module.PACKAGE_VERSION === "string" ? module.PACKAGE_VERSION : "0.0.0";
-    return { module, version };
-  },
-};
+export { BUNDLED_LOADERS };
 
 interface PluginTemplate {
   id: string;

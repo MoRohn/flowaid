@@ -798,6 +798,34 @@ export const queueJobs = pgTable(
   ],
 );
 
+export const delegatedNodes = pgTable(
+  "delegated_nodes",
+  {
+    // Node executions handed to another worker pool (ARCHITECTURE.md §10.7): the orchestrator
+    // writes the call, the pool's worker claims and completes it through SECURITY DEFINER
+    // functions (the sandbox host's `flowaid_code` role has no table access), and the
+    // orchestrator reads the result back with `run.signal{delegated_result}`.
+    nodeRunId: uuid("node_run_id").primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    runId: uuid("run_id")
+      .notNull()
+      .references(() => runs.id, { onDelete: "cascade" }),
+    pool: text("pool").$type<WorkerPool>().notNull(),
+    call: jsonb("call").$type<JsonObject>().notNull(), // serialisable ExecutionCall + input + config
+    status: text("status", { enum: ["pending", "running", "done"] })
+      .notNull()
+      .default("pending"),
+    result: jsonb("result").$type<JsonObject>(), // ExecutorOutcome
+    claimedBy: text("claimed_by"),
+    claimedAt: ts("claimed_at"),
+    completedAt: ts("completed_at"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("delegated_nodes_ws_run_idx").on(t.workspaceId, t.runId)],
+);
+
 export const jobs = pgTable(
   "jobs",
   {
