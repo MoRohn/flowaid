@@ -120,10 +120,15 @@ describe("an exported package", () => {
   });
 
   it("pnpm validate: src/workflow.ts compiles with zero errors", () => {
-    const run = spawnSync(join(REPO, "node_modules/.bin/tsx"), ["src/validate.ts"], {
-      cwd: dir,
-      encoding: "utf8",
-    });
+    // the linked workspace packages resolve to their sources (dist may not be built)
+    const run = spawnSync(
+      join(REPO, "node_modules/.bin/tsx"),
+      ["--conditions=development", "src/validate.ts"],
+      {
+        cwd: dir,
+        encoding: "utf8",
+      },
+    );
     expect(run.stderr).toMatch(/^ok · unchanged since export/m);
     expect(run.stderr).not.toMatch(/^error/m);
     expect(run.status).toBe(0);

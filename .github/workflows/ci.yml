@@ -46,6 +46,9 @@ jobs:
       - name: Environment docs are current
         run: pnpm env:check
 
+      - name: SDK types and CLI operations are current
+        run: pnpm sdk:check
+
       - name: UI inventory is current
         run: pnpm ui:inventory:check
 

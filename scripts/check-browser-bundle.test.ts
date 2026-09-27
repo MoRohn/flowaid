@@ -90,6 +90,8 @@ async function bundle(name: string, entry: string): Promise<Bundle> {
     absWorkingDir: ROOT,
     bundle: true,
     platform: "browser",
+    // the workspace packages' sources (dist exists only after a build)
+    conditions: ["development"],
     target: "es2023",
     write: false,
     logLevel: "silent",

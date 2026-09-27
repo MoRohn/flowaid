@@ -32,7 +32,7 @@ FROM base AS deps
 # isolated-vm and argon2 are native modules: build tools are needed for pnpm's allowed builds.
 RUN apk add --no-cache python3 make g++
 COPY pnpm-lock.yaml pnpm-workspace.yaml .npmrc package.json ./
-RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store pnpm fetch --frozen-lockfile
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store pnpm fetch
 
 # ── build: install offline from the fetched store, build every app ────────────────────────
 FROM deps AS build

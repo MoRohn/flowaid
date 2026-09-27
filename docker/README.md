@@ -112,7 +112,7 @@ One multi-stage `node:24-alpine` Dockerfile (pinned by digest, `ARG NODE_IMAGE`)
 targets; compose selects them with `build.target`:
 
 1. `base`: `npm install -g pnpm@${PNPM_VERSION}` (`ARG PNPM_VERSION=12.5.1`).
-2. `deps`: `pnpm fetch --frozen-lockfile` from the lockfile alone (cached until it changes).
+2. `deps`: `pnpm fetch` from the lockfile alone (cached until it changes).
 3. `build`: `pnpm install --offline`, `turbo run build` for the three apps
    (`NEXT_PUBLIC_FLOWAID_BASE_URL` build arg for the web bundle).
 4. `deploy-api` / `deploy-worker`: `pnpm deploy --prod` (pruned production trees).
