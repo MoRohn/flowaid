@@ -21,6 +21,7 @@ export const CLI_VERSION = "0.1.0";
  */
 export const HAND_WRITTEN: ReadonlySet<string> = new Set([
   "workflow export",
+  "workflow package",
   "run events",
   "run stream",
 ]);

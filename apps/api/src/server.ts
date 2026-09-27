@@ -28,6 +28,7 @@ import { toolRoutes } from "./routes/tools.js";
 import { ingressRoutes } from "./routes/ingress.js";
 import { triggerRoutes } from "./routes/triggers.js";
 import { evaluationRoutes } from "./routes/evaluations.js";
+import { exportRoutes } from "./routes/export.js";
 import { reviewRoutes } from "./routes/review.js";
 import { mcpServerRoutes } from "./routes/mcpServer.js";
 import { workflowRoutes } from "./routes/workflows.js";
@@ -105,6 +106,7 @@ export async function buildServer(ctx: ApiContext, o: BuildOptions = {}): Promis
   triggerRoutes(app, ctx);
   ingressRoutes(app, ctx);
   evaluationRoutes(app, ctx);
+  exportRoutes(app, ctx);
   reviewRoutes(app, ctx);
   mcpServerRoutes(app, ctx);
   for (const register of o.routes ?? []) register(app, ctx);

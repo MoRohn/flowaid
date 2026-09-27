@@ -1,0 +1,39 @@
+{
+  "name": "@flowaid/codegen",
+  "version": "0.1.0",
+  "private": true,
+  "description": "FlowAId code export: a workflow as typed code over the SDK builders (round-trip checked) and as a runnable package \u2014 runner, HTTP wrapper, server client, tests, Dockerfile, vendored runtime (CODE_EXPORT.md).",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src",
+    "templates",
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src",
+    "test": "vitest run",
+    "clean": "rm -rf dist .turbo *.tsbuildinfo .test-out"
+  },
+  "dependencies": {
+    "@flowaid/workflow-core": "workspace:*",
+    "@flowaid/workflow-sdk": "workspace:*",
+    "prettier": "3.9.8"
+  },
+  "devDependencies": {
+    "@flowaid/config": "workspace:*",
+    "@flowaid/workflow-compiler": "workspace:*",
+    "@types/node": "24.13.6",
+    "eslint": "9.39.5",
+    "fast-check": "4.10.2",
+    "typescript": "5.9.3",
+    "vitest": "4.1.11"
+  }
+}

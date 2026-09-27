@@ -53,6 +53,8 @@ evaluation results <id> {--out}
 evaluation start {--set-id --workflow-id --version-id --draft --environment-id --baseline-evaluation-run-id --concurrency --gate --body --out}
 event
 event publish <eventName> {--payload --correlation-key --environment-id --body --out}
+job
+job get <id> {--out}
 login
 logout
 mcp-exposure
@@ -143,6 +145,7 @@ version diff <id> <otherId> {--out}
 version export <id> {--format --out}
 version get <id> {--include --out}
 version list <id> {--out}
+version package <id> {--mode --include-sample-from-run-id --include-recorded-run-id --body --out}
 version restore <id> {--out}
 webhook
 webhook deliveries <id> {--limit --cursor --order --out}
@@ -157,7 +160,7 @@ workflow delete <id> {--purge --out}
 workflow export <id> {--version --format --out}
 workflow get <id> {--out}
 workflow import {--definition --yaml --name --body --out}
-workflow list {--limit --cursor --order --q --tag --archived --out}
+workflow list {--limit --cursor --order --q --tag --archived --include --out}
 workflow package <id> {--version --out --mode}
 workflow publish <id> {--notes --label --deploy-to --require-evaluation --body --out}
 workflow run <target> {--input --local --watch --sync --environment --version-id --wait --secret --approve}
@@ -205,6 +208,7 @@ Commands:
   environment|environments          environment operations
   evaluation|evaluations            evaluation operations
   event|events                      event operations
+  job|jobs                          job operations
   mcp-exposure|mcp-exposures        mcp-exposure operations
   mcp-server|mcp-servers            mcp-server operations
   mcp-token|mcp-tokens              mcp-token operations

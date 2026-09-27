@@ -22,3 +22,5 @@ packages/observability/fixtures/
 packages/database/migrations/meta/
 packages/nodes-core/manifest.json
 packages/nodes-langchain/manifest.json
+# generated src/workflow.ts goldens (vitest file snapshots, formatted by the generator)
+packages/codegen/golden/

@@ -534,6 +534,16 @@ export const OPERATIONS: readonly CliOperation[] = [
     },
   },
   {
+    noun: "job",
+    verb: "get",
+    method: "GET",
+    path: "/v1/jobs/{id}",
+    auth: "session_or_api_key",
+    positional: ["id"],
+    query: [],
+    body: null,
+  },
+  {
     noun: "mcp-exposure",
     verb: "create",
     method: "POST",
@@ -1437,7 +1447,7 @@ export const OPERATIONS: readonly CliOperation[] = [
     path: "/v1/workflow-versions/{id}/export",
     auth: "session_or_api_key",
     positional: ["id"],
-    query: [{ name: "format", type: "string", required: false, enum: ["json", "yaml"] }],
+    query: [{ name: "format", type: "string", required: false, enum: ["json", "yaml", "ts"] }],
     body: null,
   },
   {
@@ -1459,6 +1469,24 @@ export const OPERATIONS: readonly CliOperation[] = [
     positional: ["id"],
     query: [],
     body: null,
+  },
+  {
+    noun: "version",
+    verb: "package",
+    method: "POST",
+    path: "/v1/workflow-versions/{id}/export/package",
+    summary: "Build the code package (zip) of a version; poll GET /v1/jobs/:id",
+    auth: "session_or_api_key",
+    positional: ["id"],
+    query: [],
+    body: {
+      required: true,
+      properties: [
+        { name: "mode", type: "string", required: false, enum: ["npm", "vendored"] },
+        { name: "includeSampleFromRunId", type: "string", required: false },
+        { name: "includeRecordedRunId", type: "string", required: false },
+      ],
+    },
   },
   {
     noun: "version",
@@ -1594,7 +1622,7 @@ export const OPERATIONS: readonly CliOperation[] = [
     summary: "The draft as one file (secrets stay symbolic)",
     auth: "session_or_api_key",
     positional: ["id"],
-    query: [{ name: "format", type: "string", required: false, enum: ["json", "yaml"] }],
+    query: [{ name: "format", type: "string", required: false, enum: ["json", "yaml", "ts"] }],
     body: null,
   },
   {
@@ -1642,6 +1670,24 @@ export const OPERATIONS: readonly CliOperation[] = [
       { name: "include", type: "string", required: false, enum: ["activity"] },
     ],
     body: null,
+  },
+  {
+    noun: "workflow",
+    verb: "package",
+    method: "POST",
+    path: "/v1/workflows/{id}/draft/export/package",
+    summary: "Build the code package (zip) of the current draft (422 when it does not compile)",
+    auth: "session_or_api_key",
+    positional: ["id"],
+    query: [],
+    body: {
+      required: true,
+      properties: [
+        { name: "mode", type: "string", required: false, enum: ["npm", "vendored"] },
+        { name: "includeSampleFromRunId", type: "string", required: false },
+        { name: "includeRecordedRunId", type: "string", required: false },
+      ],
+    },
   },
   {
     noun: "workflow",

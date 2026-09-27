@@ -2114,7 +2114,7 @@ export interface ArtifactStore {
   delete(id: string): Promise<void>;
 }
 
-export type QueueName = `run:${WorkerPool}` | 'run:control' | 'schedule' | 'ingest' | 'evaluation' | 'trace_review';
+export type QueueName = `run:${WorkerPool}` | 'run:control' | 'schedule' | 'ingest' | 'evaluation' | 'trace_review' | 'jobs' | 'maintenance'; // 'jobs', 'maintenance': RFC-0001
 export type Job =
   | { type: 'run.start'; runId: string }
   | { type: 'run.resume'; runId: string; reason: WaitReason | 'manual_retry' | 'recovery' }
@@ -2125,7 +2125,12 @@ export type Job =
   | { type: 'schedule.tick'; scheduleId: string; at: string }
   | { type: 'ingest.source'; sourceId: string }
   | { type: 'evaluation.run'; evaluationRunId: string }
-  | { type: 'trace_review.run'; runId: string };
+  | { type: 'trace_review.run'; runId: string }
+  // RFC-0001: API-initiated background jobs (queue 'jobs') and maintenance (queue 'maintenance')
+  | { type: 'export.package'; jobId: string; workspaceId: string; workflowId: string; versionId: string | null; draftRevision?: number; mode: 'npm' | 'vendored'; includeSampleFromRunId?: string; includeRecordedRunId?: string; requestedBy: string }
+  | { type: 'retention.sweep'; at: string }
+  | { type: 'partition.ensure'; monthsAhead: number }
+  | { type: 'draft_versions.gc' };
 
 export interface QueueDriver {
   enqueue(queue: QueueName, job: Job, opts?: { delayMs?: number; jobId?: string; priority?: number }): Promise<void>;

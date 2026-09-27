@@ -24,5 +24,8 @@ export function featuresFor(config: ApiConfig): Record<FeatureKey, boolean> {
   const out = {} as Record<FeatureKey, boolean>;
   for (const key of FEATURE_KEYS) out[key] = FEATURES_SHIPPED.has(key) && !disabled.has(key);
   out.oidc = config.hasOidc && !disabled.has("oidc");
+  // Code export works in npm mode, or vendored with the packed runtime packages present.
+  out.code_export =
+    (config.exportMode === "npm" || config.vendorAvailable) && !disabled.has("code_export");
   return out;
 }

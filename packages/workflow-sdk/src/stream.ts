@@ -80,7 +80,10 @@ export async function* sseMessages(
     onEvent: (m) => queue.push(m),
     onRetry: (retry) => queue.push({ retry }),
   });
-  const reader = body.pipeThrough(new TextDecoderStream()).getReader();
+  // TextDecoderStream's DOM and Node typings disagree on its writable side; the runtime object is
+  // the standard transform either way.
+  const decoder = new TextDecoderStream() as unknown as ReadableWritablePair<string, Uint8Array>;
+  const reader = body.pipeThrough(decoder).getReader();
   const cancel = () => void reader.cancel().catch(() => undefined);
   signal?.addEventListener("abort", cancel, { once: true });
   try {

@@ -80,7 +80,7 @@
     "importer": { "dir": "packages/importer", "allow": ["workflow-core", "shared"] },
     "codegen": {
       "dir": "packages/codegen",
-      "allow": ["workflow-core", "workflow-compiler", "shared"]
+      "allow": ["workflow-core", "workflow-compiler", "workflow-sdk/builders", "shared"]
     },
     "langchain": {
       "dir": "packages/langchain",

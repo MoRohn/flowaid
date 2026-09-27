@@ -1914,6 +1914,59 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/jobs/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** Format: uuid */
+              artifact_id?: string;
+              /** Format: date-time */
+              created_at: string;
+              /** Format: date-time */
+              ended_at?: string;
+              error?: unknown;
+              /** Format: uuid */
+              id: string;
+              /** @enum {string} */
+              kind: "export.package";
+              /** Format: date-time */
+              started_at?: string;
+              /** @enum {string} */
+              status: "queued" | "running" | "completed" | "failed";
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/mcp/exposures": {
     parameters: {
       query?: never;
@@ -4266,7 +4319,7 @@ export interface paths {
     get: {
       parameters: {
         query?: {
-          format?: "json" | "yaml";
+          format?: "json" | "yaml" | "ts";
         };
         header?: never;
         path: {
@@ -4287,6 +4340,58 @@ export interface paths {
     };
     put?: never;
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/workflow-versions/{id}/export/package": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Build the code package (zip) of a version; poll GET /v1/jobs/:id */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            includeRecordedRunId?: string;
+            /** Format: uuid */
+            includeSampleFromRunId?: string;
+            /** @enum {string} */
+            mode?: "npm" | "vendored";
+          };
+        };
+      };
+      responses: {
+        /** @description Default Response */
+        202: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** Format: uuid */
+              job_id: string;
+            };
+          };
+        };
+      };
+    };
     delete?: never;
     options?: never;
     head?: never;
@@ -5168,7 +5273,7 @@ export interface paths {
     get: {
       parameters: {
         query?: {
-          format?: "json" | "yaml";
+          format?: "json" | "yaml" | "ts";
         };
         header?: never;
         path: {
@@ -5189,6 +5294,58 @@ export interface paths {
     };
     put?: never;
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/workflows/{id}/draft/export/package": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Build the code package (zip) of the current draft (422 when it does not compile) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            includeRecordedRunId?: string;
+            /** Format: uuid */
+            includeSampleFromRunId?: string;
+            /** @enum {string} */
+            mode?: "npm" | "vendored";
+          };
+        };
+      };
+      responses: {
+        /** @description Default Response */
+        202: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** Format: uuid */
+              job_id: string;
+            };
+          };
+        };
+      };
+    };
     delete?: never;
     options?: never;
     head?: never;

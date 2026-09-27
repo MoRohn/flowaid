@@ -1,0 +1,165 @@
+/**
+ * Fake providers for tests: every decision provider answers deterministically (boolean → yes with
+ * p = 0.9, choice → the first option, score → the middle level), every generation provider answers
+ * with a fixed text (or a schema-shaped object for structured output), embeddings are zero vectors.
+ * No network, no keys.
+ */
+import {
+  DefaultModelCatalog,
+  ProviderRegistry,
+  booleanDecision,
+  choiceDecision,
+  scoreDecision,
+} from "@flowaid/providers";
+import type {
+  DecisionProvider,
+  DecisionQuestion,
+  DecisionResult,
+  EmbeddingProvider,
+  GenerationProvider,
+  GenerationResult,
+  JsonValue,
+  ProviderHealth,
+} from "@flowaid/workflow-core";
+
+const HEALTH: ProviderHealth = {
+  status: "healthy",
+  errorRate1m: 0,
+  p95LatencyMs: 0,
+  consecutiveFailures: 0,
+  checkedAt: new Date(0).toISOString(),
+};
+
+function answer(provider: string, question: DecisionQuestion): DecisionResult {
+  const meta = { provider, model: "fake", latencyMs: 1, costUsd: 0 };
+  if (question.kind === "boolean") return booleanDecision(0.9, meta);
+  if (question.kind === "choice") {
+    const keys = Object.keys(question.options);
+    return choiceDecision(
+      Object.fromEntries(keys.map((k, i) => [k, i === 0 ? 0.9 : 0.1 / Math.max(1, keys.length - 1)])),
+      meta,
+    );
+  }
+  const n = question.levels.length;
+  const mid = Math.floor(n / 2);
+  return scoreDecision(
+    question.levels.map((_, i) => (i === mid ? 1 : 0)),
+    question.levels,
+    meta,
+  );
+}
+
+export function fakeDecisionProvider(id: string): DecisionProvider {
+  return {
+    id,
+    model: "fake",
+    capabilities: {
+      batch: true,
+      maxQuestions: 64,
+      maxStateTokens: 1_000_000,
+      kinds: ["boolean", "choice", "score"],
+      text: true,
+      images: false,
+    },
+    decideBoolean: (_s, q) => Promise.resolve(answer(id, q) as never),
+    decideChoice: (_s, q) => Promise.resolve(answer(id, q) as never),
+    decideScore: (_s, q) => Promise.resolve(answer(id, q) as never),
+    batch: (_s, questions) =>
+      Promise.resolve({
+        answers: Object.fromEntries(Object.entries(questions).map(([k, q]) => [k, answer(id, q)])),
+        usage: { inputTokens: 1, outputTokens: 1 },
+        model: "fake",
+        requestId: null,
+        latencyMs: 1,
+      }),
+    health: () => HEALTH,
+  };
+}
+
+function shaped(schema: unknown, depth = 0): JsonValue {
+  const s = (schema ?? {}) as Record<string, unknown>;
+  if (depth > 6) return null;
+  if (Array.isArray(s.enum)) return s.enum[0] as JsonValue;
+  const type = Array.isArray(s.type) ? (s.type as string[])[0] : s.type;
+  if (type === "object" || s.properties) {
+    const props = (s.properties ?? {}) as Record<string, unknown>;
+    return Object.fromEntries(Object.entries(props).map(([k, v]) => [k, shaped(v, depth + 1)]));
+  }
+  if (type === "array") return [shaped(s.items, depth + 1)];
+  if (type === "number" || type === "integer") return 1;
+  if (type === "boolean") return true;
+  return "fake";
+}
+
+export function fakeGenerationProvider(id: string): GenerationProvider {
+  const result = (structured?: JsonValue): GenerationResult => ({
+    text: structured === undefined ? "A fake answer." : JSON.stringify(structured),
+    toolCalls: [],
+    ...(structured === undefined ? {} : { structured }),
+    finishReason: "stop",
+    usage: { inputTokens: 1, outputTokens: 1 },
+    costUsd: 0,
+    priceSnapshot: null,
+    latencyMs: 1,
+    provider: id,
+    model: "fake",
+  });
+  return {
+    id,
+    model: "fake",
+    capabilities: {
+      tools: true,
+      jsonSchema: true,
+      vision: false,
+      streaming: true,
+      thinking: false,
+      maxContext: 1_000_000,
+    },
+    generate: (req) =>
+      Promise.resolve(
+        result(req.responseFormat?.type === "json_schema" ? shaped(req.responseFormat.schema) : undefined),
+      ),
+    async *stream() {
+      yield { type: "text", delta: "A fake answer." };
+      yield { type: "usage", usage: { inputTokens: 1, outputTokens: 1 } };
+      yield { type: "done", finishReason: "stop" };
+    },
+    health: () => HEALTH,
+  };
+}
+
+export function fakeEmbeddingProvider(id: string): EmbeddingProvider {
+  return {
+    id,
+    model: "fake",
+    dimensions: 8,
+    embed: (texts) =>
+      Promise.resolve({
+        vectors: texts.map(() => new Array<number>(8).fill(0)),
+        usage: { inputTokens: texts.length, outputTokens: 0 },
+        costUsd: 0,
+      }),
+    health: () => HEALTH,
+  };
+}
+
+/** A registry where every provider this workflow uses is a fake. */
+export function fakeProviders(): ProviderRegistry {
+  const registry = new ProviderRegistry({ catalog: new DefaultModelCatalog() });
+  for (const id of __DECISION_PROVIDERS__)
+    registry.register({ id, kind: "decision", create: () => fakeDecisionProvider(id) });
+  for (const id of __GENERATION_PROVIDERS__) {
+    registry.register({ id, kind: "generation", create: () => fakeGenerationProvider(id) });
+    registry.register({ id, kind: "embedding", create: () => fakeEmbeddingProvider(id) });
+  }
+  return registry;
+}
+
+/** A dummy value for every secret, so nodes that need a credential find one. */
+export function fakeSecrets(names: readonly string[]): Record<string, string> {
+  return Object.fromEntries(names.map((n) => [n, `fake-${n.toLowerCase()}`]));
+}
+
+/** No network in tests: every request fails fast. */
+export const offline = (): Promise<Response> =>
+  Promise.reject(new Error("network access is disabled in tests"));

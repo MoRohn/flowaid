@@ -1,0 +1,98 @@
+/**
+ * The embedded runtime, wired for this workflow: the node packages, the provider registry for its
+ * model refs, the sandbox when installed, and the plan. `workflow.plan.json` is the plan the server
+ * compiled; it runs as long as `src/workflow.ts` still hashes to it. After you edit the workflow,
+ * the runner compiles `src/workflow.ts` instead (tools resolve from the ones the server resolved).
+ */
+import { readFileSync } from "node:fs";
+import { COMPILER_VERSION, compile } from "@flowaid/workflow-compiler";
+import {
+  ExecutionPlanSchema,
+  definitionHash,
+  type CompileResult,
+  type ExecutionPlan,
+  type JsonValue,
+  type ToolDefinition,
+  type ToolSource,
+} from "@flowaid/workflow-core";
+import {
+  catalogOfPackages,
+  runLocally,
+  type LocalRunOptions,
+  type LocalRunResult,
+} from "@flowaid/workflow-runtime";
+import { nodes } from "./nodes.js";
+import { createProviders } from "./providers.js";
+import { createSandbox } from "./sandbox.js";
+import { workflow } from "./workflow.js";
+
+export { nodes, workflow };
+
+/** The plan the FlowAId server compiled for this version. */
+export const plan: ExecutionPlan = ExecutionPlanSchema.parse(
+  JSON.parse(readFileSync(new URL("../workflow.plan.json", import.meta.url), "utf8")),
+);
+
+const sameSource = (a: ToolSource, b: ToolSource) =>
+  JSON.stringify(Object.entries(a).sort()) === JSON.stringify(Object.entries(b).sort());
+
+/** Tools resolve from the ones the server resolved when it compiled the plan. */
+function resolveTool(source: ToolSource): ToolDefinition | undefined {
+  for (const node of Object.values(plan.nodes))
+    if (node.op.kind === "task" && node.op.tool && sameSource(node.op.tool.source, source))
+      return node.op.tool;
+  return undefined;
+}
+
+/** Compiles `src/workflow.ts` against the bundled node packages. */
+export function compileWorkflow(): CompileResult {
+  return compile(workflow, {
+    catalog: catalogOfPackages(nodes),
+    resolveTool,
+    level: "publish",
+    compilerVersion: COMPILER_VERSION,
+  });
+}
+
+/** True while `src/workflow.ts` is exactly the exported definition. */
+export function isUnchanged(): boolean {
+  return definitionHash(workflow) === plan.definitionHash;
+}
+
+/** The plan to run: the exported one while the workflow is unchanged, else a fresh compile. */
+export function currentPlan(): ExecutionPlan {
+  if (isUnchanged()) return plan;
+  const result = compileWorkflow();
+  if (!result.ok) {
+    const errors = result.diagnostics
+      .filter((d) => d.severity === "error")
+      .map((d) => `  ${d.code} ${d.location.nodeId ?? ""} ${d.message}`);
+    throw new Error(`src/workflow.ts does not compile:\n${errors.join("\n")}`);
+  }
+  return result.plan;
+}
+
+/** Secret values from the environment, keyed by the workflow's secret names (see .env.example). */
+export function secretsFromEnv(env: NodeJS.ProcessEnv = process.env): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const s of plan.secrets) {
+    const value = env[s.name];
+    if (value) out[s.name] = value;
+  }
+  return out;
+}
+
+export type RunOptions = Partial<Omit<LocalRunOptions, "input">>;
+
+/** Runs the workflow in this process — the same reducer, events and accounting as a server run. */
+export async function runWorkflow(input: JsonValue, opts: RunOptions = {}): Promise<LocalRunResult> {
+  const sandbox = opts.sandbox ?? (await createSandbox());
+  return runLocally(currentPlan(), {
+    nodes,
+    providers: opts.providers ?? createProviders(),
+    secrets: opts.secrets ?? secretsFromEnv(),
+    ...(sandbox ? { sandbox } : {}),
+    ...opts,
+    input,
+  });
+}

@@ -19,6 +19,7 @@ import {
   workflows,
   type WorkflowVersionRow,
 } from "@flowaid/database";
+import { generateWorkflowTs } from "@flowaid/codegen";
 import { diff } from "@flowaid/workflow-compiler";
 import {
   BadRequestError,
@@ -175,7 +176,7 @@ export function versionRoutes(app: FastifyInstance, ctx: ApiContext): void {
       schema: {
         tags: ["versions"],
         params: IdParams,
-        querystring: z.object({ format: z.enum(["json", "yaml"]).default("json") }),
+        querystring: z.object({ format: z.enum(["json", "yaml", "ts"]).default("json") }),
       },
     },
     async (req, reply) => {
@@ -185,6 +186,10 @@ export function versionRoutes(app: FastifyInstance, ctx: ApiContext): void {
         "content-disposition",
         `attachment; filename="workflow-v${v.version ?? "draft"}.${req.query.format}"`,
       );
+      if (req.query.format === "ts")
+        return reply
+          .type("text/plain; charset=utf-8")
+          .send(await generateWorkflowTs(v.definition, { title: `v${v.version ?? "draft"}` }));
       if (req.query.format === "yaml")
         return reply.type("application/yaml").send(toYaml(v.definition));
       return reply.type("application/json").send(`${JSON.stringify(v.definition, null, 2)}\n`);

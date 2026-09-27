@@ -26,7 +26,7 @@ import {
   ForbiddenError,
   NotFoundError,
 } from "@flowaid/workflow-core";
-import { canSeeWorkflow, type Principal } from "../auth/principal.js";
+import { canSeeWorkflow, hasScope, type Principal } from "../auth/principal.js";
 import type { ApiContext } from "../context.js";
 import { IdParams, ListQuery, decodeCursor, encodeCursor } from "../dto/common.js";
 import { startRun } from "../services/runs.js";
@@ -480,6 +480,10 @@ export function triggerRoutes(app: FastifyInstance, ctx: ApiContext): void {
           .where(and(eq(artifacts.id, req.params.id), eq(artifacts.workspaceId, p.workspaceId))),
       );
       if (!a || a.status !== "ready") throw new NotFoundError("artifact not found");
+      if (a.expiresAt && a.expiresAt.getTime() <= ctx.clock.now())
+        throw new NotFoundError("artifact expired");
+      if (a.kind === "export" && !hasScope(p, "workflows:read"))
+        throw new ForbiddenError("missing scope workflows:read");
       if (a.workflowId && !canSeeWorkflow(p, a.workflowId))
         throw new NotFoundError("artifact not found");
       if (a.storage !== "local" || !ctx.config.artifactsDir)

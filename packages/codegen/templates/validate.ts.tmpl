@@ -1,0 +1,18 @@
+/**
+ * `pnpm validate`: compiles `src/workflow.ts` against the bundled node packages and prints every
+ * diagnostic; reports whether the workflow still matches `workflow.plan.json`. Exit code 1 on errors.
+ */
+import { compileWorkflow, isUnchanged } from "./flow.js";
+
+const result = compileWorkflow();
+for (const d of result.diagnostics)
+  process.stderr.write(`${d.severity.padEnd(7)} ${d.code} ${d.location.nodeId ?? ""} ${d.message}\n`);
+const errors = result.diagnostics.filter((d) => d.severity === "error").length;
+process.stderr.write(
+  `${errors === 0 ? "ok" : `${errors} error(s)`} · ${
+    isUnchanged()
+      ? "unchanged since export (runs workflow.plan.json)"
+      : "changed since export (runs a fresh compile)"
+  }\n`,
+);
+process.exitCode = errors === 0 ? 0 : 1;

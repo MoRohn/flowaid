@@ -1,4 +1,6 @@
 /** Everything a route needs, built once in `buildServer` (tests build it over a test database). */
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import type { Database } from "@flowaid/database";
 import type { CredentialService } from "@flowaid/credentials";
 import type { QueueDriver, SafeFetch } from "@flowaid/workflow-core";
@@ -24,6 +26,10 @@ export interface ApiConfig {
   allowPrivateNetwork: boolean;
   /** Local artifact storage shared with the worker (`<data>/artifacts`); null when artifacts live in S3. */
   artifactsDir: string | null;
+  /** Code export: default dependency mode (FLOWAID_EXPORT_MODE). */
+  exportMode: "npm" | "vendored";
+  /** The packed runtime packages exist (FLOWAID_VENDOR_DIR/SHA256SUMS), so vendored exports work. */
+  vendorAvailable: boolean;
 }
 
 export interface Clock {
@@ -66,6 +72,10 @@ export function configFromEnv(env: Env): ApiConfig {
     hasOidc: env.flags.hasOidc,
     allowPrivateNetwork: false,
     artifactsDir: `${String(env.FLOWAID_MASTER_KEY_FILE ?? "/data/master.key").replace(/\/[^/]*$/, "")}/artifacts`,
+    exportMode: env.FLOWAID_EXPORT_MODE === "npm" ? "npm" : "vendored",
+    vendorAvailable: existsSync(
+      join(String(env.FLOWAID_VENDOR_DIR ?? "/opt/flowaid/vendor"), "SHA256SUMS"),
+    ),
   };
 }
 
@@ -85,6 +95,8 @@ export function defaultConfig(over: Partial<ApiConfig> = {}): ApiConfig {
     hasOidc: false,
     allowPrivateNetwork: false,
     artifactsDir: null,
+    exportMode: "npm",
+    vendorAvailable: false,
     ...over,
   };
 }

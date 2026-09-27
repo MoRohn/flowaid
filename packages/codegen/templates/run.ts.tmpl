@@ -1,0 +1,92 @@
+/**
+ * `pnpm flow -- --input inputs/example.json`: runs the workflow locally. Loads `.env`, streams the
+ * run's events to stderr, asks human tasks on the terminal, then prints the trace timeline and the
+ * output. Exit code: 0 completed, 2 waiting for a person, 1 anything else.
+ */
+import { existsSync, readFileSync } from "node:fs";
+import { createInterface } from "node:readline/promises";
+import { parseArgs } from "node:util";
+import type {
+  DurableRunEvent,
+  HumanRequest,
+  HumanResponse,
+  JsonValue,
+} from "@flowaid/workflow-core";
+import { runWorkflow } from "./flow.js";
+
+const { values } = parseArgs({
+  options: {
+    input: { type: "string", short: "i", default: "inputs/example.json" },
+    json: { type: "boolean", default: false },
+    quiet: { type: "boolean", short: "q", default: false },
+    "no-human": { type: "boolean", default: false },
+  },
+});
+
+if (existsSync(".env")) process.loadEnvFile(".env");
+
+const log = (line: string) => {
+  if (!values.quiet && !values.json) process.stderr.write(`${line}\n`);
+};
+
+function describe(event: DurableRunEvent): string {
+  const e = event as DurableRunEvent & Record<string, unknown>;
+  const node = typeof e.nodeId === "string" ? ` ${e.nodeId}` : "";
+  const decision = e.decision as
+    | { kind: string; value: unknown; confidence: number; probabilities?: Record<string, number> }
+    | undefined;
+  if (event.type === "DECISION_COMPLETED" && decision) {
+    const probs = decision.probabilities
+      ? Object.entries(decision.probabilities)
+          .map(([k, p]) => `${k}=${p.toFixed(3)}`)
+          .join(" ")
+      : "";
+    return `${event.type}${node} → ${JSON.stringify(decision.value)} (confidence ${decision.confidence.toFixed(3)}) ${probs}`;
+  }
+  if (event.type === "NODE_FAILED" || event.type === "RUN_FAILED")
+    return `${event.type}${node} ${JSON.stringify(e.error)}`;
+  return `${event.type}${node}`;
+}
+
+async function askOnTerminal(request: HumanRequest): Promise<HumanResponse> {
+  const rl = createInterface({ input: process.stdin, output: process.stderr });
+  try {
+    process.stderr.write(`\nHuman task: ${request.title}\n${JSON.stringify(request.context, null, 2)}\n`);
+    const mode = request.mode;
+    if (mode.type === "choice") {
+      mode.options.forEach((o, i) => process.stderr.write(`  ${i + 1}. ${o.label}\n`));
+      const pick = Number(await rl.question("Choose a number: "));
+      const option = mode.options[pick - 1] ?? mode.options[0];
+      return { action: "choose", option: option?.id ?? "" };
+    }
+    if (mode.type === "form") {
+      const answer = await rl.question("Answer as JSON: ");
+      return { action: "submit", value: JSON.parse(answer) as JsonValue };
+    }
+    const yes = /^y/i.test(await rl.question("Approve? [y/N] "));
+    return yes ? { action: "approve" } : { action: "reject" };
+  } finally {
+    rl.close();
+  }
+}
+
+const input = JSON.parse(readFileSync(values.input, "utf8")) as JsonValue;
+const interactive = !values["no-human"] && process.stdin.isTTY;
+const result = await runWorkflow(input, {
+  onEvent: (event) => log(describe(event)),
+  ...(interactive ? { human: askOnTerminal } : {}),
+});
+
+if (values.json) {
+  process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+} else {
+  log("\nTimeline");
+  for (const span of result.trace)
+    log(
+      `  ${span.status.padEnd(10)} ${String(span.latencyMs ?? "").padStart(6)} ms  ${span.nodeId} (${span.nodeType ?? span.kind})`,
+    );
+  log(`\n${result.status}${result.outcome ? ` · ${result.outcome}` : ""} · $${result.costUsd.toFixed(5)}`);
+  if (result.error) log(`error: ${result.error.code} ${result.error.message}`);
+  process.stdout.write(`${JSON.stringify(result.output, null, 2)}\n`);
+}
+process.exitCode = result.status === "completed" ? 0 : result.status === "waiting_for_human" ? 2 : 1;
