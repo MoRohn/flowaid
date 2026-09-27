@@ -1556,6 +1556,25 @@ export const OPERATIONS: readonly CliOperation[] = [
   },
   {
     noun: "workflow",
+    verb: "ai-generate",
+    method: "POST",
+    path: "/v1/workflows/ai/generate",
+    summary: "Draft a workflow from a description (not saved until accepted)",
+    auth: "session_or_api_key",
+    positional: [],
+    query: [],
+    body: {
+      required: true,
+      properties: [
+        { name: "prompt", type: "string", required: true },
+        { name: "baseDefinition", type: "any", required: false },
+        { name: "workflowId", type: "string", required: false },
+        { name: "catalogFilter", type: "object", required: false },
+      ],
+    },
+  },
+  {
+    noun: "workflow",
     verb: "clone",
     method: "POST",
     path: "/v1/workflows/{id}/clone",
@@ -1600,6 +1619,23 @@ export const OPERATIONS: readonly CliOperation[] = [
         { name: "definition", type: "any", required: false },
         { name: "templateId", type: "string", required: false },
         { name: "resources", type: "object", required: false },
+      ],
+    },
+  },
+  {
+    noun: "workflow",
+    verb: "critique",
+    method: "POST",
+    path: "/v1/workflows/{id}/ai/critique",
+    summary: "Review a workflow against the rubric (and, optionally, a decision judge)",
+    auth: "session_or_api_key",
+    positional: ["id"],
+    query: [],
+    body: {
+      required: true,
+      properties: [
+        { name: "definition", type: "any", required: false },
+        { name: "judge", type: "boolean", required: false },
       ],
     },
   },
@@ -1670,6 +1706,23 @@ export const OPERATIONS: readonly CliOperation[] = [
       { name: "include", type: "string", required: false, enum: ["activity"] },
     ],
     body: null,
+  },
+  {
+    noun: "workflow",
+    verb: "optimize",
+    method: "POST",
+    path: "/v1/workflows/{id}/optimize",
+    summary: "Cost suggestions from 30 days of the workflow's runs",
+    auth: "session_or_api_key",
+    positional: ["id"],
+    query: [],
+    body: {
+      required: true,
+      properties: [
+        { name: "definition", type: "any", required: false },
+        { name: "days", type: "integer", required: false },
+      ],
+    },
   },
   {
     noun: "workflow",

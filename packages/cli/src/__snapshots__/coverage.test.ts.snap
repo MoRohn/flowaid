@@ -153,14 +153,17 @@ webhook list {--workflow-id --out}
 webhook rotate-secret <id> {--out}
 webhook update <id> {--secret-credential-id --callback-url --allowed-headers --enabled --require-timestamp --idempotency-header --path --body --out}
 workflow
+workflow ai-generate {--prompt --base-definition --workflow-id --catalog-filter --body --out}
 workflow clone <id> {--name --body --out}
 workflow compile <id> {--definition --environment-id --level --body --out}
 workflow create {--name --slug --description --tags --definition --template-id --resources --body --out}
+workflow critique <id> {--definition --judge --body --out}
 workflow delete <id> {--purge --out}
 workflow export <id> {--version --format --out}
 workflow get <id> {--out}
 workflow import {--definition --yaml --name --body --out}
 workflow list {--limit --cursor --order --q --tag --archived --include --out}
+workflow optimize <id> {--definition --days --body --out}
 workflow package <id> {--version --out --mode}
 workflow publish <id> {--notes --label --deploy-to --require-evaluation --body --out}
 workflow run <target> {--input --local --watch --sync --environment --version-id --wait --secret --approve}

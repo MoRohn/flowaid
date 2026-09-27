@@ -47,6 +47,9 @@ export {
 
 export { StableStringifyError, stableStringify } from "./stringify.js";
 
+export type { JsonPatchOperation } from "./patch.js";
+export { JsonPatchError, applyJsonPatch, getPointer } from "./patch.js";
+
 export { sha256Bytes, sha256Hex, sha256Json, sha256JsonRef } from "./hash.js";
 
 export type { Clock } from "./time.js";

@@ -20,11 +20,14 @@ export const FEATURES_SHIPPED: ReadonlySet<FeatureKey> = new Set<FeatureKey>([
   "settings_audit",
   "schedules",
   "mcp_exposures",
+  "advisor",
 ]);
 
 export function featuresFor(
   config: ApiConfig,
   plugins: Pick<EnabledPlugins, "packages"> = { packages: [] },
+  /** whether the workspace has a generation model for the AI builder (P6-02) */
+  runtime: { aiBuilder: boolean } = { aiBuilder: false },
 ): Record<FeatureKey, boolean> {
   const disabled = new Set(config.featuresDisabled);
   const out = {} as Record<FeatureKey, boolean>;
@@ -34,6 +37,8 @@ export function featuresFor(
   out.langchain =
     !disabled.has("langchain") &&
     plugins.packages.some((p) => p.name === "@flowaid/nodes-langchain");
+  // The critic and optimizer are deterministic; the AI builder needs a generation model.
+  out.ai_builder = runtime.aiBuilder && !disabled.has("ai_builder");
   // Code export works in npm mode, or vendored with the packed runtime packages present.
   out.code_export =
     (config.exportMode === "npm" || config.vendorAvailable) && !disabled.has("code_export");

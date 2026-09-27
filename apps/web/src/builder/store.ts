@@ -4,12 +4,14 @@
  * changes (layout-only moves are not recorded). Compile results arrive from the Web Worker.
  */
 import { createStore } from "zustand/vanilla";
+import { applyJsonPatch, JsonPatchError, type JsonPatchOperation } from "@flowaid/shared";
 import { applyPatches, enablePatches, produceWithPatches, type Draft, type Patch } from "immer";
 import type {
   Binding,
   Diagnostic,
   ExecutionPlan,
   JsonSchema,
+  JsonValue,
   NodePolicy,
   WorkflowDefinition,
   WorkflowNode,
@@ -67,6 +69,11 @@ export interface BuilderState {
   setInputsSchema(schema: JsonSchema): void;
   setOutputsSchema(schema: JsonSchema): void;
   updateDefinition(recipe: (d: Draft<WorkflowDefinition>) => void, label: string): void;
+  /**
+   * Applies RFC 6902 operations (an advisor fix) as one undoable edit; forms remount. False, with a
+   * notice, when an operation does not apply to the current definition.
+   */
+  applyPatch(patch: readonly JsonPatchOperation[], label: string): boolean;
   replaceDefinition(def: WorkflowDefinition, revision: number): void;
   bumpEpoch(): void;
   select(selection: { nodes: string[]; edges: string[] }): void;
@@ -94,7 +101,7 @@ export function createBuilderStore(init: {
     /** Applies a recipe to the definition; records history unless `record` is false. */
     const mutate = (
       label: string,
-      recipe: (d: Draft<WorkflowDefinition>) => void,
+      recipe: (d: Draft<WorkflowDefinition>) => void | WorkflowDefinition,
       record = true,
     ) => {
       const [next, patches, inverse] = produceWithPatches(get().definition, recipe);
@@ -319,6 +326,22 @@ export function createBuilderStore(init: {
       },
       updateDefinition(recipe, label) {
         mutate(label, recipe);
+      },
+      applyPatch(patch, label) {
+        let next: WorkflowDefinition;
+        try {
+          next = applyJsonPatch(
+            get().definition as unknown as JsonValue,
+            patch,
+          ) as unknown as WorkflowDefinition;
+        } catch (error) {
+          if (!(error instanceof JsonPatchError)) throw error;
+          notify(`${label}: the workflow changed since the suggestion was made (${error.message})`);
+          return false;
+        }
+        mutate(label, () => next);
+        set((s) => ({ epoch: s.epoch + 1 }));
+        return true;
       },
       bumpEpoch() {
         set((s) => ({ epoch: s.epoch + 1 }));

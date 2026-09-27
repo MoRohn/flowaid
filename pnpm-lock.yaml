@@ -226,6 +226,9 @@ importers:
       '@fastify/swagger':
         specifier: 9.9.0
         version: 9.9.0(supports-color@7.2.0)
+      '@flowaid/advisor':
+        specifier: workspace:*
+        version: link:../../packages/advisor
       '@flowaid/codegen':
         specifier: workspace:*
         version: link:../../packages/codegen
@@ -253,6 +256,18 @@ importers:
       '@flowaid/openapi-tools':
         specifier: workspace:*
         version: link:../../packages/openapi-tools
+      '@flowaid/provider-anthropic':
+        specifier: workspace:*
+        version: link:../../packages/provider-anthropic
+      '@flowaid/provider-ollama':
+        specifier: workspace:*
+        version: link:../../packages/provider-ollama
+      '@flowaid/provider-openai':
+        specifier: workspace:*
+        version: link:../../packages/provider-openai
+      '@flowaid/provider-typesafe':
+        specifier: workspace:*
+        version: link:../../packages/provider-typesafe
       '@flowaid/providers':
         specifier: workspace:*
         version: link:../../packages/providers
@@ -484,6 +499,40 @@ importers:
       tsx:
         specifier: 4.23.15
         version: 4.23.15
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: 4.1.11
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(@vitest/coverage-v8@4.1.11)(happy-dom@20.14.5)(vite@8.3.0(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+
+  packages/advisor:
+    dependencies:
+      '@flowaid/shared':
+        specifier: workspace:*
+        version: link:../shared
+      '@flowaid/workflow-compiler':
+        specifier: workspace:*
+        version: link:../workflow-compiler
+      '@flowaid/workflow-core':
+        specifier: workspace:*
+        version: link:../workflow-core
+      zod:
+        specifier: 4.6.5
+        version: 4.6.5
+    devDependencies:
+      '@flowaid/config':
+        specifier: workspace:*
+        version: link:../config
+      '@flowaid/providers':
+        specifier: workspace:*
+        version: link:../providers
+      '@types/node':
+        specifier: 24.13.6
+        version: 24.13.6
+      eslint:
+        specifier: 9.39.5
+        version: 9.39.5(jiti@2.7.0)(supports-color@10.2.2)
       typescript:
         specifier: 5.9.3
         version: 5.9.3

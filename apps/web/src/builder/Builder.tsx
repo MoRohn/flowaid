@@ -10,7 +10,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useStore } from "zustand";
 import type { Connection, EdgeChange, NodeChange } from "@xyflow/react";
-import { Copy, Download, Rocket, Trash2 } from "lucide-react";
+import { CircleDollarSign, Copy, Download, ListChecks, Rocket, Trash2 } from "lucide-react";
 import type {
   CompileResult,
   NodeManifest,
@@ -70,6 +70,7 @@ import { runErrorMessage } from "./errors";
 import { NodeInspector } from "./NodeInspector";
 import { PublishDialog } from "./PublishDialog";
 import { RunTab } from "./RunTab";
+import { CostTab, ReviewTab, advisorAvailability, costDiagnostics, useAdvisor } from "./advisor";
 
 const AUTOSAVE_MS = 1000;
 
@@ -178,6 +179,17 @@ function BuilderView({
   );
   const [starting, setStarting] = useState(false);
   const [bottomTab, setBottomTab] = useState("run");
+  const advisorOn = advisorAvailability(s.features, !readOnly).advisor;
+  const advisor = useAdvisor({ workflowId: workflow.id, store, enabled: advisorOn });
+  const problems = useMemo(
+    () => [...compiled.diagnostics, ...costDiagnostics(advisor, version)],
+    [advisor, compiled.diagnostics, version],
+  );
+  const openAdvisorTab = (tab: "review" | "cost") => {
+    setBottomTab(tab);
+    if (tab === "review") advisor.runReview();
+    else advisor.runCost();
+  };
   const [title, setTitle] = useState(workflow.name);
   const lookup = useMemo(
     () => ({
@@ -602,12 +614,15 @@ function BuilderView({
         {
           id: "problems",
           label: "Problems",
-          count: compiled.diagnostics.length,
+          count: problems.length,
           countTone: errors.length ? "danger" : "warn",
           content: (
             <div className="h-full overflow-auto p-3">
-              {compiled.diagnostics.length ? (
-                <DiagnosticList diagnostics={compiled.diagnostics} />
+              {problems.length ? (
+                <DiagnosticList
+                  diagnostics={problems}
+                  {...(!readOnly ? { onApplyFix: advisor.applyDiagnosticFix } : {})}
+                />
               ) : (
                 <EmptyState
                   size="sm"
@@ -618,6 +633,28 @@ function BuilderView({
             </div>
           ),
         },
+        ...(advisorOn
+          ? [
+              {
+                id: "review",
+                label: "Review",
+                ...(advisor.review ? { count: advisor.review.data.advice.length } : {}),
+                content: (
+                  <ReviewTab
+                    advisor={advisor}
+                    definition={definition}
+                    onFocusNode={(id) => store.getState().select({ nodes: [id], edges: [] })}
+                  />
+                ),
+              },
+              {
+                id: "cost",
+                label: "Cost",
+                ...(advisor.cost ? { count: advisor.cost.data.suggestions.length } : {}),
+                content: <CostTab advisor={advisor} definition={definition} catalog={catalog} />,
+              },
+            ]
+          : []),
       ]}
     />
   );
@@ -694,6 +731,22 @@ function BuilderView({
           icon: <Download strokeWidth={1.75} />,
           onSelect: exportJson,
         },
+        ...(advisorOn
+          ? [
+              {
+                id: "review",
+                label: "Review this workflow",
+                icon: <ListChecks strokeWidth={1.75} />,
+                onSelect: () => openAdvisorTab("review"),
+              },
+              {
+                id: "cost",
+                label: "Find cost savings",
+                icon: <CircleDollarSign strokeWidth={1.75} />,
+                onSelect: () => openAdvisorTab("cost"),
+              },
+            ]
+          : []),
         {
           id: "undo",
           label: `Undo ${history.past.at(-1)?.label ?? ""}`.trim(),

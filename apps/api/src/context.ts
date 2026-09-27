@@ -6,6 +6,7 @@ import type { CredentialService } from "@flowaid/credentials";
 import type { QueueDriver, SafeFetch } from "@flowaid/workflow-core";
 import type { RunEventHub } from "./services/hub.js";
 import type { Env } from "@flowaid/env";
+import type { ProviderRegistry } from "@flowaid/providers";
 import type { AuthService } from "./auth/service.js";
 import type { JwtKeys } from "./auth/jwt.js";
 
@@ -51,6 +52,8 @@ export interface ApiContext {
   /** SSRF-guarded fetch for outbound calls the API makes (OpenAPI import, MCP discovery, credential tests) */
   http: SafeFetch;
   env?: Env;
+  /** providers the advisor generates and judges with (P6-02); built from the server's factories */
+  providers?: ProviderRegistry;
 }
 
 export function configFromEnv(env: Env): ApiConfig {

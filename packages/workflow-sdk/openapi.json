@@ -712,6 +712,14 @@
                       "budgets": {
                         "type": "object",
                         "properties": { "monthlyCostUsd": { "type": "number", "minimum": 0 } }
+                      },
+                      "advisorModel": {
+                        "type": "object",
+                        "properties": {
+                          "provider": { "type": "string" },
+                          "model": { "type": "string" }
+                        },
+                        "required": ["provider", "model"]
                       }
                     },
                     "additionalProperties": {}
@@ -7016,6 +7024,347 @@
         "x-auth": "session_or_api_key",
         "x-scopes": ["evaluations:write"],
         "responses": { "200": { "description": "Default Response" } }
+      }
+    },
+    "/v1/workflows/{id}/optimize": {
+      "post": {
+        "summary": "Cost suggestions from 30 days of the workflow's runs",
+        "tags": ["workflows"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "default": { "days": 30 },
+                "type": "object",
+                "properties": {
+                  "definition": {},
+                  "days": { "default": 30, "type": "integer", "minimum": 1, "maximum": 90 }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "x-cli": { "noun": "workflow", "verb": "optimize", "positional": ["id"] },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["workflows:read"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "suggestions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": { "type": "string" },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "cheaper_model",
+                              "batch_decisions",
+                              "cache_safe_node",
+                              "tighten_bounds"
+                            ]
+                          },
+                          "nodeIds": { "type": "array", "items": { "type": "string" } },
+                          "title": { "type": "string" },
+                          "rationale": { "type": "string" },
+                          "estimatedSavingsUsdPerRun": { "type": "number" },
+                          "currentCostUsdPerRun": { "type": "number" },
+                          "latencyDeltaMs": { "type": "number" },
+                          "risk": { "type": "string", "enum": ["low", "medium", "high"] },
+                          "qualityImpact": { "type": "string" },
+                          "fix": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "propertyNames": { "type": "string" },
+                              "additionalProperties": {}
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "nodeIds",
+                          "title",
+                          "rationale",
+                          "estimatedSavingsUsdPerRun",
+                          "currentCostUsdPerRun",
+                          "latencyDeltaMs",
+                          "risk",
+                          "qualityImpact",
+                          "fix"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "diagnostics": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": { "type": "string" },
+                          "severity": { "type": "string", "enum": ["error", "warning", "info"] },
+                          "message": { "type": "string" }
+                        },
+                        "required": ["code", "severity", "message"],
+                        "additionalProperties": {}
+                      }
+                    },
+                    "window": {
+                      "type": "object",
+                      "properties": {
+                        "days": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "from": { "type": "string" },
+                        "runs": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "required": ["days", "from", "runs"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["suggestions", "diagnostics", "window"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/workflows/ai/generate": {
+      "post": {
+        "summary": "Draft a workflow from a description (not saved until accepted)",
+        "tags": ["workflows"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "prompt": { "type": "string", "minLength": 3, "maxLength": 8000 },
+                  "baseDefinition": {},
+                  "workflowId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "catalogFilter": {
+                    "type": "object",
+                    "properties": {
+                      "categories": {
+                        "maxItems": 20,
+                        "type": "array",
+                        "items": { "type": "string" }
+                      },
+                      "types": { "maxItems": 200, "type": "array", "items": { "type": "string" } }
+                    }
+                  }
+                },
+                "required": ["prompt"]
+              }
+            }
+          }
+        },
+        "x-cli": { "noun": "workflow", "verb": "ai-generate" },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["workflows:write"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "definition": { "anyOf": [{}, { "type": "null" }] },
+                    "diagnostics": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": { "type": "string" },
+                          "severity": { "type": "string", "enum": ["error", "warning", "info"] },
+                          "message": { "type": "string" }
+                        },
+                        "required": ["code", "severity", "message"],
+                        "additionalProperties": {}
+                      }
+                    },
+                    "rationale": { "type": "string" },
+                    "iterations": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "model": {
+                      "type": "object",
+                      "properties": {
+                        "provider": { "type": "string" },
+                        "model": { "type": "string" }
+                      },
+                      "required": ["provider", "model"],
+                      "additionalProperties": false
+                    },
+                    "usage": {
+                      "type": "object",
+                      "properties": {
+                        "inputTokens": { "type": "number" },
+                        "outputTokens": { "type": "number" }
+                      },
+                      "required": ["inputTokens", "outputTokens"],
+                      "additionalProperties": false
+                    },
+                    "costUsd": { "type": "number" }
+                  },
+                  "required": [
+                    "definition",
+                    "diagnostics",
+                    "rationale",
+                    "iterations",
+                    "model",
+                    "usage",
+                    "costUsd"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/workflows/{id}/ai/critique": {
+      "post": {
+        "summary": "Review a workflow against the rubric (and, optionally, a decision judge)",
+        "tags": ["workflows"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "default": { "judge": false },
+                "type": "object",
+                "properties": { "definition": {}, "judge": { "default": false, "type": "boolean" } }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "x-cli": { "noun": "workflow", "verb": "critique", "positional": ["id"] },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["workflows:read"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "advice": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": { "type": "string" },
+                          "rule": { "type": "string" },
+                          "source": { "type": "string", "enum": ["rubric", "judge"] },
+                          "severity": {
+                            "type": "string",
+                            "enum": ["error", "warning", "suggestion"]
+                          },
+                          "category": {
+                            "type": "string",
+                            "enum": [
+                              "cost",
+                              "safety",
+                              "reliability",
+                              "correctness",
+                              "performance",
+                              "style"
+                            ]
+                          },
+                          "title": { "type": "string" },
+                          "detail": { "type": "string" },
+                          "nodeIds": { "type": "array", "items": { "type": "string" } },
+                          "fix": {
+                            "type": "object",
+                            "properties": {
+                              "title": { "type": "string" },
+                              "patch": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "propertyNames": { "type": "string" },
+                                  "additionalProperties": {}
+                                }
+                              }
+                            },
+                            "required": ["title", "patch"],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "rule",
+                          "source",
+                          "severity",
+                          "category",
+                          "title",
+                          "detail",
+                          "nodeIds"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "checks": { "type": "array", "items": { "type": "string" } },
+                    "reviewedAt": { "type": "string" }
+                  },
+                  "required": ["advice", "checks", "reviewedAt"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/v1/workflow-versions/{id}/export/package": {

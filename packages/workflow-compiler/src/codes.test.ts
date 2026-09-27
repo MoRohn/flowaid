@@ -19,7 +19,11 @@ import { compile, verifyPlanHash, type CompileInput } from "./index.js";
 import { FIXTURE_MANIFESTS, catalogOf, readJson } from "./test/support.js";
 
 /** Codes owned by other packages: evaluation-gated publish and the importer. */
-const NOT_COMPILER: DiagnosticCode[] = ["W_REGRESSION", "E_IMPORT_UNSUPPORTED"];
+const NOT_COMPILER: DiagnosticCode[] = [
+  "W_REGRESSION",
+  "E_IMPORT_UNSUPPORTED",
+  "I_COST_SUGGESTION",
+];
 
 type Doc = Record<string, any>;
 

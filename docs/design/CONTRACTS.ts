@@ -1373,7 +1373,7 @@ export const DiagnosticCodeSchema = z.enum([
   // decisions, human, agent, policy
   'E_DECISION_CONFIG', 'E_HUMAN_CONFIG', 'E_AGENT_UNBOUNDED', 'E_RETRY_ON_IRREVERSIBLE', 'W_RETRY_SIDE_EFFECT', 'E_DONOTPERSIST_SIDE_EFFECT',
   // publish-time & runtime
-  'E_TRIGGER_CONFLICT', 'W_COST_ESTIMATE', 'W_REGRESSION', 'E_PLAN_HASH_MISMATCH', 'E_IMPORT_UNSUPPORTED', 'E_INTERNAL',
+  'E_TRIGGER_CONFLICT', 'W_COST_ESTIMATE', 'I_COST_SUGGESTION', 'W_REGRESSION', 'E_PLAN_HASH_MISMATCH', 'E_IMPORT_UNSUPPORTED', 'E_INTERNAL',
 ]);
 export type DiagnosticCode = z.infer<typeof DiagnosticCodeSchema>;
 
