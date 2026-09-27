@@ -1,0 +1,459 @@
+/**
+ * `flowaid.ai.agent` (WP-26): a bounded tool loop over `ctx.providers.generation` (one model or a
+ * failover policy, RFC-0005) and `ctx.tools` (MCP tools, OpenAPI operations, workflows as tools),
+ * so every model turn is a GENERATION_COMPLETED event with cost and every tool call a
+ * TOOL_CALLED/TOOL_RETURNED pair with capability checks.
+ *
+ * Bounds: `maxSteps` (model turns; set on the node, where the compiler checks it), `maxToolCalls`,
+ * `maxTokens`, `maxCostUsd` (default 1 USD, also the manifest's default policy so the compiler
+ * sees a spend bound) and the node timeout (`ctx.signal`); the run's remaining budget caps them
+ * too. Exceeding one fails the node with BOUNDS_EXCEEDED (route it with the policy's `onError`).
+ *
+ * Approval: each tool has `approval: always | irreversible | never`. `irreversible` (the default)
+ * asks when the tool is marked `approvalRequired` or is not idempotent (`idempotency: none`). A
+ * model turn that requests such a call suspends the node with a human approval task; the suspend
+ * `state` holds the conversation, the pending calls and the spend so far, so the run survives
+ * restarts. On approval the pending calls run and the loop continues; on rejection (or expiry)
+ * the model is told the calls were not approved.
+ *
+ * Presets: `agentId` names an agent preset (`/v1/agents`); its settings apply under the node's own
+ * (the worker serves them through the `agent_preset` builtin tool). Tool errors are reported to
+ * the model, not raised, so the agent can recover.
+ */
+import { z } from "zod";
+import { defineNode, ok, suspend, type ExecutionContext } from "@flowaid/node-sdk";
+import {
+  BadRequestError,
+  BoundsExceededError,
+  NodeExecutionError,
+  toFlowaidError,
+  type ChatMessage,
+  type GenerationPolicy,
+  type GenerationProvider,
+  type GenerationRequest,
+  type GenerationResult,
+  type JsonValue,
+  type ModelRef,
+  type TokenUsage,
+  type ToolCall,
+  type ToolDefinition,
+} from "@flowaid/workflow-core";
+import { callCtx, generationModel, usageSchema } from "../common.js";
+
+/** The builtin tool the worker answers with an agent preset's settings. */
+export const AGENT_PRESET_BUILTIN = "agent_preset";
+
+export const APPROVAL_MODES = ["always", "irreversible", "never"] as const;
+export type ApprovalMode = (typeof APPROVAL_MODES)[number];
+
+const toolEntry = z.object({
+  name: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/),
+  approval: z.enum(APPROVAL_MODES).default("irreversible"),
+});
+
+export const AGENT_DEFAULTS = {
+  system: "You are a careful assistant. Use the tools when they help, and answer concisely.",
+  temperature: 0.2,
+  maxOutputTokens: 2048,
+  maxSteps: 8,
+  maxToolCalls: 16,
+  /** USD per node run unless the node, its preset or the run budget sets a lower one */
+  maxCostUsd: 1,
+  /** off by default: streamed turns carry no price, so maxCostUsd sees exact cost only without it */
+  stream: false,
+} as const;
+
+/** The settings a preset may carry (every node setting except the preset reference). */
+export const agentSettingsSchema = z.object({
+  model: generationModel.optional(),
+  system: z
+    .string()
+    .max(32_000)
+    .optional()
+    .meta({ "x-ui": { widget: "textarea" } }),
+  tools: z
+    .array(toolEntry)
+    .max(32)
+    .optional()
+    .meta({
+      "x-ui": {
+        widget: "list",
+        help: "Tools the agent may call (MCP tools, OpenAPI operations, workflows as tools) and when a person approves a call.",
+      },
+    }),
+  temperature: z.number().min(0).max(2).optional(),
+  maxOutputTokens: z.int().min(1).max(65_536).optional(),
+  maxSteps: z.int().min(1).max(50).optional(),
+  maxToolCalls: z.int().min(0).max(200).optional(),
+  maxTokens: z.int().min(1).optional(),
+  maxCostUsd: z.number().min(0).optional(),
+  stream: z.boolean().optional(),
+});
+export type AgentSettings = z.infer<typeof agentSettingsSchema>;
+
+export interface EffectiveAgent {
+  model: ModelRef | GenerationPolicy;
+  system: string;
+  tools: { name: string; approval: ApprovalMode }[];
+  temperature: number;
+  maxOutputTokens: number;
+  maxSteps: number;
+  maxToolCalls: number;
+  maxTokens?: number;
+  maxCostUsd?: number;
+  stream: boolean;
+}
+
+/** Defaults, then the preset, then what the node sets itself. */
+export function effectiveAgent(node: AgentSettings, preset: AgentSettings | null): EffectiveAgent {
+  const pick = <K extends keyof AgentSettings>(k: K) => node[k] ?? preset?.[k];
+  const model = pick("model");
+  if (!model)
+    throw new BadRequestError("The agent has no model: set one on the node or on its preset");
+  const maxTokens = pick("maxTokens");
+  const maxCostUsd = pick("maxCostUsd");
+  return {
+    model: model,
+    system: pick("system") ?? AGENT_DEFAULTS.system,
+    tools: (pick("tools") ?? []).map((t) => ({ name: t.name, approval: t.approval })),
+    temperature: pick("temperature") ?? AGENT_DEFAULTS.temperature,
+    maxOutputTokens: pick("maxOutputTokens") ?? AGENT_DEFAULTS.maxOutputTokens,
+    maxSteps: pick("maxSteps") ?? AGENT_DEFAULTS.maxSteps,
+    maxToolCalls: pick("maxToolCalls") ?? AGENT_DEFAULTS.maxToolCalls,
+    ...(maxTokens !== undefined ? { maxTokens } : {}),
+    ...(maxCostUsd !== undefined ? { maxCostUsd } : {}),
+    stream: pick("stream") ?? AGENT_DEFAULTS.stream,
+  };
+}
+
+/** Whether a call to `def` waits for a person under `mode`. */
+export function needsApproval(def: ToolDefinition, mode: ApprovalMode): boolean {
+  if (mode === "always") return true;
+  if (mode === "never") return false;
+  return def.approvalRequired || def.idempotency === "none";
+}
+
+interface LogEntry {
+  name: string;
+  args: JsonValue;
+  ok: boolean;
+}
+
+/** What survives a suspension. */
+export interface AgentState {
+  v: 1;
+  messages: ChatMessage[];
+  pending: ToolCall[];
+  steps: number;
+  toolCalls: number;
+  usage: TokenUsage;
+  costUsd: number;
+  log: LogEntry[];
+}
+const isAgentState = (v: unknown): v is AgentState =>
+  typeof v === "object" && v !== null && (v as { v?: unknown }).v === 1;
+
+async function loadPreset<C>(ctx: ExecutionContext<C>, agentId: string): Promise<AgentSettings> {
+  const r = await ctx.tools.call(
+    { kind: "builtin", id: AGENT_PRESET_BUILTIN },
+    AGENT_PRESET_BUILTIN,
+    {
+      agentId,
+    },
+  );
+  if (!r.ok)
+    throw new NodeExecutionError(r.error?.message ?? `agent preset ${agentId} not found`, false);
+  const parsed = agentSettingsSchema.safeParse(r.structured);
+  if (!parsed.success)
+    throw new NodeExecutionError(
+      `agent preset ${agentId} is invalid: ${parsed.error.message}`,
+      false,
+    );
+  return parsed.data;
+}
+
+/** One model turn, streamed when possible (text deltas and tool-call arguments assembled). */
+async function turn<C>(
+  ctx: ExecutionContext<C>,
+  provider: GenerationProvider,
+  req: GenerationRequest,
+  stream: boolean,
+): Promise<Pick<GenerationResult, "text" | "toolCalls" | "usage" | "costUsd">> {
+  if (!stream || !provider.capabilities.streaming) {
+    const r = await provider.generate(req, callCtx(ctx));
+    return { text: r.text, toolCalls: r.toolCalls, usage: r.usage, costUsd: r.costUsd };
+  }
+  let text = "";
+  let usage: TokenUsage = { inputTokens: 0, outputTokens: 0 };
+  const calls = new Map<number, { id: string; name: string; args: string }>();
+  for await (const chunk of provider.stream(req, callCtx(ctx))) {
+    switch (chunk.type) {
+      case "text":
+        text += chunk.delta;
+        ctx.events.stream("text", chunk.delta);
+        break;
+      case "thinking":
+        ctx.events.stream("thinking", chunk.delta);
+        break;
+      case "tool_call": {
+        const cur = calls.get(chunk.index) ?? { id: "", name: "", args: "" };
+        if (chunk.id) cur.id = chunk.id;
+        if (chunk.name) cur.name = chunk.name;
+        cur.args += chunk.argsDelta;
+        calls.set(chunk.index, cur);
+        if (chunk.argsDelta) ctx.events.stream("tool_args", chunk.argsDelta);
+        break;
+      }
+      case "usage":
+        usage = chunk.usage;
+        break;
+      case "done":
+        break;
+    }
+  }
+  const toolCalls: ToolCall[] = [...calls.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([i, c]) => {
+      let args: JsonValue = {};
+      try {
+        args = c.args.trim() ? (JSON.parse(c.args) as JsonValue) : {};
+      } catch {
+        args = { _unparsed: c.args };
+      }
+      return { id: c.id || `call_${i}`, name: c.name, args };
+    });
+  // streamed turns carry no price: the provider's usage is recorded; cost stays with generate()
+  return { text, toolCalls, usage, costUsd: 0 };
+}
+
+export const agentNode = defineNode({
+  id: "flowaid.ai.agent",
+  version: "1.0.0",
+  metadata: {
+    name: "Agent",
+    description:
+      "A tool-using agent: a model calls MCP tools, OpenAPI operations and workflows in a loop bounded by steps, tool calls, tokens, cost and time; calls that need approval pause the run for a person.",
+    category: "agent",
+    icon: "bot",
+    tags: ["agent", "tools", "llm"],
+    summary: "{{ config.maxSteps }} steps",
+  },
+  configSchema: agentSettingsSchema
+    .extend({
+      // the compiler requires the step bound on the node itself (E_AGENT_UNBOUNDED)
+      maxSteps: z.int().min(1).max(50).default(AGENT_DEFAULTS.maxSteps),
+      agentId: z
+        .uuid()
+        .optional()
+        .meta({
+          "x-ui": {
+            help: "An agent preset (Agents page); the node's own settings override it.",
+          },
+        }),
+    })
+    .strict(),
+  inputSchema: z.object({
+    task: z.string().min(1),
+    context: z.unknown().optional(),
+  }),
+  outputSchema: z.object({
+    answer: z.string(),
+    steps: z.int().min(0),
+    tool_calls: z.array(z.object({ name: z.string(), args: z.unknown(), ok: z.boolean() })),
+    usage: usageSchema,
+  }),
+  credentials: [
+    {
+      name: "llm",
+      types: ["openai.api_key", "anthropic.api_key", "ollama.none"],
+      required: false,
+    },
+  ],
+  capabilities: ["generation", "credentials", "tools", "suspend", "streaming"],
+  idempotency: "none",
+  generation: true,
+  streams: true,
+  // a spend bound the compiler can see (E_AGENT_UNBOUNDED); the loop enforces it too
+  defaultPolicy: { timeoutMs: 600_000, maxCostUsd: AGENT_DEFAULTS.maxCostUsd },
+  execute: async (ctx, input) => {
+    const { agentId, ...own } = ctx.config;
+    const preset = agentId ? await loadPreset(ctx, agentId) : null;
+    const a = effectiveAgent(own, preset);
+
+    const available = a.tools.length ? await ctx.tools.list() : [];
+    const defs = a.tools.map((t) => {
+      const def = available.find((d) => d.name === t.name);
+      if (!def)
+        throw new NodeExecutionError(
+          `The agent's tool '${t.name}' is not available in this workspace`,
+          false,
+        );
+      return { def, approval: t.approval };
+    });
+    const entryOf = (name: string) => defs.find((d) => d.def.name === name);
+
+    const resumed = ctx.resume && isAgentState(ctx.resume.state) ? ctx.resume.state : undefined;
+    const usage: TokenUsage = resumed ? { ...resumed.usage } : { inputTokens: 0, outputTokens: 0 };
+    let costUsd = resumed?.costUsd ?? 0;
+    let steps = resumed?.steps ?? 0;
+    let toolCalls = resumed?.toolCalls ?? 0;
+    const log: LogEntry[] = [...(resumed?.log ?? [])];
+    const messages: ChatMessage[] = resumed
+      ? [...resumed.messages]
+      : [
+          { role: "system", content: a.system },
+          {
+            role: "user",
+            content:
+              input.context === undefined
+                ? input.task
+                : `${input.task}\n\nContext:\n${typeof input.context === "string" ? input.context : JSON.stringify(input.context, null, 2)}`,
+          },
+        ];
+
+    /** Runs one call; failures go back to the model as text. */
+    const run = async (call: ToolCall): Promise<ChatMessage> => {
+      const entry = entryOf(call.name);
+      if (!entry) {
+        log.push({ name: call.name, args: call.args, ok: false });
+        return {
+          role: "tool",
+          toolCallId: call.id,
+          content: `There is no tool named '${call.name}'.`,
+        };
+      }
+      try {
+        const r = await ctx.tools.call(entry.def.source, entry.def.name, call.args);
+        log.push({ name: call.name, args: call.args, ok: r.ok });
+        if (r.usage) {
+          usage.inputTokens += r.usage.inputTokens;
+          usage.outputTokens += r.usage.outputTokens;
+        }
+        return {
+          role: "tool",
+          toolCallId: call.id,
+          content: r.ok ? r.content : `The tool failed: ${r.error?.message ?? r.content}`,
+        };
+      } catch (error) {
+        log.push({ name: call.name, args: call.args, ok: false });
+        return {
+          role: "tool",
+          toolCallId: call.id,
+          content: `The tool failed: ${toFlowaidError(error).message}`,
+        };
+      }
+    };
+
+    if (resumed && ctx.resume) {
+      const approved = ctx.resume.kind === "human" && ctx.resume.response.action === "approve";
+      const comment =
+        ctx.resume.kind === "human" && "comment" in ctx.resume.response
+          ? ctx.resume.response.comment
+          : undefined;
+      for (const call of resumed.pending) {
+        if (approved) messages.push(await run(call));
+        else {
+          log.push({ name: call.name, args: call.args, ok: false });
+          messages.push({
+            role: "tool",
+            toolCallId: call.id,
+            content: `The call was not approved${ctx.resume.kind === "timeout" ? " (the approval timed out)" : ""}${comment ? `: ${comment}` : ""}. Do not retry it; continue without it.`,
+          });
+        }
+      }
+    }
+
+    // the tightest of the agent's own caps and what the run has left
+    const minOf = (...xs: (number | null | undefined)[]) => {
+      const set = xs.filter((x): x is number => typeof x === "number");
+      return set.length ? Math.min(...set) : undefined;
+    };
+    const costCap = minOf(
+      a.maxCostUsd ?? AGENT_DEFAULTS.maxCostUsd,
+      ctx.budget.remainingCostUsd === null ? undefined : costUsd + ctx.budget.remainingCostUsd,
+    );
+    const tokenCap = minOf(
+      a.maxTokens,
+      ctx.budget.remainingTokens === null
+        ? undefined
+        : usage.inputTokens + usage.outputTokens + ctx.budget.remainingTokens,
+    );
+    const provider = ctx.providers.generation(a.model, { credentialSlot: "llm" });
+    const toolDefs = defs.map((d) => d.def);
+    for (;;) {
+      if (steps >= a.maxSteps)
+        throw new BoundsExceededError("maxIterations", a.maxSteps, steps + 1);
+      const r = await turn(
+        ctx,
+        provider,
+        {
+          messages,
+          ...(toolDefs.length ? { tools: toolDefs, toolChoice: "auto" as const } : {}),
+          temperature: a.temperature,
+          maxOutputTokens: a.maxOutputTokens,
+        },
+        a.stream,
+      );
+      steps += 1;
+      usage.inputTokens += r.usage.inputTokens;
+      usage.outputTokens += r.usage.outputTokens;
+      costUsd += r.costUsd;
+      const tokens = usage.inputTokens + usage.outputTokens;
+      if (tokenCap !== undefined && tokens > tokenCap)
+        throw new BoundsExceededError("maxTokens", tokenCap, tokens);
+      if (costCap !== undefined && costUsd > costCap)
+        throw new BoundsExceededError("maxCostUsd", costCap, costUsd);
+
+      if (r.toolCalls.length === 0) {
+        return ok(
+          { answer: r.text, steps, tool_calls: log, usage },
+          { usage, ...(costUsd > 0 ? { costUsd } : {}) },
+        );
+      }
+      messages.push({ role: "assistant", content: r.text, toolCalls: r.toolCalls });
+      toolCalls += r.toolCalls.length;
+      if (toolCalls > a.maxToolCalls)
+        throw new BoundsExceededError("maxIterations", a.maxToolCalls, toolCalls);
+
+      const gated = r.toolCalls.filter((call) => {
+        const e = entryOf(call.name);
+        return e ? needsApproval(e.def, e.approval) : false;
+      });
+      if (gated.length > 0) {
+        const saved: AgentState = {
+          v: 1,
+          messages,
+          pending: r.toolCalls,
+          steps,
+          toolCalls,
+          usage,
+          costUsd,
+          log,
+        };
+        return suspend(
+          {
+            kind: "human",
+            request: {
+              title: `Approve ${gated.map((g) => g.name).join(", ")}`.slice(0, 200),
+              context: {
+                task: input.task,
+                ...(r.text ? { reasoning: r.text } : {}),
+                calls: r.toolCalls.map((call) => ({
+                  tool: call.name,
+                  args: call.args,
+                  needsApproval: gated.includes(call),
+                })),
+              },
+              mode: { type: "approval" },
+              assignees: [],
+              expiresAt: null,
+              externalReview: false,
+            },
+          },
+          saved as unknown as JsonValue,
+        );
+      }
+      for (const call of r.toolCalls) messages.push(await run(call));
+    }
+  },
+});

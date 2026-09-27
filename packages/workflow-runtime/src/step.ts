@@ -868,13 +868,22 @@ class Stepper {
       workerId: this.ctx.workerId,
     } as AnyEvent);
     const input = (n.input ?? {}) as JsonObject;
+    // A resumed node sees its configuration again, rendered like the first execution (the
+    // scope's values are all in the state); only `resume` tells the two apart.
+    const node = this.node(nodeId);
+    let config: JsonObject = {};
+    try {
+      config = this.taskIo(scope, node).config;
+    } catch {
+      config = node.op.kind === "task" ? node.op.config : {};
+    }
     this.effects.push({
       type: "execute",
       scope,
       nodeId,
       nodeRunId: n.nodeRunId,
       input,
-      config: {},
+      config,
       resume,
     });
   }

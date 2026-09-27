@@ -531,6 +531,45 @@ describe("human tasks", () => {
     expect(sim.of("RUN_COMPLETED")[0]?.output).toEqual({ approved: "approve", state: { step: 3 } });
   });
 
+  it("a resumed task sees the same configuration as its first execution", async () => {
+    const plan = planOf({
+      nodes: [start, transform("agent", "start.x"), out("out", ref("agent", "result"))],
+    });
+    const configs: unknown[] = [];
+    const sim = await simulate({
+      plan,
+      input,
+      executors: {
+        agent: (c: FakeCall): ExecutorOutcome => {
+          configs.push(c.config);
+          return c.resume?.kind === "human"
+            ? okResult({ result: "done" })
+            : {
+                kind: "suspend",
+                wait: {
+                  kind: "human",
+                  request: {
+                    title: "t",
+                    context: {},
+                    mode: { type: "approval" },
+                    assignees: [],
+                    expiresAt: null,
+                    externalReview: false,
+                  },
+                },
+                state: {},
+                latencyMs: 1,
+              };
+        },
+      },
+    });
+    await sim.respond("agent", { action: "approve" });
+    expect(sim.status).toBe("completed");
+    expect(configs).toHaveLength(2);
+    expect(configs[1]).toEqual(configs[0]);
+    expect(configs[0]).not.toEqual({});
+  });
+
   it("a decision failover suspension is tagged decision_failover", async () => {
     const plan = planOf({
       nodes: [start, transform("agent", "start.x"), out("out", ref("agent", "result"))],

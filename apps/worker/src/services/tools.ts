@@ -13,7 +13,8 @@ import {
   type McpSessionPool,
 } from "@flowaid/mcp";
 import { executeOperation, type OperationSpec } from "@flowaid/openapi-tools";
-import { mcpServers, tools, type Database } from "@flowaid/database";
+import { agents, mcpServers, tools, type Database } from "@flowaid/database";
+import { AGENT_PRESET_BUILTIN } from "@flowaid/nodes-core";
 import type { ToolAccess } from "@flowaid/node-sdk";
 import { uuidv7 } from "@flowaid/shared";
 import {
@@ -27,6 +28,7 @@ import {
 } from "@flowaid/workflow-core";
 import type { ExecutionCall } from "@flowaid/workflow-runtime";
 import type { RunCredentialCache } from "./credentials.js";
+import { callWorkflowTool, type WorkflowToolDeps } from "./workflowTool.js";
 
 export interface ToolDeps {
   db: Database;
@@ -36,6 +38,8 @@ export interface ToolDeps {
   cache: RunCredentialCache;
   /** development only */
   allowPrivateNetwork?: boolean;
+  /** workflows as tools; without it `workflow` tools are refused */
+  workflows?: Omit<WorkflowToolDeps, "db">;
 }
 
 type Discovered = ToolDefinition & { "x-mcp-name"?: string };
@@ -126,6 +130,21 @@ export function toolAccessFor(deps: ToolDeps, call: ExecutionCall): ToolAccess {
     });
   };
 
+  /** An agent preset's settings (flowaid.ai.agent `agentId`), read in the run's workspace. */
+  const preset = async (args: JsonValue): Promise<ToolResult> => {
+    const agentId = (args as { agentId?: unknown } | null)?.agentId;
+    const started = Date.now();
+    if (typeof agentId !== "string") throw new NotFoundError("agent preset id missing");
+    const [a] = await deps.db.tenant(call.workspaceId, (tx) =>
+      tx
+        .select({ config: agents.config })
+        .from(agents)
+        .where(and(eq(agents.id, agentId), eq(agents.workspaceId, call.workspaceId))),
+    );
+    if (!a) throw new NotFoundError(`agent preset ${agentId} not found`);
+    return { ok: true, content: "", structured: a.config, latencyMs: Date.now() - started };
+  };
+
   return {
     list: async () => {
       const [servers, sets] = await deps.db.tenant(call.workspaceId, (tx) =>
@@ -158,7 +177,25 @@ export function toolAccessFor(deps: ToolDeps, call: ExecutionCall): ToolAccess {
       let result: ToolResult;
       try {
         if (source.kind === "openapi") result = await openapi(source, args, opts?.timeoutMs);
-        else if (
+        else if (source.kind === "builtin" && source.id === AGENT_PRESET_BUILTIN)
+          result = await preset(args);
+        else if (source.kind === "workflow") {
+          if (!deps.workflows) throw new NotFoundError("workflow tools are not available here");
+          result = await callWorkflowTool(
+            { db: deps.db, ...deps.workflows },
+            {
+              workspaceId: call.workspaceId,
+              environmentId: call.environmentId,
+              parentRunId: call.runId,
+              parentNodeRunId: call.nodeRunId,
+              sessionId: call.sessionId,
+              signal: call.signal,
+            },
+            source.workflowId,
+            args,
+            opts?.timeoutMs,
+          );
+        } else if (
           source.kind === "mcp" ||
           (source.kind === "builtin" &&
             (source.id === MCP_RESOURCE_BUILTIN || source.id === MCP_PROMPT_BUILTIN))

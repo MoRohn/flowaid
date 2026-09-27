@@ -47,6 +47,7 @@ import { rerankNode } from "./ai/rerank.js";
 import { visionNode } from "./ai/vision.js";
 import { speechNode } from "./ai/speech.js";
 import { imageNode } from "./ai/image.js";
+import { agentNode } from "./ai/agent.js";
 import { policyCheckNode } from "./safety/policy_check.js";
 import { rateLimitNode } from "./safety/rate_limit.js";
 import { permissionCheckNode } from "./safety/permission_check.js";
@@ -100,6 +101,7 @@ export {
   visionNode,
   speechNode,
   imageNode,
+  agentNode,
   policyCheckNode,
   rateLimitNode,
   permissionCheckNode,
@@ -114,6 +116,16 @@ export { combine } from "./decision/consensus.js";
 export { splitText } from "./data/split.js";
 export { detectPii, redactPii, PII_KINDS, type PiiFinding, type PiiKind } from "./safety/pii.js";
 export { extractJson } from "./ai/structured_generate.js";
+export {
+  AGENT_PRESET_BUILTIN,
+  APPROVAL_MODES,
+  agentSettingsSchema,
+  effectiveAgent,
+  needsApproval,
+  type AgentSettings,
+  type AgentState,
+  type ApprovalMode,
+} from "./ai/agent.js";
 
 /** Every core node, in palette order. */
 export const CORE_NODES: readonly AnyNodeDefinition[] = [
@@ -132,6 +144,7 @@ export const CORE_NODES: readonly AnyNodeDefinition[] = [
   visionNode,
   speechNode,
   imageNode,
+  agentNode,
   rerankNode,
   httpNode,
   mcpNode,

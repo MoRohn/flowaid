@@ -1,7 +1,13 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`generated CLI > matches the command tree snapshot 1`] = `
-"api-key
+"agent
+agent create {--name --description --config --body --out}
+agent delete <id> {--out}
+agent get <id> {--out}
+agent list {--out}
+agent update <id> {--name --description --config --body --out}
+api-key
 api-key create {--name --scopes --mode --environment-id --workflow-ids --expires-at --rate-limit-per-min --service-account --body --out}
 api-key list {--out}
 api-key revoke <id> {--out}
@@ -144,6 +150,7 @@ task revoke-review-link <id> <linkId> {--out}
 template
 template list {--include --out}
 tool
+tool add-workflow {--workflow-id --tool-name --description --approval-required --body --out}
 tool catalog {--out}
 tool delete <id> {--out}
 tool get <id> {--out}
@@ -213,6 +220,7 @@ Commands:
   dev [options]                     start the local stack (docker compose) and open the web app
   validate [options] <path>         compile a workflow definition locally (bundled core nodes) and
                                     list diagnostics
+  agent|agents                      agent operations
   api-key|api-keys                  api-key operations
   artifact|artifacts                artifact operations
   audit|audits                      audit operations

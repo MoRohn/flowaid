@@ -3,6 +3,299 @@
     {
       "capabilities": [
         "generation",
+        "credentials",
+        "tools",
+        "suspend",
+        "streaming"
+      ],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "agentId": {
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "type": "string",
+            "x-ui": {
+              "help": "An agent preset (Agents page); the node's own settings override it."
+            }
+          },
+          "maxCostUsd": {
+            "minimum": 0,
+            "type": "number"
+          },
+          "maxOutputTokens": {
+            "maximum": 65536,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "maxSteps": {
+            "default": 8,
+            "maximum": 50,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "maxTokens": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "maxToolCalls": {
+            "maximum": 200,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "properties": {
+                  "model": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "provider": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "provider",
+                  "model"
+                ],
+                "type": "object"
+              },
+              {
+                "properties": {
+                  "candidates": {
+                    "items": {
+                      "properties": {
+                        "model": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "provider": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "provider",
+                        "model"
+                      ],
+                      "type": "object"
+                    },
+                    "maxItems": 5,
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "maxCostUsdPerCall": {
+                    "exclusiveMinimum": 0,
+                    "type": "number"
+                  },
+                  "requirements": {
+                    "properties": {
+                      "jsonSchema": {
+                        "type": "boolean"
+                      },
+                      "minContext": {
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "tools": {
+                        "type": "boolean"
+                      },
+                      "vision": {
+                        "type": "boolean"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "strategy": {
+                    "default": "ordered",
+                    "enum": [
+                      "ordered",
+                      "cheapest",
+                      "fastest",
+                      "healthiest"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "candidates"
+                ],
+                "type": "object"
+              }
+            ],
+            "x-ui": {
+              "widget": "model"
+            }
+          },
+          "stream": {
+            "type": "boolean"
+          },
+          "system": {
+            "maxLength": 32000,
+            "type": "string",
+            "x-ui": {
+              "widget": "textarea"
+            }
+          },
+          "temperature": {
+            "maximum": 2,
+            "minimum": 0,
+            "type": "number"
+          },
+          "tools": {
+            "items": {
+              "properties": {
+                "approval": {
+                  "default": "irreversible",
+                  "enum": [
+                    "always",
+                    "irreversible",
+                    "never"
+                  ],
+                  "type": "string"
+                },
+                "name": {
+                  "pattern": "^[A-Za-z0-9_-]{1,64}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "type": "object"
+            },
+            "maxItems": 32,
+            "type": "array",
+            "x-ui": {
+              "help": "Tools the agent may call (MCP tools, OpenAPI operations, workflows as tools) and when a person approves a call.",
+              "widget": "list"
+            }
+          }
+        },
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [
+        {
+          "name": "llm",
+          "required": false,
+          "types": [
+            "openai.api_key",
+            "anthropic.api_key",
+            "ollama.none"
+          ]
+        }
+      ],
+      "defaultPolicy": {
+        "maxCostUsd": 1,
+        "timeoutMs": 600000
+      },
+      "generation": true,
+      "id": "flowaid.ai.agent",
+      "idempotency": "none",
+      "inputs": [
+        {
+          "name": "task",
+          "required": true,
+          "schema": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        {
+          "name": "context",
+          "required": false,
+          "schema": {}
+        }
+      ],
+      "metadata": {
+        "category": "agent",
+        "description": "A tool-using agent: a model calls MCP tools, OpenAPI operations and workflows in a loop bounded by steps, tool calls, tokens, cost and time; calls that need approval pause the run for a person.",
+        "icon": "bot",
+        "name": "Agent",
+        "summary": "{{ config.maxSteps }} steps",
+        "tags": [
+          "agent",
+          "tools",
+          "llm"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "answer",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "steps",
+          "required": true,
+          "schema": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        {
+          "name": "tool_calls",
+          "required": true,
+          "schema": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "args": {},
+                "name": {
+                  "type": "string"
+                },
+                "ok": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "name",
+                "args",
+                "ok"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "name": "usage",
+          "required": true,
+          "schema": {
+            "additionalProperties": false,
+            "properties": {
+              "inputTokens": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "outputTokens": {
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "inputTokens",
+              "outputTokens"
+            ],
+            "type": "object"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": true,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [
+        "generation",
         "credentials"
       ],
       "configSchema": {
