@@ -189,12 +189,46 @@ export interface Schedule {
   timezone: string;
   overlap: "skip" | "allow";
   catchUp: "skip" | "one" | "all";
+  maxCatchUp: number;
+  jitterMs: number;
   enabled: boolean;
   nextRunAt: string | null;
   lastRunAt: string | null;
   lastRunId: string | null;
   lastError: string | null;
 }
+export interface WebhookDelivery {
+  id: string;
+  webhookId: string;
+  runId: string | null;
+  direction: "inbound" | "outbound";
+  externalId: string | null;
+  status: "accepted" | "rejected" | "delivered" | "failed" | "pending" | "duplicate";
+  attempt: number;
+  httpStatus: number | null;
+  error: string | null;
+  nextAttemptAt: string | null;
+  createdAt: string;
+}
+
+export type NotificationEvent =
+  | "human_task.created"
+  | "run.failed"
+  | "trace_review.page"
+  | "schedule.failed"
+  | "webhook.rejected";
+
+export interface NotificationChannel {
+  id: string;
+  kind: "email" | "slack_webhook" | "webhook";
+  name: string;
+  config: { to?: string[]; url?: string };
+  events: NotificationEvent[];
+  enabled: boolean;
+  secretSet: boolean;
+  createdAt: string;
+}
+
 export interface DeployResult {
   triggers: {
     webhooks: { id: string; path: string; url: string; signature: string; secretBound: boolean }[];

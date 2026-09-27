@@ -225,3 +225,13 @@ describe("Prometheus listener", () => {
     }
   });
 });
+
+describe("envelopeAddress", () => {
+  it("takes the address of a display-name sender", async () => {
+    const { envelopeAddress } = await import("./alerts.js");
+    expect(envelopeAddress("FlowAId <notifications@example.com>")).toBe(
+      "notifications@example.com",
+    );
+    expect(envelopeAddress("alerts@example.com")).toBe("alerts@example.com");
+  });
+});

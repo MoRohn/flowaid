@@ -189,6 +189,12 @@ interface Mail {
   text: string;
 }
 
+/** The bare address of `Name <address>` or `address` (the SMTP envelope takes only the address). */
+export function envelopeAddress(from: string): string {
+  const m = /<([^<>\s]+@[^<>\s]+)>\s*$/.exec(from);
+  return (m?.[1] ?? from).trim();
+}
+
 /** Minimal RFC 5321 client: EHLO, STARTTLS when offered (smtp://), AUTH PLAIN, one message. */
 export async function sendMail(config: SmtpConfig, mail: Mail): Promise<void> {
   const url = new URL(config.url);
@@ -286,7 +292,7 @@ export async function sendMail(config: SmtpConfig, mail: Mail): Promise<void> {
       send(`AUTH PLAIN ${token}`);
       await expect([235], "authentication");
     }
-    send(`MAIL FROM:<${config.from}>`);
+    send(`MAIL FROM:<${envelopeAddress(config.from)}>`);
     await expect([250], "MAIL FROM");
     for (const to of mail.to) {
       send(`RCPT TO:<${to}>`);

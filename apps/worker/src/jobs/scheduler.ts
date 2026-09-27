@@ -34,6 +34,13 @@ export interface SchedulerOptions {
   now?: () => Date;
   batch?: number;
   onError?: (error: unknown, scheduleId: string) => void;
+  /** A schedule could not start its run (recorded as `last_error`); drives `schedule.failed`. */
+  onFailed?: (failure: {
+    scheduleId: string;
+    workspaceId: string;
+    workflowId: string;
+    error: string;
+  }) => void;
 }
 
 /** Fire times due at `now`, oldest first, per the catch-up policy. */
@@ -176,6 +183,12 @@ export async function tickSchedules(o: SchedulerOptions): Promise<string[]> {
           .where(eq(schedules.id, s.id));
       } catch (error) {
         o.onError?.(error, s.id);
+        o.onFailed?.({
+          scheduleId: s.id,
+          workspaceId: s.workspaceId,
+          workflowId: s.workflowId,
+          error: error instanceof Error ? error.message.slice(0, 500) : String(error),
+        });
         await tx
           .update(schedules)
           .set({

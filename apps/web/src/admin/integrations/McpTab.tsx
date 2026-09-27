@@ -40,6 +40,7 @@ import { useSession } from "~/session";
 import { TOOL_NAME } from "../logic";
 import type { CreatedKey, Credential, McpDiscovery, McpExposure, McpServer } from "../types";
 import { Notice, OneTimeSecretDialog, QueryView, Section, useConfirm, useMutate } from "../ui";
+import { toolNamesFrom } from "../triggers/logic";
 
 const TRANSPORT_LABEL: Record<McpServer["transport"], string> = {
   streamable_http: "Streamable HTTP",
@@ -55,7 +56,7 @@ function statusTone(status: string): "ok" | "danger" | "warn" | "neutral" {
   return "neutral";
 }
 
-function useWorkflowNames() {
+export function useWorkflowNames() {
   const s = useSession();
   return useQuery({
     queryKey: ["workflow-names", s.ws],
@@ -703,7 +704,7 @@ function TokenDialog({
   );
 }
 
-function ExposuresSection() {
+export function ExposuresSection() {
   const s = useSession();
   const canWrite = s.can("mcp:write");
   const canMint = s.can("api_keys:manage");
@@ -817,6 +818,7 @@ function ExposuresSection() {
         extra={
           minted ? (
             <div className="flex flex-col gap-1.5">
+              <TryToken endpoint={endpoint} token={minted.key} />
               <p className="text-xs text-ink-2">Client configuration (Streamable HTTP):</p>
               <pre className="overflow-auto rounded-md border border-border bg-surface-2 p-2 font-mono text-2xs text-ink">
                 {JSON.stringify(
@@ -845,11 +847,78 @@ function ExposuresSection() {
   );
 }
 
+/**
+ * Calls `tools/list` on the workspace's MCP endpoint with a just-minted token, so the person sees
+ * exactly what an MCP client will see before copying the configuration.
+ */
+function TryToken({ endpoint, token }: { endpoint: string; token: string }) {
+  const [state, setState] = useState<
+    | { kind: "idle" }
+    | { kind: "busy" }
+    | { kind: "ok"; tools: string[] }
+    | { kind: "error"; message: string }
+  >({ kind: "idle" });
+  const run = async () => {
+    setState({ kind: "busy" });
+    try {
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${token}`,
+          "content-type": "application/json",
+          accept: "application/json, text/event-stream",
+        },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} }),
+      });
+      if (!res.ok) throw new Error(`the endpoint answered HTTP ${res.status}`);
+      setState({ kind: "ok", tools: toolNamesFrom(await res.json()) });
+    } catch (error) {
+      setState({ kind: "error", message: error instanceof Error ? error.message : String(error) });
+    }
+  };
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <Button size="sm" onClick={() => void run()} loading={state.kind === "busy"}>
+        Try it: list tools
+      </Button>
+      {state.kind === "ok" ? (
+        <span className="text-xs text-ink-2" role="status">
+          {state.tools.length === 0
+            ? "No tool yet: expose a deployed workflow this token is pinned to."
+            : `${state.tools.length} tool${state.tools.length === 1 ? "" : "s"}: `}
+          {state.tools.map((t) => (
+            <code key={t} className="mr-1 font-mono">
+              {t}
+            </code>
+          ))}
+        </span>
+      ) : state.kind === "error" ? (
+        <span className="text-xs text-danger-text" role="alert">
+          {state.message}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 export function McpTab() {
+  const s = useSession();
   return (
     <div className="flex flex-col gap-5">
       <ServersSection />
-      <ExposuresSection />
+      {s.features.mcp_exposures ? (
+        <Section
+          title="Workflows as MCP tools"
+          description="Exposing workflows to MCP clients, and minting their tokens, live under Triggers."
+          actions={
+            <Button asChild>
+              <a href={`/${s.ws}/triggers?tab=mcp`}>Open Triggers</a>
+            </Button>
+          }
+        />
+      ) : (
+        <ExposuresSection />
+      )}
     </div>
   );
 }

@@ -224,8 +224,8 @@ lists them empty for you to generate (`openssl rand -hex 16`).
 |---|---|---|---|
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | no | — | OTLP/HTTP endpoint for traces and metrics. Unset disables the OpenTelemetry exporter (spans are still created for logs). Example: `http://localhost:4318`. |
 | `PROMETHEUS_PORT` | no | — | Port of the internal Prometheus `/metrics` listener in the api and worker. Unset disables it. Example: `9464`. |
-| `SMTP_URL` | no | — | SMTP server for email alert channels: `smtp://user:password@host:587` (STARTTLS when the server offers it) or `smtps://…:465`. Unset disables email channels; Slack and webhook channels still work. Example: `smtp://alerts:<password>@smtp.example.com:587`. Secret. |
-| `SMTP_FROM` | no | — | Sender address of email alerts. Email channels need both `SMTP_URL` and `SMTP_FROM`. Example: `flowaid@example.com`. |
+| `SMTP_URL` | no | — | SMTP server for `email` notification channels (`smtp://user:password@host:587`, or `smtps://` for implicit TLS). Unset leaves email channels undeliverable; Slack and webhook channels work without it. Example: `smtps://notifications:<password>@smtp.example.com:465`. Secret. |
+| `SMTP_FROM` | no | — | Sender address of notification emails (`Name <address>` or a bare address). Email channels need both `SMTP_URL` and `SMTP_FROM`. Example: `FlowAId <notifications@example.com>`. |
 
 ### Docker Compose stack (read by docker compose, not by the api)
 

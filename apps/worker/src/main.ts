@@ -232,7 +232,7 @@ async function main(): Promise<void> {
             text: error instanceof Error ? error.message : String(error),
             ...(webUrl
               ? {
-                  url: `${webUrl.replace(/\/$/, "")}/${row.slug}/workflows/${row.workflowId}/settings`,
+                  url: `${webUrl.replace(/\/$/, "")}/${row.slug}/triggers?tab=schedules`,
                 }
               : {}),
             data: { scheduleId: id, workflowId: row.workflowId },

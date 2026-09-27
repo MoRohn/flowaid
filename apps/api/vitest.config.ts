@@ -9,5 +9,8 @@ export default defineConfig({
     environment: "node",
     testTimeout: 60_000,
     hookTimeout: 120_000,
+    // each Postgres suite opens its own pools: four files at a time stays well under the
+    // server's default 100 connections (CI runs the same limit)
+    maxWorkers: 4,
   },
 });

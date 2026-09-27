@@ -3,36 +3,27 @@ import { useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-q
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Suspense, use, useState } from "react";
-import { CalendarClock, KeyRound, Play, Webhook } from "lucide-react";
 import {
   Badge,
   Button,
   ConfirmDialog,
-  CopyButton,
   FieldRow,
   Input,
   Select,
   SelectItem,
-  Switch,
   Textarea,
   ToggleGroup,
   ToggleGroupItem,
 } from "@flowaid/ui/primitives";
-import { RelativeTime } from "@flowaid/ui/data";
-import { del, get, patch, post, put } from "~/api/client";
+import { del, get, patch, put } from "~/api/client";
 import type { WorkflowDetail } from "~/api/types";
 import { WorkflowFrame } from "~/admin/WorkflowFrame";
 import { credentialsForSecret, missingRequiredSecrets, parseTags } from "~/admin/logic";
-import type { Credential, EvaluationSet, Schedule, Webhook as WebhookRow } from "~/admin/types";
-import {
-  Notice,
-  OneTimeSecretDialog,
-  QueryView,
-  Section,
-  useMutate,
-  useQueryTab,
-} from "~/admin/ui";
+import type { Credential, EvaluationSet } from "~/admin/types";
+import { Notice, QueryView, Section, useMutate, useQueryTab } from "~/admin/ui";
 import { useSession } from "~/session";
+import { ScheduleList } from "~/admin/triggers/Schedules";
+import { WebhookList } from "~/admin/triggers/Webhooks";
 
 const TABS = ["general", "secrets", "triggers", "evaluation", "danger"] as const;
 type Tab = (typeof TABS)[number];
@@ -299,250 +290,26 @@ function Secrets({ w }: { w: WorkflowDetail }) {
 
 function Triggers({ w }: { w: WorkflowDetail }) {
   const s = useSession();
-  const [secret, setSecret] = useState<string | null>(null);
-  const hooksKey = ["triggers", s.ws, w.id, "webhooks"];
-  const schedKey = ["triggers", s.ws, w.id, "schedules"];
-  const hooks = useQuery({
-    queryKey: hooksKey,
-    queryFn: () => get<WebhookRow[]>(`/v1/webhooks?workflowId=${w.id}`),
-    enabled: s.can("webhooks:write"),
-  });
-  const schedules = useQuery({
-    queryKey: schedKey,
-    queryFn: () => get<Schedule[]>(`/v1/schedules?workflowId=${w.id}`),
-    enabled: s.can("schedules:write"),
-  });
-  const envName = (id: string) => s.environments.find((e) => e.id === id)?.name ?? id.slice(0, 8);
-  const patchHook = useMutate(
-    (v: { id: string; body: Record<string, unknown> }) => patch(`/v1/webhooks/${v.id}`, v.body),
-    {
-      success: "Webhook updated",
-      invalidate: [hooksKey],
-    },
-  );
-  const rotate = useMutate(
-    (id: string) => post<{ secret: string }>(`/v1/webhooks/${id}/rotate-secret`),
-    {
-      invalidate: [hooksKey],
-      onSuccess: (r) => setSecret(r.secret),
-    },
-  );
-  const patchSchedule = useMutate(
-    (v: { id: string; body: Record<string, unknown> }) => patch(`/v1/schedules/${v.id}`, v.body),
-    {
-      success: "Schedule updated",
-      invalidate: [schedKey],
-    },
-  );
-  const fire = useMutate((id: string) => post(`/v1/schedules/${id}/trigger`), {
-    success: "Run started",
-  });
-
   return (
     <div className="flex flex-col gap-4">
       <p className="text-xs text-ink-3">
         Triggers are declared in the workflow and materialised per environment on deploy. Here you
         control the environment-specific parts.
+        {s.features.schedules ? (
+          <>
+            {" "}
+            <Link className="text-accent-text hover:underline" href={`/${s.ws}/triggers`}>
+              All triggers in this workspace
+            </Link>
+          </>
+        ) : null}
       </p>
       <Section title="Webhooks">
-        {!s.can("webhooks:write") ? (
-          <Notice tone="info">You need the webhooks:write scope to manage webhooks.</Notice>
-        ) : (
-          <QueryView query={hooks} rows={2}>
-            {(rows) =>
-              rows.length === 0 ? (
-                <p className="text-xs text-ink-3">
-                  No webhook is live. Add a webhook trigger in the builder, publish and deploy.
-                </p>
-              ) : (
-                <ul
-                  className="flex flex-col divide-y divide-border rounded-md border border-border"
-                  role="list"
-                >
-                  {rows.map((h) => (
-                    <li key={h.id} className="flex flex-col gap-2 px-3 py-2.5">
-                      <div className="flex items-center gap-2">
-                        <Webhook
-                          strokeWidth={1.75}
-                          className="size-3.5 shrink-0 text-ink-3"
-                          aria-hidden="true"
-                        />
-                        <Badge mono>{envName(h.environmentId)}</Badge>
-                        <code className="min-w-0 flex-1 truncate font-mono text-2xs text-ink">
-                          {h.url}
-                        </code>
-                        <CopyButton value={h.url} label="Copy URL" size="sm" />
-                      </div>
-                      <div className="flex flex-wrap items-center gap-4 text-xs text-ink-2">
-                        <label className="flex items-center gap-2">
-                          <Switch
-                            size="sm"
-                            checked={h.enabled}
-                            onCheckedChange={(c) =>
-                              patchHook.mutate({ id: h.id, body: { enabled: c } })
-                            }
-                          />
-                          Enabled
-                        </label>
-                        <label className="flex items-center gap-2">
-                          <Switch
-                            size="sm"
-                            checked={h.requireTimestamp}
-                            onCheckedChange={(c) =>
-                              patchHook.mutate({ id: h.id, body: { requireTimestamp: c } })
-                            }
-                          />
-                          Require signed timestamp
-                        </label>
-                        <span className="flex items-center gap-1.5">
-                          {h.secretBound ? (
-                            <Badge tone="ok" dot>
-                              Signed ({h.signature})
-                            </Badge>
-                          ) : (
-                            <Badge tone="warn" dot>
-                              No signing secret
-                            </Badge>
-                          )}
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            leadingIcon={<KeyRound strokeWidth={1.75} />}
-                            loading={rotate.isPending && rotate.variables === h.id}
-                            onClick={() => rotate.mutate(h.id)}
-                          >
-                            {h.secretBound ? "Rotate secret" : "Generate secret"}
-                          </Button>
-                        </span>
-                        <span className="ml-auto text-2xs text-ink-3">
-                          {h.lastReceivedAt ? (
-                            <>
-                              last call <RelativeTime date={h.lastReceivedAt} />
-                            </>
-                          ) : (
-                            "never called"
-                          )}
-                        </span>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )
-            }
-          </QueryView>
-        )}
+        <WebhookList workflowId={w.id} />
       </Section>
       <Section title="Schedules">
-        {!s.can("schedules:write") ? (
-          <Notice tone="info">You need the schedules:write scope to manage schedules.</Notice>
-        ) : (
-          <QueryView query={schedules} rows={2}>
-            {(rows) =>
-              rows.length === 0 ? (
-                <p className="text-xs text-ink-3">
-                  No schedule is live. Add a schedule trigger in the builder, publish and deploy.
-                </p>
-              ) : (
-                <ul
-                  className="flex flex-col divide-y divide-border rounded-md border border-border"
-                  role="list"
-                >
-                  {rows.map((x) => (
-                    <li key={x.id} className="flex flex-col gap-2 px-3 py-2.5">
-                      <div className="flex items-center gap-2 text-xs">
-                        <CalendarClock
-                          strokeWidth={1.75}
-                          className="size-3.5 shrink-0 text-ink-3"
-                          aria-hidden="true"
-                        />
-                        <Badge mono>{envName(x.environmentId)}</Badge>
-                        <code className="font-mono text-ink">{x.cron}</code>
-                        <span className="text-ink-3">{x.timezone}</span>
-                        <span className="ml-auto text-2xs text-ink-3">
-                          {x.enabled && x.nextRunAt ? (
-                            <>
-                              next <RelativeTime date={x.nextRunAt} />
-                            </>
-                          ) : (
-                            "paused"
-                          )}
-                          {x.lastRunAt ? (
-                            <>
-                              {" "}
-                              · last <RelativeTime date={x.lastRunAt} />
-                            </>
-                          ) : null}
-                        </span>
-                      </div>
-                      {x.lastError ? <Notice tone="danger">{x.lastError}</Notice> : null}
-                      <div className="flex flex-wrap items-center gap-4 text-xs text-ink-2">
-                        <label className="flex items-center gap-2">
-                          <Switch
-                            size="sm"
-                            checked={x.enabled}
-                            onCheckedChange={(c) =>
-                              patchSchedule.mutate({ id: x.id, body: { enabled: c } })
-                            }
-                          />
-                          Enabled
-                        </label>
-                        <label className="flex items-center gap-2">
-                          Overlap
-                          <Select
-                            size="sm"
-                            aria-label="Overlap"
-                            value={x.overlap}
-                            className="w-28"
-                            onValueChange={(v) =>
-                              patchSchedule.mutate({ id: x.id, body: { overlap: v } })
-                            }
-                          >
-                            <SelectItem value="skip">Skip</SelectItem>
-                            <SelectItem value="allow">Allow</SelectItem>
-                          </Select>
-                        </label>
-                        <label className="flex items-center gap-2">
-                          Missed runs
-                          <Select
-                            size="sm"
-                            aria-label="Missed runs"
-                            value={x.catchUp}
-                            className="w-32"
-                            onValueChange={(v) =>
-                              patchSchedule.mutate({ id: x.id, body: { catchUp: v } })
-                            }
-                          >
-                            <SelectItem value="skip">Skip</SelectItem>
-                            <SelectItem value="one">Run once</SelectItem>
-                            <SelectItem value="all">Run all</SelectItem>
-                          </Select>
-                        </label>
-                        {s.can("runs:create") ? (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="ml-auto"
-                            leadingIcon={<Play strokeWidth={1.75} />}
-                            onClick={() => fire.mutate(x.id)}
-                          >
-                            Run now
-                          </Button>
-                        ) : null}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )
-            }
-          </QueryView>
-        )}
+        <ScheduleList workflowId={w.id} />
       </Section>
-      <OneTimeSecretDialog
-        secret={secret}
-        title="Webhook signing secret"
-        description="Configure the sender with it now; it is stored as a credential and cannot be shown again."
-        onClose={() => setSecret(null)}
-      />
     </div>
   );
 }

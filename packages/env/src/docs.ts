@@ -681,17 +681,17 @@ const docs = {
   SMTP_URL: {
     group: "observability",
     description:
-      "SMTP server for email alert channels: `smtp://user:password@host:587` (STARTTLS when the server offers it) or `smtps://…:465`. Unset disables email channels; Slack and webhook channels still work.",
+      "SMTP server for `email` notification channels (`smtp://user:password@host:587`, or `smtps://` for implicit TLS). Unset leaves email channels undeliverable; Slack and webhook channels work without it.",
     required: false,
-    example: "smtp://alerts:<password>@smtp.example.com:587",
+    example: "smtps://notifications:<password>@smtp.example.com:465",
     secret: true,
   },
   SMTP_FROM: {
     group: "observability",
     description:
-      "Sender address of email alerts. Email channels need both `SMTP_URL` and `SMTP_FROM`.",
+      "Sender address of notification emails (`Name <address>` or a bare address). Email channels need both `SMTP_URL` and `SMTP_FROM`.",
     required: false,
-    example: "flowaid@example.com",
+    example: "FlowAId <notifications@example.com>",
     secret: false,
   },
 

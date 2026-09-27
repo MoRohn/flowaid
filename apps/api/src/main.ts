@@ -65,6 +65,8 @@ async function main(): Promise<void> {
     timeoutMs: 30_000,
     userAgent: "FlowAId-API/1",
   });
+  // email channels need both SMTP_URL and SMTP_FROM (alerts and test sends use the same settings)
+  const smtp = smtpFromEnv(env) ?? undefined;
   const ctx: ApiContext = {
     config: configFromEnv(env),
     db,
@@ -80,12 +82,13 @@ async function main(): Promise<void> {
       db,
       credentials,
       fetch: http,
-      smtp: smtpFromEnv(env),
+      smtp: smtp ?? null,
       onError: (error, context) =>
         process.stderr.write(
           `${JSON.stringify({ level: 50, msg: "alert delivery failed", err: String(error), ...context })}\n`,
         ),
     }),
+    ...(smtp ? { smtp } : {}),
   };
   const boot = await firstBoot(db, {
     ...(env.FLOWAID_ADMIN_EMAIL ? { adminEmail: String(env.FLOWAID_ADMIN_EMAIL) } : {}),

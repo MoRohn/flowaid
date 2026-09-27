@@ -14,6 +14,7 @@ import {
   Plug,
   Settings,
   Workflow,
+  Zap,
 } from "lucide-react";
 
 export interface NavEntry {
@@ -76,6 +77,13 @@ export const NAV: NavEntry[] = [
     feature: "templates",
     icon: <LayoutTemplate {...ICON} />,
     path: "templates",
+  },
+  {
+    id: "triggers",
+    label: "Triggers",
+    anyOf: ["schedules", "mcp_exposures"],
+    icon: <Zap {...ICON} />,
+    path: "triggers",
   },
   {
     id: "integrations",

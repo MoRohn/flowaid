@@ -12,6 +12,8 @@ describe("feature-keyed navigation", () => {
     expect(ids({ workflows: true })).not.toContain("agents");
     expect(ids({ workflows: true, agents: true })).toEqual(["workflows", "agents"]);
     expect(ids({ dashboard: true, workflows: true })).toEqual(["dashboard", "workflows"]);
+    expect(ids({ mcp_exposures: true })).toEqual(["triggers"]);
+    expect(ids({ schedules: false, mcp_exposures: false })).toEqual([]);
   });
   it("keeps settings reachable for every signed-in user", () => {
     expect(visibleNav(NAV_SECONDARY, {}).map((e) => e.id)).toEqual(["settings"]);

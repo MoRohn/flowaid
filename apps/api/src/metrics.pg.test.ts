@@ -265,7 +265,7 @@ describeDb("metrics and alerts (Postgres)", () => {
     await new Promise((r) => setTimeout(r, 100));
     expect(posted).toHaveLength(1);
     expect(posted[0]?.url).toBe("https://hooks.slack.test/T/B/x");
-    expect(String(posted[0]?.body.text)).toContain("Webhook rejected");
+    expect(String(posted[0]?.body.text)).toContain("was rejected");
 
     const list = (await call(t.app, jar, "GET", "/v1/alerts/deliveries")).json();
     expect(list.items).toHaveLength(1);

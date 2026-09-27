@@ -153,9 +153,9 @@ export function ingressRoutes(app: FastifyInstance, ctx: ApiContext): void {
           void ctx.alerts?.dispatch(w.workspaceId, `webhook.rejected:${w.id}:${hour}`, {
             event: "webhook.rejected",
             severity: "warning",
-            title: `Webhook rejected: ${w.path}`,
-            text: `A request to the webhook ${slug}/${w.path} was rejected: ${reason}.`,
-            url: `${ctx.config.webUrl.replace(/\/$/, "")}/${slug}/workflows/${w.workflowId}/settings`,
+            title: `A call to webhook /${w.path} was rejected`,
+            text: `${reason} (HTTP ${status}, environment ${env.name}).`,
+            url: `${ctx.config.webUrl.replace(/\/$/, "")}/${slug}/triggers?tab=webhooks&webhook=${w.id}`,
             data: { webhookId: w.id, workflowId: w.workflowId, reason, httpStatus: status },
           });
           return reply

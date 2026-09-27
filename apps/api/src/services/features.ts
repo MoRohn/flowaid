@@ -18,6 +18,7 @@ export const FEATURES_SHIPPED: ReadonlySet<FeatureKey> = new Set<FeatureKey>([
   "evaluations",
   "credentials",
   "settings_audit",
+  "settings_notifications",
   "schedules",
   "mcp_exposures",
   "advisor",

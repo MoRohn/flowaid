@@ -6,3 +6,4 @@ export * from "./traceReviewer.js";
 export * from "./alerts.js";
 export * from "./listener.js";
 export * from "./runMetrics.js";
+export * from "./notify.js";

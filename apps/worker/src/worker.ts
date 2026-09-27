@@ -37,11 +37,11 @@ import { uuidv7 } from "@flowaid/shared";
 import { artifactStorage, LocalArtifactStore, type ArtifactStorage } from "@flowaid/storage";
 import type {
   DecisionProvider,
+  DurableRunEvent,
   EventBus,
   ExecutionPlan,
   Job,
   QueueDriver,
-  DurableRunEvent,
   Run,
   RunEventOf,
   SafeFetch,
@@ -267,7 +267,12 @@ export function createWorker(deps: WorkerDeps): Worker {
         { workflow: run.workflowId, env },
       );
     }
-    if (deps.alerts && (run.status === "failed" || run.status === "timed_out")) {
+    // evaluation runs stay quiet: an evaluation of many failing cases must not page anyone
+    if (
+      deps.alerts &&
+      run.origin !== "evaluation" &&
+      (run.status === "failed" || run.status === "timed_out")
+    ) {
       const url = link(slug, `runs/${runId}`);
       await deps.alerts.dispatch(run.workspaceId, `run.failed:${runId}`, {
         event: "run.failed",
@@ -293,7 +298,7 @@ export function createWorker(deps: WorkerDeps): Worker {
   };
   const onEvents = (run: Run, events: readonly DurableRunEvent[]) => {
     for (const e of events) {
-      if (e.type === "HUMAN_APPROVAL_REQUESTED" && deps.alerts) {
+      if (e.type === "HUMAN_APPROVAL_REQUESTED" && deps.alerts && run.origin !== "evaluation") {
         const alerts = deps.alerts;
         void labelsOf(run)
           .then(({ slug, env }) => {

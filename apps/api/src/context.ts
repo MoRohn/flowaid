@@ -8,7 +8,7 @@ import type { RunEventHub } from "./services/hub.js";
 import type { Env } from "@flowaid/env";
 import type { ProviderRegistry } from "@flowaid/providers";
 import type { AuthService } from "./auth/service.js";
-import type { AlertDispatcher } from "@flowaid/observability";
+import type { AlertDispatcher, SmtpSettings } from "@flowaid/observability";
 import type { JwtKeys } from "./auth/jwt.js";
 import type { S3Options } from "@flowaid/storage";
 
@@ -62,6 +62,8 @@ export interface ApiContext {
   providers?: ProviderRegistry;
   /** observability alerts to notification channels (P6-04); absent in most tests */
   alerts?: AlertDispatcher;
+  /** SMTP for `email` channels (SMTP_URL, SMTP_FROM); test sends explain its absence */
+  smtp?: SmtpSettings;
 }
 
 export function configFromEnv(env: Env): ApiConfig {

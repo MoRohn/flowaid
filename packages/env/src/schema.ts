@@ -852,7 +852,7 @@ export const EnvSchema = z
     ),
     PROMETHEUS_PORT: optionalInt("PROMETHEUS_PORT", PORT_RANGE),
     SMTP_URL: optionalUrl("SMTP_URL", /^smtps?$/, "smtp:// or smtps://"),
-    SMTP_FROM: optionalEmail("SMTP_FROM"),
+    SMTP_FROM: optionalString("SMTP_FROM"),
   })
   .superRefine((vars, ctx) => {
     for (const issue of crossFieldIssues(vars)) {
