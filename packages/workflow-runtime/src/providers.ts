@@ -9,6 +9,7 @@
 import { sha256Hex, stableStringify } from "@flowaid/shared";
 import type { ProviderAccess } from "@flowaid/node-sdk";
 import type { ProviderRegistry, ResolveContext } from "@flowaid/providers";
+import { modelCandidates } from "@flowaid/workflow-core";
 import type {
   BooleanDecision,
   ChoiceDecision,
@@ -19,6 +20,7 @@ import type {
   DecisionState,
   EmbeddingProvider,
   GenerationChunk,
+  GenerationPolicy,
   GenerationProvider,
   GenerationRequest,
   GenerationResult,
@@ -160,9 +162,15 @@ export function registryProviderAccess(
     };
   };
 
-  const generation = (ref: ModelRef): GenerationProvider => {
+  const generation = (selection: ModelRef | GenerationPolicy): GenerationProvider => {
     let resolved: Promise<GenerationProvider> | null = null;
-    const get = () => (resolved ??= registry.generation(ref, resolveCtx));
+    // A policy resolves to a failover chain (RFC-0005); its hand-overs become PROVIDER_FAILOVER.
+    const get = () =>
+      (resolved ??= registry.generation(selection, resolveCtx, {
+        onFailover: (f) =>
+          emit({ type: "PROVIDER_FAILOVER", from: f.from, to: f.to, error: f.error.toInfo() }),
+      }));
+    const ref = modelCandidates(selection)[0] as ModelRef;
     const completed = (r: GenerationResult) =>
       emit({
         type: "GENERATION_COMPLETED",

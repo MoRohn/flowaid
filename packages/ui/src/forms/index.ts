@@ -164,6 +164,18 @@ export {
   type ModelKind,
 } from "./ModelPicker";
 export {
+  ModelFallbacks,
+  selectionCandidates,
+  toModelSelection,
+  ROUTING_STRATEGIES,
+  MAX_MODEL_CANDIDATES,
+  type ModelFallbacksProps,
+  type ModelCandidate,
+  type ModelSelectionValue,
+  type GenerationPolicyValue,
+  type RoutingStrategy,
+} from "./ModelFallbacks";
+export {
   CodeEditor,
   formatJson,
   type CodeEditorProps,

@@ -91,6 +91,40 @@ export type NodePolicy = z.infer<typeof NodePolicySchema>;
 export const ModelRefSchema = z.object({ provider: z.string().min(1), model: z.string().min(1) });
 export type ModelRef = z.infer<typeof ModelRefSchema>;
 
+/** How a generation policy orders its candidates (RFC-0005). */
+export const GenerationStrategySchema = z.enum(["ordered", "cheapest", "fastest", "healthiest"]);
+export type GenerationStrategy = z.infer<typeof GenerationStrategySchema>;
+
+/**
+ * Generation failover and routing (RFC-0005): 1–5 candidate models, filtered by the capabilities
+ * the node needs and ordered by `strategy`; a retryable failure moves to the next candidate,
+ * recorded in `GenerationResult.attempts` and a PROVIDER_FAILOVER event, like decisions.
+ */
+export const GenerationPolicySchema = z.object({
+  candidates: z.array(ModelRefSchema).min(1).max(5),
+  strategy: GenerationStrategySchema.default("ordered"),
+  requirements: z
+    .object({
+      tools: z.boolean().optional(),
+      jsonSchema: z.boolean().optional(),
+      vision: z.boolean().optional(),
+      minContext: z.int().min(1).optional(),
+    })
+    .optional(),
+  /** Candidates whose estimated cost for the request exceeds this are skipped. */
+  maxCostUsdPerCall: z.number().positive().optional(),
+});
+export type GenerationPolicy = z.infer<typeof GenerationPolicySchema>;
+
+/** Accepted wherever a generation model is configured: one model, or a policy over several. */
+export const ModelSelectionSchema = z.union([ModelRefSchema, GenerationPolicySchema]);
+export type ModelSelection = z.infer<typeof ModelSelectionSchema>;
+
+/** The candidates of a selection, in configured order. */
+export function modelCandidates(selection: ModelSelection): ModelRef[] {
+  return "candidates" in selection ? [...selection.candidates] : [selection];
+}
+
 /** One hop of a decision failover chain. `human` suspends the node for a reviewer and is always last. */
 export const ProviderHopSchema = z.discriminatedUnion("provider", [
   z.object({ provider: z.literal("typesafe"), model: z.string().default("jev-latest") }),

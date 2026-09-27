@@ -34,6 +34,7 @@ import {
 } from "@flowaid/ui/primitives";
 import type { BuilderStore } from "./store";
 import type { Projection } from "./model";
+import { useModelViews } from "./models";
 
 export interface NodeInspectorProps {
   node: WorkflowNode;
@@ -86,6 +87,7 @@ export function NodeInspector({
   );
   const s = store.getState();
   const view = projection.nodes.find((n) => n.id === node.id);
+  const models = useModelViews();
 
   return (
     <div className="flex flex-col gap-5">
@@ -120,6 +122,7 @@ export function NodeInspector({
             defaultValues={node.config}
             scope={scope}
             nodeType={manifest.id}
+            models={models}
             disabled={readOnly}
             onChange={(values) => s.setNodeConfig(node.id, values)}
             aria-label={`${node.name} configuration`}

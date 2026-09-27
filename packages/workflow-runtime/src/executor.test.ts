@@ -3,7 +3,12 @@ import { z } from "zod";
 import { defineNode, fail, ok, suspend, type AnyNodeDefinition } from "@flowaid/node-sdk";
 import { ProviderRegistry, DefaultModelCatalog } from "@flowaid/providers";
 import { Redactor } from "@flowaid/credentials";
-import type { ExecutionPlan, GenerationProvider, JsonObject } from "@flowaid/workflow-core";
+import {
+  NetworkError,
+  type ExecutionPlan,
+  type GenerationProvider,
+  type JsonObject,
+} from "@flowaid/workflow-core";
 import { evalScope, evaluateBinding, evaluateRecord, portValue, setPointer } from "./bindings.js";
 import { executeTask, NodeRegistry, type ExecutionCall, type NodeServices } from "./executor.js";
 import { registryProviderAccess } from "./providers.js";
@@ -324,6 +329,71 @@ describe("registry provider access", () => {
     expect(access.embedding({ provider: "acme", model: "e" }).id).toBe("acme");
     const d = access.decision([{ provider: "human" }]);
     expect(d.health().status).toBe("healthy");
+  });
+
+  it("fails a generation policy over and emits PROVIDER_FAILOVER (RFC-0005)", async () => {
+    const registry = new ProviderRegistry({ catalog: new DefaultModelCatalog() });
+    const make = (id: string, fails: boolean): GenerationProvider => ({
+      id,
+      model: "m",
+      capabilities: {
+        tools: true,
+        jsonSchema: true,
+        vision: false,
+        streaming: true,
+        thinking: false,
+        maxContext: 1000,
+      },
+      generate: () =>
+        fails
+          ? Promise.reject(new NetworkError(`${id} unreachable`))
+          : Promise.resolve({
+              text: `from ${id}`,
+              toolCalls: [],
+              finishReason: "stop",
+              usage: { inputTokens: 3, outputTokens: 1 },
+              costUsd: 0.01,
+              priceSnapshot: null,
+              latencyMs: 4,
+              provider: id,
+              model: "m",
+            }),
+      stream: () => ({
+        [Symbol.asyncIterator]: () => ({ next: () => Promise.reject(new Error("unused")) }),
+      }),
+      health: () => ({
+        status: "healthy",
+        errorRate1m: 0,
+        p95LatencyMs: 0,
+        consecutiveFailures: 0,
+        checkedAt: "",
+      }),
+    });
+    registry.register({ id: "primary", kind: "generation", create: () => make("primary", true) });
+    registry.register({ id: "backup", kind: "generation", create: () => make("backup", false) });
+    const events: NodeEmitted[] = [];
+    const access = registryProviderAccess(registry, callFor(events), {
+      credential: () => Promise.resolve(undefined),
+      http: () => Promise.reject(new Error("no")),
+    });
+    const g = access.generation({
+      candidates: [
+        { provider: "primary", model: "m" },
+        { provider: "backup", model: "m" },
+      ],
+      strategy: "ordered",
+    });
+    const ctx = {
+      signal: new AbortController().signal,
+      runId: "r",
+      nodeRunId: "n",
+      idempotencyKey: null,
+    };
+    const result = await g.generate({ messages: [] }, ctx);
+    expect(result.text).toBe("from backup");
+    expect(result.attempts?.map((a) => a.outcome)).toEqual(["error", "ok"]);
+    expect(events.map((e) => e.type)).toEqual(["PROVIDER_FAILOVER", "GENERATION_COMPLETED"]);
+    expect(events[0]).toMatchObject({ from: "primary/m", to: "backup/m" });
   });
 });
 

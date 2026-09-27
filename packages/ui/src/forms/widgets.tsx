@@ -40,6 +40,7 @@ import { TemplateEditor, type TemplateRef } from "./TemplateEditor";
 import { ExpressionInput, ExpressionTextarea } from "./ExpressionInput";
 import { KeyValueEditor, type KeyValueRow } from "./KeyValueEditor";
 import { ModelPicker } from "./ModelPicker";
+import { ModelFallbacks } from "./ModelFallbacks";
 import { QuestionsEditor, type BatchQuestions } from "./QuestionsEditor";
 import { RetryPolicyEditor, type RetryPolicy, DEFAULT_RETRY_POLICY } from "./RetryPolicyEditor";
 import { ThresholdField, DEFAULT_THRESHOLDS } from "./ThresholdField";
@@ -631,6 +632,14 @@ function modelIdOf(value: unknown, models: readonly ModelView[]): string | null 
   return match?.id ?? model;
 }
 
+/** A model field whose schema also accepts a GenerationPolicy (RFC-0005: `anyOf` with `candidates`). */
+export function acceptsGenerationPolicy(schema: JsonSchema): boolean {
+  return (schema.anyOf ?? schema.oneOf ?? []).some(
+    (branch) =>
+      isRecord(branch) && isRecord(branch.properties) && "candidates" in branch.properties,
+  );
+}
+
 /**
  * Model picker. A string field stores the model id; an object field (the
  * manifest `ModelRefSchema`, `{ provider, model }`) stores the ref.
@@ -645,6 +654,18 @@ export function ModelWidget({
   "aria-label": ariaLabel,
 }: SchemaWidgetProps) {
   const env = useSchemaFormEnvironment();
+  if (acceptsGenerationPolicy(schema))
+    return (
+      <ModelFallbacks
+        aria-label={ariaLabel ?? "Model"}
+        models={env.models}
+        {...(hints.modelKind ? { kind: hints.modelKind } : {})}
+        value={value}
+        onValueChange={onChange}
+        {...(invalid !== undefined ? { invalid } : {})}
+        {...(disabled !== undefined ? { disabled } : {})}
+      />
+    );
   const asRef = primaryType(schema) === "object";
   return (
     <ModelPicker

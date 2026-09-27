@@ -1401,18 +1401,74 @@
             "type": "object",
             "properties": {
               "model": {
-                "type": "object",
-                "properties": {
-                  "provider": {
-                    "type": "string",
-                    "minLength": 1
+                "anyOf": [
+                  {
+                    "properties": {
+                      "model": {
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "provider": {
+                        "minLength": 1,
+                        "type": "string"
+                      }
+                    },
+                    "required": ["provider", "model"],
+                    "type": "object"
                   },
-                  "model": {
-                    "type": "string",
-                    "minLength": 1
+                  {
+                    "properties": {
+                      "candidates": {
+                        "items": {
+                          "properties": {
+                            "model": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "provider": {
+                              "minLength": 1,
+                              "type": "string"
+                            }
+                          },
+                          "required": ["provider", "model"],
+                          "type": "object"
+                        },
+                        "maxItems": 5,
+                        "minItems": 1,
+                        "type": "array"
+                      },
+                      "maxCostUsdPerCall": {
+                        "exclusiveMinimum": 0,
+                        "type": "number"
+                      },
+                      "requirements": {
+                        "properties": {
+                          "jsonSchema": {
+                            "type": "boolean"
+                          },
+                          "minContext": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "tools": {
+                            "type": "boolean"
+                          },
+                          "vision": {
+                            "type": "boolean"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "strategy": {
+                        "default": "ordered",
+                        "enum": ["ordered", "cheapest", "fastest", "healthiest"],
+                        "type": "string"
+                      }
+                    },
+                    "required": ["candidates"],
+                    "type": "object"
                   }
-                },
-                "required": ["provider", "model"],
+                ],
                 "x-ui": {
                   "widget": "model"
                 }
@@ -3905,5 +3961,5 @@
     "maxCostUsd": 0.5,
     "nodeCount": 11
   },
-  "planHash": "52c9de2de3ea974af9bafcc62490856a9f9e9c650d850f9ba90db23ed456faf5"
+  "planHash": "23bf3fcd344d7cbed100b8e204607f5c405b319d1eed6b2edc4aa5a9f0abc819"
 }

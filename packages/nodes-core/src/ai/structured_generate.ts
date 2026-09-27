@@ -2,7 +2,7 @@ import { z } from "zod";
 import { defineNode, ok } from "@flowaid/node-sdk";
 import { SchemaValidationError, type JsonSchema, type JsonValue } from "@flowaid/workflow-core";
 import { validateJson } from "../jsonSchema.js";
-import { callCtx, modelRef, usageSchema } from "../common.js";
+import { callCtx, generationModel, usageSchema } from "../common.js";
 import { messagesFor } from "./generate.js";
 
 /** Pulls the first JSON value out of model text (bare JSON or a fenced block). */
@@ -37,7 +37,7 @@ export const structuredGenerateNode = defineNode({
     summary: "{{ config.model.provider }}/{{ config.model.model }}",
   },
   configSchema: z.strictObject({
-    model: modelRef,
+    model: generationModel,
     system: z
       .string()
       .max(32000)
