@@ -7,6 +7,7 @@
 import { and, eq } from "drizzle-orm";
 import { coreManifests } from "@flowaid/nodes-core/manifest";
 import { compile, COMPILER_VERSION } from "@flowaid/workflow-compiler";
+import { enabledPlugins } from "./plugins.js";
 import {
   environments,
   mcpServers,
@@ -47,7 +48,7 @@ export interface CompileContextInput {
 
 /** Loads everything `compile()` resolves against, inside the caller's tenant transaction. */
 export async function loadCompileContext(tx: Tx, i: CompileContextInput) {
-  const [servers, toolsets, ws] = await Promise.all([
+  const [servers, toolsets, ws, extensions] = await Promise.all([
     tx
       .select({ id: mcpServers.id, tools: mcpServers.discoveredTools })
       .from(mcpServers)
@@ -60,6 +61,7 @@ export async function loadCompileContext(tx: Tx, i: CompileContextInput) {
       .select({ settings: workspaces.settings })
       .from(workspaces)
       .where(eq(workspaces.id, i.workspaceId)),
+    enabledPlugins(tx, i.workspaceId),
   ]);
   const byKey = new Map<string, ToolDefinition>();
   for (const s of servers) for (const t of s.tools) byKey.set(`mcp|${s.id}|${t.name}`, t);
@@ -154,7 +156,7 @@ export async function loadCompileContext(tx: Tx, i: CompileContextInput) {
     chain.length > 0 ? { primary: chain[0] as ProviderHop, failover: chain.slice(1) } : undefined;
 
   return {
-    catalog: coreCatalog(),
+    catalog: coreCatalog(extensions.manifests),
     resolveTool,
     resolveSubflow,
     /** Pinned subflow versions are looked up lazily: call after a first compile, then recompile. */

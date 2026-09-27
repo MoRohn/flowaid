@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { plugins } from "@flowaid/database";
+import { plugins, templates } from "@flowaid/database";
 import { createTestDatabase, describeDb, type TestDatabase } from "@flowaid/database/testing";
 import { loadBundledPlugins } from "./bundled.js";
 
@@ -28,6 +28,12 @@ describeDb("bundled plugins are recorded in the plugins table (Postgres)", () =>
       integrity: "0.1.0",
     });
     expect(rows[0]?.manifests.map((m) => m.id)).toContain("@flowaid/nodes-langchain.retriever");
+    // its template is a global built-in, once, however often the worker boots
+    const seeded = await db.app.system((tx) =>
+      tx.select().from(templates).where(eq(templates.slug, "knowledge-assistant-langchain-rag")),
+    );
+    expect(seeded).toHaveLength(1);
+    expect(seeded[0]).toMatchObject({ workspaceId: null, category: "knowledge" });
 
     // Boot again: still one row. Then an administrator disables it; the next boot respects that.
     await loadBundledPlugins(["@flowaid/nodes-langchain"], { db: db.app });
@@ -44,5 +50,9 @@ describeDb("bundled plugins are recorded in the plugins table (Postgres)", () =>
     ]);
     const after = await db.app.system((tx) => tx.select().from(plugins));
     expect(after).toHaveLength(1);
+    const templateRows = await db.app.system((tx) =>
+      tx.select().from(templates).where(eq(templates.slug, "knowledge-assistant-langchain-rag")),
+    );
+    expect(templateRows).toHaveLength(1);
   });
 });

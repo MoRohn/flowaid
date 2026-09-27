@@ -27,6 +27,7 @@ import { NoContent } from "../dto/common.js";
 import { LoginRequestSchema, MeResponseSchema, SessionResponseSchema } from "../dto/identity.js";
 import { REFRESH_COOKIE, sessionCookieName } from "../plugins/auth.js";
 import { featuresFor } from "../services/features.js";
+import { loadEnabledPlugins } from "../services/plugins.js";
 import { Throttle } from "../services/throttle.js";
 
 const REFRESH_TTL_MS = 30 * 24 * 3600 * 1000;
@@ -427,7 +428,7 @@ export function authRoutes(app: FastifyInstance, ctx: ApiContext): void {
           name: w.workspace.name,
           role: w.role,
         })),
-        features: featuresFor(ctx.config),
+        features: featuresFor(ctx.config, await loadEnabledPlugins(ctx.db, p?.workspaceId ?? null)),
       };
     },
   );

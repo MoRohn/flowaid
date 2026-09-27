@@ -238,3 +238,17 @@ describe("needsLayout", () => {
     expect(needsLayout(def)).toBe(false);
   });
 });
+
+describe("runErrorMessage", () => {
+  it("names the server's diagnostics instead of a count", async () => {
+    const { runErrorMessage } = await import("./errors");
+    const { ApiError } = await import("~/api/client");
+    const e = new ApiError(422, "WORKFLOW_VALIDATION_ERROR", "1 diagnostic(s)", {
+      diagnostics: [{ message: "secret TYPESAFE_API_KEY is not bound in this environment" }],
+    });
+    expect(runErrorMessage(e)).toBe(
+      "The run could not start: secret TYPESAFE_API_KEY is not bound in this environment",
+    );
+    expect(runErrorMessage(new Error("x"))).toBe("The run could not start.");
+  });
+});

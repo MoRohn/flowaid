@@ -66,6 +66,7 @@ import {
 import { createBuilderStore, type BuilderStore } from "./store";
 import { useCompiler } from "./useCompiler";
 import { useLiveRun } from "./useLiveRun";
+import { runErrorMessage } from "./errors";
 import { NodeInspector } from "./NodeInspector";
 import { PublishDialog } from "./PublishDialog";
 import { RunTab } from "./RunTab";
@@ -443,7 +444,7 @@ function BuilderView({
         setRunId(res.run_id);
         setBottomTab("trace");
       } catch (e) {
-        toast.error(e instanceof ApiError ? e.message : "The run could not start.");
+        toast.error(runErrorMessage(e));
       } finally {
         setStarting(false);
       }

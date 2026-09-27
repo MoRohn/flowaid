@@ -8,7 +8,7 @@
  * on that row survives restarts: a disabled bundled plugin is recorded but not loaded.
  */
 import { sql } from "drizzle-orm";
-import type { Database } from "@flowaid/database";
+import { seedTemplates, type BuiltInTemplate, type Database } from "@flowaid/database";
 import { normalizePackage, toManifest, type NodePackage } from "@flowaid/node-sdk";
 import type { ProviderRegistry } from "@flowaid/providers";
 import { uuidv7 } from "@flowaid/shared";
@@ -24,6 +24,46 @@ export const BUNDLED_LOADERS: Readonly<Record<string, Loader>> = {
     return { module, version };
   },
 };
+
+interface PluginTemplate {
+  id: string;
+  category: string;
+  definition: unknown;
+  requiredResources: readonly unknown[];
+}
+
+/** Built-in templates a bundled package ships (seeded as global templates while it is enabled). */
+export const BUNDLED_TEMPLATES: Readonly<Record<string, () => Promise<readonly PluginTemplate[]>>> =
+  {
+    "@flowaid/nodes-langchain": async () =>
+      (await import("@flowaid/nodes-langchain/manifest")).langchainTemplates,
+  };
+
+function toBuiltIn(t: PluginTemplate): BuiltInTemplate {
+  const resources = t.requiredResources as {
+    kind: string;
+    key: string;
+    description: string;
+    tools?: { name: string }[];
+  }[];
+  return {
+    slug: t.id,
+    category: t.category,
+    definition: t.definition as never,
+    requiredResources: {
+      mcpServers: resources
+        .filter((r) => r.kind === "mcp")
+        .map((r) => ({
+          key: r.key,
+          description: r.description,
+          requiredTools: (r.tools ?? []).map((x) => x.name),
+        })),
+      knowledgeSources: resources
+        .filter((r) => r.kind === "knowledge")
+        .map((r) => ({ key: r.key, description: r.description })),
+    },
+  };
+}
 
 export interface BundledResult {
   packages: NodePackage[];
@@ -85,6 +125,11 @@ export async function loadBundledPlugins(
       continue;
     }
     out.packages.push(normalized.package);
+    const templates = BUNDLED_TEMPLATES[name];
+    if (opts.db && templates) {
+      const list = (await templates()).map(toBuiltIn);
+      await opts.db.system((tx) => seedTemplates(tx, list));
+    }
     opts.log?.info(
       { plugin: name, version, nodes: normalized.package.nodes.length },
       "bundled plugin loaded",

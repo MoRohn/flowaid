@@ -16,8 +16,20 @@ import {
 import { ForbiddenError, NotFoundError, type ToolDefinition } from "@flowaid/workflow-core";
 import type { ApiContext } from "../context.js";
 import { visibleWorkflow } from "../services/workflows.js";
+import { loadEnabledPlugins } from "../services/plugins.js";
 
-const ETAG = `"${createHash("sha256").update(JSON.stringify(coreManifests)).digest("base64url").slice(0, 20)}"`;
+const CORE_HASH = createHash("sha256").update(JSON.stringify(coreManifests)).digest("base64url");
+
+/** Core plus enabled plugin manifests, and an ETag that changes when either does. */
+async function catalogFor(ctx: ApiContext, workspaceId: string | null) {
+  const extra = await loadEnabledPlugins(ctx.db, workspaceId);
+  const etag = `"${createHash("sha256")
+    .update(CORE_HASH)
+    .update(JSON.stringify(extra.packages))
+    .digest("base64url")
+    .slice(0, 20)}"`;
+  return { manifests: [...coreManifests, ...extra.manifests], etag };
+}
 
 export function catalogRoutes(app: FastifyInstance, ctx: ApiContext): void {
   const r = app.withTypeProvider<ZodTypeProvider>();
@@ -34,9 +46,10 @@ export function catalogRoutes(app: FastifyInstance, ctx: ApiContext): void {
       schema: { tags: ["catalog"], summary: "Node manifests (core, bundled and enabled plugins)" },
     },
     async (req, reply) => {
-      void reply.header("etag", ETAG).header("cache-control", "private, max-age=60");
-      if (req.headers["if-none-match"] === ETAG) return reply.code(304).send();
-      return coreManifests;
+      const { manifests, etag } = await catalogFor(ctx, req.principal?.workspaceId ?? null);
+      void reply.header("etag", etag).header("cache-control", "private, max-age=60");
+      if (req.headers["if-none-match"] === etag) return reply.code(304).send();
+      return manifests;
     },
   );
 
@@ -54,9 +67,10 @@ export function catalogRoutes(app: FastifyInstance, ctx: ApiContext): void {
         querystring: z.object({ version: z.string().optional() }),
       },
     },
-    (req) => {
+    async (req) => {
       const id = decodeURIComponent(req.params.typeId);
-      const m = coreManifests
+      const { manifests } = await catalogFor(ctx, req.principal?.workspaceId ?? null);
+      const m = manifests
         .filter((x) => x.id === id && (!req.query.version || x.version === req.query.version))
         .sort((a, b) => (a.version < b.version ? 1 : -1))[0];
       if (!m) throw new NotFoundError(`node type ${id} not found`);

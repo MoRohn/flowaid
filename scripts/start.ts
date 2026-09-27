@@ -1,55 +1,75 @@
 /**
- * `pnpm start`: one command from a fresh clone to a running FlowAId UI.
+ * `pnpm start`: one command from a fresh clone to a running FlowAId — database, API, worker and
+ * web app — on this machine.
  *
- * 1. Preflight: Node.js, pnpm, dependencies and the port (the same checks as `pnpm preflight`).
+ * 1. Preflight: Node.js, pnpm, dependencies, free ports, and Docker when no database is given.
  * 2. Installs dependencies when they are missing or older than pnpm-lock.yaml.
- * 3. Builds the workspace packages the UI depends on.
- * 4. Serves the UI playground: the Vite dev server, or with --prod an optimised build.
+ * 3. Configuration: `.env` and `.env.local` (provider keys and overrides), plus local secrets
+ *    generated once into `.flowaid/dev.env` (master key, owner password) and printed once.
+ * 4. Database: DATABASE_URL when set, otherwise a pgvector Postgres container (`flowaid-dev-db`,
+ *    loopback only, data in the `flowaid-dev-db` volume).
+ * 5. Builds what the apps import, then starts the API, the worker and the web app with prefixed
+ *    logs, waits for /v1/ready and prints where to sign in. Ctrl+C stops everything.
  *
- * Runs on plain Node (native type stripping) so it works before `pnpm install`. The API,
- * worker and web app are not built yet; when they are, this command will start them too.
+ * `--prod` runs the production builds (`next start`, compiled API and worker) instead of watch
+ * mode; `--playground` serves the @flowaid/ui component playground instead of the stack.
+ *
+ * Runs on plain Node (native type stripping) so it works before `pnpm install`.
  */
-import { spawn } from "node:child_process";
+import { spawn, spawnSync, type ChildProcess } from "node:child_process";
+import { randomBytes } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { parseArgs } from "node:util";
+import { parseArgs, parseEnv } from "node:util";
 
 import {
   DEFAULT_HOST,
   DEFAULT_PORT,
   ROOT,
+  checkPort,
   formatReport,
   hasFailures,
+  probe,
   runPreflight,
   useColor,
+  type CheckResult,
 } from "./preflight.ts";
 
 const HELP = `Usage: pnpm start [options]
 
-Start the FlowAId UI playground from a fresh clone.
+Start FlowAId locally: Postgres, the API, the worker and the web app.
 
 Options
-  --port <n>        Port to serve on (default ${DEFAULT_PORT})
-  --host <address>  Interface to bind (default ${DEFAULT_HOST}; 0.0.0.0 exposes it on your network)
-  --open            Open the browser once the server is ready
-  --prod            Serve an optimised production build instead of the dev server
-  --verify          Run every CI gate (pnpm check) before starting
-  --skip-install    Never install dependencies, even when they are missing or stale
-  -h, --help        Show this help
+  --port <n>          Web app port (default 3001)
+  --api-port <n>      API port (default 3000)
+  --host <address>    Interface to bind (default ${DEFAULT_HOST}; 0.0.0.0 exposes it on your network)
+  --database-url <u>  Use this Postgres instead of a Docker container (or set DATABASE_URL)
+  --prod              Run production builds instead of watch mode
+  --open              Open the browser once the web app is ready
+  --verify            Run every CI gate (pnpm check) before starting
+  --skip-install      Never install dependencies, even when they are missing or stale
+  --playground        Serve the @flowaid/ui component playground instead (port ${DEFAULT_PORT})
+  -h, --help          Show this help
+
+Provider keys (TYPESAFE_API_KEY, OPENAI_API_KEY, …) and any other setting from .env.example are
+read from .env and .env.local. Generated local secrets live in .flowaid/dev.env.
 `;
 
 let parsed;
 try {
-  // `pnpm start -- --help` passes the separator through; drop it.
   const argv = process.argv.slice(2);
   parsed = parseArgs({
     args: argv[0] === "--" ? argv.slice(1) : argv,
     options: {
-      port: { type: "string", default: String(DEFAULT_PORT) },
+      port: { type: "string" },
+      "api-port": { type: "string", default: "3000" },
       host: { type: "string", default: DEFAULT_HOST },
-      open: { type: "boolean", default: false },
+      "database-url": { type: "string" },
       prod: { type: "boolean", default: false },
+      open: { type: "boolean", default: false },
       verify: { type: "boolean", default: false },
       "skip-install": { type: "boolean", default: false },
+      playground: { type: "boolean", default: false },
       help: { type: "boolean", short: "h", default: false },
     },
   });
@@ -58,35 +78,47 @@ try {
   process.exit(2);
 }
 const opts = parsed.values;
-
 if (opts.help) {
   console.log(HELP);
   process.exit(0);
 }
 
-const port = Number(opts.port);
-if (!Number.isInteger(port) || port < 1 || port > 65_535) {
-  console.error(`--port must be an integer between 1 and 65535 (got ${opts.port}).`);
-  process.exit(2);
+function portOption(value: string, flag: string): number {
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < 1 || n > 65_535) {
+    console.error(`${flag} must be an integer between 1 and 65535 (got ${value}).`);
+    process.exit(2);
+  }
+  return n;
 }
 const host = opts.host;
+const webPort = portOption(opts.port ?? String(opts.playground ? DEFAULT_PORT : 3001), "--port");
+const apiPort = portOption(opts["api-port"], "--api-port");
+const browserHost = host === "0.0.0.0" ? "127.0.0.1" : host;
 
 const color = useColor();
 const paint = (code: number, text: string) => (color ? `\u001b[${code}m${text}\u001b[0m` : text);
-const TOTAL_STEPS = opts.verify ? 5 : 4;
+const ok = (text: string) => console.log(`${paint(32, "✓")} ${text}`);
+const warn = (text: string) => console.log(`${paint(33, "!")} ${text}`);
+const fail = (text: string): never => {
+  console.error(`\n${paint(31, "✗")} ${text}`);
+  process.exit(1);
+};
+
+const TOTAL = (opts.playground ? 4 : 6) + (opts.verify ? 1 : 0);
 let step = 0;
 const heading = (text: string) => {
   step += 1;
-  console.log(`\n${paint(1, `[${step}/${TOTAL_STEPS}] ${text}`)}`);
+  console.log(`\n${paint(1, `[${step}/${TOTAL}] ${text}`)}`);
 };
 
-/** Runs a command with inherited stdio; resolves with its exit code. */
-function run(command: string, args: readonly string[]): Promise<number> {
+function run(command: string, args: readonly string[], env?: NodeJS.ProcessEnv): Promise<number> {
   return new Promise((resolve) => {
     const child = spawn(command, args, {
       cwd: ROOT,
       stdio: "inherit",
       shell: process.platform === "win32",
+      ...(env ? { env } : {}),
     });
     child.once("error", () => resolve(127));
     child.once("exit", (code, signal) => resolve(code ?? (signal ? 1 : 0)));
@@ -96,98 +128,362 @@ function run(command: string, args: readonly string[]): Promise<number> {
 async function mustRun(label: string, command: string, args: readonly string[]): Promise<void> {
   const started = performance.now();
   const code = await run(command, args);
-  if (code !== 0) {
-    console.error(
-      `\n${paint(31, "✗")} ${label} failed (exit ${code}). Run pnpm preflight for help.`,
-    );
-    process.exit(code);
-  }
-  const seconds = ((performance.now() - started) / 1000).toFixed(1);
-  console.log(`${paint(32, "✓")} ${label} (${seconds} s)`);
+  if (code !== 0) fail(`${label} failed (exit ${code}). Run pnpm preflight for help.`);
+  ok(`${label} (${((performance.now() - started) / 1000).toFixed(1)} s)`);
 }
 
+// ─── configuration ───────────────────────────────────────────────────────────────────────────
+
+function readEnvFile(path: string): Record<string, string> {
+  return existsSync(path) ? (parseEnv(readFileSync(path, "utf8")) as Record<string, string>) : {};
+}
+
+/** Local secrets, generated once and kept in .flowaid/dev.env (gitignored). */
+function localSecrets(): { values: Record<string, string>; created: boolean } {
+  const dir = join(ROOT, ".flowaid");
+  const file = join(dir, "dev.env");
+  if (existsSync(file)) return { values: readEnvFile(file), created: false };
+  mkdirSync(dir, { recursive: true });
+  const values = {
+    FLOWAID_MASTER_KEY: randomBytes(32).toString("base64"),
+    FLOWAID_ADMIN_EMAIL: "owner@flowaid.local",
+    FLOWAID_ADMIN_PASSWORD: `${randomBytes(12).toString("base64url")}-Aa9`,
+    FLOWAID_DEV_DB_PASSWORD: randomBytes(16).toString("hex"),
+  };
+  const body = Object.entries(values)
+    .map(([k, v]) => `${k}=${v}`)
+    .join("\n");
+  writeFileSync(
+    file,
+    `# Generated by pnpm start for this checkout. Keep it: the master key encrypts every credential.\n${body}\n`,
+    { mode: 0o600 },
+  );
+  return { values, created: true };
+}
+
+// ─── database ────────────────────────────────────────────────────────────────────────────────
+
+const DB_CONTAINER = "flowaid-dev-db";
+const DB_PORT = 54329;
+// the same image compose pins (docker/compose.yml), with its digest
+const DB_IMAGE =
+  "pgvector/pgvector:0.8.6-pg16@sha256:ccc6e83d6e35e931dc7c5def2022729d5a6c370318d099181995567ff1fb4d6b";
+
+async function ensureDockerDatabase(password: string): Promise<string> {
+  const state = probe("docker", ["inspect", "-f", "{{.State.Running}}", DB_CONTAINER]);
+  if (state === null) {
+    const created = spawnSync(
+      "docker",
+      [
+        "run",
+        "-d",
+        "--name",
+        DB_CONTAINER,
+        "-e",
+        "POSTGRES_USER=flowaid",
+        "-e",
+        `POSTGRES_PASSWORD=${password}`,
+        "-e",
+        "POSTGRES_DB=flowaid",
+        "-p",
+        `127.0.0.1:${DB_PORT}:5432`,
+        "-v",
+        "flowaid-dev-db:/var/lib/postgresql/data",
+        DB_IMAGE,
+      ],
+      { stdio: ["ignore", "ignore", "pipe"] },
+    );
+    if (created.status !== 0)
+      fail(`could not start Postgres in Docker: ${created.stderr.toString().trim()}`);
+    ok(`started Postgres (${DB_CONTAINER}, 127.0.0.1:${DB_PORT})`);
+  } else if (state !== "true") {
+    if (spawnSync("docker", ["start", DB_CONTAINER], { stdio: "ignore" }).status !== 0)
+      fail(`could not start the ${DB_CONTAINER} container`);
+    ok(`restarted Postgres (${DB_CONTAINER})`);
+  } else ok(`Postgres already running (${DB_CONTAINER})`);
+  for (let i = 0; i < 60; i++) {
+    const ready = spawnSync(
+      "docker",
+      ["exec", DB_CONTAINER, "pg_isready", "-U", "flowaid", "-d", "flowaid"],
+      {
+        stdio: "ignore",
+      },
+    );
+    if (ready.status === 0) return `postgres://flowaid:${password}@127.0.0.1:${DB_PORT}/flowaid`;
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+  return fail("Postgres did not become ready within a minute");
+}
+
+// ─── processes ───────────────────────────────────────────────────────────────────────────────
+
+const children: ChildProcess[] = [];
+let stopping = false;
+
+function start(
+  name: string,
+  code: number,
+  command: string,
+  args: string[],
+  cwd: string,
+  env: NodeJS.ProcessEnv,
+) {
+  const child = spawn(command, args, {
+    cwd,
+    env,
+    stdio: ["ignore", "pipe", "pipe"],
+    shell: process.platform === "win32",
+  });
+  const tag = paint(code, name.padEnd(6));
+  const pipe = (stream: NodeJS.ReadableStream, out: NodeJS.WriteStream) => {
+    let rest = "";
+    stream.on("data", (chunk: Buffer) => {
+      const lines = (rest + chunk.toString()).split("\n");
+      rest = lines.pop() ?? "";
+      for (const line of lines) if (line.trim()) out.write(`${tag} ${line}\n`);
+    });
+  };
+  if (child.stdout) pipe(child.stdout, process.stdout);
+  if (child.stderr) pipe(child.stderr, process.stderr);
+  child.once("exit", (exitCode) => {
+    if (stopping) return;
+    console.error(
+      `\n${paint(31, "✗")} ${name} exited (${exitCode ?? "signal"}); stopping the others.`,
+    );
+    shutdown(exitCode ?? 1);
+  });
+  children.push(child);
+  return child;
+}
+
+function shutdown(code = 0) {
+  if (stopping) return;
+  stopping = true;
+  for (const c of children) c.kill("SIGTERM");
+  const hard = setTimeout(() => {
+    for (const c of children) c.kill("SIGKILL");
+    process.exit(code);
+  }, 10_000);
+  hard.unref();
+  let left = children.filter((c) => c.exitCode === null).length;
+  if (left === 0) process.exit(code);
+  for (const c of children)
+    c.once("exit", () => {
+      left -= 1;
+      if (left <= 0) process.exit(code);
+    });
+}
+for (const signal of ["SIGINT", "SIGTERM"] as const) process.on(signal, () => shutdown(0));
+
+async function waitFor(url: string, timeoutMs: number): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline && !stopping) {
+    try {
+      const res = await fetch(url);
+      if (res.ok) return true;
+    } catch {
+      /* not up yet */
+    }
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+  return false;
+}
+
+function openBrowser(url: string) {
+  const cmd =
+    process.platform === "darwin" ? "open" : process.platform === "win32" ? "start" : "xdg-open";
+  spawn(cmd, [url], {
+    stdio: "ignore",
+    detached: true,
+    shell: process.platform === "win32",
+  }).unref();
+}
+
+// ─── main ────────────────────────────────────────────────────────────────────────────────────
+
 console.log(
-  `\n${paint(1, "FlowAId")} · starting the UI playground${opts.prod ? " (production build)" : ""}`,
+  `\n${paint(1, "FlowAId")} · ${opts.playground ? "UI playground" : `local stack${opts.prod ? " (production builds)" : ""}`}`,
 );
 
 heading("Preflight");
-const results = await runPreflight({ host, port });
-console.log(formatReport(results, color));
-if (hasFailures(results)) {
-  console.error(`\n${paint(31, "✗")} Fix the items marked ✗ and run pnpm start again.`);
-  process.exit(1);
+const fileEnv = { ...readEnvFile(join(ROOT, ".env")), ...readEnvFile(join(ROOT, ".env.local")) };
+const databaseUrl = opts["database-url"] ?? process.env.DATABASE_URL ?? fileEnv.DATABASE_URL;
+const results: CheckResult[] = await runPreflight({ host, port: webPort });
+if (!opts.playground) {
+  const api = await checkPort(host, apiPort);
+  results.push({
+    ...api,
+    name: "API port",
+    ...(api.fix ? { fix: `${api.fix} (or pass --api-port)` } : {}),
+  });
+  if (databaseUrl) {
+    const i = results.findIndex((r) => r.name === "Docker");
+    if (i >= 0) results[i] = { name: "Database", status: "ok", detail: "using DATABASE_URL" };
+  } else if (probe("docker", ["info", "--format", "{{.ServerVersion}}"]) === null) {
+    results.push({
+      name: "Database",
+      status: "fail",
+      detail: "no DATABASE_URL and the Docker daemon is not running",
+      fix: "start Docker Desktop, or pass --database-url postgres://… (Postgres 16 with pgvector)",
+    });
+  }
+  const web = results.findIndex((r) => r.name === "Playground port");
+  if (web >= 0) results[web] = { ...(results[web] as CheckResult), name: "Web port" };
 }
+console.log(formatReport(results, color));
+if (hasFailures(results)) fail("Fix the items marked ✗ and run pnpm start again.");
 
 heading("Dependencies");
 const deps = results.find((r) => r.name === "Dependencies");
-if (deps?.status === "ok") {
-  console.log(`${paint(32, "✓")} already installed`);
-} else if (opts["skip-install"]) {
-  console.log(`${paint(33, "!")} ${deps?.detail ?? "unknown"}; skipped (--skip-install)`);
-} else {
-  await mustRun("pnpm install", "pnpm", ["install", "--frozen-lockfile"]);
-}
+if (deps?.status === "ok") ok("already installed");
+else if (opts["skip-install"]) warn(`${deps?.detail ?? "unknown"}; skipped (--skip-install)`);
+else await mustRun("pnpm install", "pnpm", ["install", "--frozen-lockfile"]);
 
 if (opts.verify) {
   heading("Verify (every CI gate)");
   await mustRun("pnpm check", "pnpm", ["check"]);
 }
 
-heading("Build workspace packages");
-await mustRun("Workspace packages built", "pnpm", [
-  "turbo",
-  "run",
-  "build",
-  "--filter=@flowaid/ui^...",
-  "--output-logs=errors-only",
-]);
-if (opts.prod) {
-  await mustRun("Playground production build", "pnpm", [
-    "--filter",
-    "@flowaid/ui",
-    "build:playground",
+if (opts.playground) {
+  heading("Build workspace packages");
+  await mustRun("Workspace packages built", "pnpm", [
+    "turbo",
+    "run",
+    "build",
+    "--filter=@flowaid/ui^...",
+    "--output-logs=errors-only",
   ]);
-}
-
-heading(opts.prod ? "Serve the production build" : "Start the dev server");
-const url = `http://${host === "0.0.0.0" ? "127.0.0.1" : host}:${port}`;
-if (host === "0.0.0.0") {
-  console.log(
-    `${paint(33, "!")} bound to 0.0.0.0: anyone on your network can reach the playground`,
+  if (opts.prod)
+    await mustRun("Playground production build", "pnpm", [
+      "--filter",
+      "@flowaid/ui",
+      "build:playground",
+    ]);
+  heading(opts.prod ? "Serve the production build" : "Start the dev server");
+  const UI_DIR = join(ROOT, "packages/ui");
+  const vite = join(
+    UI_DIR,
+    "node_modules/.bin",
+    process.platform === "win32" ? "vite.cmd" : "vite",
   );
-}
-console.log(`${paint(32, "→")} ${paint(1, url)}   (Ctrl+C to stop)\n`);
+  const url = `http://${browserHost}:${webPort}`;
+  console.log(`${paint(32, "→")} ${paint(1, url)}   (Ctrl+C to stop)\n`);
+  start(
+    "ui",
+    36,
+    vite,
+    [
+      ...(opts.prod ? ["preview"] : []),
+      "--config",
+      "playground/vite.config.ts",
+      "--host",
+      host,
+      "--port",
+      String(webPort),
+      "--strictPort",
+      ...(opts.open ? ["--open"] : []),
+    ],
+    UI_DIR,
+    process.env,
+  );
+} else {
+  heading("Configuration");
+  const secrets = localSecrets();
+  ok(
+    secrets.created
+      ? "generated local secrets in .flowaid/dev.env"
+      : "local secrets from .flowaid/dev.env",
+  );
+  const providers = [
+    "TYPESAFE_API_KEY",
+    "OPENAI_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "OLLAMA_HOST",
+  ].filter((k) => fileEnv[k] ?? process.env[k]);
+  if (providers.length) ok(`provider keys: ${providers.join(", ")}`);
+  else
+    warn(
+      "no provider keys in .env: decision and generation nodes need TYPESAFE_API_KEY (and OPENAI/ANTHROPIC for generation)",
+    );
 
-// Vite runs directly (not through `pnpm exec`) so a stop is clean and its output is its own.
-const UI_DIR = join(ROOT, "packages/ui");
-const vite = join(UI_DIR, "node_modules/.bin", process.platform === "win32" ? "vite.cmd" : "vite");
-const viteArgs = [
-  ...(opts.prod ? ["preview"] : []),
-  "--config",
-  "playground/vite.config.ts",
-  "--host",
-  host,
-  "--port",
-  String(port),
-  "--strictPort",
-  ...(opts.open ? ["--open"] : []),
-];
-const server = spawn(vite, viteArgs, {
-  cwd: UI_DIR,
-  stdio: "inherit",
-  shell: process.platform === "win32",
-});
+  heading("Database");
+  const dbUrl =
+    databaseUrl ??
+    (await ensureDockerDatabase(secrets.values.FLOWAID_DEV_DB_PASSWORD ?? "flowaid"));
+  if (databaseUrl) ok("using DATABASE_URL");
 
-// Forward stop signals so the server also stops when only this process is signalled (a
-// supervisor, or kill), then exit with the server's code once it has shut down.
-let stopping = false;
-for (const signal of ["SIGINT", "SIGTERM"] as const) {
-  process.on(signal, () => {
-    stopping = true;
-    server.kill(signal);
-  });
+  heading("Build");
+  await mustRun(opts.prod ? "API, worker and web built" : "Workspace packages built", "pnpm", [
+    "turbo",
+    "run",
+    "build",
+    ...(opts.prod
+      ? ["--filter=@flowaid/api...", "--filter=@flowaid/worker...", "--filter=@flowaid/web..."]
+      : ["--filter=@flowaid/api^...", "--filter=@flowaid/worker^...", "--filter=@flowaid/web^..."]),
+    "--output-logs=errors-only",
+  ]);
+
+  heading("Start");
+  const data = join(ROOT, ".flowaid");
+  mkdirSync(join(data, "keys"), { recursive: true });
+  const apiUrl = `http://${browserHost}:${apiPort}`;
+  const webUrl = `http://${browserHost}:${webPort}`;
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    ...fileEnv,
+    ...secrets.values,
+    NODE_ENV: opts.prod ? "production" : "development",
+    DATABASE_URL: dbUrl,
+    FLOWAID_MASTER_KEY_FILE: join(data, "master.key"),
+    FLOWAID_JWT_KEYS_DIR: join(data, "keys"),
+    // plain http on this machine: cookies without Secure
+    FLOWAID_ALLOW_INSECURE_HTTP: "true",
+    FLOWAID_BASE_URL: fileEnv.FLOWAID_BASE_URL ?? apiUrl,
+    FLOWAID_WEB_URL: fileEnv.FLOWAID_WEB_URL ?? webUrl,
+    FLOWAID_API_INTERNAL_URL: `http://127.0.0.1:${apiPort}`,
+    LOG_LEVEL: fileEnv.LOG_LEVEL ?? "warn",
+  };
+  const bin = (dir: string, name: string) =>
+    join(ROOT, dir, "node_modules/.bin", process.platform === "win32" ? `${name}.cmd` : name);
+  const api = join(ROOT, "apps/api");
+  const worker = join(ROOT, "apps/worker");
+  const web = join(ROOT, "apps/web");
+  start(
+    "api",
+    34,
+    opts.prod ? process.execPath : bin("apps/api", "tsx"),
+    opts.prod ? ["dist/main.js"] : ["watch", "src/main.ts"],
+    api,
+    { ...env, HOST: host, PORT: String(apiPort) },
+  );
+  if (!(await waitFor(`http://127.0.0.1:${apiPort}/v1/ready`, 120_000)))
+    fail("the API did not become ready (see the api lines above)");
+  ok(`API ready on ${apiUrl}`);
+  start(
+    "worker",
+    33,
+    opts.prod ? process.execPath : bin("apps/worker", "tsx"),
+    opts.prod ? ["dist/main.js"] : ["watch", "src/main.ts"],
+    worker,
+    env,
+  );
+  start(
+    "web",
+    36,
+    bin("apps/web", "next"),
+    [opts.prod ? "start" : "dev", "--port", String(webPort), "--hostname", host],
+    web,
+    { ...env, PORT: String(webPort) },
+  );
+  if (!(await waitFor(`http://127.0.0.1:${webPort}/login`, 180_000)))
+    fail("the web app did not start (see the web lines above)");
+
+  console.log(`\n${paint(32, "→")} ${paint(1, webUrl)}   (Ctrl+C to stop)`);
+  if (secrets.created || !existsSync(join(data, "signed-in")))
+    console.log(
+      `  sign in as ${paint(1, secrets.values.FLOWAID_ADMIN_EMAIL ?? "")} / ${paint(1, secrets.values.FLOWAID_ADMIN_PASSWORD ?? "")}   (also in .flowaid/dev.env)`,
+    );
+  console.log(`  API ${apiUrl} · docs ${apiUrl}/docs\n`);
+  writeFileSync(join(data, "signed-in"), "");
+  if (opts.open) openBrowser(webUrl);
 }
-server.once("exit", (code) => {
-  // A requested stop is a clean exit even though pnpm reports its killed child as a failure.
-  process.exit(stopping ? 0 : (code ?? 1));
-});
