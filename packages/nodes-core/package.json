@@ -29,11 +29,12 @@
     "clean": "rm -rf dist .turbo *.tsbuildinfo"
   },
   "dependencies": {
-    "ajv": "8.20.0",
+    "@flowaid/mcp": "workspace:*",
     "@flowaid/node-sdk": "workspace:*",
     "@flowaid/providers": "workspace:*",
     "@flowaid/shared": "workspace:*",
     "@flowaid/workflow-core": "workspace:*",
+    "ajv": "8.20.0",
     "zod": "4.6.5"
   },
   "devDependencies": {

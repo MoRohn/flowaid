@@ -16,6 +16,10 @@ import { generateNode } from "./ai/generate.js";
 import { structuredGenerateNode } from "./ai/structured_generate.js";
 import { embeddingsNode } from "./ai/embeddings.js";
 import { httpNode } from "./tools/http.js";
+import { mcpNode } from "./tools/mcp.js";
+import { mcpResourceNode } from "./tools/mcp_resource.js";
+import { mcpPromptNode } from "./tools/mcp_prompt.js";
+import { openapiNode } from "./tools/openapi.js";
 import { transformNode } from "./data/transform.js";
 import { templateNode } from "./data/template.js";
 import { jsonNode } from "./data/json.js";
@@ -48,6 +52,10 @@ export {
   structuredGenerateNode,
   embeddingsNode,
   httpNode,
+  mcpNode,
+  mcpResourceNode,
+  mcpPromptNode,
+  openapiNode,
   transformNode,
   templateNode,
   jsonNode,
@@ -87,6 +95,10 @@ export const CORE_NODES: readonly AnyNodeDefinition[] = [
   structuredGenerateNode,
   embeddingsNode,
   httpNode,
+  mcpNode,
+  mcpResourceNode,
+  mcpPromptNode,
+  openapiNode,
   transformNode,
   templateNode,
   jsonNode,

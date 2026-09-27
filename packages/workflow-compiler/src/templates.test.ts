@@ -14,16 +14,14 @@ import {
 } from "@flowaid/workflow-core";
 import { describe, expect, it } from "vitest";
 import { compile } from "./index.js";
-import { catalogOf, readJson } from "./test/support.js";
+import { catalogOf } from "./test/support.js";
 
 const NODES_CORE = join(dirname(fileURLToPath(import.meta.url)), "../../nodes-core");
 const read = (...p: string[]): unknown => JSON.parse(readFileSync(join(NODES_CORE, ...p), "utf8"));
 
-// flowaid.tools.mcp ships with @flowaid/mcp (P2-05); until then its fixture manifest stands in.
-const manifests = [
-  ...(read("manifest.json") as { nodes: unknown[] }).nodes,
-  readJson("manifests", "flowaid.tools.mcp.json"),
-].map((m) => NodeManifestSchema.parse(m));
+const manifests = (read("manifest.json") as { nodes: unknown[] }).nodes.map((m) =>
+  NodeManifestSchema.parse(m),
+);
 const catalog = catalogOf(manifests);
 
 const templates = readdirSync(join(NODES_CORE, "templates"))

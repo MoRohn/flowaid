@@ -11,11 +11,9 @@ const FIXTURES = join(
   dirname(fileURLToPath(import.meta.url)),
   "../../workflow-core/fixtures/manifests",
 );
-// flowaid.tools.mcp ships with @flowaid/mcp (P2-05).
 const fixtureIds = readdirSync(FIXTURES)
   .filter((f) => f.endsWith(".json"))
-  .map((f) => f.slice(0, -5))
-  .filter((id) => id !== "flowaid.tools.mcp");
+  .map((f) => f.slice(0, -5));
 
 describe("core node manifests", () => {
   it.each(fixtureIds)("%s deep-equals the workflow-core fixture manifest", (id) => {

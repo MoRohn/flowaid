@@ -1,0 +1,91 @@
+openapi: 3.0.3
+info:
+  title: Swagger Petstore
+  version: 1.0.0
+servers:
+  - url: https://petstore.example.com/{version}
+    variables:
+      version:
+        default: v1
+paths:
+  /pets:
+    get:
+      operationId: listPets
+      summary: List all pets
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, maximum: 100 }
+        - name: tags
+          in: query
+          schema: { type: array, items: { type: string } }
+      responses:
+        "200":
+          description: A paged array of pets
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Pet" }
+    post:
+      operationId: createPet
+      summary: Create a pet
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NewPet" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Pet" }
+  /pets/{petId}:
+    parameters:
+      - name: petId
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      operationId: showPetById
+      summary: Info for a specific pet
+      responses:
+        "200":
+          description: Expected response to a valid request
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Pet" }
+    delete:
+      operationId: deletePet
+      responses:
+        "204": { description: Deleted }
+    patch:
+      summary: Update a pet
+      x-idempotent: true
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+      responses:
+        "200": { description: OK }
+components:
+  schemas:
+    NewPet:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        tag: { type: string, nullable: true }
+    Pet:
+      allOf:
+        - $ref: "#/components/schemas/NewPet"
+        - type: object
+          required: [id]
+          properties:
+            id: { type: integer, format: int64 }
+            parent: { $ref: "#/components/schemas/Pet" }

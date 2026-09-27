@@ -1,0 +1,86 @@
+{
+  "openapi": "3.1.0",
+  "info": { "title": "Billing API", "version": "2.0.0" },
+  "servers": [{ "url": "https://billing.example.com/api" }],
+  "security": [{ "bearer": [] }],
+  "paths": {
+    "/invoices/{id}/refund": {
+      "post": {
+        "operationId": "refundInvoice",
+        "summary": "Refund an invoice",
+        "x-flowaid-capability": "billing.refund",
+        "x-flowaid-approval": true,
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "X-Reason", "in": "header", "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["amount"],
+                "properties": { "amount": { "type": "number" }, "notify": { "type": "boolean" } }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Refunded",
+            "content": {
+              "application/json": {
+                "schema": { "type": "object", "properties": { "refundId": { "type": "string" } } }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/invoices": {
+      "get": {
+        "operationId": "listInvoices",
+        "security": [{ "apiKey": [] }],
+        "parameters": [
+          { "name": "filter", "in": "query", "style": "deepObject", "schema": { "type": "object" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": { "application/json": { "schema": { "type": "array" } } }
+          }
+        }
+      }
+    },
+    "/reports": {
+      "put": {
+        "operationId": "putReport",
+        "security": [{ "cc": ["reports:write"] }],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": { "type": "object", "properties": { "file": { "type": "string" } } }
+            }
+          }
+        },
+        "responses": { "200": { "description": "OK" } }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearer": { "type": "http", "scheme": "bearer" },
+      "apiKey": { "type": "apiKey", "in": "query", "name": "api_key" },
+      "cc": {
+        "type": "oauth2",
+        "flows": {
+          "clientCredentials": {
+            "tokenUrl": "https://auth.example.com/token",
+            "scopes": { "reports:write": "write" }
+          }
+        }
+      }
+    }
+  }
+}

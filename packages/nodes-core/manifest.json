@@ -4833,6 +4833,451 @@
       "portRules": [],
       "streams": false,
       "version": "1.0.0"
+    },
+    {
+      "capabilities": [
+        "network",
+        "credentials",
+        "tools"
+      ],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "serverId": {
+            "minLength": 1,
+            "type": "string",
+            "x-ui": {
+              "optionsProvider": "mcpServers",
+              "widget": "select"
+            }
+          },
+          "timeoutMs": {
+            "default": 60000,
+            "maximum": 600000,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "tool": {
+            "pattern": "^[A-Za-z0-9_-]{1,64}$",
+            "type": "string",
+            "x-ui": {
+              "optionsProvider": "mcpTools",
+              "widget": "select"
+            }
+          }
+        },
+        "required": [
+          "serverId",
+          "tool"
+        ],
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [
+        {
+          "description": "Credential sent to the MCP server, if it needs one.",
+          "name": "mcp",
+          "required": false,
+          "types": [
+            "mcp.headers",
+            "mcp.oauth",
+            "http.bearer"
+          ]
+        }
+      ],
+      "defaultPolicy": {
+        "timeoutMs": 60000
+      },
+      "generation": false,
+      "id": "flowaid.tools.mcp",
+      "idempotency": "none",
+      "inputs": [],
+      "metadata": {
+        "category": "tool",
+        "description": "Calls one tool of a connected MCP server. Input ports are the tool's arguments; `result` is its structured result and `content` its text content.",
+        "icon": "plug",
+        "name": "MCP tool",
+        "summary": "{{ config.tool }}",
+        "tags": [
+          "tool",
+          "mcp"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [
+        "mcpServers",
+        "mcpTools"
+      ],
+      "outputs": [
+        {
+          "name": "result",
+          "required": true,
+          "schema": {}
+        },
+        {
+          "name": "content",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [
+        {
+          "kind": "toolSignature",
+          "source": "mcp"
+        }
+      ],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [
+        "network",
+        "credentials",
+        "tools"
+      ],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string",
+            "x-ui": {
+              "optionsProvider": "mcpPrompts",
+              "widget": "select"
+            }
+          },
+          "serverId": {
+            "minLength": 1,
+            "type": "string",
+            "x-ui": {
+              "optionsProvider": "mcpServers",
+              "widget": "select"
+            }
+          },
+          "timeoutMs": {
+            "default": 30000,
+            "maximum": 600000,
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "serverId",
+          "name"
+        ],
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [
+        {
+          "description": "Credential sent to the MCP server, if it needs one.",
+          "name": "mcp",
+          "required": false,
+          "types": [
+            "mcp.headers",
+            "mcp.oauth",
+            "http.bearer"
+          ]
+        }
+      ],
+      "defaultPolicy": {
+        "timeoutMs": 30000
+      },
+      "dynamicInputs": {
+        "schema": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ]
+        }
+      },
+      "generation": false,
+      "id": "flowaid.tools.mcp_prompt",
+      "idempotency": "safe",
+      "inputs": [],
+      "metadata": {
+        "category": "tool",
+        "description": "Renders a prompt template from a connected MCP server. Input ports are the prompt's arguments; `messages` are chat messages ready for a generation node.",
+        "icon": "message-square-text",
+        "name": "MCP prompt",
+        "summary": "{{ config.name }}",
+        "tags": [
+          "tool",
+          "mcp",
+          "prompt"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [
+        "mcpServers",
+        "mcpPrompts"
+      ],
+      "outputs": [
+        {
+          "name": "messages",
+          "required": true,
+          "schema": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "content": {
+                  "type": "string"
+                },
+                "role": {
+                  "enum": [
+                    "user",
+                    "assistant"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "role",
+                "content"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "name": "description",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [
+        "network",
+        "credentials",
+        "tools"
+      ],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "serverId": {
+            "minLength": 1,
+            "type": "string",
+            "x-ui": {
+              "optionsProvider": "mcpServers",
+              "widget": "select"
+            }
+          },
+          "timeoutMs": {
+            "default": 30000,
+            "maximum": 600000,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "uri": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "type": "string",
+            "x-ui": {
+              "placeholder": "kb://guides/{{ start.topic }}",
+              "widget": "template"
+            }
+          }
+        },
+        "required": [
+          "serverId",
+          "uri"
+        ],
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [
+        {
+          "description": "Credential sent to the MCP server, if it needs one.",
+          "name": "mcp",
+          "required": false,
+          "types": [
+            "mcp.headers",
+            "mcp.oauth",
+            "http.bearer"
+          ]
+        }
+      ],
+      "defaultPolicy": {
+        "timeoutMs": 30000
+      },
+      "generation": false,
+      "id": "flowaid.tools.mcp_resource",
+      "idempotency": "safe",
+      "inputs": [],
+      "metadata": {
+        "category": "tool",
+        "description": "Reads a resource from a connected MCP server. `uri` may be a template; the server's toolPolicy applies to the URI.",
+        "icon": "file-text",
+        "name": "MCP resource",
+        "summary": "{{ config.uri }}",
+        "tags": [
+          "tool",
+          "mcp",
+          "resource"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [
+        "mcpServers"
+      ],
+      "outputs": [
+        {
+          "name": "contents",
+          "required": true,
+          "schema": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "blob": {
+                  "type": "string"
+                },
+                "mimeType": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                },
+                "uri": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "uri"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "description": "Text contents joined by blank lines.",
+          "name": "text",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [
+        "network",
+        "credentials",
+        "tools"
+      ],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "operationId": {
+            "pattern": "^[A-Za-z0-9_-]{1,64}$",
+            "type": "string",
+            "x-ui": {
+              "optionsProvider": "openapiOperations",
+              "widget": "select"
+            }
+          },
+          "timeoutMs": {
+            "default": 30000,
+            "maximum": 120000,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "toolsetId": {
+            "minLength": 1,
+            "type": "string",
+            "x-ui": {
+              "optionsProvider": "openapiToolsets",
+              "widget": "select"
+            }
+          }
+        },
+        "required": [
+          "toolsetId",
+          "operationId"
+        ],
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [
+        {
+          "description": "Applied according to the operation's security scheme.",
+          "name": "auth",
+          "required": false,
+          "types": [
+            "http.bearer",
+            "http.basic",
+            "http.api_key",
+            "http.header",
+            "oauth2.client_credentials"
+          ]
+        }
+      ],
+      "defaultPolicy": {
+        "timeoutMs": 30000
+      },
+      "generation": false,
+      "id": "flowaid.tools.openapi",
+      "idempotency": "none",
+      "inputs": [],
+      "metadata": {
+        "category": "tool",
+        "description": "Calls one operation of an imported OpenAPI toolset. Inputs are the operation's `path`, `query`, `headers` and `body`; outputs its `status` and parsed `body`. Keyed operations send the node's Idempotency-Key.",
+        "icon": "webhook",
+        "name": "OpenAPI operation",
+        "summary": "{{ config.operationId }}",
+        "tags": [
+          "tool",
+          "openapi",
+          "http"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [
+        "openapiToolsets",
+        "openapiOperations"
+      ],
+      "outputs": [
+        {
+          "name": "status",
+          "required": true,
+          "schema": {
+            "maximum": 599,
+            "minimum": 100,
+            "type": "integer"
+          }
+        },
+        {
+          "name": "body",
+          "required": true,
+          "schema": {}
+        }
+      ],
+      "pool": "general",
+      "portRules": [
+        {
+          "kind": "toolSignature",
+          "source": "openapi"
+        }
+      ],
+      "streams": false,
+      "version": "1.0.0"
     }
   ],
   "package": "@flowaid/nodes-core",
