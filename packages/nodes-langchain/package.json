@@ -1,0 +1,58 @@
+{
+  "name": "@flowaid/nodes-langchain",
+  "version": "0.1.0",
+  "private": true,
+  "description": "LangChain-powered FlowAId nodes (chat, LCEL runnable, bounded ReAct agent with approvals, document loaders, text splitters, embeddings, vector stores, retrievers, output parsers), the langchain:<vendor> providers and the 'Knowledge assistant (LangChain RAG)' template (docs/design/LANGCHAIN.md §3).",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "flowaid": {
+    "package": "nodePackage",
+    "sdk": "^0.1.0"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./manifest": "./src/manifestFile.ts",
+    "./manifest.json": "./manifest.json",
+    "./templates/*": "./templates/*"
+  },
+  "files": [
+    "src",
+    "dist",
+    "templates",
+    "manifest.json",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "manifest": "tsx scripts/build-manifest.ts",
+    "manifest:check": "tsx scripts/build-manifest.ts --check",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src",
+    "test": "vitest run",
+    "clean": "rm -rf dist .turbo *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@flowaid/langchain": "workspace:*",
+    "@flowaid/node-sdk": "workspace:*",
+    "@flowaid/providers": "workspace:*",
+    "@flowaid/shared": "workspace:*",
+    "@flowaid/workflow-core": "workspace:*",
+    "@langchain/anthropic": "1.5.11",
+    "@langchain/core": "1.2.12",
+    "@langchain/langgraph": "1.4.17",
+    "@langchain/ollama": "1.3.0",
+    "@langchain/openai": "1.5.13",
+    "@langchain/textsplitters": "1.0.1",
+    "ajv": "8.20.0",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@flowaid/config": "workspace:*",
+    "@types/node": "24.13.6",
+    "eslint": "9.39.5",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "vitest": "4.1.11"
+  }
+}

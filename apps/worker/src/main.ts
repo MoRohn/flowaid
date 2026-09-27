@@ -17,9 +17,11 @@ import { loadEnv, pickEnv } from "@flowaid/env";
 import { createSafeFetch } from "@flowaid/providers";
 import { createSandbox } from "@flowaid/sandbox";
 import { BullMqQueueDriver, RedisEventBus } from "@flowaid/workflow-runtime";
+import { coreNodes } from "@flowaid/nodes-core";
 import { startHeartbeat } from "./heartbeat.js";
 import { startScheduler } from "./jobs/scheduler.js";
-import { createWorker, type WorkerLogger } from "./worker.js";
+import { loadBundledPlugins, registerPluginProviders } from "./plugins/bundled.js";
+import { createWorker, defaultProviderRegistry, type WorkerLogger } from "./worker.js";
 
 const log: WorkerLogger = {
   info: (data, msg) =>
@@ -58,12 +60,21 @@ async function main(): Promise<void> {
   const sandboxMode =
     String(env.SANDBOX_MODE ?? "isolated-vm") === "container" ? "container" : "isolated-vm";
 
+  // Bundled plugins (e.g. @flowaid/nodes-langchain) load unless features.langchain is disabled.
+  const bundled = env.FLOWAID_FEATURES_DISABLED?.includes("langchain")
+    ? { packages: [], skipped: [] }
+    : await loadBundledPlugins(env.FLOWAID_BUNDLED_PLUGINS, { db, log });
+  const registry = defaultProviderRegistry();
+  registerPluginProviders(registry, bundled.packages);
+
   const worker = createWorker({
     db,
     queue,
     bus,
     credentials,
     http,
+    registry,
+    nodes: [coreNodes, ...bundled.packages],
     artifactsDir: join(dataDir, "artifacts"),
     serverKeys: {
       ...(env.TYPESAFE_API_KEY ? { typesafe: String(env.TYPESAFE_API_KEY) } : {}),

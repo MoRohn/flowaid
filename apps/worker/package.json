@@ -25,6 +25,7 @@
     "@flowaid/mcp": "workspace:*",
     "@flowaid/node-sdk": "workspace:*",
     "@flowaid/nodes-core": "workspace:*",
+    "@flowaid/nodes-langchain": "workspace:*",
     "@flowaid/openapi-tools": "workspace:*",
     "@flowaid/provider-anthropic": "workspace:*",
     "@flowaid/provider-ollama": "workspace:*",

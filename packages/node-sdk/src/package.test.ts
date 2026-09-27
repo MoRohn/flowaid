@@ -67,6 +67,19 @@ describe("normalizePackage", () => {
     expect(idPrefixFor("@flowaid/nodes-core")).toBe("flowaid.");
     expect(idPrefixFor("@community/slack")).toBe("@community/slack.");
   });
+
+  it("lets a @flowaid package use its own scoped prefix, like a third-party plugin", () => {
+    const own = normalizePackage(
+      { nodes: [node("@flowaid/nodes-langchain.chat"), node("flowaid.langchain.chat")] },
+      { name: "@flowaid/nodes-langchain", version: "0.1.0" },
+    );
+    expect(own.ok).toBe(true);
+    const foreign = normalizePackage(
+      { nodes: [node("@flowaid/nodes-core.chat")] },
+      { name: "@flowaid/nodes-langchain", version: "0.1.0" },
+    );
+    expect(!foreign.ok && foreign.diagnostics[0]?.code).toBe("E_PLUGIN_ID_PREFIX");
+  });
 });
 
 describe("toManifest shapes", () => {
