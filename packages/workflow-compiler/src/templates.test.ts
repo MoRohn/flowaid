@@ -38,7 +38,7 @@ describe.each(templates)("template %s", (name) => {
     `00000000-0000-4000-8000-${Buffer.from(key).toString("hex").padEnd(12, "0").slice(0, 12)}`;
   const definition = JSON.parse(
     readFileSync(join(NODES_CORE, "templates", `${name}.json`), "utf8").replace(
-      /"\$template\.mcp\.([a-z0-9_]+)"/g,
+      /"\$template\.(?:mcp|knowledge)\.([a-z0-9_]+)"/g,
       (_m, key: string) => `"${idFor(key)}"`,
     ),
   ) as unknown;

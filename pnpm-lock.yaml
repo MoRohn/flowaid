@@ -250,6 +250,9 @@ importers:
       '@flowaid/importer':
         specifier: workspace:*
         version: link:../../packages/importer
+      '@flowaid/knowledge':
+        specifier: workspace:*
+        version: link:../../packages/knowledge
       '@flowaid/mcp':
         specifier: workspace:*
         version: link:../../packages/mcp
@@ -478,6 +481,9 @@ importers:
       '@flowaid/evaluation':
         specifier: workspace:*
         version: link:../../packages/evaluation
+      '@flowaid/knowledge':
+        specifier: workspace:*
+        version: link:../../packages/knowledge
       '@flowaid/mcp':
         specifier: workspace:*
         version: link:../../packages/mcp
@@ -932,6 +938,31 @@ importers:
         specifier: 4.1.11
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(@vitest/coverage-v8@4.1.11)(happy-dom@20.14.5)(vite@8.3.0(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
+  packages/knowledge:
+    dependencies:
+      '@flowaid/shared':
+        specifier: workspace:*
+        version: link:../shared
+      '@flowaid/workflow-core':
+        specifier: workspace:*
+        version: link:../workflow-core
+    devDependencies:
+      '@flowaid/config':
+        specifier: workspace:*
+        version: link:../config
+      '@types/node':
+        specifier: 24.13.6
+        version: 24.13.6
+      eslint:
+        specifier: 9.39.5
+        version: 9.39.5(jiti@2.7.0)(supports-color@10.2.2)
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: 4.1.11
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(@vitest/coverage-v8@4.1.11)(happy-dom@20.14.5)(vite@8.3.0(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+
   packages/langchain:
     dependencies:
       '@flowaid/node-sdk':
@@ -1030,6 +1061,9 @@ importers:
 
   packages/nodes-core:
     dependencies:
+      '@flowaid/knowledge':
+        specifier: workspace:*
+        version: link:../knowledge
       '@flowaid/mcp':
         specifier: workspace:*
         version: link:../mcp

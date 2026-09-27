@@ -64,7 +64,7 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
 # package's `dist` (built here), and the build fails when a listed package is missing so the
 # vendor set can never silently shrink.
 FROM build AS vendor
-ARG VENDOR_PACKAGES="shared env workflow-core workflow-compiler workflow-runtime node-sdk nodes-core providers provider-typesafe provider-openai provider-anthropic provider-ollama credentials observability mcp openapi-tools sandbox workflow-sdk langchain nodes-langchain"
+ARG VENDOR_PACKAGES="shared env workflow-core workflow-compiler workflow-runtime node-sdk nodes-core knowledge providers provider-typesafe provider-openai provider-anthropic provider-ollama credentials observability mcp openapi-tools sandbox workflow-sdk langchain nodes-langchain"
 RUN set -eu; \
     filters=""; for p in ${VENDOR_PACKAGES}; do filters="${filters} --filter=@flowaid/${p}..."; done; \
     pnpm turbo run build ${filters}

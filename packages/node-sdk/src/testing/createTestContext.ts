@@ -27,7 +27,13 @@ import {
 } from "@flowaid/workflow-core";
 import { scopeContext } from "../context.js";
 import { bindSandbox } from "../sandbox.js";
-import type { ExecutionContext, NodeEmittable, ResumeInfo, SafeFetch } from "../types.js";
+import type {
+  ExecutionContext,
+  KnowledgeAccess,
+  NodeEmittable,
+  ResumeInfo,
+  SafeFetch,
+} from "../types.js";
 
 export interface RecordedToolCall {
   source: ToolSource;
@@ -72,6 +78,8 @@ export interface TestContextOptions<C = JsonObject> {
   resume?: ResumeInfo;
   /** RFC-0019: bound to the test context's http/tools/state like the runtime does */
   sandbox?: SandboxExecutor;
+  /** RFC-0021: a knowledge base for retrieval nodes (e.g. `KnowledgeService` over a memory index) */
+  knowledge?: KnowledgeAccess;
   budget?: Partial<ExecutionContext["budget"]>;
   node?: Partial<ExecutionContext["node"]>;
   run?: Partial<ExecutionContext["run"]>;
@@ -88,6 +96,7 @@ const ALL_CAPABILITIES: NodeCapability[] = [
   "generation",
   "sandbox",
   "suspend",
+  "knowledge",
 ];
 
 function pick<T>(value: T | ((arg: never) => T) | undefined, arg: unknown, what: string): T {
@@ -236,6 +245,10 @@ export function createTestContext<C = JsonObject>(
     clock: { now },
     ...(options.resume ? { resume: options.resume } : {}),
   };
-  const full: ExecutionContext<C> = { ...ctx, sandbox: bindSandbox(options.sandbox, ctx) };
+  const full: ExecutionContext<C> = {
+    ...ctx,
+    sandbox: bindSandbox(options.sandbox, ctx),
+    ...(options.knowledge ? { knowledge: options.knowledge } : {}),
+  };
   return { ctx: scopeContext(full, options.capabilities ?? ALL_CAPABILITIES), recorder };
 }

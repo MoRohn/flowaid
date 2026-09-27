@@ -21,6 +21,11 @@ import type {
   JsonObject,
   JsonValue,
   GenerationPolicy,
+  KnowledgeDocumentInput,
+  KnowledgeSearchRequest,
+  KnowledgeSearchResult,
+  KnowledgeSourceSummary,
+  KnowledgeUpsertResult,
   ModelRef,
   NodeCapability,
   NodeId,
@@ -180,11 +185,20 @@ export interface ExecutionContext<TConfig = JsonObject> {
   readonly resume?: ResumeInfo;
   /** RFC-0019: present for nodes declaring 'sandbox' when the pool has a sandbox executor */
   readonly sandbox?: SandboxAccess;
+  /** RFC-0021: present for nodes declaring 'knowledge' when the host has a knowledge base */
+  readonly knowledge?: KnowledgeAccess;
 }
 /** RFC-0019: the sandbox bound to the calling node (bridges already scoped). Without an executor: SandboxError SANDBOX_UNAVAILABLE. */
 export interface SandboxAccess {
   run(req: SandboxRunRequest): Promise<SandboxRunResult>;
   shell(req: SandboxShellRequest): Promise<SandboxShellResult>;
+}
+/** RFC-0021: the workspace's knowledge base (sources, search, indexing), bound to the calling node's signal and credentials. */
+export interface KnowledgeAccess {
+  sources(): Promise<KnowledgeSourceSummary[]>;
+  search(req: KnowledgeSearchRequest): Promise<KnowledgeSearchResult>;
+  upsertDocument(doc: KnowledgeDocumentInput): Promise<KnowledgeUpsertResult>;
+  deleteDocument(sourceId: string, externalId: string): Promise<boolean>;
 }
 
 export type NodeResult<TOutput> =

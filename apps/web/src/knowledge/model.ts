@@ -1,0 +1,198 @@
+/** Knowledge sources in the web app (API.md §3, `/v1/knowledge/*`): response shapes and form logic. */
+
+export type SourceKind = "files" | "text" | "url" | "sitemap" | "github";
+export type SourceStatus = "new" | "syncing" | "ready" | "stale" | "error";
+export type SearchMode = "hybrid" | "vector" | "keyword";
+
+export interface KnowledgeSource {
+  id: string;
+  name: string;
+  kind: SourceKind;
+  config: Record<string, unknown>;
+  pipeline: {
+    chunker?: { strategy?: string; chunkTokens?: number; overlapTokens?: number };
+    embedding?: { provider: string; model: string } | null;
+    index?: { adapter: string };
+  };
+  credentialId: string | null;
+  status: SourceStatus;
+  stats: { lastRun?: { indexed: number; unchanged: number; deleted: number; failed: number } };
+  documents: number;
+  chunks: number;
+  lastSyncAt: string | null;
+  lastError: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface KnowledgeDocument {
+  id: string;
+  sourceId: string;
+  externalId: string;
+  title: string | null;
+  uri: string | null;
+  mimeType: string | null;
+  status: "pending" | "indexed" | "error" | "deleted";
+  chunkCount: number;
+  metadata: Record<string, unknown>;
+  error: string | null;
+  updatedAt: string;
+}
+
+export interface KnowledgeChunk {
+  id: string;
+  ordinal: number;
+  content: string;
+  tokens: number;
+  metadata: Record<string, unknown>;
+  embedded: boolean;
+}
+
+export interface KnowledgeHit {
+  chunkId: string;
+  documentId: string;
+  sourceId: string;
+  ordinal: number;
+  content: string;
+  score: number;
+  title: string | null;
+  uri: string | null;
+  metadata: Record<string, unknown>;
+}
+
+export interface QueryResult {
+  hits: KnowledgeHit[];
+  mode: SearchMode;
+  costUsd: number;
+}
+
+export const KIND_LABEL: Record<SourceKind, string> = {
+  files: "Uploaded files",
+  text: "Pasted text",
+  url: "Web pages",
+  sitemap: "Sitemap",
+  github: "GitHub repository",
+};
+
+/** Uploads are added by hand; the other kinds are fetched by the sync job. */
+export const isUploadKind = (kind: SourceKind): boolean => kind === "files" || kind === "text";
+
+export function sourceTone(status: SourceStatus): "ok" | "danger" | "accent" | "warn" | "neutral" {
+  if (status === "ready") return "ok";
+  if (status === "error") return "danger";
+  if (status === "syncing") return "accent";
+  if (status === "stale") return "warn";
+  return "neutral";
+}
+
+export function documentTone(status: KnowledgeDocument["status"]): "ok" | "danger" | "neutral" {
+  return status === "indexed" ? "ok" : status === "error" ? "danger" : "neutral";
+}
+
+/** One URL per line (blank lines and surrounding space ignored). */
+export function parseUrls(text: string): string[] {
+  return text
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+}
+
+export interface SourceForm {
+  name: string;
+  kind: SourceKind;
+  /** url: one per line; sitemap: the sitemap URL */
+  urls: string;
+  /** sitemap: URL prefixes to keep, one per line */
+  include: string;
+  repo: string;
+  ref: string;
+  path: string;
+  /** "" = keyword search only */
+  embeddingProvider: string;
+  embeddingModel: string;
+  strategy: "recursive" | "markdown" | "fixed";
+  chunkTokens: number;
+  overlapTokens: number;
+  credentialId: string | null;
+}
+
+export const EMPTY_SOURCE: SourceForm = {
+  name: "",
+  kind: "files",
+  urls: "",
+  include: "",
+  repo: "",
+  ref: "",
+  path: "",
+  embeddingProvider: "openai",
+  embeddingModel: "text-embedding-3-small",
+  strategy: "recursive",
+  chunkTokens: 400,
+  overlapTokens: 60,
+  credentialId: null,
+};
+
+/** What the form is missing (null when it can be submitted). */
+export function sourceFormError(f: SourceForm): string | null {
+  if (!f.name.trim()) return "Give the source a name";
+  if (f.kind === "url" && parseUrls(f.urls).length === 0) return "Add at least one URL";
+  if (f.kind === "sitemap" && !f.urls.trim()) return "Add the sitemap URL";
+  if (f.kind === "github" && !/^[\w.-]+\/[\w.-]+$/.test(f.repo.trim()))
+    return "Name the repository as owner/name";
+  if (f.embeddingProvider.trim() && !f.embeddingModel.trim()) return "Name the embedding model";
+  if (f.overlapTokens >= f.chunkTokens) return "Overlap must be smaller than the chunk size";
+  return null;
+}
+
+function loaderConfig(f: SourceForm): Record<string, unknown> {
+  switch (f.kind) {
+    case "url":
+      return { urls: parseUrls(f.urls) };
+    case "sitemap": {
+      const include = parseUrls(f.include);
+      return { url: f.urls.trim(), ...(include.length ? { include } : {}) };
+    }
+    case "github":
+      return {
+        repo: f.repo.trim(),
+        ...(f.ref.trim() ? { ref: f.ref.trim() } : {}),
+        ...(f.path.trim() ? { path: f.path.trim() } : {}),
+      };
+    case "files":
+    case "text":
+      return {};
+  }
+}
+
+/** The `POST /v1/knowledge/sources` body. */
+export function sourceBody(f: SourceForm): Record<string, unknown> {
+  return {
+    name: f.name.trim(),
+    kind: f.kind,
+    config: loaderConfig(f),
+    pipeline: {
+      chunker: { strategy: f.strategy, chunkTokens: f.chunkTokens, overlapTokens: f.overlapTokens },
+      embedding: f.embeddingProvider.trim()
+        ? { provider: f.embeddingProvider.trim(), model: f.embeddingModel.trim() }
+        : null,
+    },
+    ...(f.credentialId ? { credentialId: f.credentialId } : {}),
+  };
+}
+
+/** A MIME type for an uploaded file, by extension (the API accepts these four). */
+export function mimeOf(
+  filename: string,
+): "text/plain" | "text/markdown" | "text/html" | "application/json" {
+  const ext = filename.toLowerCase().split(".").pop() ?? "";
+  if (ext === "md" || ext === "mdx" || ext === "markdown") return "text/markdown";
+  if (ext === "html" || ext === "htm") return "text/html";
+  if (ext === "json") return "application/json";
+  return "text/plain";
+}
+
+/** A short "3 documents · 41 chunks" line. */
+export function countsLine(s: Pick<KnowledgeSource, "documents" | "chunks">): string {
+  const p = (n: number, one: string) => `${n.toLocaleString("en-US")} ${one}${n === 1 ? "" : "s"}`;
+  return `${p(s.documents, "document")} · ${p(s.chunks, "chunk")}`;
+}

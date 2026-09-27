@@ -46,9 +46,11 @@ import type {
 } from "@flowaid/workflow-core";
 
 /* ───────────────────────── custom types ───────────────────────── */
+// Unsized: sources choose their embedding model, so vectors of different dimensions share the
+// table; migration 0005 adds a partial HNSW index per common dimension (see DATABASE.md).
 const vector = customType<{ data: number[]; driverData: string }>({
   dataType() {
-    return "vector(1536)";
+    return "vector";
   },
   toDriver(value) {
     return `[${value.join(",")}]`;
@@ -1045,6 +1047,10 @@ export const documents = pgTable(
     status: text("status", { enum: ["pending", "indexed", "error", "deleted"] })
       .notNull()
       .default("pending"),
+    // v1.2 (0005): the normalised text of inline documents (uploads), so a source can be
+    // re-indexed after its pipeline changes; null for documents a loader can fetch again
+    content: text("content"),
+    error: text("error"),
     updatedAt: updatedAt(),
   },
   (t) => [uniqueIndex("documents_source_external_uq").on(t.sourceId, t.externalId)],
@@ -1066,13 +1072,13 @@ export const chunks = pgTable(
     content: text("content").notNull(),
     tokens: integer("tokens").notNull(),
     metadata: jsonb("metadata").$type<JsonObject>().notNull().default({}),
-    embedding: vector("embedding"), // dimension per source; sources with ≠1536 dims use chunks_<dim> tables created by the adapter
+    embedding: vector("embedding"), // dimension per source (the embedding model's); null for keyword-only sources
     tsv: tsvector("tsv"), // generated column (migration): to_tsvector('simple', content)
   },
   (t) => [
     index("chunks_doc_idx").on(t.documentId, t.ordinal),
     index("chunks_source_idx").on(t.sourceId),
-    index("chunks_embedding_hnsw").using("hnsw", t.embedding.op("vector_cosine_ops")),
+    // HNSW needs a fixed dimension: partial expression indexes per dimension live in 0005
     index("chunks_tsv_gin").using("gin", t.tsv),
     index("chunks_meta_gin").using("gin", t.metadata),
   ],

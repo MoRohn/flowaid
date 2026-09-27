@@ -9,18 +9,26 @@ import { coreManifests } from "./manifestFile.js";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const TEMPLATES = join(ROOT, "templates");
 const FIXTURES = join(ROOT, "../workflow-core/fixtures");
+/** variants of a demo live under fixtures/variants */
+const fixtureOf = (name: string) =>
+  join(FIXTURES, name.includes(".") ? "variants" : "", `${name}.json`);
 const names = readdirSync(TEMPLATES)
   .filter((f) => f.endsWith(".json") && !f.endsWith(".resources.json"))
   .map((f) => f.slice(0, -5));
 
 describe("templates", () => {
-  it("ships the three demos", () => {
-    expect(names.sort()).toEqual(["github-issue-triage", "research-agent", "support-triage"]);
+  it("ships the three demos and the retrieval variant of the GitHub triage", () => {
+    expect(names.sort()).toEqual([
+      "github-issue-triage",
+      "github-issue-triage.retrieval",
+      "research-agent",
+      "support-triage",
+    ]);
   });
 
   it.each(names)("%s stays in sync with the workflow-core fixture", (name) => {
     expect(readFileSync(join(TEMPLATES, `${name}.json`), "utf8")).toBe(
-      readFileSync(join(FIXTURES, `${name}.json`), "utf8"),
+      readFileSync(fixtureOf(name), "utf8"),
     );
   });
 
@@ -29,18 +37,20 @@ describe("templates", () => {
     (name) => {
       const source = readFileSync(join(TEMPLATES, `${name}.json`), "utf8");
       const sentinels = [
-        ...new Set([...source.matchAll(/\$template\.mcp\.([a-z0-9_]+)/g)].map((m) => m[1])),
+        ...new Set(
+          [...source.matchAll(/\$template\.(?:mcp|knowledge)\.([a-z0-9_]+)/g)].map((m) => m[1]),
+        ),
       ].sort();
       const resources = JSON.parse(
         readFileSync(join(TEMPLATES, `${name}.resources.json`), "utf8"),
       ) as {
         id: string;
-        requiredResources: { kind: string; key: string; tools: unknown[] }[];
+        requiredResources: { kind: string; key: string; tools?: unknown[] }[];
       };
       expect(resources.id).toBe(name);
       expect(resources.requiredResources.map((r) => r.key).sort()).toEqual(sentinels);
       for (const r of resources.requiredResources)
-        for (const tool of r.tools)
+        for (const tool of r.tools ?? [])
           expect(() =>
             ToolDefinitionSchema.parse({
               ...(tool as object),

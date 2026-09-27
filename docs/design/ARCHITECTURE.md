@@ -104,7 +104,8 @@ credentials       → workflow-core (types), shared, env
 observability     → workflow-core, credentials (Redactor), shared, env
 mcp               → workflow-core, shared
 openapi-tools     → workflow-core, shared
-nodes-core        → node-sdk, providers, mcp, openapi-tools, workflow-core, shared
+knowledge         → workflow-core, shared                       (the pgvector adapter lives in database)
+nodes-core        → node-sdk, providers, mcp, openapi-tools, knowledge, workflow-core, shared
 sandbox           → workflow-core, shared
 workflow-runtime  → workflow-core, workflow-compiler, node-sdk, providers, credentials, observability, shared, env
 database          → workflow-core, shared, env                 (implements RunStore/QueueDriver/EventBus/ArtifactStore/CredentialRepository)
@@ -119,7 +120,7 @@ langchain         → providers, node-sdk, workflow-core, shared, @langchain/cor
 nodes-langchain   → langchain, node-sdk, providers, workflow-core, shared, @langchain/*
 ui                → workflow-core (types), react, xyflow, tailwind
 apps/api          → everything server-side except nodes-core executors, sandbox, langchain and nodes-langchain (imports nodes-core/manifest only; codegen for the single-file `ts` export; importer)
-apps/worker       → workflow-runtime, workflow-compiler, node-sdk, nodes-core, providers, provider-*, mcp, openapi-tools, sandbox, database, credentials, observability, evaluation, codegen, langchain, nodes-langchain, env, shared, workflow-core
+apps/worker       → workflow-runtime, workflow-compiler, node-sdk, nodes-core, providers, provider-*, mcp, openapi-tools, sandbox, knowledge, database, credentials, observability, evaluation, codegen, langchain, nodes-langchain, env, shared, workflow-core
 apps/web          → ui, workflow-core, workflow-compiler, workflow-sdk
 ```
 
@@ -1225,9 +1226,11 @@ pino JSON logs bound to `requestId/runId/nodeRunId/workspaceId`, scrubbed by the
 
 Nodes reach the executor through `ctx.sandbox` (RFC-0019): the runtime binds a `SandboxExecutor` to the node's own `http`, `tools` and `state` as bridges. `flowaid.tools.code` (`pool: 'code'`, `capabilities: ['sandbox']`, `portRules: [inputSchemaFromConfig('/inputs'), outputSchemaFromConfig('/output')]`) and `flowaid.tools.shell` are delegated to the `code` pool. `IsolatedVmSandbox`: one `isolated-vm` isolate per execution (`new ivm.Isolate({ memoryLimit: 128, inspector: false })`, CPU timeout = node timeout **and** a wall-clock deadline `min(node timeout, 120 s)` enforced with `AbortSignal.timeout` around the whole run plus `isolate.dispose()`, no `require`, no Node globals), code transpiled by `esbuild` once per hash (LRU 200), host bridges `fetch` (through `SafeFetch`, only with `allowNetwork` + allow-listed hosts), `log` (captured into `LOG` events, 1 000 lines / 8 KiB per line cap), `tools.call` (only `config.tools[]` names whose `approval` is `never`; anything else is `SandboxToolNeedsApproval` — no suspension from inside an isolate), `state.get/set` (keys prefixed by the runtime with `run:<id>`); every value crossing the bridge is capped at 4 MiB; result validated against the declared output schema (`SCHEMA_VALIDATION_ERROR`). `isolated-vm` is in maintenance mode: it is the single-tenant/dev default, `SANDBOX_MODE=container` is the recommendation for multi-tenant production, and the `worker-code` container runs with `cap_drop: [ALL]`, `pids_limit`, a memory limit, no `.env`, no `/data` mount and no master key (§10.6). `ContainerSandbox` (`SANDBOX_MODE=container`, gVisor/`docker run --network none --read-only --memory --pids-limit`) implements the same `SandboxExecutor` interface and is the only host for `shell`. The API image has no sandbox dependency.
 
-### 10.8 Knowledge / RAG (not in the first slice)
+### 10.8 Knowledge / RAG (`@flowaid/knowledge`, P6-09)
 
 Ingestion as worker jobs (`ingest.source`): loaders (files via artifacts, URL/sitemap, GitHub) → normalise (pdf/docx/html→md) → chunker (recursive by tokens with overlap) → metadata → `EmbeddingProvider` → `VectorIndexAdapter { upsert, query, delete, stats }` with pgvector first (`chunks` table, HNSW cosine + `tsvector` for hybrid via reciprocal rank fusion), then Qdrant/Pinecone/Weaviate/Milvus/Chroma/Elasticsearch/OpenSearch. Nodes: `flowaid.retrieval.loader|chunker|embed|upsert|retriever|hybrid_search|rerank|knowledge_base`.
+
+As built (RFC-0021): nodes that declare the `knowledge` capability get `ctx.knowledge { sources, search, upsertDocument, deleteDocument }`, a `KnowledgeService` (`@flowaid/knowledge`) over the workspace's `PgKnowledgeStore` and one `VectorIndexAdapter` per source — `PgVectorIndex` (`@flowaid/database`) unless `pipeline.index.adapter` names a remote backend reached through `SafeFetch` with the source's credential. `chunks.embedding` is an unsized `vector` column with a partial HNSW index per common dimension (384/768/1024/1536, migration `0005`), so sources with different embedding models share the table; keyword search is `ts_rank_cd` over the generated `tsv` column; hybrid fuses both rankings with RRF (k = 60). Upserts are idempotent by the normalised content hash. The worker consumes `ingest.source` on the `ingest` queue (loaders for url/sitemap/github; stored uploads are re-indexed when pending); the API serves `/v1/knowledge/*` (sources, uploads, sync, documents, chunks, a query playground) and the web app the Knowledge pages behind feature `knowledge`. The LangChain vector-store nodes stay a separate, self-contained path (`LANGCHAIN.md`).
 
 ### 10.9 FlowAId importer (`@flowaid/importer`)
 

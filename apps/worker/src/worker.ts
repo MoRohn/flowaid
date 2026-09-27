@@ -70,6 +70,8 @@ import { runExportJob } from "./jobs/export.js";
 import { delegateNode, poolExecutor, takeDelegatedResult } from "./delegation.js";
 import { runTraceReviewJob, wantsReview } from "./jobs/traceReview.js";
 import { recordRunMetrics, type AlertDispatcher, type Instruments } from "@flowaid/observability";
+import { runIngestJob } from "./jobs/ingest.js";
+import { knowledgeServiceFor, type KnowledgeDeps } from "./services/knowledge.js";
 
 export interface WorkerLogger {
   info(data: Record<string, unknown>, msg: string): void;
@@ -184,6 +186,13 @@ export function createWorker(deps: WorkerDeps): Worker {
   const pools = new Set<WorkerPool>(deps.pools ?? ALL_POOLS);
   const localPools = new Set([...pools].filter((p) => p !== "general"));
   const storage = deps.storage ?? artifactStorage(new LocalArtifactStore(deps.artifactsDir));
+  const knowledge: KnowledgeDeps = {
+    db: deps.db,
+    credentials: deps.credentials,
+    registry: providers,
+    http: deps.http,
+    serverKeys,
+  };
 
   const planOf = async (run: Run): Promise<ExecutionPlan> => {
     const cached = plans.get(run.workflowVersionId);
@@ -230,6 +239,12 @@ export function createWorker(deps: WorkerDeps): Worker {
     artifacts: (call) => artifactAccessFor(deps.db, storage, call),
     http: () => deps.http,
     ...(deps.sandbox ? { sandbox: deps.sandbox } : {}),
+    knowledge: (call) =>
+      knowledgeServiceFor(knowledge, call.workspaceId, {
+        signal: call.signal,
+        runId: call.runId,
+        nodeRunId: call.nodeRunId,
+      }),
   };
 
   // ── observability: metrics, alerts and trace reviews of finished runs ──
@@ -599,7 +614,21 @@ export function createWorker(deps: WorkerDeps): Worker {
         },
         { concurrency: 2 },
       );
+      const ingest = await deps.queue.consume(
+        "ingest",
+        async (job) => {
+          if (job.type !== "ingest.source") return;
+          const r = await runIngestJob(knowledge, job.sourceId);
+          if (r)
+            log.info(
+              { sourceId: job.sourceId, ...r, failed: r.failed.length },
+              "knowledge source synced",
+            );
+        },
+        { concurrency: 2 },
+      );
       stops.push(
+        () => ingest.stop(),
         () => general.stop(),
         () => control.stop(),
         () => evaluation.stop(),

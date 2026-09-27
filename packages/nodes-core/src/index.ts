@@ -44,6 +44,13 @@ import { graphqlNode } from "./tools/graphql.js";
 import { dbQueryNode } from "./tools/db_query.js";
 import { promptNode } from "./ai/prompt.js";
 import { rerankNode } from "./ai/rerank.js";
+import { chunkerNode, embedNode, loaderNode, upsertNode } from "./retrieval/ingest.js";
+import {
+  hybridSearchNode,
+  knowledgeBaseNode,
+  retrievalRerankNode,
+  retrieverNode,
+} from "./retrieval/search.js";
 import { visionNode } from "./ai/vision.js";
 import { speechNode } from "./ai/speech.js";
 import { imageNode } from "./ai/image.js";
@@ -146,6 +153,14 @@ export const CORE_NODES: readonly AnyNodeDefinition[] = [
   imageNode,
   agentNode,
   rerankNode,
+  loaderNode,
+  chunkerNode,
+  embedNode,
+  upsertNode,
+  retrieverNode,
+  hybridSearchNode,
+  retrievalRerankNode,
+  knowledgeBaseNode,
   httpNode,
   mcpNode,
   mcpResourceNode,

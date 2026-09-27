@@ -34,6 +34,7 @@ describeDb("identity and access (Postgres)", () => {
     const tpl = await t.db.admin`select slug, required_resources from templates order by slug`;
     expect(tpl.map((x) => x.slug)).toEqual([
       "github-issue-triage",
+      "github-issue-triage.retrieval",
       "research-agent",
       "support-triage",
     ]);
@@ -73,7 +74,7 @@ describeDb("identity and access (Postgres)", () => {
     const me = (await call(t.app, jar, "GET", "/v1/me")).json();
     expect(me.principal).toMatchObject({ type: "user", workspaceSlug: "default", role: "owner" });
     expect(me.principal.scopes).toContain("admin");
-    expect(me.features).toMatchObject({ workflows: true, knowledge: false, oidc: false });
+    expect(me.features).toMatchObject({ workflows: true, knowledge: true, oidc: false });
     expect(await audit("auth.login")).toBeGreaterThan(0);
   });
 

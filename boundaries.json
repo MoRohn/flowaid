@@ -58,7 +58,15 @@
     "openapi-tools": { "dir": "packages/openapi-tools", "allow": ["workflow-core", "shared"] },
     "nodes-core": {
       "dir": "packages/nodes-core",
-      "allow": ["node-sdk", "providers", "mcp", "openapi-tools", "workflow-core", "shared"]
+      "allow": [
+        "node-sdk",
+        "providers",
+        "mcp",
+        "openapi-tools",
+        "knowledge",
+        "workflow-core",
+        "shared"
+      ]
     },
     "sandbox": {
       "dir": "packages/sandbox",
@@ -84,6 +92,10 @@
     "evaluation": {
       "dir": "packages/evaluation",
       "allow": ["workflow-core", "providers", "shared"]
+    },
+    "knowledge": {
+      "dir": "packages/knowledge",
+      "allow": ["workflow-core", "shared"]
     },
     "advisor": {
       "dir": "packages/advisor",
@@ -164,6 +176,7 @@
         "importer",
         "codegen",
         "advisor",
+        "knowledge",
         "nodes-core/manifest",
         "plugins"
       ]
@@ -193,7 +206,8 @@
         "evaluation",
         "codegen",
         "langchain",
-        "nodes-langchain"
+        "nodes-langchain",
+        "knowledge"
       ]
     },
     "web": {

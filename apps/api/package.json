@@ -34,6 +34,7 @@
     "@flowaid/env": "workspace:*",
     "@flowaid/evaluation": "workspace:*",
     "@flowaid/importer": "workspace:*",
+    "@flowaid/knowledge": "workspace:*",
     "@flowaid/mcp": "workspace:*",
     "@flowaid/nodes-core": "workspace:*",
     "@flowaid/observability": "workspace:*",

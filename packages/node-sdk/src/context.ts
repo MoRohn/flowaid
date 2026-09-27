@@ -12,6 +12,7 @@ import type {
   ProviderAccess,
   SafeFetch,
   SandboxAccess,
+  KnowledgeAccess,
   StateAccess,
   ToolAccess,
 } from "./types.js";
@@ -45,6 +46,7 @@ export const CAPABILITY_SERVICES: Readonly<Record<string, NodeCapability>> = {
   "providers.embedding": "generation",
   "providers.rerank": "generation",
   sandbox: "sandbox",
+  knowledge: "knowledge",
 };
 
 /** Wraps a full context so that services of undeclared capabilities throw `ForbiddenError`. */
@@ -106,6 +108,15 @@ export function scopeContext<C>(
         run: () => rejected("sandbox", "ctx.sandbox.run"),
         shell: () => rejected("sandbox", "ctx.sandbox.shell"),
       };
+  // RFC-0021: nodes that did not declare `knowledge` never see the knowledge base
+  const knowledge: KnowledgeAccess | undefined = has("knowledge")
+    ? ctx.knowledge
+    : {
+        sources: () => rejected("knowledge", "ctx.knowledge.sources"),
+        search: () => rejected("knowledge", "ctx.knowledge.search"),
+        upsertDocument: () => rejected("knowledge", "ctx.knowledge.upsertDocument"),
+        deleteDocument: () => rejected("knowledge", "ctx.knowledge.deleteDocument"),
+      };
   return {
     ...ctx,
     credentials,
@@ -116,5 +127,6 @@ export function scopeContext<C>(
     events,
     providers,
     ...(sandbox ? { sandbox } : {}),
+    ...(knowledge ? { knowledge } : {}),
   };
 }

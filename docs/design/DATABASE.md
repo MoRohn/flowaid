@@ -58,9 +58,11 @@ import type {
 } from "@flowaid/workflow-core";
 
 /* ───────────────────────── custom types ───────────────────────── */
+// Unsized: sources choose their embedding model, so vectors of different dimensions share the
+// table; migration 0005 adds a partial HNSW index per common dimension (see DATABASE.md).
 const vector = customType<{ data: number[]; driverData: string }>({
   dataType() {
-    return "vector(1536)";
+    return "vector";
   },
   toDriver(value) {
     return `[${value.join(",")}]`;
@@ -1057,6 +1059,10 @@ export const documents = pgTable(
     status: text("status", { enum: ["pending", "indexed", "error", "deleted"] })
       .notNull()
       .default("pending"),
+    // v1.2 (0005): the normalised text of inline documents (uploads), so a source can be
+    // re-indexed after its pipeline changes; null for documents a loader can fetch again
+    content: text("content"),
+    error: text("error"),
     updatedAt: updatedAt(),
   },
   (t) => [uniqueIndex("documents_source_external_uq").on(t.sourceId, t.externalId)],
@@ -1078,13 +1084,13 @@ export const chunks = pgTable(
     content: text("content").notNull(),
     tokens: integer("tokens").notNull(),
     metadata: jsonb("metadata").$type<JsonObject>().notNull().default({}),
-    embedding: vector("embedding"), // dimension per source; sources with ≠1536 dims use chunks_<dim> tables created by the adapter
+    embedding: vector("embedding"), // dimension per source (the embedding model's); null for keyword-only sources
     tsv: tsvector("tsv"), // generated column (migration): to_tsvector('simple', content)
   },
   (t) => [
     index("chunks_doc_idx").on(t.documentId, t.ordinal),
     index("chunks_source_idx").on(t.sourceId),
-    index("chunks_embedding_hnsw").using("hnsw", t.embedding.op("vector_cosine_ops")),
+    // HNSW needs a fixed dimension: partial expression indexes per dimension live in 0005
     index("chunks_tsv_gin").using("gin", t.tsv),
     index("chunks_meta_gin").using("gin", t.metadata),
   ],
@@ -1483,4 +1489,4 @@ Workspace deletion cascades everything through foreign keys; S3 objects are remo
 
 ## Migration set for the first slice
 
-`0000_init.sql` (the pgvector extension, all tables, enums, indexes), `0001_rls.sql` (`ENABLE` + `FORCE` RLS policies, roles and grants; policies active when `DB_RLS=true`, the compose default), `0002_partition_run_events.sql` (conditional on `RUN_EVENTS_PARTITIONED`, plus `flowaid_ensure_run_events_partitions()`), `0003_chunks_generated_tsv.sql` (generated `tsv` column); numbered by drizzle-kit's journal, seeds: `seed_environments.sql` is applied per workspace by the API on workspace creation (`dev`, `staging`, `prod` with `prod.protected = true`), `seed_templates.ts` loads the three demo templates with their `required_resources`. First boot (`apps/api` bootstrap): owner user, default workspace `default`, environments, templates (ARCHITECTURE.md §8).
+`0000_init.sql` (the pgvector extension, all tables, enums, indexes), `0001_rls.sql` (`ENABLE` + `FORCE` RLS policies, roles and grants; policies active when `DB_RLS=true`, the compose default), `0002_partition_run_events.sql` (conditional on `RUN_EVENTS_PARTITIONED`, plus `flowaid_ensure_run_events_partitions()`), `0003_chunks_generated_tsv.sql` (generated `tsv` column), `0004_run_replay.sql`, `0005_knowledge_dims.sql` (unsized `chunks.embedding` with a partial HNSW index per common dimension, `documents.content` and `documents.error`); numbered by drizzle-kit's journal, seeds: `seed_environments.sql` is applied per workspace by the API on workspace creation (`dev`, `staging`, `prod` with `prod.protected = true`), `seed_templates.ts` loads the three demo templates with their `required_resources`. First boot (`apps/api` bootstrap): owner user, default workspace `default`, environments, templates (ARCHITECTURE.md §8).

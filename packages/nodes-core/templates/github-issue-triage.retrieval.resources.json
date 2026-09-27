@@ -1,0 +1,107 @@
+{
+  "$comment": "Resources this template needs bound on instantiate: each `$template.<kind>.<key>` sentinel in the definition is replaced by the chosen resource id. `tools` are the signatures the template calls, used to type-check it before binding.",
+  "id": "github-issue-triage.retrieval",
+  "name": "GitHub issue triage (knowledge base)",
+  "description": "Labels new GitHub issues, finds duplicates in a knowledge base of past issues with hybrid search, and indexes every new issue.",
+  "category": "engineering",
+  "requiredResources": [
+    {
+      "kind": "mcp",
+      "key": "github",
+      "name": "GitHub",
+      "description": "An MCP server exposing the GitHub issue tools (add_issue_comment, add_issue_labels).",
+      "tools": [
+        {
+          "name": "add_issue_comment",
+          "description": "Add a comment to an issue.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "owner": {
+                "type": "string"
+              },
+              "repo": {
+                "type": "string"
+              },
+              "issue_number": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "body": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": ["owner", "repo", "issue_number", "body"],
+            "additionalProperties": false
+          },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "html_url": {
+                "type": "string"
+              }
+            },
+            "required": ["id", "html_url"]
+          },
+          "capability": "github.write",
+          "idempotency": "none",
+          "approvalRequired": false
+        },
+        {
+          "name": "add_issue_labels",
+          "description": "Add labels to an issue.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "owner": {
+                "type": "string"
+              },
+              "repo": {
+                "type": "string"
+              },
+              "issue_number": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "labels": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1
+              }
+            },
+            "required": ["owner", "repo", "issue_number", "labels"],
+            "additionalProperties": false
+          },
+          "outputSchema": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": ["name"]
+            }
+          },
+          "capability": "github.write",
+          "idempotency": "keyed",
+          "approvalRequired": false
+        }
+      ]
+    },
+    {
+      "kind": "knowledge",
+      "key": "github_issues",
+      "name": "Past issues",
+      "description": "A knowledge source holding the repository's issues (title and body, with number and state in metadata); a GitHub loader or this workflow's own indexing fills it.",
+      "tools": []
+    }
+  ]
+}

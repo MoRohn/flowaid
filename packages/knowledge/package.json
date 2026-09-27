@@ -1,0 +1,44 @@
+{
+  "name": "@flowaid/knowledge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Knowledge/RAG for flowaid (ARCHITECTURE.md §10.8): loaders, normalisation, the token chunker, reciprocal rank fusion, the knowledge service behind ctx.knowledge, and VectorIndexAdapter implementations (memory, Qdrant, Pinecone, Weaviate, Milvus, Chroma, Elasticsearch, OpenSearch; pgvector lives in @flowaid/database).",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "development": "./src/index.ts",
+      "default": "./dist/index.js"
+    },
+    "./testing": {
+      "types": "./src/testing.ts",
+      "development": "./src/testing.ts",
+      "default": "./dist/testing.js"
+    }
+  },
+  "files": [
+    "src",
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src",
+    "test": "vitest run",
+    "clean": "rm -rf dist .turbo *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@flowaid/shared": "workspace:*",
+    "@flowaid/workflow-core": "workspace:*"
+  },
+  "devDependencies": {
+    "@flowaid/config": "workspace:*",
+    "@types/node": "24.13.6",
+    "eslint": "9.39.5",
+    "typescript": "5.9.3",
+    "vitest": "4.1.11"
+  }
+}

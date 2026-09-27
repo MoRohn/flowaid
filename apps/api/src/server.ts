@@ -28,6 +28,7 @@ import { toolRoutes } from "./routes/tools.js";
 import { ingressRoutes } from "./routes/ingress.js";
 import { notificationRoutes } from "./routes/notifications.js";
 import { triggerRoutes } from "./routes/triggers.js";
+import { knowledgeRoutes } from "./routes/knowledge.js";
 import { evaluationRoutes } from "./routes/evaluations.js";
 import { agentRoutes } from "./routes/agents.js";
 import { metricsRoutes } from "./routes/metrics.js";
@@ -115,6 +116,7 @@ export async function buildServer(ctx: ApiContext, o: BuildOptions = {}): Promis
   evaluationRoutes(app, ctx);
   agentRoutes(app, ctx);
   metricsRoutes(app, ctx);
+  knowledgeRoutes(app, ctx);
   optimizeRoutes(app, ctx);
   aiRoutes(app, ctx);
   exportRoutes(app, ctx);

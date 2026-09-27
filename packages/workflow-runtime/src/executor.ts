@@ -12,6 +12,7 @@ import type {
   ArtifactAccess,
   CredentialAccess,
   ExecutionContext,
+  KnowledgeAccess,
   NodeLogger,
   NodePackage,
   ProviderAccess,
@@ -107,6 +108,8 @@ export interface NodeServices {
   http?: (call: ExecutionCall) => SafeFetch;
   /** RFC-0019: the pool's sandbox; bound per node to its own http/tools/state as bridges. */
   sandbox?: SandboxExecutor;
+  /** RFC-0021: the workspace's knowledge base, for nodes declaring `knowledge` */
+  knowledge?: (call: ExecutionCall) => KnowledgeAccess;
   clock?: () => Date;
 }
 
@@ -280,7 +283,14 @@ export async function executeTask(
   try {
     const result = await Promise.race([
       def.execute(
-        scopeContext({ ...ctx, sandbox: bindSandbox(services.sandbox, ctx) }, def.capabilities),
+        scopeContext(
+          {
+            ...ctx,
+            sandbox: bindSandbox(services.sandbox, ctx),
+            ...(services.knowledge ? { knowledge: services.knowledge(scopedCall) } : {}),
+          },
+          def.capabilities,
+        ),
         input.data,
       ),
       new Promise<never>((_, reject) => {

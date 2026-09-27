@@ -27,6 +27,7 @@
     "@flowaid/database": "workspace:*",
     "@flowaid/env": "workspace:*",
     "@flowaid/evaluation": "workspace:*",
+    "@flowaid/knowledge": "workspace:*",
     "@flowaid/mcp": "workspace:*",
     "@flowaid/node-sdk": "workspace:*",
     "@flowaid/nodes-core": "workspace:*",

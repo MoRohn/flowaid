@@ -9,7 +9,7 @@
   "knowledgeSources": [
     {
       "key": "github_issues",
-      "description": "Knowledge source indexing the repository's existing issues (title, body, metadata.number, metadata.repo) for hybrid duplicate search."
+      "description": "Knowledge source holding the repository's issues (title and body, with number and state in metadata) for hybrid duplicate search; the workflow indexes each new issue into it."
     }
   ]
 }
