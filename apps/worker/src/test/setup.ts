@@ -13,9 +13,11 @@ import {
   createUser,
   createWorkspace,
   environments,
+  runs,
   workflowDeployments,
   workflowVersions,
   workflows,
+  type RunReplaySpec,
 } from "@flowaid/database";
 import { createTestDatabase, type TestDatabase } from "@flowaid/database/testing";
 import { coreManifests } from "@flowaid/nodes-core/manifest";
@@ -86,6 +88,8 @@ export interface Harness {
     versionId: string,
     input: JsonValue,
     extra?: Partial<Run>,
+    /** set on the row before the start job: a recorded replay (§5.9) and run variables */
+    row?: { replay?: RunReplaySpec; variables?: Record<string, JsonValue> },
   ): Promise<string>;
   waitFor(runId: string, statuses: Run["status"][], timeoutMs?: number): Promise<Run>;
   close(): Promise<void>;
@@ -174,7 +178,7 @@ export async function createHarness(o: { registry?: ProviderRegistry } = {}): Pr
       });
       return { workflowId, versionId };
     },
-    async start(workflowId, versionId, input, extra = {}) {
+    async start(workflowId, versionId, input, extra = {}, row = {}) {
       const id = uuidv7();
       const now = new Date().toISOString();
       const [v] = await db.app.system((tx) =>
@@ -223,8 +227,18 @@ export async function createHarness(o: { registry?: ProviderRegistry } = {}): Pr
         input,
         planHash: v?.planHash ?? "",
         idempotencyKey: null,
-        sourceRunId: null,
+        sourceRunId: run.sourceRunId,
       });
+      if (row.replay || row.variables)
+        await db.app.system((tx) =>
+          tx
+            .update(runs)
+            .set({
+              ...(row.replay ? { replay: row.replay } : {}),
+              ...(row.variables ? { variables: row.variables } : {}),
+            })
+            .where(eq(runs.id, id)),
+        );
       await queue.enqueue("run:general", { type: "run.start", runId: id });
       return id;
     },

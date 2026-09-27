@@ -997,6 +997,27 @@ export const OPERATIONS: readonly CliOperation[] = [
   },
   {
     noun: "run",
+    verb: "fork",
+    method: "POST",
+    path: "/v1/runs/{id}/fork",
+    summary:
+      "Fork a run onto another version (or the draft) with patched input or variables, reusing recorded results whose inputs are unchanged",
+    auth: "session_or_api_key",
+    positional: ["id"],
+    query: [],
+    body: {
+      required: true,
+      properties: [
+        { name: "versionId", type: "string", required: false },
+        { name: "draft", type: "boolean", required: false },
+        { name: "nodeId", type: "string", required: false },
+        { name: "input", type: "object", required: false },
+        { name: "variables", type: "object", required: false },
+      ],
+    },
+  },
+  {
+    noun: "run",
     verb: "get",
     method: "GET",
     path: "/v1/runs/{id}",
@@ -1062,17 +1083,51 @@ export const OPERATIONS: readonly CliOperation[] = [
     verb: "replay",
     method: "POST",
     path: "/v1/runs/{id}/replay",
-    summary: "Re-execute a run's input on the same (or another) version",
+    summary:
+      "Replay a run's input on the same (or another) version: re-execute everything, or reuse recorded results whose inputs are unchanged",
     auth: "session_or_api_key",
     positional: ["id"],
     query: [],
     body: {
       required: true,
       properties: [
+        { name: "mode", type: "string", required: false, enum: ["reexecute", "recorded"] },
         { name: "versionId", type: "string", required: false },
         { name: "environmentId", type: "string", required: false },
       ],
     },
+  },
+  {
+    noun: "run",
+    verb: "restart",
+    method: "POST",
+    path: "/v1/runs/{id}/restart",
+    summary:
+      "Restart from a node: a new run that reuses the source run's results before the node and executes the node and everything after it",
+    auth: "session_or_api_key",
+    positional: ["id"],
+    query: [],
+    body: {
+      required: true,
+      properties: [
+        { name: "nodeId", type: "string", required: true },
+        { name: "scope", type: "string", required: false },
+        { name: "versionId", type: "string", required: false },
+        { name: "input", type: "object", required: false },
+      ],
+    },
+  },
+  {
+    noun: "run",
+    verb: "retry-node",
+    method: "POST",
+    path: "/v1/runs/{id}/node-runs/{nodeRunId}/retry",
+    summary:
+      "Retry a failed node of a failed run in place: the run reopens and continues from the node",
+    auth: "session_or_api_key",
+    positional: ["id", "nodeRunId"],
+    query: [],
+    body: null,
   },
   {
     noun: "run",

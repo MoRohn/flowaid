@@ -30,6 +30,7 @@ import { fetchAllEvents, useCatalog, useWorkflowNames } from "./api";
 import { CostPanel } from "./CostPanel";
 import { nodeCategory } from "./graph";
 import { NodeRunPanel } from "./NodeRunPanel";
+import { RunActionDialog, type RunAction, type RunActionRequest } from "./RunActionDialog";
 import { RunGraph } from "./RunGraph";
 import type { HumanTaskDetail, RunDetail, VersionDetail } from "./types";
 import { useRunStream } from "./useRunStream";
@@ -63,6 +64,7 @@ export function TraceViewer({ runId }: { runId: string }) {
   const [selected, setSelected] = useState<string | undefined>();
   const [live, setLive] = useState<unknown[]>([]);
   const [evalOpen, setEvalOpen] = useState(false);
+  const [action, setAction] = useState<RunAction | null>(null);
 
   const detail = useQuery({
     queryKey: ["run", s.ws, runId],
@@ -129,11 +131,23 @@ export function TraceViewer({ runId }: { runId: string }) {
     onSuccess: () => toast.success("Cancel requested; running nodes finish their current step"),
     onError: (e) => toast.error(errorMessage(e)),
   });
-  const replay = useMutation({
-    mutationFn: () => post<{ run_id: string }>(`/v1/runs/${runId}/replay`, {}),
-    onSuccess: (r) => router.push(`/${s.ws}/runs/${r.run_id}`),
-    onError: (e) => toast.error(errorMessage(e)),
-  });
+  // Replay, fork and restart open the new run; retry-node reopens this one in place.
+  const runAction = async ({ path, body }: RunActionRequest) => {
+    try {
+      const r = await post<{ run_id: string; status?: string }>(path, body ?? {});
+      if (r.run_id === runId) {
+        toast.success("Retrying the node; the run continues from its result");
+        setLive([]);
+        await Promise.all([
+          qc.invalidateQueries({ queryKey: ["run", s.ws, runId] }),
+          qc.invalidateQueries({ queryKey: ["run-events", s.ws, runId] }),
+        ]);
+      } else router.push(`/${s.ws}/runs/${r.run_id}`);
+    } catch (e) {
+      toast.error(errorMessage(e));
+      throw e;
+    }
+  };
 
   if (detail.isError)
     return <ErrorPanel error={detail.error} onRetry={() => void detail.refetch()} />;
@@ -173,6 +187,7 @@ export function TraceViewer({ runId }: { runId: string }) {
   const logs = run.nodeRuns.flatMap((n) => n.logs ?? []).sort((a, b) => a.at.localeCompare(b.at));
   const streamed = current ? live0.folded.streams[current.id] : undefined;
 
+  const canReplay = s.can("runs:replay");
   const panel = current ? (
     <div className="w-[380px] shrink-0 border-l border-border bg-surface max-lg:hidden">
       <NodeRunPanel
@@ -181,6 +196,23 @@ export function TraceViewer({ runId }: { runId: string }) {
         {...(streamed ? { streamed } : {})}
         partial={stream.resumed && current.status === "running"}
         onClose={() => setSelected(undefined)}
+        {...(canReplay && !isLive && current.status !== "running"
+          ? {
+              onRestart: () =>
+                setAction({
+                  kind: "restart",
+                  nodeId: current.nodeId,
+                  nodeName: current.nodeName,
+                  ...(current.scope ? { scope: current.scope } : {}),
+                }),
+            }
+          : {})}
+        {...(canReplay && run.status === "failed" && current.status === "failed" && !current.scope
+          ? {
+              onRetry: () =>
+                setAction({ kind: "retry", nodeRunId: current.id, nodeName: current.nodeName }),
+            }
+          : {})}
       />
     </div>
   ) : null;
@@ -191,7 +223,17 @@ export function TraceViewer({ runId }: { runId: string }) {
         <RunHeader
           run={run}
           {...(isLive && s.can("runs:cancel") ? { onCancel: () => cancel.mutate() } : {})}
-          {...(s.can("runs:replay") ? { onReplay: () => replay.mutate() } : {})}
+          {...(canReplay
+            ? {
+                onReplay: () => setAction({ kind: "replay" }),
+                onFork: () =>
+                  setAction({
+                    kind: "fork",
+                    versionId: version.data?.kind === "draft" ? null : (versionId ?? null),
+                    input: run.input,
+                  }),
+              }
+            : {})}
           onOpenInBuilder={() => router.push(`/${s.ws}/workflows/${run.workflowId}`)}
           {...(openTaskId
             ? { onOpenReview: () => router.push(`/${s.ws}/human-tasks/${openTaskId}`) }
@@ -308,6 +350,14 @@ export function TraceViewer({ runId }: { runId: string }) {
           {panel}
         </TabsContent>
       </Tabs>
+      <RunActionDialog
+        runId={runId}
+        action={action}
+        onOpenChange={(open) => {
+          if (!open) setAction(null);
+        }}
+        onSubmit={runAction}
+      />
       {evalOpen ? (
         <AddToEvaluationDialog
           open={evalOpen}

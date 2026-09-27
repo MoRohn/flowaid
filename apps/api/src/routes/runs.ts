@@ -13,6 +13,7 @@ import {
   runEvents,
   toHumanTask,
   workflowVersions,
+  type RunReplaySpec,
   type Tx,
 } from "@flowaid/database";
 import {
@@ -20,11 +21,13 @@ import {
   ConflictError,
   ForbiddenError,
   HumanResponseSchema,
+  NodeIdSchema,
   NotFoundError,
   RateLimitError,
   type DurableRunEvent,
   type HumanRequest,
   type HumanResponse,
+  type JsonObject,
   type JsonValue,
   type Run,
   type RunStatus,
@@ -41,6 +44,7 @@ import {
 } from "../dto/runs.js";
 import { envelope } from "../plugins/errors.js";
 import { startRun, waitForRun, type StartRunRequest } from "../services/runs.js";
+import { visibleWorkflow } from "../services/workflows.js";
 
 const Ajv2020 = Ajv2020Module.default;
 const ajv = new Ajv2020({ strict: false, allErrors: true, validateFormats: false });
@@ -58,6 +62,75 @@ async function visibleRun(ctx: ApiContext, p: Principal, id: string): Promise<Ru
   if (!run || run.workspaceId !== p.workspaceId || !canSeeWorkflow(p, run.workflowId))
     throw new NotFoundError(`run ${id} not found`);
   return run;
+}
+
+const isObject = (v: unknown): v is Record<string, JsonValue> =>
+  typeof v === "object" && v !== null && !Array.isArray(v);
+
+/** How a replay, restart or fork reuses its source run (`runs.replay`, ARCHITECTURE.md §5.9). */
+function replaySpec(
+  action: RunReplaySpec["action"],
+  fromNodeId: string | null,
+  scope?: string,
+  input?: Record<string, unknown>,
+): RunReplaySpec {
+  return {
+    mode: "recorded",
+    action,
+    fromNodeId,
+    inputOverrides:
+      fromNodeId && input
+        ? [
+            {
+              nodeId: fromNodeId,
+              ...(scope !== undefined ? { scope } : {}),
+              input: input as JsonObject,
+            },
+          ]
+        : [],
+  };
+}
+
+/** Runs whose node data was not persisted (privacy `doNotPersist`) cannot be reused (409). */
+async function assertReplayable(ctx: ApiContext, p: Principal, run: Run): Promise<void> {
+  const [row] = await ctx.db.tenant(p.workspaceId, (tx) =>
+    tx.select({ privacy: runs.privacy }).from(runs).where(eq(runs.id, run.id)),
+  );
+  if (row && !row.privacy.replayable)
+    throw new ConflictError("this run's node results were not persisted, so it cannot be reused");
+}
+
+/** Node ids of a version, or of the current draft when `versionId` is null. */
+async function versionNodes(
+  ctx: ApiContext,
+  p: Principal,
+  workflowId: string,
+  versionId: string | null,
+): Promise<Set<string>> {
+  return ctx.db.tenant(p.workspaceId, async (tx) => {
+    if (versionId === null) {
+      const w = await visibleWorkflow(tx, p, workflowId);
+      return new Set((w.draft as { nodes?: { id: string }[] }).nodes?.map((n) => n.id) ?? []);
+    }
+    const [v] = await tx
+      .select({ workflowId: workflowVersions.workflowId, plan: workflowVersions.plan })
+      .from(workflowVersions)
+      .where(eq(workflowVersions.id, versionId));
+    if (!v || v.workflowId !== workflowId)
+      throw new NotFoundError(`version ${versionId} not found`);
+    return new Set(Object.keys(v.plan.nodes));
+  });
+}
+
+async function runVariables(
+  ctx: ApiContext,
+  p: Principal,
+  runId: string,
+): Promise<Record<string, JsonValue>> {
+  const [row] = await ctx.db.tenant(p.workspaceId, (tx) =>
+    tx.select({ variables: runs.variables }).from(runs).where(eq(runs.id, runId)),
+  );
+  return row?.variables ?? {};
 }
 
 function links(ctx: ApiContext, id: string) {
@@ -505,17 +578,23 @@ export function runRoutes(app: FastifyInstance, ctx: ApiContext): void {
       },
       schema: {
         tags: ["runs"],
-        summary: "Re-execute a run's input on the same (or another) version",
+        summary:
+          "Replay a run's input on the same (or another) version: re-execute everything, or reuse recorded results whose inputs are unchanged",
         params: IdParams,
         body: z
-          .object({ versionId: z.uuid().optional(), environmentId: z.uuid().optional() })
-          .default({}),
+          .object({
+            mode: z.enum(["reexecute", "recorded"]).default("reexecute"),
+            versionId: z.uuid().optional(),
+            environmentId: z.uuid().optional(),
+          })
+          .default({ mode: "reexecute" }),
         response: { 202: z.object({ run_id: z.uuid() }) },
       },
     },
     async (req, reply) => {
       const p = need(req.principal);
       const source = await visibleRun(ctx, p, req.params.id);
+      if (req.body.mode === "recorded") await assertReplayable(ctx, p, source);
       const started = await startRun(
         ctx,
         p,
@@ -527,10 +606,183 @@ export function runRoutes(app: FastifyInstance, ctx: ApiContext): void {
           versionId: req.body.versionId ?? source.workflowVersionId,
           labels: source.labels,
         },
-        { origin: "replay", sourceRunId: source.id },
+        {
+          origin: "replay",
+          sourceRunId: source.id,
+          ...(req.body.mode === "recorded" ? { replay: replaySpec("replay", null) } : {}),
+        },
       );
-      req.audit.details = { newRunId: started.run.id };
+      req.audit.details = { newRunId: started.run.id, mode: req.body.mode };
       return reply.code(202).send({ run_id: started.run.id });
+    },
+  );
+
+  r.post(
+    "/v1/runs/:id/restart",
+    {
+      config: {
+        auth: "session_or_api_key",
+        scope: "runs:replay",
+        audit: { action: "run.restart", resource: "run" },
+        cli: { noun: "run", verb: "restart", positional: ["id"] },
+      },
+      schema: {
+        tags: ["runs"],
+        summary:
+          "Restart from a node: a new run that reuses the source run's results before the node and executes the node and everything after it",
+        params: IdParams,
+        body: z.object({
+          nodeId: NodeIdSchema,
+          scope: z.string().max(500).optional(),
+          versionId: z.uuid().optional(),
+          /** replaces the node's resolved input ports */
+          input: z.record(z.string(), z.unknown()).optional(),
+        }),
+        response: { 202: z.object({ run_id: z.uuid() }) },
+      },
+    },
+    async (req, reply) => {
+      const p = need(req.principal);
+      const source = await visibleRun(ctx, p, req.params.id);
+      await assertReplayable(ctx, p, source);
+      const versionId = req.body.versionId ?? source.workflowVersionId;
+      const nodes = await versionNodes(ctx, p, source.workflowId, versionId);
+      if (!nodes.has(req.body.nodeId))
+        throw new ConflictError(`node ${req.body.nodeId} is not in the target version`);
+      const started = await startRun(
+        ctx,
+        p,
+        source.workflowId,
+        {
+          input: source.input,
+          mode: "async",
+          environmentId: source.environmentId,
+          versionId,
+          labels: source.labels,
+        },
+        {
+          origin: "restart",
+          sourceRunId: source.id,
+          replay: replaySpec("restart", req.body.nodeId, req.body.scope, req.body.input),
+        },
+      );
+      req.audit.details = { newRunId: started.run.id, nodeId: req.body.nodeId };
+      return reply.code(202).send({ run_id: started.run.id });
+    },
+  );
+
+  r.post(
+    "/v1/runs/:id/fork",
+    {
+      config: {
+        auth: "session_or_api_key",
+        scope: "runs:replay",
+        audit: { action: "run.fork", resource: "run" },
+        cli: { noun: "run", verb: "fork", positional: ["id"] },
+      },
+      schema: {
+        tags: ["runs"],
+        summary:
+          "Fork a run onto another version (or the draft) with patched input or variables, reusing recorded results whose inputs are unchanged",
+        params: IdParams,
+        body: z
+          .object({
+            versionId: z.uuid().optional(),
+            draft: z.boolean().default(false),
+            nodeId: NodeIdSchema.optional(),
+            /** merged over the source run's input */
+            input: z.record(z.string(), z.unknown()).optional(),
+            /** merged over the source run's run variables */
+            variables: z.record(z.string(), z.unknown()).optional(),
+          })
+          .refine((b) => Boolean(b.versionId) !== b.draft, {
+            message: "fork onto a versionId or the draft (draft: true), not both",
+          }),
+        response: { 202: z.object({ run_id: z.uuid() }) },
+      },
+    },
+    async (req, reply) => {
+      const p = need(req.principal);
+      const source = await visibleRun(ctx, p, req.params.id);
+      await assertReplayable(ctx, p, source);
+      const { versionId, draft, nodeId } = req.body;
+      if (nodeId) {
+        const nodes = await versionNodes(ctx, p, source.workflowId, versionId ?? null);
+        if (!nodes.has(nodeId))
+          throw new ConflictError(`node ${nodeId} is not in the target version`);
+      }
+      const input =
+        req.body.input && isObject(source.input)
+          ? { ...source.input, ...req.body.input }
+          : ((req.body.input as JsonValue | undefined) ?? source.input);
+      const variables = { ...(await runVariables(ctx, p, source.id)), ...req.body.variables };
+      const started = await startRun(
+        ctx,
+        p,
+        source.workflowId,
+        {
+          input: input as JsonValue,
+          mode: "async",
+          environmentId: source.environmentId,
+          ...(versionId ? { versionId } : { draft }),
+          variables: variables as Record<string, JsonValue>,
+          labels: source.labels,
+        },
+        { origin: "fork", sourceRunId: source.id, replay: replaySpec("fork", nodeId ?? null) },
+      );
+      req.audit.details = { newRunId: started.run.id, ...(nodeId ? { nodeId } : {}) };
+      return reply.code(202).send({ run_id: started.run.id });
+    },
+  );
+
+  r.post(
+    "/v1/runs/:id/node-runs/:nodeRunId/retry",
+    {
+      config: {
+        auth: "session_or_api_key",
+        scope: "runs:replay",
+        audit: { action: "run.retry_node", resource: "run" },
+        cli: { noun: "run", verb: "retry-node", positional: ["id", "nodeRunId"] },
+      },
+      schema: {
+        tags: ["runs"],
+        summary:
+          "Retry a failed node of a failed run in place: the run reopens and continues from the node",
+        params: z.object({ id: z.uuid(), nodeRunId: z.uuid() }),
+        response: { 202: z.object({ run_id: z.uuid(), status: z.literal("retrying") }) },
+      },
+    },
+    async (req, reply) => {
+      const p = need(req.principal);
+      const run = await visibleRun(ctx, p, req.params.id);
+      if (run.status !== "failed")
+        throw new ConflictError(`only failed runs can retry a node (the run is ${run.status})`);
+      await ctx.db.tenant(p.workspaceId, async (tx) => {
+        const [nr] = await tx
+          .select({ scope: nodeRuns.scope, status: nodeRuns.status, nodeId: nodeRuns.nodeId })
+          .from(nodeRuns)
+          .where(and(eq(nodeRuns.id, req.params.nodeRunId), eq(nodeRuns.runId, run.id)));
+        if (!nr) throw new NotFoundError(`node run ${req.params.nodeRunId} not found`);
+        if (nr.status !== "failed") throw new ConflictError(`this node run is ${nr.status}`);
+        if (nr.scope !== "")
+          throw new ConflictError(
+            "retry-node retries top-level nodes; restart the run from this node instead",
+          );
+        // Claim the run: the worker can take its lease again, and a second retry is refused.
+        const [claimed] = await tx
+          .update(runs)
+          .set({ status: "retrying" })
+          .where(and(eq(runs.id, run.id), eq(runs.status, "failed")))
+          .returning({ id: runs.id });
+        if (!claimed) throw new ConflictError("the run is already being retried");
+        req.audit.details = { nodeRunId: req.params.nodeRunId, nodeId: nr.nodeId };
+      });
+      await ctx.queue.enqueue(
+        "run:general",
+        { type: "run.resume", runId: run.id, reason: "manual_retry" },
+        { jobId: `run.retry:${run.id}:${req.params.nodeRunId}` },
+      );
+      return reply.code(202).send({ run_id: run.id, status: "retrying" as const });
     },
   );
 

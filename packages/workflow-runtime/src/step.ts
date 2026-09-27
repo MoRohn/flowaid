@@ -119,7 +119,9 @@ export type Trigger =
     }
   | { type: "delegated_result"; nodeRunId: string; result: ExecutorOutcome }
   | { type: "cancel"; by: string; reason: string | null }
-  | { type: "recovered"; lostNodeRunIds: string[] };
+  | { type: "recovered"; lostNodeRunIds: string[] }
+  /** Retry-node (§5.9): reopens a failed run by retrying its failed top-level nodes. */
+  | { type: "manual_retry"; by: string };
 
 export type ResumeInfo =
   | { kind: "human"; state: JsonValue; response: HumanResponse; by: string; humanTaskId: string }
@@ -166,6 +168,12 @@ export type Effect =
     }
   | { type: "release_lease" };
 
+export interface InputOverride {
+  nodeId: NodeId;
+  scope?: ScopePath;
+  input: JsonObject;
+}
+
 export interface RecordedOutput {
   nodeRunId: string;
   output: JsonValue;
@@ -190,8 +198,10 @@ export interface StepContext {
   run?: Partial<RunMeta>;
   /** Recorded replay: `recordedKey(nodeId, scope, inputHash)` → recorded result. */
   recorded?: ReadonlyMap<string, RecordedOutput>;
-  /** Restart-from-node: these nodes (and whatever depends on them) always execute. */
+  /** Restart-from-node: these nodes always execute (pass `downstreamOf(plan, nodeId)`). */
   neverReuse?: ReadonlySet<NodeId>;
+  /** Restart-from-node: replaces resolved input ports of a node (in one scope, or every scope). */
+  inputOverrides?: readonly InputOverride[];
   /** Resolves a subflow's version (the environment's deployment when `versionId` is null). */
   subflowVersion?: (workflowId: string, versionId: string | null) => string | null;
   /** Subflow nesting depth of this run (root = 0). */
@@ -1055,6 +1065,70 @@ class Stepper {
     }
   }
 
+  /**
+   * Retry-node (§5.9): an explicit, audited decision to run a failed run's failed top-level nodes
+   * again, with the nodes the failure cancelled. `NODE_RETRIED` reopens the run (the reducer gives
+   * it a fresh deadline) and the retry timer fires at once, so the next attempts start in this
+   * step.
+   */
+  manualRetry(by: string) {
+    if (this.s.run.status !== "failed") return;
+    const root = this.s.scopes[""];
+    if (!root) return;
+    const failed = Object.entries(root.nodes).filter(
+      ([, n]) =>
+        n.nodeRunId &&
+        (n.status === "failed" || (n.status === "cancelled" && n.cancelReason === "parent_failed")),
+    );
+    for (const [nodeId, n] of failed) {
+      const a = this.addr("", nodeId);
+      const cause: ErrorInfo =
+        n.status === "cancelled"
+          ? {
+              code: "CANCELLED_ERROR",
+              message: `${nodeId} was cancelled when the run failed`,
+              retryable: true,
+            }
+          : (n.error ?? {
+              code: "NODE_EXECUTION_ERROR",
+              message: `${nodeId} failed`,
+              retryable: false,
+            });
+      const details =
+        cause.details && typeof cause.details === "object" && !Array.isArray(cause.details)
+          ? cause.details
+          : {};
+      const timerId = this.ctx.ids.uuid();
+      this.emit({
+        type: "NODE_RETRIED",
+        ...a,
+        error: { ...cause, details: { ...details, manualRetry: { by } } },
+        nextAttempt: n.attempt + 1,
+        delayMs: 0,
+        timerId,
+      } as AnyEvent);
+      this.emit({
+        type: "TIMER_SET",
+        ...a,
+        timerId,
+        fireAt: this.ctx.now,
+        purpose: "retry",
+      } as AnyEvent);
+      this.emit({ type: "TIMER_FIRED", ...a, timerId, purpose: "retry" } as AnyEvent);
+    }
+    if (failed.length > 0 && this.s.run.deadlineAt)
+      this.effects.push({
+        type: "set_timer",
+        timer: {
+          id: deadlineTimerId(this.s.run.id),
+          runId: this.s.run.id,
+          nodeRunId: null,
+          purpose: "run_deadline",
+          fireAt: this.s.run.deadlineAt,
+        },
+      });
+  }
+
   /* ─── starting nodes ─── */
 
   runningCount(): number {
@@ -1361,6 +1435,9 @@ class Stepper {
       this.fail(scope, nodeId, this.errorInfo(error, scope, nodeId), 0, false);
       return;
     }
+    for (const o of this.ctx.inputOverrides ?? [])
+      if (o.nodeId === nodeId && (o.scope === undefined || o.scope === scope))
+        io = { ...io, input: { ...io.input, ...o.input } };
     const inputHash = inputHashOf(io.input, io.config, node.op.typeVersion);
     const recorded = this.ctx.neverReuse?.has(nodeId)
       ? undefined
@@ -1887,6 +1964,7 @@ export function step(
   ctx: StepContext,
 ): StepResult {
   const st = new Stepper(plan, state, ctx);
+  if (trigger.type === "manual_retry") st.manualRetry(trigger.by);
   if (!st.terminal) {
     switch (trigger.type) {
       case "start":
@@ -1920,8 +1998,33 @@ export function step(
       case "recovered":
         st.recovered(trigger.lostNodeRunIds);
         break;
+      case "manual_retry":
+        break;
     }
     st.process();
   }
   return { state: st.s, events: st.events, effects: st.effects };
+}
+
+/**
+ * Restart-from-node (§5.9): the node and everything that can run after it — its successor
+ * closure, the bodies of containers in it, and the successors of the containers around it — so
+ * none of them is reused from the source run.
+ */
+export function downstreamOf(plan: ExecutionPlan, nodeId: NodeId): Set<NodeId> {
+  const containerOf = new Map<NodeId, NodeId>();
+  for (const sc of Object.values(plan.scopes))
+    if (sc.container) for (const n of sc.nodes) containerOf.set(n, sc.container);
+  const out = new Set<NodeId>();
+  const stack: NodeId[] = [nodeId];
+  for (let c = containerOf.get(nodeId); c; c = containerOf.get(c))
+    stack.push(...(plan.nodes[c]?.successors ?? []));
+  while (stack.length > 0) {
+    const id = stack.pop();
+    if (id === undefined || out.has(id) || !plan.nodes[id]) continue;
+    out.add(id);
+    stack.push(...(plan.nodes[id]?.successors ?? []));
+    for (const sc of Object.values(plan.scopes)) if (sc.container === id) stack.push(...sc.nodes);
+  }
+  return out;
 }

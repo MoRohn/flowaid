@@ -236,6 +236,41 @@ export class Flowaid {
       this.transport.request<Page<Run>>("GET", "/v1/runs", { query }),
     cancel: (id: string, reason?: string) => this.run(id).cancel(reason),
     stream: (id: string, o?: Parameters<RunHandle["stream"]>[0]) => this.run(id).stream(o),
+    /** A new run with the same input: re-executed, or reusing unchanged recorded results. */
+    replay: async (
+      id: string,
+      body: { mode?: "reexecute" | "recorded"; versionId?: string; environmentId?: string } = {},
+    ) => this.run((await this.api.post("/v1/runs/{id}/replay", { path: { id }, body })).run_id),
+    /** A new run that reuses results before `nodeId` and executes it and what follows. */
+    restart: async (
+      id: string,
+      body: {
+        nodeId: string;
+        scope?: string;
+        versionId?: string;
+        input?: Record<string, JsonValue>;
+      },
+    ) => this.run((await this.api.post("/v1/runs/{id}/restart", { path: { id }, body })).run_id),
+    /** A new run on another version (or the draft) with patched input or variables. */
+    fork: async (
+      id: string,
+      body: {
+        versionId?: string;
+        draft?: boolean;
+        nodeId?: string;
+        input?: Record<string, JsonValue>;
+        variables?: Record<string, JsonValue>;
+      },
+    ) => this.run((await this.api.post("/v1/runs/{id}/fork", { path: { id }, body })).run_id),
+    /** Retries a failed node of a failed run in place; the handle follows the reopened run. */
+    retryNode: async (id: string, nodeRunId: string) =>
+      this.run(
+        (
+          await this.api.post("/v1/runs/{id}/node-runs/{nodeRunId}/retry", {
+            path: { id, nodeRunId },
+          })
+        ).run_id,
+      ),
   };
 
   readonly humanTasks = {

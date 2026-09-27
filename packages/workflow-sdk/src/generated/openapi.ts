@@ -3342,6 +3342,63 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/runs/{id}/fork": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Fork a run onto another version (or the draft) with patched input or variables, reusing recorded results whose inputs are unchanged */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            /** @default false */
+            draft?: boolean;
+            input?: {
+              [key: string]: unknown;
+            };
+            nodeId?: string;
+            variables?: {
+              [key: string]: unknown;
+            };
+            /** Format: uuid */
+            versionId?: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Default Response */
+        202: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** Format: uuid */
+              run_id: string;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/runs/{id}/node-runs": {
     parameters: {
       query?: never;
@@ -3416,6 +3473,50 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/runs/{id}/node-runs/{nodeRunId}/retry": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Retry a failed node of a failed run in place: the run reopens and continues from the node */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+          nodeRunId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        202: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** Format: uuid */
+              run_id: string;
+              /** @enum {string} */
+              status: "retrying";
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/runs/{id}/output": {
     parameters: {
       query?: never;
@@ -3460,7 +3561,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Re-execute a run's input on the same (or another) version */
+    /** Replay a run's input on the same (or another) version: re-execute everything, or reuse recorded results whose inputs are unchanged */
     post: {
       parameters: {
         query?: never;
@@ -3475,6 +3576,64 @@ export interface paths {
           "application/json": {
             /** Format: uuid */
             environmentId?: string;
+            /**
+             * @default reexecute
+             * @enum {string}
+             */
+            mode?: "reexecute" | "recorded";
+            /** Format: uuid */
+            versionId?: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Default Response */
+        202: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** Format: uuid */
+              run_id: string;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/runs/{id}/restart": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Restart from a node: a new run that reuses the source run's results before the node and executes the node and everything after it */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            input?: {
+              [key: string]: unknown;
+            };
+            nodeId: string;
+            scope?: string;
             /** Format: uuid */
             versionId?: string;
           };

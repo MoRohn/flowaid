@@ -195,6 +195,17 @@ export const userTokens = pgTable(
   ],
 );
 
+/** `runs.replay`: how a replay, restart or fork reuses its source run (ARCHITECTURE.md §5.9). */
+export interface RunReplaySpec {
+  mode: "recorded";
+  /** The action that created the run. */
+  action: "replay" | "restart" | "fork";
+  /** Restart target: it and its successor closure in the run's plan always execute. */
+  fromNodeId: string | null;
+  /** Replaces the target's resolved input ports. */
+  inputOverrides: { nodeId: string; scope?: string; input: JsonObject }[];
+}
+
 export interface WorkspaceSettings {
   decisions?: { primary: JsonObject; failover: JsonObject[] }; // ProviderHop[]; workspace default decision chain
   egress?: { allow: string[]; deny: string[] };
@@ -490,6 +501,9 @@ export const runs = pgTable(
     parentRunId: uuid("parent_run_id"),
     parentNodeRunId: uuid("parent_node_run_id"),
     sourceRunId: uuid("source_run_id"), // replay / restart / fork source
+    // Recorded replay of `source_run_id` (ARCHITECTURE.md §5.9): reuse its node results except
+    // from `fromNodeId` on (restart-from-node), with the target's inputs patched.
+    replay: jsonb("replay").$type<RunReplaySpec>(),
     sessionId: text("session_id"),
     idempotencyKey: text("idempotency_key"),
     idempotencyHash: text("idempotency_hash"),

@@ -259,6 +259,13 @@ export async function applyProjection(
         .where(eq(nodeRuns.id, event.nodeRunId));
       return;
     case "NODE_RETRIED":
+      // A manual retry-node reopens an ended (failed) run (ARCHITECTURE.md §5.9).
+      if (run.endedAt !== null) {
+        run.status = "running";
+        run.endedAt = null;
+        run.expiresAt = null;
+        run.error = null;
+      }
       await tx
         .update(nodeRuns)
         .set({ status: "retry_wait", error: event.error })
