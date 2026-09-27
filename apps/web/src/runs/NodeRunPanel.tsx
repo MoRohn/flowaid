@@ -3,10 +3,10 @@
  * Detail of one node run (UI.md §7.3): status and timing, the decision with its distribution,
  * the tool call, retry attempts, the error, streamed text while generating, input and output.
  */
-import { X } from "lucide-react";
+import { RotateCcw, SkipForward, X } from "lucide-react";
 import type { NodeRunView } from "@flowaid/ui";
 import { formatCost, formatMs, formatTokens } from "@flowaid/ui/lib";
-import { Badge, CategoryDot, IconButton, StatusChip } from "@flowaid/ui/primitives";
+import { Badge, Button, CategoryDot, IconButton, StatusChip } from "@flowaid/ui/primitives";
 import { JsonView } from "@flowaid/ui/data";
 import { RetryAttempts, ToolCallCard, TraceDecisionDetail } from "@flowaid/ui/trace";
 
@@ -19,6 +19,10 @@ export interface NodeRunPanelProps {
   /** The stream dropped and resumed while this node ran: the text above may miss deltas. */
   partial?: boolean;
   onClose?: () => void;
+  /** Start a new run from this node (restart-from-node). */
+  onRestart?: () => void;
+  /** Execute this failed node again inside its failed run. */
+  onRetry?: () => void;
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -36,6 +40,8 @@ export function NodeRunPanel({
   streamed,
   partial,
   onClose,
+  onRestart,
+  onRetry,
 }: NodeRunPanelProps) {
   const tokens = n.usage ? n.usage.inputTokens + n.usage.outputTokens : 0;
   return (
@@ -89,6 +95,30 @@ export function NodeRunPanel({
             </div>
           ) : null}
         </dl>
+        {onRestart || onRetry ? (
+          <div className="flex flex-wrap gap-1.5">
+            {onRetry ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                leadingIcon={<RotateCcw strokeWidth={1.75} />}
+                onClick={onRetry}
+              >
+                Retry node
+              </Button>
+            ) : null}
+            {onRestart ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                leadingIcon={<SkipForward strokeWidth={1.75} />}
+                onClick={onRestart}
+              >
+                Restart from here
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
         {n.reusedFromNodeRunId ? <Badge tone="ok">Reused a cached result</Badge> : null}
         {n.error ? (
           <Section title="Error">

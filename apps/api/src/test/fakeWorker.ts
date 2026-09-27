@@ -70,6 +70,8 @@ export class FakeWorker {
       leaseUntil: new Date(now.getTime() + 30_000).toISOString(),
       deadlineAt: new Date(now.getTime() + 600_000).toISOString(),
     };
+    // A retry-node resume is recorded (tests assert it) and left to the real worker's tests.
+    if (job.type === "run.resume" && job.reason === "manual_retry") return;
     if (job.type === "run.resume") {
       const [task] = await this.db.system((tx) =>
         tx
@@ -104,9 +106,26 @@ export class FakeWorker {
           durationMs: 42,
         } as Append,
       ]);
-    if (kind === "fail")
+    if (kind === "fail") {
+      const draftRunId = uuidv7();
+      const at = { nodeRunId: draftRunId, nodeId: "draft", scope: "", attempt: 1 };
+      const error = {
+        code: "NODE_EXECUTION_ERROR" as const,
+        message: "the model refused",
+        retryable: false,
+      };
       return this.append(job.runId, [
         started,
+        { ...fixture("NODE_SCHEDULED"), ...at },
+        { ...fixture("NODE_STARTED"), ...at },
+        {
+          ...fixture("NODE_FAILED"),
+          ...at,
+          error,
+          firedPorts: [],
+          latencyMs: 3,
+          terminal: true,
+        } as Append,
         {
           ...fixture("RUN_FAILED"),
           error: {
@@ -117,6 +136,7 @@ export class FakeWorker {
           },
         } as Append,
       ]);
+    }
     const nodeRunId = uuidv7();
     const humanTaskId = uuidv7();
     const request = {

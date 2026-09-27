@@ -43,6 +43,7 @@ export function planOf(def: {
   outputs?: unknown;
   execution?: unknown;
   variables?: unknown[];
+  secrets?: unknown[];
 }): ExecutionPlan {
   const definition = {
     $schema: WORKFLOW_SCHEMA_URI,
@@ -53,6 +54,7 @@ export function planOf(def: {
     nodes: def.nodes,
     edges: def.edges ?? [],
     variables: def.variables ?? [],
+    secrets: def.secrets ?? [],
     execution: def.execution ?? {},
   };
   const result = compile(definition, { catalog, level: "draft" } as never);

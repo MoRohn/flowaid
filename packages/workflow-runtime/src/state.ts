@@ -42,6 +42,8 @@ export interface NodeState {
   /** Spend already counted from DECISION_/GENERATION_COMPLETED of the current attempt. */
   spentUsd: number;
   spentUsage: TokenUsage;
+  /** Why a `cancelled` node was cancelled (retry-node re-runs those a failure cancelled). */
+  cancelReason?: "run_cancelled" | "race_lost" | "early_exit" | "parent_failed";
 }
 
 export interface ScopeState {

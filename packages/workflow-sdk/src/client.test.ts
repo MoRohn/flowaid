@@ -199,4 +199,26 @@ describe("Flowaid client", () => {
     );
     expect(() => fillPath("/v1/runs/{id}", {})).toThrow(TypeError);
   });
+
+  it("replays, restarts, forks and retries nodes, handing back the run to follow", async () => {
+    const NEW = "0190b5a4-0000-7000-8000-000000000002";
+    const NODE_RUN = "0190b5a4-0000-7000-8000-000000000003";
+    const server = fakeFetch([
+      (req) =>
+        req.url.pathname === `/v1/runs/${RUN}/node-runs/${NODE_RUN}/retry`
+          ? json(202, { run_id: RUN, status: "retrying" })
+          : json(202, { run_id: NEW }),
+    ]);
+    const fa = new Flowaid({ baseUrl: "http://api.test", fetch: server.fetch });
+    expect((await fa.runs.replay(RUN, { mode: "recorded" })).id).toBe(NEW);
+    expect((await fa.runs.restart(RUN, { nodeId: "draft", input: { prompt: "x" } })).id).toBe(NEW);
+    expect((await fa.runs.fork(RUN, { draft: true, input: { message: "y" } })).id).toBe(NEW);
+    expect((await fa.runs.retryNode(RUN, NODE_RUN)).id).toBe(RUN);
+    expect(server.requests.map((r) => [r.method, r.url.pathname, r.body])).toEqual([
+      ["POST", `/v1/runs/${RUN}/replay`, { mode: "recorded" }],
+      ["POST", `/v1/runs/${RUN}/restart`, { nodeId: "draft", input: { prompt: "x" } }],
+      ["POST", `/v1/runs/${RUN}/fork`, { draft: true, input: { message: "y" } }],
+      ["POST", `/v1/runs/${RUN}/node-runs/${NODE_RUN}/retry`, undefined],
+    ]);
+  });
 });

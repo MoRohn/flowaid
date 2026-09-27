@@ -101,12 +101,15 @@ run add-to-evaluation <id> {--set-id --expected --body --out}
 run cancel <id> {--reason --body --out}
 run delete <id> {--out}
 run events <id> {--follow --after --limit --types}
+run fork <id> {--version-id --draft --node-id --input --variables --body --out}
 run get <id> {--include --out}
 run list {--limit --cursor --order --workflow-id --environment-id --status --origin --session-id --out}
 run node-run <id> <nodeRunId> {--out}
 run node-runs <id> {--node-id --scope --out}
 run output <id> {--out}
-run replay <id> {--version-id --environment-id --body --out}
+run replay <id> {--mode --version-id --environment-id --body --out}
+run restart <id> {--node-id --scope --version-id --input --body --out}
+run retry-node <id> <nodeRunId> {--out}
 run start <id> {--input --mode --environment-id --version-id --draft --session-id --variables --labels --wait-timeout-ms --body --out}
 run start-version <id> {--input --mode --environment-id --session-id --variables --labels --wait-timeout-ms --body --out}
 run stream <id> {--after --no-deltas --until}

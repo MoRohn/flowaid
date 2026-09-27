@@ -18,6 +18,7 @@ import {
   listSecretBindings,
   runs,
   workspaces,
+  type RunReplaySpec,
   type Tx,
   type WorkflowVersionRow,
 } from "@flowaid/database";
@@ -169,7 +170,13 @@ export async function startRun(
   p: Principal,
   workflowId: string,
   r: StartRunRequest,
-  o: { idempotencyKey?: string | undefined; origin?: RunOrigin; sourceRunId?: string | null } = {},
+  o: {
+    idempotencyKey?: string | undefined;
+    origin?: RunOrigin;
+    sourceRunId?: string | null;
+    /** recorded replay, restart-from-node or fork of `sourceRunId` (§5.9) */
+    replay?: RunReplaySpec;
+  } = {},
 ): Promise<StartedRun> {
   const hash = hashRequest(workflowId, r);
   const prepared = await ctx.db.tenant(p.workspaceId, async (tx) => {
@@ -294,6 +301,7 @@ export async function startRun(
       .set({
         idempotencyHash: o.idempotencyKey ? hash : null,
         variables: r.variables ?? {},
+        ...(o.replay ? { replay: o.replay } : {}),
       })
       .where(eq(runs.id, id)),
   );

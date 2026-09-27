@@ -41,6 +41,7 @@ import {
   NodeRegistry,
   Orchestrator,
   createEventRedactor,
+  downstreamOf,
   registryProviderAccess,
   type NodeServices,
 } from "@flowaid/workflow-runtime";
@@ -189,7 +190,7 @@ export function createWorker(deps: WorkerDeps): Worker {
     loadPlan: planOf,
     redact: createEventRedactor(deps.credentials.redactor),
     context: async (run) => {
-      const { env, deployments, variables } = await deps.db.system(async (tx) => {
+      const { env, deployments, variables, source } = await deps.db.system(async (tx) => {
         const [e] = await tx
           .select()
           .from(environments)
@@ -204,14 +205,24 @@ export function createWorker(deps: WorkerDeps): Worker {
             ),
           );
         const [r] = await tx
-          .select({ variables: runs.variables })
+          .select({ variables: runs.variables, replay: runs.replay, sourceRunId: runs.sourceRunId })
           .from(runs)
           .where(eq(runs.id, run.id));
-        return { env: e, deployments: d, variables: r?.variables ?? {} };
+        return { env: e, deployments: d, variables: r?.variables ?? {}, source: r };
       });
       const own = deployments.find((d) => d.workflowId === run.workflowId);
       const deployedVersion = new Map(deployments.map((d) => [d.workflowId, d.versionId]));
+      // Recorded replay, restart-from-node and fork (§5.9): reuse the source run's node results.
+      const replay = source?.replay;
+      const recorded =
+        replay && source.sourceRunId ? await store.recordedOutputs(source.sourceRunId) : null;
+      const neverReuse = replay?.fromNodeId
+        ? downstreamOf(await planOf(run), replay.fromNodeId)
+        : null;
       return {
+        ...(recorded ? { recorded } : {}),
+        ...(neverReuse ? { neverReuse } : {}),
+        ...(replay?.inputOverrides.length ? { inputOverrides: replay.inputOverrides } : {}),
         vars: {
           ...(env?.variables ?? {}),
           ...(own?.variableOverrides ?? {}),
@@ -321,7 +332,11 @@ export function createWorker(deps: WorkerDeps): Worker {
         await orchestrator.handle(job.runId, { type: "start" });
         return;
       case "run.resume":
-        await orchestrator.handle(job.runId, { type: "resume" });
+        // Retry-node (§5.9): the API reopened the failed run; retry its failed nodes.
+        await orchestrator.handle(
+          job.runId,
+          job.reason === "manual_retry" ? { type: "manual_retry", by: "api" } : { type: "resume" },
+        );
         return;
       case "run.control":
         await orchestrator.handle(job.runId, { type: "cancel", by: job.by, reason: job.reason });

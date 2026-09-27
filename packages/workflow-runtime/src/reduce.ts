@@ -181,14 +181,26 @@ function reduceNodeEvent(plan: ExecutionPlan, s: SchedulerState, e: NodeEvent): 
             }
           : { ...n, error: e.error },
       );
-    case "NODE_RETRIED":
-      return withNode(s, scope, nodeId, (n) => ({
+    case "NODE_RETRIED": {
+      const next = withNode(s, scope, nodeId, (n) => ({
         ...n,
         status: "retry_wait",
         error: e.error,
         retryTimerId: e.timerId,
         waiting: null,
       }));
+      // A manual retry-node (§5.9) reopens a failed run: it runs again, with a fresh deadline.
+      if (next.run.status !== "failed") return next;
+      return {
+        ...next,
+        run: {
+          ...next.run,
+          status: "running",
+          error: null,
+          deadlineAt: new Date(Date.parse(e.at) + plan.execution.timeoutMs).toISOString(),
+        },
+      };
+    }
     case "NODE_SKIPPED":
       return withNode(s, scope, nodeId, (n) => ({
         ...n,
@@ -201,6 +213,7 @@ function reduceNodeEvent(plan: ExecutionPlan, s: SchedulerState, e: NodeEvent): 
       return withNode(s, scope, nodeId, (n) => ({
         ...n,
         status: "cancelled",
+        cancelReason: e.reason,
         firedPorts: [],
         waiting: null,
       }));
