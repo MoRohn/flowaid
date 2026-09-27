@@ -26,6 +26,7 @@ import { ollamaEmbeddingFactory, ollamaFactory } from "@flowaid/provider-ollama"
 import { openaiFactories } from "@flowaid/provider-openai";
 import { typesafeFactory } from "@flowaid/provider-typesafe";
 import { uuidv7 } from "@flowaid/shared";
+import { artifactStorage, LocalArtifactStore, type ArtifactStorage } from "@flowaid/storage";
 import type {
   DecisionProvider,
   EventBus,
@@ -36,6 +37,7 @@ import type {
   RunEventOf,
   SafeFetch,
   SandboxExecutor,
+  WorkerPool,
 } from "@flowaid/workflow-core";
 import {
   NodeRegistry,
@@ -56,6 +58,7 @@ import { stateAccessFor } from "./services/state.js";
 import { toolAccessFor } from "./services/tools.js";
 import { runEvaluationJob } from "./jobs/evaluation.js";
 import { runExportJob } from "./jobs/export.js";
+import { delegateNode, poolExecutor, takeDelegatedResult } from "./delegation.js";
 
 export interface WorkerLogger {
   info(data: Record<string, unknown>, msg: string): void;
@@ -70,6 +73,8 @@ export interface WorkerDeps {
   credentials: CredentialService;
   http: SafeFetch;
   artifactsDir: string;
+  /** artifact storage (main.ts: S3 when configured); defaults to the local `artifactsDir` */
+  storage?: ArtifactStorage;
   serverKeys?: ServerKeys;
   /** replaces the default provider registry (tests) */
   registry?: ProviderRegistry;
@@ -85,7 +90,22 @@ export interface WorkerDeps {
   maintenance?: { timerPollMs?: number; heartbeatMs?: number; reapMs?: number };
   /** code export (`export.package` on the `jobs` queue): FLOWAID_VENDOR_DIR for vendored mode */
   exports?: { vendorDir?: string | null };
+  /**
+   * Pools this worker serves besides orchestration on `general` (WORKER_POOLS; every pool by
+   * default). Nodes of these pools run in-process; nodes of other pools are delegated to the
+   * workers that serve them (ARCHITECTURE.md §10.7).
+   */
+  pools?: readonly WorkerPool[];
 }
+
+export const ALL_POOLS: readonly WorkerPool[] = [
+  "general",
+  "code",
+  "browser",
+  "gpu",
+  "retrieval",
+  "high_memory",
+];
 
 const TERMINAL = new Set(["RUN_COMPLETED", "RUN_FAILED", "RUN_CANCELLED", "RUN_TIMED_OUT"]);
 const silent: WorkerLogger = {
@@ -133,6 +153,9 @@ export function createWorker(deps: WorkerDeps): Worker {
   const plans = new Map<string, ExecutionPlan>();
   const registry = new NodeRegistry([...(deps.nodes ?? [coreNodes])]);
   const serverKeys = deps.serverKeys ?? {};
+  const pools = new Set<WorkerPool>(deps.pools ?? ALL_POOLS);
+  const localPools = new Set([...pools].filter((p) => p !== "general"));
+  const storage = deps.storage ?? artifactStorage(new LocalArtifactStore(deps.artifactsDir));
 
   const planOf = async (run: Run): Promise<ExecutionPlan> => {
     const cached = plans.get(run.workflowVersionId);
@@ -175,7 +198,7 @@ export function createWorker(deps: WorkerDeps): Worker {
         call,
       ),
     state: (call) => stateAccessFor(deps.db, call),
-    artifacts: (call) => artifactAccessFor(deps.db, deps.artifactsDir, call),
+    artifacts: (call) => artifactAccessFor(deps.db, storage, call),
     http: () => deps.http,
     ...(deps.sandbox ? { sandbox: deps.sandbox } : {}),
   };
@@ -188,6 +211,8 @@ export function createWorker(deps: WorkerDeps): Worker {
     services,
     workerId,
     pool: "general",
+    localPools,
+    delegate: delegateNode(deps.db, deps.queue),
     loadPlan: planOf,
     redact: createEventRedactor(deps.credentials.redactor),
     context: async (run) => {
@@ -351,6 +376,15 @@ export function createWorker(deps: WorkerDeps): Worker {
           });
         else if (job.signal.type === "subflow_completed")
           await completeChild(job.signal.childRunId);
+        else if (job.signal.type === "delegated_result") {
+          const result = await takeDelegatedResult(deps.db, job.signal.nodeRunId);
+          if (result)
+            await orchestrator.handle(job.runId, {
+              type: "delegated_result",
+              nodeRunId: job.signal.nodeRunId,
+              result,
+            });
+        }
         return;
       case "timer.fire":
         await orchestrator.handle(job.runId, { type: "timer", timerId: job.timerId });
@@ -411,7 +445,7 @@ export function createWorker(deps: WorkerDeps): Worker {
             await runExportJob(
               {
                 db: deps.db,
-                artifactsDir: deps.artifactsDir,
+                storage,
                 vendorDir: deps.exports?.vendorDir ?? null,
               },
               job,
@@ -425,6 +459,22 @@ export function createWorker(deps: WorkerDeps): Worker {
         () => evaluation.stop(),
         () => background.stop(),
       );
+      // Delegated nodes of the pools this worker serves (sent by workers that do not).
+      const executor = poolExecutor({
+        db: deps.db,
+        queue: deps.queue,
+        registry,
+        services,
+        workerId,
+        log,
+      });
+      for (const p of localPools) {
+        const consumer = await deps.queue.consume(`run:${p}`, executor.handle, {
+          concurrency: Math.max(1, Math.floor(concurrency / 2)),
+        });
+        stops.push(() => consumer.stop());
+      }
+      stops.push(() => Promise.resolve(executor.abortAll()));
       // Terminal runs: release their credentials and complete subflows into their parents.
       const unsub = await deps.bus.subscribe(RUN_EVENTS_CHANNEL, (m) => {
         const msg = m as { runId?: string; fromSeq?: number; toSeq?: number };

@@ -111,14 +111,16 @@ HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=12 \
 CMD ["node", "dist/main.js"]
 
 # ── worker: queue consumer, orchestrator, node executors, plugin host ──────────────────────
-# The same image serves every pool; WORKER_POOLS selects what a container consumes (compose
-# runs one container for the general pools and one, locked down, for `code`).
+# The same image serves every pool; WORKER_POOLS selects what a container consumes (every pool
+# by default; compose runs one container for the general pools and one, locked down, for `code`).
 FROM runtime-base AS worker
-ENV WORKER_POOLS=general
 RUN apk add --no-cache libstdc++ \
   && mkdir -p /data && chown flowaid:flowaid /data
 WORKDIR /app
 COPY --from=deploy-worker --chown=flowaid:flowaid /out/worker ./
+# the export job (worker) builds vendored packages from these; the api only checks they exist
+ENV FLOWAID_VENDOR_DIR=/opt/flowaid/vendor
+COPY --from=vendor --chown=flowaid:flowaid /out/vendor /opt/flowaid/vendor
 USER flowaid
 VOLUME ["/data"]
 # apps/worker/src/health.ts exits 0 while the worker's heartbeat is fresh.

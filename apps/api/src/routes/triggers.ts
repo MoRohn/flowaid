@@ -4,8 +4,7 @@
  * list deliveries, and fire a schedule by hand. Also: the audit log and artifact downloads.
  */
 import { randomBytes } from "node:crypto";
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { Readable } from "node:stream";
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
@@ -20,6 +19,7 @@ import {
   type Tx,
 } from "@flowaid/database";
 import { uuidv7 } from "@flowaid/shared";
+import { LocalArtifactStore, S3ArtifactStore, type ArtifactStore } from "@flowaid/storage";
 import {
   BadRequestError,
   ConflictError,
@@ -72,6 +72,10 @@ const scheduleDto = (s: ScheduleRow) => ({
 
 export function triggerRoutes(app: FastifyInstance, ctx: ApiContext): void {
   const r = app.withTypeProvider<ZodTypeProvider>();
+  const stores: ArtifactStore[] = [
+    ...(ctx.config.s3 ? [new S3ArtifactStore(ctx.config.s3)] : []),
+    ...(ctx.config.artifactsDir ? [new LocalArtifactStore(ctx.config.artifactsDir)] : []),
+  ];
   const need = (p: Principal | null): Principal => {
     if (!p) throw new ForbiddenError("no principal");
     return p;
@@ -486,9 +490,10 @@ export function triggerRoutes(app: FastifyInstance, ctx: ApiContext): void {
         throw new ForbiddenError("missing scope workflows:read");
       if (a.workflowId && !canSeeWorkflow(p, a.workflowId))
         throw new NotFoundError("artifact not found");
-      if (a.storage !== "local" || !ctx.config.artifactsDir)
-        throw new NotFoundError("artifact storage is not available to the API");
-      const data = await readFile(join(ctx.config.artifactsDir, a.storageKey));
+      const store = stores.find((s) => s.kind === a.storage);
+      if (!store) throw new NotFoundError("artifact storage is not available to the API");
+      // streamed through the API (the object store need not be reachable from browsers)
+      const object = await store.open(a.storageKey);
       const inline = req.query.inline && INLINE.has(a.mimeType);
       void reply
         .header("content-type", a.mimeType)
@@ -498,7 +503,8 @@ export function triggerRoutes(app: FastifyInstance, ctx: ApiContext): void {
           "content-disposition",
           `${inline ? "inline" : "attachment"}; filename="${a.name.replace(/[^A-Za-z0-9._-]+/g, "_")}"`,
         );
-      return reply.send(data);
+      if (object.size >= 0) void reply.header("content-length", object.size);
+      return reply.send(Readable.fromWeb(object.body));
     },
   );
 }

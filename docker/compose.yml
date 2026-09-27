@@ -1,33 +1,39 @@
-# flowaid default stack: Postgres 16 + pgvector, api, worker, web.
+# flowaid default stack: Postgres 16 + pgvector, api, worker, worker-code, web.
 # No Redis: queues and the event bus run over Postgres (ARCHITECTURE.md D10).
 # `docker compose --profile scale up` (see compose.scale.yml) adds Redis and worker replicas.
+# `docker compose --profile s3 up` adds a bundled S3-compatible artifact store (rustfs).
 #
 # Configuration comes from ../.env (copy ../.env.example; every variable is documented in
-# packages/env/README.md). Only `api` and `worker` read the whole file (env_file): `web`
-# receives the explicit variables listed below and nothing else, so a compromised web process
-# never holds the master key, provider keys or the owner's database password. Values that must
-# differ inside the compose network (the database host, data paths, the listen address) are
-# pinned per service and override the file. docker/compose.test.ts asserts the per-service
-# variable sets; scripts/check-compose.test.ts feeds each service environment to loadEnv().
+# packages/env/README.md). Only `api` and `worker` read the whole file (env_file): `web` and the
+# sandbox host `worker-code` receive the explicit variables listed below and nothing else, so a
+# compromised sandbox or web process never holds the master key, provider keys or the owner's
+# database password. Values that must differ inside the compose network (the database host,
+# data paths, the listen address) are pinned per service and override the file.
+# docker/compose.test.ts asserts the per-service variable sets; scripts/check-compose.test.ts
+# feeds each service environment to loadEnv().
 #
-# Code nodes run in isolated-vm isolates inside the worker (memory, CPU and wall-clock limits,
-# scoped bridges). Run artifacts and code-export packages live in the `flowaid-data` volume the
-# api and worker share.
+# Code nodes (the `code` pool) run on `worker-code`: the worker delegates them over the queue
+# and the sandbox host runs them in isolated-vm isolates, connected as the restricted
+# `flowaid_code` role, without `.env`, `/data` or the master key. Plugin nodes run in a child
+# process of the worker (the plugin host). Run artifacts and code-export packages live in the
+# `flowaid-data` volume the api and worker share, or in S3 when S3_* is set.
 #
 # Images are pinned to a release tag and its digest; renovate bumps them.
 #
 # Networks:
-#   internal  internal: true (no egress): postgres, redis, api, worker. Service-to-service
-#             traffic only. `web` is not on it.
-#   edge      api, web, worker: the published api/web ports and outbound access (providers,
-#             webhooks, MCP servers).
-#   admin     postgres, redis: publishes the databases on the host (BIND_ADDRESS, loopback by
-#             default) for local development and administration. Published ports do not work
-#             on an internal-only network, hence this third one.
+#   internal  internal: true (no egress): postgres, redis, rustfs, api, worker, worker-code.
+#             Service-to-service traffic only. `web` is not on it.
+#   edge      api, web, worker, worker-code: the published api/web ports and outbound access
+#             (providers, webhooks, MCP servers, `allowNetwork` code nodes). Remove worker-code
+#             from it for a sandbox host without egress (code nodes then cannot fetch).
+#   admin     postgres, redis, rustfs: publishes the databases on the host (BIND_ADDRESS,
+#             loopback by default) for local development and administration. Published ports
+#             do not work on an internal-only network, hence this third one.
 #
 # Passwords have no defaults: POSTGRES_PASSWORD and POSTGRES_CODE_PASSWORD must be set in
-# ../.env (and REDIS_PASSWORD with the scale profile). POSTGRES_CODE_PASSWORD is the password of
-# the restricted `flowaid_code` role that migrations grant to (postgres-init/01-roles.sql).
+# ../.env (REDIS_PASSWORD with the scale profile, S3_SECRET_KEY with the s3 profile).
+# POSTGRES_CODE_PASSWORD is the password of the restricted `flowaid_code` role that
+# worker-code connects with (postgres-init/01-roles.sql).
 
 name: flowaid
 
@@ -36,8 +42,9 @@ x-env-file: &env-file
     required: false
 
 x-postgres-image: &postgres-image pgvector/pgvector:0.8.6-pg16@sha256:ccc6e83d6e35e931dc7c5def2022729d5a6c370318d099181995567ff1fb4d6b
+x-rustfs-image: &rustfs-image rustfs/rustfs:1.0.0@sha256:8cc9801755448b71a786705ce76692c77e14936cccd87cf2fc31842e58f4d1ff
 
-# Shared by api and worker (the trusted tier). web gets its own explicit map.
+# Shared by api and worker (the trusted tier). worker-code and web get their own explicit maps.
 x-service-env: &service-env
   NODE_ENV: ${NODE_ENV:-production}
   LOG_LEVEL: ${LOG_LEVEL:-info}
@@ -129,8 +136,9 @@ services:
       start_period: 30s
     restart: unless-stopped
 
-  # Orchestrator + general-purpose node executors and plugin host (the trusted tier: it holds
-  # the master key file and every provider key). Waits for the api so migrations are applied.
+  # Orchestrator + node executors for every pool but `code`, and the plugin host (the trusted
+  # tier: it holds the master key file and every provider key). Waits for the api so migrations
+  # are applied.
   worker:
     build:
       context: ..
@@ -162,6 +170,103 @@ services:
       retries: 4
       start_period: 30s
     restart: unless-stopped
+
+  # Sandbox host for the `code` pool: claims delegated code-node executions and runs them in
+  # isolated-vm isolates. No .env, no /data, no master key; the flowaid_code role reaches only
+  # the queue and the delegated-node functions.
+  worker-code:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: worker
+    image: flowaid/worker:local
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DATABASE_URL: postgres://flowaid_code:${POSTGRES_CODE_PASSWORD:?set POSTGRES_CODE_PASSWORD in .env (openssl rand -hex 16); the sandbox host's database password, distinct from POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-flowaid}
+      DB_RLS: ${DB_RLS:-true}
+      REDIS_URL: ${REDIS_URL:-}
+      WORKER_POOLS: code
+      WORKER_CONCURRENCY: ${WORKER_CODE_CONCURRENCY:-4}
+      SANDBOX_MODE: ${SANDBOX_MODE:-isolated-vm}
+    networks:
+      - internal
+      - edge
+    depends_on:
+      postgres:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    <<: *worker-security
+    read_only: true
+    tmpfs:
+      - /tmp:size=256m
+    # pids_limit is expressed here because compose rejects `pids_limit` next to a `deploy` block.
+    deploy:
+      resources:
+        limits:
+          pids: 256
+          memory: 1g
+    healthcheck:
+      test: ["CMD", "node", "dist/health.js"]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 30s
+    restart: unless-stopped
+
+  # `--profile s3`: a bundled S3-compatible artifact store. Point the api and worker at it in
+  # .env: S3_ENDPOINT=http://rustfs:9000, S3_BUCKET, S3_ACCESS_KEY, S3_SECRET_KEY (docker/README.md).
+  rustfs:
+    image: *rustfs-image
+    profiles: [s3]
+    environment:
+      RUSTFS_ACCESS_KEY: ${S3_ACCESS_KEY:-flowaid}
+      # empty (unset) makes the container refuse to start
+      RUSTFS_SECRET_KEY: ${S3_SECRET_KEY:-}
+      RUSTFS_ADDRESS: ":9000"
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${RUSTFS_PORT:-9000}:9000"
+    volumes:
+      - s3-data:/data
+    networks:
+      - internal
+      - admin
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "curl", "-so", "/dev/null", "http://127.0.0.1:9000/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+
+  # One-shot (profile s3): creates S3_BUCKET with a SigV4-signed PUT, then exits 0.
+  rustfs-init:
+    image: *rustfs-image
+    profiles: [s3]
+    depends_on:
+      rustfs:
+        condition: service_healthy
+    environment:
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-flowaid}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-}
+      S3_BUCKET: ${S3_BUCKET:-flowaid}
+      S3_REGION: ${S3_REGION:-us-east-1}
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        code=$$(curl -s -o /dev/null -w '%{http_code}' --aws-sigv4 "aws:amz:$$S3_REGION:s3" \
+          --user "$$S3_ACCESS_KEY:$$S3_SECRET_KEY" -X PUT "http://rustfs:9000/$$S3_BUCKET")
+        case "$$code" in 200|409) echo "bucket $$S3_BUCKET ready" ;; *) echo "create bucket: HTTP $$code"; exit 1 ;; esac
+    networks:
+      - internal
+    security_opt:
+      - no-new-privileges:true
+    restart: "no"
 
   # Next.js app: builder, runs, trace viewer, human tasks, evaluations, settings. Browsers talk
   # only to it; it forwards /v1, /hooks and /mcp to the api at request time.
@@ -205,5 +310,7 @@ networks:
 
 volumes:
   postgres-data:
+  # Objects of the bundled S3 store (profile s3).
+  s3-data:
   # Master key file, generated JWT keys and installed plugins, shared by api and worker only.
   flowaid-data:

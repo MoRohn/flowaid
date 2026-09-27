@@ -4,8 +4,8 @@
  * (`<data>/worker.heartbeat`); a stale or missing file means the process is stuck or gone.
  */
 import { readFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
 import { loadEnv } from "@flowaid/env";
+import { heartbeatPath } from "./heartbeat.js";
 
 export const MAX_HEARTBEAT_AGE_MS = 45_000;
 
@@ -24,10 +24,7 @@ export function heartbeatIsFresh(
 
 async function main(): Promise<number> {
   const env = loadEnv();
-  const path = join(
-    dirname(String(env.FLOWAID_MASTER_KEY_FILE ?? "/data/master.key")),
-    "worker.heartbeat",
-  );
+  const path = heartbeatPath(env);
   try {
     return heartbeatIsFresh(await readFile(path, "utf8"), Date.now()) ? 0 : 1;
   } catch {

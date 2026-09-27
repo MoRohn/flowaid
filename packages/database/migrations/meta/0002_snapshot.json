@@ -81,13 +81,9 @@
         "agents_workspace_id_workspaces_id_fk": {
           "name": "agents_workspace_id_workspaces_id_fk",
           "tableFrom": "agents",
-          "columnsFrom": [
-            "workspace_id"
-          ],
+          "columnsFrom": ["workspace_id"],
           "tableTo": "workspaces",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         }
@@ -231,39 +227,27 @@
         "api_keys_workspace_id_workspaces_id_fk": {
           "name": "api_keys_workspace_id_workspaces_id_fk",
           "tableFrom": "api_keys",
-          "columnsFrom": [
-            "workspace_id"
-          ],
+          "columnsFrom": ["workspace_id"],
           "tableTo": "workspaces",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         },
         "api_keys_environment_id_environments_id_fk": {
           "name": "api_keys_environment_id_environments_id_fk",
           "tableFrom": "api_keys",
-          "columnsFrom": [
-            "environment_id"
-          ],
+          "columnsFrom": ["environment_id"],
           "tableTo": "environments",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "set null"
         },
         "api_keys_created_by_users_id_fk": {
           "name": "api_keys_created_by_users_id_fk",
           "tableFrom": "api_keys",
-          "columnsFrom": [
-            "created_by"
-          ],
+          "columnsFrom": ["created_by"],
           "tableTo": "users",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "set null"
         }
@@ -432,39 +416,27 @@
         "artifacts_workspace_id_workspaces_id_fk": {
           "name": "artifacts_workspace_id_workspaces_id_fk",
           "tableFrom": "artifacts",
-          "columnsFrom": [
-            "workspace_id"
-          ],
+          "columnsFrom": ["workspace_id"],
           "tableTo": "workspaces",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         },
         "artifacts_run_id_runs_id_fk": {
           "name": "artifacts_run_id_runs_id_fk",
           "tableFrom": "artifacts",
-          "columnsFrom": [
-            "run_id"
-          ],
+          "columnsFrom": ["run_id"],
           "tableTo": "runs",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         },
         "artifacts_workflow_id_workflows_id_fk": {
           "name": "artifacts_workflow_id_workflows_id_fk",
           "tableFrom": "artifacts",
-          "columnsFrom": [
-            "workflow_id"
-          ],
+          "columnsFrom": ["workflow_id"],
           "tableTo": "workflows",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         }
@@ -602,13 +574,9 @@
         "audit_events_workspace_id_workspaces_id_fk": {
           "name": "audit_events_workspace_id_workspaces_id_fk",
           "tableFrom": "audit_events",
-          "columnsFrom": [
-            "workspace_id"
-          ],
+          "columnsFrom": ["workspace_id"],
           "tableTo": "workspaces",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         }
@@ -773,26 +741,18 @@
         "chunks_workspace_id_workspaces_id_fk": {
           "name": "chunks_workspace_id_workspaces_id_fk",
           "tableFrom": "chunks",
-          "columnsFrom": [
-            "workspace_id"
-          ],
+          "columnsFrom": ["workspace_id"],
           "tableTo": "workspaces",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         },
         "chunks_document_id_documents_id_fk": {
           "name": "chunks_document_id_documents_id_fk",
           "tableFrom": "chunks",
-          "columnsFrom": [
-            "document_id"
-          ],
+          "columnsFrom": ["document_id"],
           "tableTo": "documents",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         }
@@ -987,39 +947,27 @@
         "credentials_workspace_id_workspaces_id_fk": {
           "name": "credentials_workspace_id_workspaces_id_fk",
           "tableFrom": "credentials",
-          "columnsFrom": [
-            "workspace_id"
-          ],
+          "columnsFrom": ["workspace_id"],
           "tableTo": "workspaces",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         },
         "credentials_environment_id_environments_id_fk": {
           "name": "credentials_environment_id_environments_id_fk",
           "tableFrom": "credentials",
-          "columnsFrom": [
-            "environment_id"
-          ],
+          "columnsFrom": ["environment_id"],
           "tableTo": "environments",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         },
         "credentials_created_by_users_id_fk": {
           "name": "credentials_created_by_users_id_fk",
           "tableFrom": "credentials",
-          "columnsFrom": [
-            "created_by"
-          ],
+          "columnsFrom": ["created_by"],
           "tableTo": "users",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "set null"
         }
@@ -1138,26 +1086,18 @@
         "documents_workspace_id_workspaces_id_fk": {
           "name": "documents_workspace_id_workspaces_id_fk",
           "tableFrom": "documents",
-          "columnsFrom": [
-            "workspace_id"
-          ],
+          "columnsFrom": ["workspace_id"],
           "tableTo": "workspaces",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         },
         "documents_source_id_knowledge_sources_id_fk": {
           "name": "documents_source_id_knowledge_sources_id_fk",
           "tableFrom": "documents",
-          "columnsFrom": [
-            "source_id"
-          ],
+          "columnsFrom": ["source_id"],
           "tableTo": "knowledge_sources",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         }
@@ -1290,13 +1230,9 @@
         "environments_workspace_id_workspaces_id_fk": {
           "name": "environments_workspace_id_workspaces_id_fk",
           "tableFrom": "environments",
-          "columnsFrom": [
-            "workspace_id"
-          ],
+          "columnsFrom": ["workspace_id"],
           "tableTo": "workspaces",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         }
@@ -1409,26 +1345,18 @@
         "evaluation_cases_workspace_id_workspaces_id_fk": {
           "name": "evaluation_cases_workspace_id_workspaces_id_fk",
           "tableFrom": "evaluation_cases",
-          "columnsFrom": [
-            "workspace_id"
-          ],
+          "columnsFrom": ["workspace_id"],
           "tableTo": "workspaces",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         },
         "evaluation_cases_set_id_evaluation_sets_id_fk": {
           "name": "evaluation_cases_set_id_evaluation_sets_id_fk",
           "tableFrom": "evaluation_cases",
-          "columnsFrom": [
-            "set_id"
-          ],
+          "columnsFrom": ["set_id"],
           "tableTo": "evaluation_sets",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         }
@@ -1492,39 +1420,27 @@
         "evaluation_results_evaluation_run_id_evaluation_runs_id_fk": {
           "name": "evaluation_results_evaluation_run_id_evaluation_runs_id_fk",
           "tableFrom": "evaluation_results",
-          "columnsFrom": [
-            "evaluation_run_id"
-          ],
+          "columnsFrom": ["evaluation_run_id"],
           "tableTo": "evaluation_runs",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         },
         "evaluation_results_case_id_evaluation_cases_id_fk": {
           "name": "evaluation_results_case_id_evaluation_cases_id_fk",
           "tableFrom": "evaluation_results",
-          "columnsFrom": [
-            "case_id"
-          ],
+          "columnsFrom": ["case_id"],
           "tableTo": "evaluation_cases",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         },
         "evaluation_results_run_id_runs_id_fk": {
           "name": "evaluation_results_run_id_runs_id_fk",
           "tableFrom": "evaluation_results",
-          "columnsFrom": [
-            "run_id"
-          ],
+          "columnsFrom": ["run_id"],
           "tableTo": "runs",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "set null"
         }
@@ -1532,10 +1448,7 @@
       "compositePrimaryKeys": {
         "evaluation_results_evaluation_run_id_case_id_pk": {
           "name": "evaluation_results_evaluation_run_id_case_id_pk",
-          "columns": [
-            "evaluation_run_id",
-            "case_id"
-          ]
+          "columns": ["evaluation_run_id", "case_id"]
         }
       },
       "uniqueConstraints": {},
@@ -1697,52 +1610,36 @@
         "evaluation_runs_workspace_id_workspaces_id_fk": {
           "name": "evaluation_runs_workspace_id_workspaces_id_fk",
           "tableFrom": "evaluation_runs",
-          "columnsFrom": [
-            "workspace_id"
-          ],
+          "columnsFrom": ["workspace_id"],
           "tableTo": "workspaces",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         },
         "evaluation_runs_set_id_evaluation_sets_id_fk": {
           "name": "evaluation_runs_set_id_evaluation_sets_id_fk",
           "tableFrom": "evaluation_runs",
-          "columnsFrom": [
-            "set_id"
-          ],
+          "columnsFrom": ["set_id"],
           "tableTo": "evaluation_sets",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         },
         "evaluation_runs_workflow_version_id_workflow_versions_id_fk": {
           "name": "evaluation_runs_workflow_version_id_workflow_versions_id_fk",
           "tableFrom": "evaluation_runs",
-          "columnsFrom": [
-            "workflow_version_id"
-          ],
+          "columnsFrom": ["workflow_version_id"],
           "tableTo": "workflow_versions",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "no action"
         },
         "evaluation_runs_environment_id_environments_id_fk": {
           "name": "evaluation_runs_environment_id_environments_id_fk",
           "tableFrom": "evaluation_runs",
-          "columnsFrom": [
-            "environment_id"
-          ],
+          "columnsFrom": ["environment_id"],
           "tableTo": "environments",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "no action"
         }
@@ -1836,26 +1733,18 @@
         "evaluation_sets_workspace_id_workspaces_id_fk": {
           "name": "evaluation_sets_workspace_id_workspaces_id_fk",
           "tableFrom": "evaluation_sets",
-          "columnsFrom": [
-            "workspace_id"
-          ],
+          "columnsFrom": ["workspace_id"],
           "tableTo": "workspaces",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         },
         "evaluation_sets_workflow_id_workflows_id_fk": {
           "name": "evaluation_sets_workflow_id_workflows_id_fk",
           "tableFrom": "evaluation_sets",
-          "columnsFrom": [
-            "workflow_id"
-          ],
+          "columnsFrom": ["workflow_id"],
           "tableTo": "workflows",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "set null"
         }
@@ -1941,26 +1830,18 @@
         "event_subscriptions_workspace_id_workspaces_id_fk": {
           "name": "event_subscriptions_workspace_id_workspaces_id_fk",
           "tableFrom": "event_subscriptions",
-          "columnsFrom": [
-            "workspace_id"
-          ],
+          "columnsFrom": ["workspace_id"],
           "tableTo": "workspaces",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         },
         "event_subscriptions_run_id_runs_id_fk": {
           "name": "event_subscriptions_run_id_runs_id_fk",
           "tableFrom": "event_subscriptions",
-          "columnsFrom": [
-            "run_id"
-          ],
+          "columnsFrom": ["run_id"],
           "tableTo": "runs",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         }
@@ -1968,10 +1849,7 @@
       "compositePrimaryKeys": {
         "event_subscriptions_run_id_node_run_id_pk": {
           "name": "event_subscriptions_run_id_node_run_id_pk",
-          "columns": [
-            "run_id",
-            "node_run_id"
-          ]
+          "columns": ["run_id", "node_run_id"]
         }
       },
       "uniqueConstraints": {},
@@ -2075,26 +1953,18 @@
         "human_task_review_tokens_workspace_id_workspaces_id_fk": {
           "name": "human_task_review_tokens_workspace_id_workspaces_id_fk",
           "tableFrom": "human_task_review_tokens",
-          "columnsFrom": [
-            "workspace_id"
-          ],
+          "columnsFrom": ["workspace_id"],
           "tableTo": "workspaces",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         },
         "human_task_review_tokens_task_id_human_tasks_id_fk": {
           "name": "human_task_review_tokens_task_id_human_tasks_id_fk",
           "tableFrom": "human_task_review_tokens",
-          "columnsFrom": [
-            "task_id"
-          ],
+          "columnsFrom": ["task_id"],
           "tableTo": "human_tasks",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         }
@@ -2279,26 +2149,18 @@
         "human_tasks_workspace_id_workspaces_id_fk": {
           "name": "human_tasks_workspace_id_workspaces_id_fk",
           "tableFrom": "human_tasks",
-          "columnsFrom": [
-            "workspace_id"
-          ],
+          "columnsFrom": ["workspace_id"],
           "tableTo": "workspaces",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         },
         "human_tasks_run_id_runs_id_fk": {
           "name": "human_tasks_run_id_runs_id_fk",
           "tableFrom": "human_tasks",
-          "columnsFrom": [
-            "run_id"
-          ],
+          "columnsFrom": ["run_id"],
           "tableTo": "runs",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         }
@@ -2387,13 +2249,9 @@
         "identities_user_id_users_id_fk": {
           "name": "identities_user_id_users_id_fk",
           "tableFrom": "identities",
-          "columnsFrom": [
-            "user_id"
-          ],
+          "columnsFrom": ["user_id"],
           "tableTo": "users",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         }
@@ -2526,26 +2384,18 @@
         "jobs_workspace_id_workspaces_id_fk": {
           "name": "jobs_workspace_id_workspaces_id_fk",
           "tableFrom": "jobs",
-          "columnsFrom": [
-            "workspace_id"
-          ],
+          "columnsFrom": ["workspace_id"],
           "tableTo": "workspaces",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         },
         "jobs_artifact_id_artifacts_id_fk": {
           "name": "jobs_artifact_id_artifacts_id_fk",
           "tableFrom": "jobs",
-          "columnsFrom": [
-            "artifact_id"
-          ],
+          "columnsFrom": ["artifact_id"],
           "tableTo": "artifacts",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "set null"
         }
@@ -2670,26 +2520,18 @@
         "knowledge_sources_workspace_id_workspaces_id_fk": {
           "name": "knowledge_sources_workspace_id_workspaces_id_fk",
           "tableFrom": "knowledge_sources",
-          "columnsFrom": [
-            "workspace_id"
-          ],
+          "columnsFrom": ["workspace_id"],
           "tableTo": "workspaces",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         },
         "knowledge_sources_credential_id_credentials_id_fk": {
           "name": "knowledge_sources_credential_id_credentials_id_fk",
           "tableFrom": "knowledge_sources",
-          "columnsFrom": [
-            "credential_id"
-          ],
+          "columnsFrom": ["credential_id"],
           "tableTo": "credentials",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "set null"
         }
@@ -2803,39 +2645,27 @@
         "mcp_exposures_workspace_id_workspaces_id_fk": {
           "name": "mcp_exposures_workspace_id_workspaces_id_fk",
           "tableFrom": "mcp_exposures",
-          "columnsFrom": [
-            "workspace_id"
-          ],
+          "columnsFrom": ["workspace_id"],
           "tableTo": "workspaces",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         },
         "mcp_exposures_workflow_id_workflows_id_fk": {
           "name": "mcp_exposures_workflow_id_workflows_id_fk",
           "tableFrom": "mcp_exposures",
-          "columnsFrom": [
-            "workflow_id"
-          ],
+          "columnsFrom": ["workflow_id"],
           "tableTo": "workflows",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         },
         "mcp_exposures_environment_id_environments_id_fk": {
           "name": "mcp_exposures_environment_id_environments_id_fk",
           "tableFrom": "mcp_exposures",
-          "columnsFrom": [
-            "environment_id"
-          ],
+          "columnsFrom": ["environment_id"],
           "tableTo": "environments",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         }
@@ -3007,26 +2837,18 @@
         "mcp_servers_workspace_id_workspaces_id_fk": {
           "name": "mcp_servers_workspace_id_workspaces_id_fk",
           "tableFrom": "mcp_servers",
-          "columnsFrom": [
-            "workspace_id"
-          ],
+          "columnsFrom": ["workspace_id"],
           "tableTo": "workspaces",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         },
         "mcp_servers_credential_id_credentials_id_fk": {
           "name": "mcp_servers_credential_id_credentials_id_fk",
           "tableFrom": "mcp_servers",
-          "columnsFrom": [
-            "credential_id"
-          ],
+          "columnsFrom": ["credential_id"],
           "tableTo": "credentials",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "set null"
         }
@@ -3089,26 +2911,18 @@
         "memberships_workspace_id_workspaces_id_fk": {
           "name": "memberships_workspace_id_workspaces_id_fk",
           "tableFrom": "memberships",
-          "columnsFrom": [
-            "workspace_id"
-          ],
+          "columnsFrom": ["workspace_id"],
           "tableTo": "workspaces",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         },
         "memberships_user_id_users_id_fk": {
           "name": "memberships_user_id_users_id_fk",
           "tableFrom": "memberships",
-          "columnsFrom": [
-            "user_id"
-          ],
+          "columnsFrom": ["user_id"],
           "tableTo": "users",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         }
@@ -3116,10 +2930,7 @@
       "compositePrimaryKeys": {
         "memberships_workspace_id_user_id_pk": {
           "name": "memberships_workspace_id_user_id_pk",
-          "columns": [
-            "workspace_id",
-            "user_id"
-          ]
+          "columns": ["workspace_id", "user_id"]
         }
       },
       "uniqueConstraints": {},
@@ -3214,13 +3025,9 @@
         "models_workspace_id_workspaces_id_fk": {
           "name": "models_workspace_id_workspaces_id_fk",
           "tableFrom": "models",
-          "columnsFrom": [
-            "workspace_id"
-          ],
+          "columnsFrom": ["workspace_id"],
           "tableTo": "workspaces",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         }
@@ -3588,26 +3395,18 @@
         "node_runs_run_id_runs_id_fk": {
           "name": "node_runs_run_id_runs_id_fk",
           "tableFrom": "node_runs",
-          "columnsFrom": [
-            "run_id"
-          ],
+          "columnsFrom": ["run_id"],
           "tableTo": "runs",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         },
         "node_runs_workspace_id_workspaces_id_fk": {
           "name": "node_runs_workspace_id_workspaces_id_fk",
           "tableFrom": "node_runs",
-          "columnsFrom": [
-            "workspace_id"
-          ],
+          "columnsFrom": ["workspace_id"],
           "tableTo": "workspaces",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         }
@@ -3701,26 +3500,18 @@
         "notifications_workspace_id_workspaces_id_fk": {
           "name": "notifications_workspace_id_workspaces_id_fk",
           "tableFrom": "notifications",
-          "columnsFrom": [
-            "workspace_id"
-          ],
+          "columnsFrom": ["workspace_id"],
           "tableTo": "workspaces",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         },
         "notifications_credential_id_credentials_id_fk": {
           "name": "notifications_credential_id_credentials_id_fk",
           "tableFrom": "notifications",
-          "columnsFrom": [
-            "credential_id"
-          ],
+          "columnsFrom": ["credential_id"],
           "tableTo": "credentials",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "set null"
         }
@@ -3839,13 +3630,9 @@
         "plugins_workspace_id_workspaces_id_fk": {
           "name": "plugins_workspace_id_workspaces_id_fk",
           "tableFrom": "plugins",
-          "columnsFrom": [
-            "workspace_id"
-          ],
+          "columnsFrom": ["workspace_id"],
           "tableTo": "workspaces",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         }
@@ -4092,13 +3879,9 @@
         "refresh_tokens_user_id_users_id_fk": {
           "name": "refresh_tokens_user_id_users_id_fk",
           "tableFrom": "refresh_tokens",
-          "columnsFrom": [
-            "user_id"
-          ],
+          "columnsFrom": ["user_id"],
           "tableTo": "users",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         }
@@ -4144,13 +3927,9 @@
         "run_checkpoints_run_id_runs_id_fk": {
           "name": "run_checkpoints_run_id_runs_id_fk",
           "tableFrom": "run_checkpoints",
-          "columnsFrom": [
-            "run_id"
-          ],
+          "columnsFrom": ["run_id"],
           "tableTo": "runs",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         }
@@ -4158,10 +3937,7 @@
       "compositePrimaryKeys": {
         "run_checkpoints_run_id_seq_pk": {
           "name": "run_checkpoints_run_id_seq_pk",
-          "columns": [
-            "run_id",
-            "seq"
-          ]
+          "columns": ["run_id", "seq"]
         }
       },
       "uniqueConstraints": {},
@@ -4264,13 +4040,9 @@
         "run_events_run_id_runs_id_fk": {
           "name": "run_events_run_id_runs_id_fk",
           "tableFrom": "run_events",
-          "columnsFrom": [
-            "run_id"
-          ],
+          "columnsFrom": ["run_id"],
           "tableTo": "runs",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         }
@@ -4278,10 +4050,7 @@
       "compositePrimaryKeys": {
         "run_events_run_id_seq_pk": {
           "name": "run_events_run_id_seq_pk",
-          "columns": [
-            "run_id",
-            "seq"
-          ]
+          "columns": ["run_id", "seq"]
         }
       },
       "uniqueConstraints": {},
@@ -4390,13 +4159,9 @@
         "run_timers_run_id_runs_id_fk": {
           "name": "run_timers_run_id_runs_id_fk",
           "tableFrom": "run_timers",
-          "columnsFrom": [
-            "run_id"
-          ],
+          "columnsFrom": ["run_id"],
           "tableTo": "runs",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         }
@@ -4808,52 +4573,36 @@
         "runs_workspace_id_workspaces_id_fk": {
           "name": "runs_workspace_id_workspaces_id_fk",
           "tableFrom": "runs",
-          "columnsFrom": [
-            "workspace_id"
-          ],
+          "columnsFrom": ["workspace_id"],
           "tableTo": "workspaces",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         },
         "runs_workflow_id_workflows_id_fk": {
           "name": "runs_workflow_id_workflows_id_fk",
           "tableFrom": "runs",
-          "columnsFrom": [
-            "workflow_id"
-          ],
+          "columnsFrom": ["workflow_id"],
           "tableTo": "workflows",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         },
         "runs_workflow_version_id_workflow_versions_id_fk": {
           "name": "runs_workflow_version_id_workflow_versions_id_fk",
           "tableFrom": "runs",
-          "columnsFrom": [
-            "workflow_version_id"
-          ],
+          "columnsFrom": ["workflow_version_id"],
           "tableTo": "workflow_versions",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "no action"
         },
         "runs_environment_id_environments_id_fk": {
           "name": "runs_environment_id_environments_id_fk",
           "tableFrom": "runs",
-          "columnsFrom": [
-            "environment_id"
-          ],
+          "columnsFrom": ["environment_id"],
           "tableTo": "environments",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "no action"
         }
@@ -5034,39 +4783,27 @@
         "schedules_workspace_id_workspaces_id_fk": {
           "name": "schedules_workspace_id_workspaces_id_fk",
           "tableFrom": "schedules",
-          "columnsFrom": [
-            "workspace_id"
-          ],
+          "columnsFrom": ["workspace_id"],
           "tableTo": "workspaces",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         },
         "schedules_workflow_id_workflows_id_fk": {
           "name": "schedules_workflow_id_workflows_id_fk",
           "tableFrom": "schedules",
-          "columnsFrom": [
-            "workflow_id"
-          ],
+          "columnsFrom": ["workflow_id"],
           "tableTo": "workflows",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         },
         "schedules_environment_id_environments_id_fk": {
           "name": "schedules_environment_id_environments_id_fk",
           "tableFrom": "schedules",
-          "columnsFrom": [
-            "environment_id"
-          ],
+          "columnsFrom": ["environment_id"],
           "tableTo": "environments",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         }
@@ -5140,52 +4877,36 @@
         "secret_references_workspace_id_workspaces_id_fk": {
           "name": "secret_references_workspace_id_workspaces_id_fk",
           "tableFrom": "secret_references",
-          "columnsFrom": [
-            "workspace_id"
-          ],
+          "columnsFrom": ["workspace_id"],
           "tableTo": "workspaces",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         },
         "secret_references_workflow_id_workflows_id_fk": {
           "name": "secret_references_workflow_id_workflows_id_fk",
           "tableFrom": "secret_references",
-          "columnsFrom": [
-            "workflow_id"
-          ],
+          "columnsFrom": ["workflow_id"],
           "tableTo": "workflows",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         },
         "secret_references_environment_id_environments_id_fk": {
           "name": "secret_references_environment_id_environments_id_fk",
           "tableFrom": "secret_references",
-          "columnsFrom": [
-            "environment_id"
-          ],
+          "columnsFrom": ["environment_id"],
           "tableTo": "environments",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         },
         "secret_references_credential_id_credentials_id_fk": {
           "name": "secret_references_credential_id_credentials_id_fk",
           "tableFrom": "secret_references",
-          "columnsFrom": [
-            "credential_id"
-          ],
+          "columnsFrom": ["credential_id"],
           "tableTo": "credentials",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "restrict"
         }
@@ -5193,11 +4914,7 @@
       "compositePrimaryKeys": {
         "secret_references_workflow_id_environment_id_secret_name_pk": {
           "name": "secret_references_workflow_id_environment_id_secret_name_pk",
-          "columns": [
-            "workflow_id",
-            "environment_id",
-            "secret_name"
-          ]
+          "columns": ["workflow_id", "environment_id", "secret_name"]
         }
       },
       "uniqueConstraints": {},
@@ -5276,13 +4993,9 @@
         "state_entries_workspace_id_workspaces_id_fk": {
           "name": "state_entries_workspace_id_workspaces_id_fk",
           "tableFrom": "state_entries",
-          "columnsFrom": [
-            "workspace_id"
-          ],
+          "columnsFrom": ["workspace_id"],
           "tableTo": "workspaces",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         }
@@ -5290,11 +5003,7 @@
       "compositePrimaryKeys": {
         "state_entries_workspace_id_namespace_key_pk": {
           "name": "state_entries_workspace_id_namespace_key_pk",
-          "columns": [
-            "workspace_id",
-            "namespace",
-            "key"
-          ]
+          "columns": ["workspace_id", "namespace", "key"]
         }
       },
       "uniqueConstraints": {},
@@ -5404,13 +5113,9 @@
         "templates_workspace_id_workspaces_id_fk": {
           "name": "templates_workspace_id_workspaces_id_fk",
           "tableFrom": "templates",
-          "columnsFrom": [
-            "workspace_id"
-          ],
+          "columnsFrom": ["workspace_id"],
           "tableTo": "workspaces",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         }
@@ -5517,26 +5222,18 @@
         "tools_workspace_id_workspaces_id_fk": {
           "name": "tools_workspace_id_workspaces_id_fk",
           "tableFrom": "tools",
-          "columnsFrom": [
-            "workspace_id"
-          ],
+          "columnsFrom": ["workspace_id"],
           "tableTo": "workspaces",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         },
         "tools_credential_id_credentials_id_fk": {
           "name": "tools_credential_id_credentials_id_fk",
           "tableFrom": "tools",
-          "columnsFrom": [
-            "credential_id"
-          ],
+          "columnsFrom": ["credential_id"],
           "tableTo": "credentials",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "set null"
         }
@@ -5637,13 +5334,9 @@
         "user_tokens_user_id_users_id_fk": {
           "name": "user_tokens_user_id_users_id_fk",
           "tableFrom": "user_tokens",
-          "columnsFrom": [
-            "user_id"
-          ],
+          "columnsFrom": ["user_id"],
           "tableTo": "users",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         }
@@ -5891,26 +5584,18 @@
         "webhook_deliveries_workspace_id_workspaces_id_fk": {
           "name": "webhook_deliveries_workspace_id_workspaces_id_fk",
           "tableFrom": "webhook_deliveries",
-          "columnsFrom": [
-            "workspace_id"
-          ],
+          "columnsFrom": ["workspace_id"],
           "tableTo": "workspaces",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         },
         "webhook_deliveries_webhook_id_webhooks_id_fk": {
           "name": "webhook_deliveries_webhook_id_webhooks_id_fk",
           "tableFrom": "webhook_deliveries",
-          "columnsFrom": [
-            "webhook_id"
-          ],
+          "columnsFrom": ["webhook_id"],
           "tableTo": "webhooks",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         }
@@ -6061,65 +5746,45 @@
         "webhooks_workspace_id_workspaces_id_fk": {
           "name": "webhooks_workspace_id_workspaces_id_fk",
           "tableFrom": "webhooks",
-          "columnsFrom": [
-            "workspace_id"
-          ],
+          "columnsFrom": ["workspace_id"],
           "tableTo": "workspaces",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         },
         "webhooks_workflow_id_workflows_id_fk": {
           "name": "webhooks_workflow_id_workflows_id_fk",
           "tableFrom": "webhooks",
-          "columnsFrom": [
-            "workflow_id"
-          ],
+          "columnsFrom": ["workflow_id"],
           "tableTo": "workflows",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         },
         "webhooks_environment_id_environments_id_fk": {
           "name": "webhooks_environment_id_environments_id_fk",
           "tableFrom": "webhooks",
-          "columnsFrom": [
-            "environment_id"
-          ],
+          "columnsFrom": ["environment_id"],
           "tableTo": "environments",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         },
         "webhooks_secret_credential_id_credentials_id_fk": {
           "name": "webhooks_secret_credential_id_credentials_id_fk",
           "tableFrom": "webhooks",
-          "columnsFrom": [
-            "secret_credential_id"
-          ],
+          "columnsFrom": ["secret_credential_id"],
           "tableTo": "credentials",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "set null"
         },
         "webhooks_callback_secret_credential_id_credentials_id_fk": {
           "name": "webhooks_callback_secret_credential_id_credentials_id_fk",
           "tableFrom": "webhooks",
-          "columnsFrom": [
-            "callback_secret_credential_id"
-          ],
+          "columnsFrom": ["callback_secret_credential_id"],
           "tableTo": "credentials",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "set null"
         }
@@ -6247,65 +5912,45 @@
         "workflow_deployments_workspace_id_workspaces_id_fk": {
           "name": "workflow_deployments_workspace_id_workspaces_id_fk",
           "tableFrom": "workflow_deployments",
-          "columnsFrom": [
-            "workspace_id"
-          ],
+          "columnsFrom": ["workspace_id"],
           "tableTo": "workspaces",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         },
         "workflow_deployments_workflow_id_workflows_id_fk": {
           "name": "workflow_deployments_workflow_id_workflows_id_fk",
           "tableFrom": "workflow_deployments",
-          "columnsFrom": [
-            "workflow_id"
-          ],
+          "columnsFrom": ["workflow_id"],
           "tableTo": "workflows",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         },
         "workflow_deployments_environment_id_environments_id_fk": {
           "name": "workflow_deployments_environment_id_environments_id_fk",
           "tableFrom": "workflow_deployments",
-          "columnsFrom": [
-            "environment_id"
-          ],
+          "columnsFrom": ["environment_id"],
           "tableTo": "environments",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         },
         "workflow_deployments_version_id_workflow_versions_id_fk": {
           "name": "workflow_deployments_version_id_workflow_versions_id_fk",
           "tableFrom": "workflow_deployments",
-          "columnsFrom": [
-            "version_id"
-          ],
+          "columnsFrom": ["version_id"],
           "tableTo": "workflow_versions",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "no action"
         },
         "workflow_deployments_deployed_by_users_id_fk": {
           "name": "workflow_deployments_deployed_by_users_id_fk",
           "tableFrom": "workflow_deployments",
-          "columnsFrom": [
-            "deployed_by"
-          ],
+          "columnsFrom": ["deployed_by"],
           "tableTo": "users",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "set null"
         }
@@ -6496,39 +6141,27 @@
         "workflow_versions_workspace_id_workspaces_id_fk": {
           "name": "workflow_versions_workspace_id_workspaces_id_fk",
           "tableFrom": "workflow_versions",
-          "columnsFrom": [
-            "workspace_id"
-          ],
+          "columnsFrom": ["workspace_id"],
           "tableTo": "workspaces",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         },
         "workflow_versions_workflow_id_workflows_id_fk": {
           "name": "workflow_versions_workflow_id_workflows_id_fk",
           "tableFrom": "workflow_versions",
-          "columnsFrom": [
-            "workflow_id"
-          ],
+          "columnsFrom": ["workflow_id"],
           "tableTo": "workflows",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         },
         "workflow_versions_published_by_users_id_fk": {
           "name": "workflow_versions_published_by_users_id_fk",
           "tableFrom": "workflow_versions",
-          "columnsFrom": [
-            "published_by"
-          ],
+          "columnsFrom": ["published_by"],
           "tableTo": "users",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "set null"
         }
@@ -6688,26 +6321,18 @@
         "workflows_workspace_id_workspaces_id_fk": {
           "name": "workflows_workspace_id_workspaces_id_fk",
           "tableFrom": "workflows",
-          "columnsFrom": [
-            "workspace_id"
-          ],
+          "columnsFrom": ["workspace_id"],
           "tableTo": "workspaces",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "cascade"
         },
         "workflows_created_by_users_id_fk": {
           "name": "workflows_created_by_users_id_fk",
           "tableFrom": "workflows",
-          "columnsFrom": [
-            "created_by"
-          ],
+          "columnsFrom": ["created_by"],
           "tableTo": "users",
-          "columnsTo": [
-            "id"
-          ],
+          "columnsTo": ["id"],
           "onUpdate": "no action",
           "onDelete": "set null"
         }
@@ -6791,12 +6416,7 @@
     "public.data_class": {
       "name": "data_class",
       "schema": "public",
-      "values": [
-        "public",
-        "internal",
-        "sensitive",
-        "pii"
-      ]
+      "values": ["public", "internal", "sensitive", "pii"]
     },
     "public.node_run_status": {
       "name": "node_run_status",
@@ -6816,12 +6436,7 @@
     "public.retention_class": {
       "name": "retention_class",
       "schema": "public",
-      "values": [
-        "standard",
-        "short",
-        "long",
-        "none"
-      ]
+      "values": ["standard", "short", "long", "none"]
     },
     "public.run_status": {
       "name": "run_status",
@@ -6842,13 +6457,7 @@
     "public.workspace_role": {
       "name": "workspace_role",
       "schema": "public",
-      "values": [
-        "owner",
-        "admin",
-        "editor",
-        "operator",
-        "viewer"
-      ]
+      "values": ["owner", "admin", "editor", "operator", "viewer"]
     }
   },
   "schemas": {},

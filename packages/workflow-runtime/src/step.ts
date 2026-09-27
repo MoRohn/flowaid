@@ -147,7 +147,16 @@ export type Effect =
       resume?: ResumeInfo;
     }
   | { type: "execute_batch"; batchId: string; nodeRunIds: string[] }
-  | { type: "delegate"; pool: WorkerPool; nodeRunId: string; jobId: string }
+  | {
+      type: "delegate";
+      pool: WorkerPool;
+      nodeRunId: string;
+      jobId: string;
+      scope: ScopePath;
+      nodeId: NodeId;
+      input: JsonObject;
+      config: JsonObject;
+    }
   | { type: "set_timer"; timer: TimerSpec }
   | { type: "cancel_timer"; timerId: string }
   | { type: "create_human_task"; humanTaskId: string; nodeRunId: string; request: HumanRequest }
@@ -194,6 +203,8 @@ export interface StepContext {
   workerId: string;
   /** Pool this worker orchestrates in (nodes of other pools are delegated). */
   pool?: WorkerPool;
+  /** Other pools this worker also serves: their nodes run in-process instead of being delegated. */
+  localPools?: ReadonlySet<WorkerPool>;
   vars?: Readonly<Record<string, JsonValue>>;
   run?: Partial<RunMeta>;
   /** Recorded replay: `recordedKey(nodeId, scope, inputHash)` → recorded result. */
@@ -1455,7 +1466,7 @@ class Stepper {
         : null;
     this.schedule(scope, nodeId, { inputHash, idempotencyKey });
     const a = this.addr(scope, nodeId);
-    if (node.pool !== this.pool) {
+    if (node.pool !== this.pool && !this.ctx.localPools?.has(node.pool)) {
       const jobId = `node:${a.nodeRunId}`;
       this.emit({
         type: "NODE_STARTED",
@@ -1465,7 +1476,16 @@ class Stepper {
         workerId: this.ctx.workerId,
       } as AnyEvent);
       this.emit({ type: "NODE_DELEGATED", ...a, pool: node.pool, jobId } as AnyEvent);
-      this.effects.push({ type: "delegate", pool: node.pool, nodeRunId: a.nodeRunId, jobId });
+      this.effects.push({
+        type: "delegate",
+        pool: node.pool,
+        nodeRunId: a.nodeRunId,
+        jobId,
+        scope,
+        nodeId,
+        input: io.input,
+        config: io.config,
+      });
       return;
     }
     this.started(scope, nodeId, io.input);

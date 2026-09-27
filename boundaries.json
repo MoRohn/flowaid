@@ -34,6 +34,7 @@
       "allow": ["workflow-core", "credentials", "shared", "env"]
     },
     "mcp": { "dir": "packages/mcp", "allow": ["workflow-core", "shared"] },
+    "storage": { "dir": "packages/storage", "allow": ["workflow-core", "shared"] },
     "openapi-tools": { "dir": "packages/openapi-tools", "allow": ["workflow-core", "shared"] },
     "nodes-core": {
       "dir": "packages/nodes-core",
@@ -113,6 +114,7 @@
         "credentials",
         "observability",
         "mcp",
+        "storage",
         "openapi-tools",
         "database",
         "evaluation",
@@ -139,6 +141,7 @@
         "provider-anthropic",
         "provider-ollama",
         "mcp",
+        "storage",
         "openapi-tools",
         "sandbox",
         "database",

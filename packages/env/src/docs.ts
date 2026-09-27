@@ -303,8 +303,8 @@ const docs = {
   WORKER_POOLS: {
     group: "queue",
     description:
-      "Comma-separated worker pools this worker process consumes. A run's orchestration always happens on `general`; nodes declaring another pool are delegated to a worker that serves it.",
-    default: "general",
+      "Comma-separated worker pools this worker process consumes. A run's orchestration always happens on `general`; nodes of another pool the same process serves run in-process, the others are delegated to a worker that serves that pool (compose runs `code` in the locked-down `worker-code` container). The default serves every pool in one process.",
+    default: "general,code,browser,gpu,retrieval,high_memory",
     required: false,
     example: "general,retrieval",
     secret: false,
@@ -547,7 +547,7 @@ const docs = {
   S3_ENDPOINT: {
     group: "storage",
     description:
-      "S3-compatible endpoint for artifacts and uploads (AWS S3, Cloudflare R2 or a self-hosted store), reserved for object storage. Set all of `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY` and `S3_SECRET_KEY` or none; when none are set, run artifacts and code-export packages are stored in `<data>/artifacts` beside the master key file (the `flowaid-data` volume in compose), shared by the api and the worker.",
+      "S3-compatible endpoint for artifacts (AWS S3, Cloudflare R2 or a self-hosted store). Set all of `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY` and `S3_SECRET_KEY` or none. When all are set, the worker writes run artifacts and code-export packages to the bucket and the api streams downloads from it (artifacts written earlier to the local directory stay readable); when none are set, they are stored in `<data>/artifacts` beside the master key file (the `flowaid-data` volume in compose), shared by the api and the worker.",
     required: false,
     example: "http://localhost:9000",
     secret: false,
@@ -702,7 +702,7 @@ const docs = {
   POSTGRES_CODE_PASSWORD: {
     group: "compose",
     description:
-      "Password of the restricted `flowaid_code` role (queue tables only) that migrations grant to, reserved for a separate sandbox host of the `code` pool. Required by the compose stack and must differ from `POSTGRES_PASSWORD`. Generate with `openssl rand -hex 16`.",
+      "Password of the restricted `flowaid_code` role that the sandbox host `worker-code` connects with (queue tables and the delegated-node claim/complete functions only; no credentials, no workflow data). Required by the compose stack and must differ from `POSTGRES_PASSWORD`. Generate with `openssl rand -hex 16`.",
     required: false,
     example: "<openssl rand -hex 16>",
     secret: true,
@@ -752,6 +752,25 @@ const docs = {
     default: "3001",
     required: false,
     example: "3001",
+    secret: false,
+    composeOnly: true,
+  },
+  WORKER_CODE_CONCURRENCY: {
+    group: "compose",
+    description: "`WORKER_CONCURRENCY` of the sandbox host `worker-code`.",
+    default: "4",
+    required: false,
+    example: "4",
+    secret: false,
+    composeOnly: true,
+  },
+  RUSTFS_PORT: {
+    group: "compose",
+    description:
+      "Host port of the bundled S3-compatible store (`rustfs`, profile `s3`), published on `BIND_ADDRESS`.",
+    default: "9000",
+    required: false,
+    example: "9000",
     secret: false,
     composeOnly: true,
   },

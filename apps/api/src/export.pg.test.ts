@@ -1,20 +1,27 @@
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { buildExportBundle, readZip } from "@flowaid/codegen";
 import { artifacts, jobs, workflowVersions } from "@flowaid/database";
 import { describeDb } from "@flowaid/database/testing";
 import { uuidv7 } from "@flowaid/shared";
+import {
+  LocalArtifactStore,
+  S3ArtifactStore,
+  startFakeS3,
+  type ArtifactStore,
+  type FakeS3,
+} from "@flowaid/storage";
 import { call, createTestApp, login, type Jar, type TestApp } from "./test/app.js";
 
 /**
  * Stands in for the worker's `export.package` consumer (apps/worker/src/jobs/export.ts, tested
  * there): builds the bundle from the version, stores the zip as an export artifact, completes the job.
  */
-async function startFakeExporter(t: TestApp, artifactsDir: string) {
+async function startFakeExporter(t: TestApp, store: ArtifactStore) {
   return t.ctx.queue.consume(
     "jobs",
     async (job) => {
@@ -36,8 +43,7 @@ async function startFakeExporter(t: TestApp, artifactsDir: string) {
       const zip = bundle.toZip();
       const id = uuidv7();
       const key = `ws/${job.workspaceId}/${id}`;
-      mkdirSync(dirname(join(artifactsDir, key)), { recursive: true });
-      writeFileSync(join(artifactsDir, key), zip);
+      await store.put(key, zip, "application/zip");
       await t.db.app.system(async (tx) => {
         await tx.insert(artifacts).values({
           id,
@@ -47,7 +53,7 @@ async function startFakeExporter(t: TestApp, artifactsDir: string) {
           mimeType: "application/zip",
           bytes: zip.byteLength,
           sha256: createHash("sha256").update(zip).digest("hex"),
-          storage: "local",
+          storage: store.kind,
           storageKey: key,
           kind: "export",
           expiresAt: new Date(t.clock.now() + 24 * 3600_000),
@@ -77,7 +83,7 @@ describeDb("code export (Postgres)", () => {
       .id as string;
     versionId = (await call(t.app, jar, "POST", `/v1/workflows/${workflowId}/publish`, {})).json()
       .id as string;
-    exporter = await startFakeExporter(t, artifactsDir);
+    exporter = await startFakeExporter(t, new LocalArtifactStore(artifactsDir));
   });
   afterAll(async () => {
     await exporter.stop();
@@ -212,5 +218,82 @@ describeDb("code export (Postgres)", () => {
     expect((await call(t.app, jar, "GET", `/v1/jobs/${uuidv7()}`)).statusCode).toBe(404);
     const me = (await call(t.app, jar, "GET", "/v1/me")).json();
     expect(me.features.code_export).toBe(true);
+  });
+});
+
+describeDb("code export with S3 artifact storage (Postgres)", () => {
+  let t: TestApp;
+  let jar: Jar;
+  let s3: FakeS3;
+  let exporter: { stop(): Promise<void> };
+
+  beforeAll(async () => {
+    s3 = await startFakeS3();
+    const opts = {
+      endpoint: s3.endpoint,
+      bucket: s3.bucket,
+      accessKey: s3.accessKey,
+      secretKey: s3.secretKey,
+      region: s3.region,
+      forcePathStyle: true,
+    };
+    t = await createTestApp({ s3: opts });
+    jar = await login(t.app);
+    exporter = await startFakeExporter(t, new S3ArtifactStore(opts));
+  });
+  afterAll(async () => {
+    await exporter.stop();
+    await t.close();
+    await s3.close();
+  });
+
+  it("stores the package in the bucket and streams the download from it", async () => {
+    const workflowId = (await call(t.app, jar, "POST", "/v1/workflows", { name: "Echo" })).json()
+      .id as string;
+    const versionId = (
+      await call(t.app, jar, "POST", `/v1/workflows/${workflowId}/publish`, {})
+    ).json().id as string;
+    const jobId = (
+      await call(t.app, jar, "POST", `/v1/workflow-versions/${versionId}/export/package`, {})
+    ).json().job_id as string;
+    let job: { status: string; artifact_id?: string } = { status: "queued" };
+    for (let i = 0; i < 100 && job.status !== "completed"; i++) {
+      job = (await call(t.app, jar, "GET", `/v1/jobs/${jobId}`)).json();
+      if (job.status !== "completed") await new Promise((r) => setTimeout(r, 50));
+    }
+    const [row] = await t.db.app.system((tx) =>
+      tx
+        .select()
+        .from(artifacts)
+        .where(eq(artifacts.id, job.artifact_id as string)),
+    );
+    expect(row?.storage).toBe("s3");
+    expect(s3.objects.has(row?.storageKey as string)).toBe(true);
+
+    const download = await call(
+      t.app,
+      jar,
+      "GET",
+      `/v1/artifacts/${job.artifact_id as string}/download`,
+    );
+    expect(download.statusCode).toBe(200);
+    expect(download.headers["content-type"]).toBe("application/zip");
+    expect(Number(download.headers["content-length"])).toBe(row?.bytes);
+    expect([...readZip(download.rawPayload).keys()]).toContain(
+      "flowaid-exported-v1/src/workflow.ts",
+    );
+    expect(s3.requests).toContain(`GET /${s3.bucket}/${row?.storageKey as string}`);
+
+    // a local row with no local storage configured is not served
+    await t.db.app.system((tx) =>
+      tx
+        .update(artifacts)
+        .set({ storage: "local" })
+        .where(eq(artifacts.id, job.artifact_id as string)),
+    );
+    expect(
+      (await call(t.app, jar, "GET", `/v1/artifacts/${job.artifact_id as string}/download`))
+        .statusCode,
+    ).toBe(404);
   });
 });
