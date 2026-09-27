@@ -40,6 +40,21 @@ import { stateSetNode } from "./state/set.js";
 import { guardNode } from "./safety/guard.js";
 import { moderationNode } from "./safety/moderation.js";
 import { piiDetectorNode } from "./safety/pii_detector.js";
+import { graphqlNode } from "./tools/graphql.js";
+import { dbQueryNode } from "./tools/db_query.js";
+import { promptNode } from "./ai/prompt.js";
+import { rerankNode } from "./ai/rerank.js";
+import { visionNode } from "./ai/vision.js";
+import { speechNode } from "./ai/speech.js";
+import { imageNode } from "./ai/image.js";
+import { policyCheckNode } from "./safety/policy_check.js";
+import { rateLimitNode } from "./safety/rate_limit.js";
+import { permissionCheckNode } from "./safety/permission_check.js";
+import { testNode } from "./dev/test.js";
+import { debugNode } from "./dev/debug.js";
+import { traceNode } from "./dev/trace.js";
+import { sessionNode } from "./state/session.js";
+import { checkpointNode } from "./state/checkpoint.js";
 
 export {
   booleanNode,
@@ -78,6 +93,21 @@ export {
   guardNode,
   moderationNode,
   piiDetectorNode,
+  graphqlNode,
+  dbQueryNode,
+  promptNode,
+  rerankNode,
+  visionNode,
+  speechNode,
+  imageNode,
+  policyCheckNode,
+  rateLimitNode,
+  permissionCheckNode,
+  testNode,
+  debugNode,
+  traceNode,
+  sessionNode,
+  checkpointNode,
 };
 export { gateOutcome, type GateOutcome } from "./decision/confidence_gate.js";
 export { combine } from "./decision/consensus.js";
@@ -98,6 +128,11 @@ export const CORE_NODES: readonly AnyNodeDefinition[] = [
   generateNode,
   structuredGenerateNode,
   embeddingsNode,
+  promptNode,
+  visionNode,
+  speechNode,
+  imageNode,
+  rerankNode,
   httpNode,
   mcpNode,
   mcpResourceNode,
@@ -105,6 +140,8 @@ export const CORE_NODES: readonly AnyNodeDefinition[] = [
   openapiNode,
   codeNode,
   shellNode,
+  graphqlNode,
+  dbQueryNode,
   transformNode,
   templateNode,
   jsonNode,
@@ -118,11 +155,19 @@ export const CORE_NODES: readonly AnyNodeDefinition[] = [
   assertNode,
   mockNode,
   metricNode,
+  testNode,
+  debugNode,
+  traceNode,
   stateGetNode,
   stateSetNode,
+  sessionNode,
+  checkpointNode,
   guardNode,
   moderationNode,
   piiDetectorNode,
+  policyCheckNode,
+  rateLimitNode,
+  permissionCheckNode,
 ] as readonly AnyNodeDefinition[];
 
 export const coreNodes: NodePackage = definePackage({

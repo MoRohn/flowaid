@@ -32,6 +32,7 @@ import type {
   PortRule,
   ProviderFactory,
   ProviderHop,
+  RerankProvider,
   RunOrigin,
   SafeFetch,
   SandboxRunRequest,
@@ -69,6 +70,8 @@ export interface ProviderAccess {
     opts?: { credentialSlot?: string },
   ): GenerationProvider;
   embedding(ref: ModelRef, opts?: { credentialSlot?: string }): EmbeddingProvider;
+  /** RFC-0004 */
+  rerank(ref: ModelRef, opts?: { credentialSlot?: string }): RerankProvider;
 }
 export interface ToolAccess {
   list(): Promise<ToolDefinition[]>;
@@ -272,7 +275,9 @@ export interface NodePackage {
   version: Semver;
   nodes: readonly AnyNodeDefinition[];
   credentialTypes?: readonly CredentialTypeDefinition[];
-  providers?: readonly ProviderFactory<DecisionProvider | GenerationProvider | EmbeddingProvider>[];
+  providers?: readonly ProviderFactory<
+    DecisionProvider | GenerationProvider | EmbeddingProvider | RerankProvider
+  >[];
   /** SDK semver range the package was built against */
   sdk: string;
 }

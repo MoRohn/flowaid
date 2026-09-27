@@ -43,6 +43,7 @@
     "@flowaid/shared": "workspace:*",
     "@flowaid/workflow-core": "workspace:*",
     "ajv": "8.20.0",
+    "postgres": "3.4.9",
     "zod": "4.6.5"
   },
   "devDependencies": {

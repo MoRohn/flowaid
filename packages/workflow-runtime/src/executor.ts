@@ -242,6 +242,9 @@ export async function executeTask(
       embedding: () => {
         throw new CredentialError("No embedding providers are configured");
       },
+      rerank: () => {
+        throw new CredentialError("No rerank providers are configured");
+      },
     },
     tools: services.tools?.(scopedCall) ?? {
       list: () => Promise.resolve([]),

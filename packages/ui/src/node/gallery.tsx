@@ -42,6 +42,7 @@ import { WaitNodeCard } from "./WaitNodeCard";
 import { nodeTypes, orderParentsFirst, toFlowNode, type FlowNode } from "./nodeTypes";
 import { minutesAgo, mkRun, sampleCode, sampleReply, triage, triageRuns } from "./fixtures";
 import { cardVariantFor } from "./nodeUtils";
+import { SLICE3_NODES, Slice3Card } from "./catalogSlice3";
 import {
   researchAgentEdges,
   researchAgentEvents,
@@ -894,6 +895,20 @@ export default function NodeGallery() {
           caption="Each kind puts its one important fact on the card: the distribution, the streaming output, the status code, the taken route, the thresholds. Configuration stays in the inspector."
         >
           <KindCards />
+        </Section>
+
+        <Section
+          id="catalog-slice-3"
+          title="Catalog additions · tools, AI, safety, developer and state"
+          caption="GraphQL and database queries, prompt building, rerank, vision, speech and image generation, policy, rate-limit and permission checks, test, debug and trace markers, session memory and checkpoints — each drawn by the card the canvas picks for it."
+        >
+          <Board>
+            {SLICE3_NODES.map((node) => (
+              <Labelled key={node.id} label={node.nodeType ?? node.kind}>
+                <Slice3Card node={node} />
+              </Labelled>
+            ))}
+          </Board>
         </Section>
 
         <Section

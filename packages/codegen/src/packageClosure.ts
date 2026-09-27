@@ -44,7 +44,7 @@ export const RUNTIME_DEPENDENCIES: Readonly<Record<string, readonly string[]>> =
 export const PACKAGE_VERSIONS: Readonly<Record<string, string>> = {
   shared: "0.1.0",
   env: "0.1.0",
-  "workflow-core": "0.3.4",
+  "workflow-core": "0.3.5",
   "workflow-compiler": "0.1.0",
   "workflow-runtime": "0.1.0",
   "node-sdk": "0.1.0",

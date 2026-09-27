@@ -26,6 +26,7 @@ import {
   type ModelRef,
   type ProviderFactory,
   type ProviderHop,
+  type RerankProvider,
   type SafeFetch,
 } from "@flowaid/workflow-core";
 import type { DefaultModelCatalog } from "./catalog/index.js";
@@ -37,7 +38,7 @@ import { RateLimiter, type TokenBucket } from "./rateLimit.js";
 import { RuleDecisionProvider, type DecisionRuleSet } from "./rule-decision.js";
 import { CircuitOpenError, systemClock, type ProviderClock } from "./signals.js";
 
-type AnyProvider = DecisionProvider | GenerationProvider | EmbeddingProvider;
+type AnyProvider = DecisionProvider | GenerationProvider | EmbeddingProvider | RerankProvider;
 type Kind = ProviderFactory<AnyProvider>["kind"];
 
 /** What resolving needs from the caller: the workspace, its credentials and the safe fetch. */
@@ -278,6 +279,31 @@ export class ProviderRegistry {
         await bucket?.take(callCtx.signal);
         const result = await inner.embed(texts, callCtx);
         return result.costUsd > 0
+          ? result
+          : { ...result, costUsd: catalog.price(inner.id, inner.model, result.usage).costUsd };
+      },
+      health: () => inner.health(),
+    };
+  }
+
+  /** RFC-0004: a rerank model, rate-limited and catalog-priced like embeddings. */
+  async rerank(ref: ModelRef, ctx: ResolveContext): Promise<RerankProvider> {
+    const model = this.catalog.resolveAlias(ref.provider, ref.model);
+    const { provider, credentialId } = await this.create("rerank", ref.provider, model, ctx, {
+      kind: "rerank",
+      provider: ref.provider,
+      model,
+    });
+    const inner = provider as RerankProvider;
+    const bucket = this.bucketFor(ref.provider, model, credentialId);
+    const catalog = this.catalog;
+    return {
+      id: inner.id,
+      model: inner.model,
+      async rerank(query, docs, callCtx) {
+        await bucket?.take(callCtx.signal);
+        const result = await inner.rerank(query, docs, callCtx);
+        return result.costUsd > 0 || !result.usage
           ? result
           : { ...result, costUsd: catalog.price(inner.id, inner.model, result.usage).costUsd };
       },

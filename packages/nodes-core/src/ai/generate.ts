@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { defineNode, ok } from "@flowaid/node-sdk";
 import type { ChatMessage, GenerationResult, TokenUsage } from "@flowaid/workflow-core";
-import { callCtx, generationModel } from "../common.js";
+import { BadRequestError } from "@flowaid/workflow-core";
+import { callCtx, chatMessageSchema, generationModel } from "../common.js";
 
 const usage = z.object({ inputTokens: z.int().min(0), outputTokens: z.int().min(0) });
 
@@ -10,6 +11,24 @@ export function messagesFor(system: string | undefined, prompt: string): ChatMes
     ...(system ? [{ role: "system" as const, content: system }] : []),
     { role: "user" as const, content: prompt },
   ];
+}
+
+/** The request's messages: a given conversation (with `system` prepended unless it has one), else the prompt. */
+export function requestMessages(
+  system: string | undefined,
+  input: { prompt?: string | undefined; messages?: ChatMessage[] | undefined },
+): ChatMessage[] {
+  if (input.messages?.length) {
+    const hasSystem = input.messages.some((m) => m.role === "system");
+    const tail = input.prompt ? [{ role: "user" as const, content: input.prompt }] : [];
+    return [
+      ...(system && !hasSystem ? [{ role: "system" as const, content: system }] : []),
+      ...input.messages,
+      ...tail,
+    ];
+  }
+  if (input.prompt === undefined) throw new BadRequestError("bind prompt or messages");
+  return messagesFor(system, input.prompt);
 }
 
 export const generateNode = defineNode({
@@ -35,7 +54,11 @@ export const generateNode = defineNode({
     maxOutputTokens: z.int().min(1).max(65536).default(1024),
     stream: z.boolean().default(true),
   }),
-  inputSchema: z.object({ prompt: z.string() }),
+  inputSchema: z.object({
+    prompt: z.string().optional(),
+    // a conversation (from flowaid.ai.prompt or session state); `system` is prepended when set
+    messages: z.array(chatMessageSchema).optional(),
+  }),
   outputSchema: z.object({ text: z.string(), finish_reason: z.string(), usage: usage.loose() }),
   credentials: [
     { name: "llm", types: ["openai.api_key", "anthropic.api_key", "ollama.none"], required: true },
@@ -51,7 +74,7 @@ export const generateNode = defineNode({
       credentialSlot: "llm",
     });
     const req = {
-      messages: messagesFor(ctx.config.system, input.prompt),
+      messages: requestMessages(ctx.config.system, input),
       temperature: ctx.config.temperature,
       maxOutputTokens: ctx.config.maxOutputTokens,
     };
