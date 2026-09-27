@@ -74,7 +74,7 @@ export const CanvasControls = forwardRef<HTMLDivElement, CanvasControlsProps>(
             <button
               type="button"
               onClick={onResetZoom}
-              className="h-5 rounded-xs font-mono text-2xs tabular text-ink-3 transition-colors duration-(--dur-fast) hover:bg-surface-3 hover:text-ink"
+              className="h-6 min-w-6 rounded-xs font-mono text-2xs tabular text-ink-3 transition-colors duration-(--dur-fast) hover:bg-surface-3 hover:text-ink"
               aria-label={`Zoom ${pct}%`}
             >
               {pct}%

@@ -41,68 +41,77 @@ export const NodeSummaryStrip = forwardRef<HTMLDivElement, NodeSummaryStripProps
     const inTok = usage?.inputTokens;
     const outTok = usage?.outputTokens;
     const interactive = onSelect !== undefined;
+    // the actions sit beside the selectable summary: a button cannot contain other controls
     return (
       <div
         ref={ref}
-        role={interactive ? "button" : undefined}
-        tabIndex={interactive ? 0 : undefined}
-        aria-pressed={interactive ? selected : undefined}
-        onClick={onSelect}
-        onKeyDown={(e) => {
-          if (!interactive) return;
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            onSelect();
-          }
-        }}
         data-status={nodeRun.status}
         className={cn(
-          "flex min-h-8 min-w-0 flex-wrap items-center gap-x-3 gap-y-1 rounded-sm border border-border bg-surface px-2.5 py-1",
-          interactive && "cursor-pointer hover:bg-surface-3/60 focus-visible:rounded-sm",
+          "flex min-h-8 min-w-0 items-center gap-2 rounded-sm border border-border bg-surface px-2.5 py-1",
           selected && "border-accent bg-accent-soft/40",
           className,
         )}
         {...rest}
       >
-        <span className="flex min-w-0 items-center gap-2">
-          <CategoryDot category={nodeRun.category} />
-          <span className="truncate text-xs font-medium text-ink">{nodeRun.nodeName}</span>
-          <span className="truncate font-mono text-2xs tracking-wide text-ink-3">
-            {nodeRun.nodeType}
-          </span>
-        </span>
-        <StatusChip
-          status={nodeRun.status}
-          size="sm"
-          meta={nodeRun.attempt > 1 ? `×${nodeRun.attempt}` : undefined}
-        />
-        <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <Stat
-            label="dur"
-            value={nodeRun.durationMs === undefined ? "—" : formatMs(nodeRun.durationMs)}
-            muted={nodeRun.durationMs === undefined}
-          />
-          <Stat
-            label="cost"
-            value={cost === undefined ? "—" : formatCost(cost)}
-            muted={cost === undefined}
-          />
-          <Stat
-            label="tok"
-            value={
-              inTok === undefined && outTok === undefined
-                ? "—"
-                : `${formatTokens(inTok ?? 0)}→${formatTokens(outTok ?? 0)}`
+        <div
+          role={interactive ? "button" : undefined}
+          tabIndex={interactive ? 0 : undefined}
+          aria-pressed={interactive ? selected : undefined}
+          onClick={onSelect}
+          onKeyDown={(e) => {
+            if (!interactive) return;
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              onSelect();
             }
-            muted={inTok === undefined && outTok === undefined}
+          }}
+          className={cn(
+            "flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1",
+            interactive && "cursor-pointer rounded-xs hover:bg-surface-3/60",
+          )}
+        >
+          <span className="flex min-w-0 items-center gap-2">
+            <CategoryDot category={nodeRun.category} />
+            <span className="truncate text-xs font-medium text-ink">{nodeRun.nodeName}</span>
+            <span className="truncate font-mono text-2xs tracking-wide text-ink-3">
+              {nodeRun.nodeType}
+            </span>
+          </span>
+          <StatusChip
+            status={nodeRun.status}
+            size="sm"
+            meta={nodeRun.attempt > 1 ? `×${nodeRun.attempt}` : undefined}
           />
-        </span>
-        {providerLabel ? (
-          <Badge tone="outline" mono size="sm" className="text-ink-3">
-            {providerLabel}
-          </Badge>
+          <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <Stat
+              label="dur"
+              value={nodeRun.durationMs === undefined ? "—" : formatMs(nodeRun.durationMs)}
+              muted={nodeRun.durationMs === undefined}
+            />
+            <Stat
+              label="cost"
+              value={cost === undefined ? "—" : formatCost(cost)}
+              muted={cost === undefined}
+            />
+            <Stat
+              label="tok"
+              value={
+                inTok === undefined && outTok === undefined
+                  ? "—"
+                  : `${formatTokens(inTok ?? 0)}→${formatTokens(outTok ?? 0)}`
+              }
+              muted={inTok === undefined && outTok === undefined}
+            />
+          </span>
+          {providerLabel ? (
+            <Badge tone="outline" mono size="sm" className="text-ink-3">
+              {providerLabel}
+            </Badge>
+          ) : null}
+        </div>
+        {actions ? (
+          <span className="ml-auto flex shrink-0 items-center gap-1">{actions}</span>
         ) : null}
-        {actions ? <span className="ml-auto flex items-center gap-1">{actions}</span> : null}
       </div>
     );
   },

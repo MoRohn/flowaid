@@ -8,7 +8,7 @@
  * host): no master key, no credentials, no plugins, no scheduler — only the delegated nodes of
  * its pools.
  */
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { CredentialService, KeyRing, envMasterKey, fileMasterKey } from "@flowaid/credentials";
 import {
   PgCredentialRepository,
@@ -19,6 +19,7 @@ import {
 } from "@flowaid/database";
 import { loadEnv, pickEnv } from "@flowaid/env";
 import { createSafeFetch } from "@flowaid/providers";
+import { FileFixtureStore } from "@flowaid/providers/recording-fs";
 import { createSandbox } from "@flowaid/sandbox";
 import { artifactStorageFrom } from "@flowaid/storage";
 import { BullMqQueueDriver, RedisEventBus } from "@flowaid/workflow-runtime";
@@ -100,7 +101,22 @@ async function main(): Promise<void> {
   const bundled = env.FLOWAID_FEATURES_DISABLED?.includes("langchain")
     ? { packages: [], skipped: [] }
     : await loadBundledPlugins(env.FLOWAID_BUNDLED_PLUGINS, { db, log });
-  const registry = defaultProviderRegistry();
+  const fixtureMode = env.FLOWAID_PROVIDER_FIXTURES;
+  const registry = defaultProviderRegistry(
+    fixtureMode === "off"
+      ? {}
+      : {
+          fixtures: {
+            mode: fixtureMode,
+            store: new FileFixtureStore(resolve(String(env.FLOWAID_PROVIDER_FIXTURES_DIR))),
+          },
+        },
+  );
+  if (fixtureMode !== "off")
+    log.warn(
+      { mode: fixtureMode, dir: String(env.FLOWAID_PROVIDER_FIXTURES_DIR) },
+      "provider calls are recorded/replayed from fixtures",
+    );
   registerPluginProviders(registry, bundled.packages);
   // Plugin node code runs in a host process per package, never in this one (ARCHITECTURE.md D21).
   const hosts = bundled.packages.map(

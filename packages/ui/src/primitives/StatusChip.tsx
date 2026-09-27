@@ -114,7 +114,7 @@ export const StatusChip = forwardRef<HTMLSpanElement, StatusChipProps>(function 
       />
       {compact ? <span className="sr-only">{text}</span> : text}
       {!compact && meta ? (
-        <span className="font-mono text-2xs font-normal tabular opacity-80">{meta}</span>
+        <span className="font-mono text-2xs font-normal tabular">{meta}</span>
       ) : null}
     </span>
   );

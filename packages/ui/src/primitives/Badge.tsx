@@ -1,7 +1,7 @@
 import { forwardRef, type HTMLAttributes, type ReactNode } from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/cn";
-import { CATEGORY_LABEL, categoryVar, type NodeCategory } from "@/lib/categories";
+import { CATEGORY_LABEL, categoryTextVar, categoryVar, type NodeCategory } from "@/lib/categories";
 
 export const badgeVariants = cva(
   "inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-xs border font-medium leading-none [&_svg]:size-3 [&_svg]:shrink-0",
@@ -47,7 +47,7 @@ export const Badge = forwardRef<HTMLSpanElement, BadgeProps>(function Badge(
 ) {
   const categoryStyle = category
     ? {
-        color: categoryVar(category),
+        color: categoryTextVar(category),
         backgroundColor: `color-mix(in srgb, ${categoryVar(category)} 12%, transparent)`,
         borderColor: "transparent",
       }

@@ -206,7 +206,22 @@ export const ReviewQueue = forwardRef<HTMLDivElement, ReviewQueueProps>(function
             const sla = expiresAt ? slaState(toEpochMs(expiresAt) - now) : undefined;
             const isActive = item.id === activeId;
             return (
-              <li key={item.id} className="relative">
+              <li
+                key={item.id}
+                className={cn("relative flex items-stretch", showSelection && "pl-3")}
+              >
+                {/* the checkbox sits beside the row's button: a button cannot contain controls */}
+                {showSelection ? (
+                  <span className="flex w-4 shrink-0 items-center">
+                    {isLow ? (
+                      <Checkbox
+                        aria-label={`Select ${item.request.title}`}
+                        checked={isSelected}
+                        onCheckedChange={(v) => toggle(item.id, v === true)}
+                      />
+                    ) : null}
+                  </span>
+                ) : null}
                 <div
                   ref={(el) => {
                     rowRefs.current[index] = el;
@@ -220,7 +235,7 @@ export const ReviewQueue = forwardRef<HTMLDivElement, ReviewQueueProps>(function
                   onClick={() => onOpen(item)}
                   onKeyDown={(e) => onRowKey(e, index, item)}
                   className={cn(
-                    "group/row flex min-h-14 w-full cursor-pointer items-center gap-3 px-3 py-2 text-left outline-none",
+                    "group/row flex min-h-14 min-w-0 flex-1 cursor-pointer items-center gap-3 px-3 py-2 text-left outline-none",
                     "transition-colors duration-(--dur-fast) hover:bg-surface-2 focus-visible:bg-surface-2",
                     isActive && "bg-accent-soft/40 hover:bg-accent-soft/50",
                     sla === "danger" && "shadow-[inset_2px_0_0_0_var(--danger)]",
@@ -228,22 +243,6 @@ export const ReviewQueue = forwardRef<HTMLDivElement, ReviewQueueProps>(function
                     isActive && "shadow-[inset_2px_0_0_0_var(--accent)]",
                   )}
                 >
-                  {showSelection ? (
-                    <span
-                      role="presentation"
-                      className="flex h-5 w-4 shrink-0 items-center"
-                      onClick={(e) => e.stopPropagation()}
-                      onKeyDown={(e) => e.stopPropagation()}
-                    >
-                      {isLow ? (
-                        <Checkbox
-                          aria-label={`Select ${item.request.title}`}
-                          checked={isSelected}
-                          onCheckedChange={(v) => toggle(item.id, v === true)}
-                        />
-                      ) : null}
-                    </span>
-                  ) : null}
                   <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                     <div className="flex min-w-0 items-center gap-1.5 text-xs text-ink-3">
                       <CategoryDot category="human" size={6} />

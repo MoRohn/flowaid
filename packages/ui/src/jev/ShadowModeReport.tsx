@@ -72,7 +72,7 @@ export const ShadowModeReport = forwardRef<HTMLDivElement, ShadowModeReportProps
               vs production {source ? SOURCE_LABEL[source] : "path"}
             </span>
             {window ? (
-              <span className="ml-auto font-mono text-2xs text-ink-4">{window}</span>
+              <span className="ml-auto font-mono text-2xs text-ink-3">{window}</span>
             ) : null}
           </div>
           <p className="m-0 text-xs text-ink-3">
@@ -118,7 +118,7 @@ export const ShadowModeReport = forwardRef<HTMLDivElement, ShadowModeReportProps
               <table className="border-collapse font-mono text-2xs tabular">
                 <thead>
                   <tr>
-                    <th scope="col" className="p-1 text-left font-normal text-ink-4">
+                    <th scope="col" className="p-1 text-left font-normal text-ink-3">
                       prod ↓ / shadow →
                     </th>
                     {s.outcomes.map((o) => (
@@ -130,7 +130,7 @@ export const ShadowModeReport = forwardRef<HTMLDivElement, ShadowModeReportProps
                         {label(o)}
                       </th>
                     ))}
-                    <th scope="col" className="p-1 text-right font-normal text-ink-4">
+                    <th scope="col" className="p-1 text-right font-normal text-ink-3">
                       n
                     </th>
                   </tr>
@@ -154,7 +154,12 @@ export const ShadowModeReport = forwardRef<HTMLDivElement, ShadowModeReportProps
                             aria-label={`production ${p}, shadow ${sh}: ${n}`}
                             className={cn(
                               "h-8 min-w-10 border border-surface p-1 text-center",
-                              diag ? "font-semibold text-ink" : n > 0 ? "text-warn" : "text-ink-4",
+                              diag
+                                ? "font-semibold text-ink"
+                                : n > 0
+                                  ? // disagreement: underlined (the heat tint can darken past AA for the warn hue)
+                                    "font-medium text-ink underline decoration-warn decoration-2 underline-offset-2"
+                                  : "text-ink-3",
                             )}
                             style={{
                               backgroundColor:
@@ -240,7 +245,9 @@ export const ShadowModeReport = forwardRef<HTMLDivElement, ShadowModeReportProps
                     <td
                       className={cn(
                         "py-1.5 pr-2 text-right",
-                        econ.costRatio !== null && econ.costRatio < 1 ? "text-ok" : "text-warn",
+                        econ.costRatio !== null && econ.costRatio < 1
+                          ? "text-ok-text"
+                          : "text-warn-text",
                       )}
                     >
                       {econ.costRatio === null
@@ -250,7 +257,7 @@ export const ShadowModeReport = forwardRef<HTMLDivElement, ShadowModeReportProps
                     <td
                       className={cn(
                         "py-1.5 pr-2 text-right",
-                        econ.p50DeltaMs <= 0 ? "text-ok" : "text-warn",
+                        econ.p50DeltaMs <= 0 ? "text-ok-text" : "text-warn-text",
                       )}
                     >
                       {signedMs(econ.p50DeltaMs)}
@@ -258,7 +265,7 @@ export const ShadowModeReport = forwardRef<HTMLDivElement, ShadowModeReportProps
                     <td
                       className={cn(
                         "py-1.5 text-right",
-                        econ.p95DeltaMs <= 0 ? "text-ok" : "text-warn",
+                        econ.p95DeltaMs <= 0 ? "text-ok-text" : "text-warn-text",
                       )}
                     >
                       {signedMs(econ.p95DeltaMs)}
@@ -266,7 +273,7 @@ export const ShadowModeReport = forwardRef<HTMLDivElement, ShadowModeReportProps
                   </tr>
                 </tbody>
               </table>
-              <p className="m-0 text-2xs text-ink-4">
+              <p className="m-0 text-2xs text-ink-3">
                 {economics.shadow.decisions.toLocaleString("en")} shadow and{" "}
                 {economics.production.decisions.toLocaleString("en")} production decisions. Per-call
                 price is one component: a rollout completes on end-to-end task outcomes, not
@@ -300,7 +307,7 @@ export const ShadowModeReport = forwardRef<HTMLDivElement, ShadowModeReportProps
                     data-right={right ?? undefined}
                   >
                     <div className="flex min-w-0 flex-col gap-0.5">
-                      <span className="text-2xs text-ink-4">production</span>
+                      <span className="text-2xs text-ink-3">production</span>
                       <span className="font-mono text-ink">
                         {c.production.answer === null ? "unmapped" : label(c.production.answer)}
                         {c.production.confidence !== null ? (
@@ -312,7 +319,7 @@ export const ShadowModeReport = forwardRef<HTMLDivElement, ShadowModeReportProps
                       </span>
                     </div>
                     <div className="flex min-w-0 flex-col gap-0.5">
-                      <span className="text-2xs text-ink-4">shadow</span>
+                      <span className="text-2xs text-ink-3">shadow</span>
                       <span className="flex items-center gap-1.5 font-mono text-ink">
                         {label(c.shadow.outcome)}{" "}
                         <span className="text-ink-3">{formatProbability(c.shadow.confidence)}</span>
@@ -332,7 +339,7 @@ export const ShadowModeReport = forwardRef<HTMLDivElement, ShadowModeReportProps
                           {right === "neither" ? "both wrong" : `${right} right`}
                         </Badge>
                       )}
-                      <span className="font-mono text-2xs text-ink-4">
+                      <span className="font-mono text-2xs text-ink-3">
                         state #{shortHash(c.stateHash)} · {c.jevModel}
                       </span>
                     </div>

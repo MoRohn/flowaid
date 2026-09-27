@@ -97,7 +97,7 @@ export function App() {
             </button>
           ))}
         </div>
-        <div className="px-3 pb-2 text-2xs font-mono text-ink-4">resolved: {resolved}</div>
+        <div className="px-3 pb-2 text-2xs font-mono text-ink-3">resolved: {resolved}</div>
       </nav>
       <main className="flex-1 overflow-auto">
         <Suspense fallback={<div className="p-8 text-ink-3 text-xs font-mono">loading…</div>}>

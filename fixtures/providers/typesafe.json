@@ -1,0 +1,33 @@
+{
+  "typesafe/jev-latest/boolean/136baa7e0dc580dca40b761f19a60bbc8dae1dc1ce664f57ccb4eb65880e2407": {
+    "provider": "typesafe",
+    "model": "jev-1.13.0",
+    "latencyMs": 441,
+    "usage": {
+      "inputTokens": 287,
+      "outputTokens": 20
+    },
+    "costUsd": 0.000012054000000000002,
+    "requestId": "req_01a0e36b7db37a488d516507bbff6b72",
+    "raw": {
+      "type": "noul",
+      "noul": 0.64
+    },
+    "attempts": [
+      {
+        "provider": "typesafe",
+        "model": "jev-1.13.0",
+        "outcome": "ok",
+        "latencyMs": 441
+      }
+    ],
+    "kind": "boolean",
+    "value": true,
+    "pYes": 0.64,
+    "probabilities": {
+      "true": 0.64,
+      "false": 0.36
+    },
+    "confidence": 0.64
+  }
+}

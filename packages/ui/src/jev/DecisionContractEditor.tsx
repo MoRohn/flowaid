@@ -147,14 +147,14 @@ function Issues({
         i.severity === "error" ? (
           <FieldError key={n}>{i.message}</FieldError>
         ) : (
-          <p key={n} className="m-0 flex items-start gap-1 text-xs leading-normal text-warn">
+          <p key={n} className="m-0 flex items-start gap-1 text-xs leading-normal text-warn-text">
             <AlertTriangle
               className="mt-0.5 size-3.5 shrink-0"
               strokeWidth={1.75}
               aria-hidden="true"
             />
             <span>
-              {i.message} <span className="font-mono text-2xs text-ink-4">{i.code}</span>
+              {i.message} <span className="font-mono text-2xs text-ink-3">{i.code}</span>
             </span>
           </p>
         ),
@@ -346,10 +346,10 @@ export const DecisionContractEditor = forwardRef<HTMLDivElement, DecisionContrac
             <ContractRefChip contract={body} />
             <ConsequenceBadge value={body.routing.consequenceClass} verbose />
             <span className="ml-auto flex items-center gap-3 text-xs">
-              <span className={errors.length > 0 ? "text-danger" : "text-ink-3"}>
+              <span className={errors.length > 0 ? "text-danger-text" : "text-ink-3"}>
                 {errors.length} error{errors.length === 1 ? "" : "s"}
               </span>
-              <span className={warnings.length > 0 ? "text-warn" : "text-ink-3"}>
+              <span className={warnings.length > 0 ? "text-warn-text" : "text-ink-3"}>
                 {warnings.length} warning{warnings.length === 1 ? "" : "s"}
               </span>
             </span>
@@ -359,22 +359,25 @@ export const DecisionContractEditor = forwardRef<HTMLDivElement, DecisionContrac
               {issues.map((i, n) => (
                 <li key={n} className="flex items-start gap-1.5 text-xs text-ink">
                   {i.severity === "error" ? (
-                    <CircleX className="mt-0.5 size-3.5 shrink-0 text-danger" aria-hidden="true" />
+                    <CircleX
+                      className="mt-0.5 size-3.5 shrink-0 text-danger-text"
+                      aria-hidden="true"
+                    />
                   ) : (
                     <AlertTriangle
-                      className="mt-0.5 size-3.5 shrink-0 text-warn"
+                      className="mt-0.5 size-3.5 shrink-0 text-warn-text"
                       aria-hidden="true"
                     />
                   )}
                   <span className="min-w-0">
                     <span className="font-mono text-2xs text-ink-3">{i.code}</span>{" "}
-                    <span className="font-mono text-2xs text-ink-4">{i.path}</span> {i.message}
+                    <span className="font-mono text-2xs text-ink-3">{i.path}</span> {i.message}
                   </span>
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="m-0 text-xs text-ok">Contract is lint clean.</p>
+            <p className="m-0 text-xs text-ok-text">Contract is lint clean.</p>
           )}
         </div>
 
@@ -640,7 +643,7 @@ export const DecisionContractEditor = forwardRef<HTMLDivElement, DecisionContrac
                 {q.levels.map((level, i) => (
                   <li key={i} className="flex flex-col gap-1">
                     <div className="flex items-center gap-2">
-                      <span className="w-5 shrink-0 text-right font-mono text-2xs text-ink-4">
+                      <span className="w-5 shrink-0 text-right font-mono text-2xs text-ink-3">
                         {i}
                       </span>
                       <Input

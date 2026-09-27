@@ -637,7 +637,14 @@ export const TraceTimeline = forwardRef<HTMLDivElement, TraceTimelineProps>(func
           </span>
           <StatusChip status={n.status} compact />
         </div>
-        {isOpen ? <NodeDetail row={row} nowMs={nowMs} /> : null}
+        {isOpen ? (
+          // a tree holds tree items and groups: the detail is a child item of this node's group
+          <div role="group" aria-label={`${n.nodeName} details`}>
+            <div role="treeitem" aria-level={row.depth + 2} aria-selected={false} tabIndex={-1}>
+              <NodeDetail row={row} nowMs={nowMs} />
+            </div>
+          </div>
+        ) : null}
       </div>
     );
   };

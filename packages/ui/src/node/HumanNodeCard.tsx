@@ -77,9 +77,12 @@ export const HumanNodeCard = forwardRef<HTMLDivElement, HumanNodeCardProps>(func
       controls={controlOutsFor(node, "human")}
       footerRight={
         waiting ? (
-          <span className="inline-flex items-center gap-1 text-cat-human" data-elapsed={elapsed}>
+          <span
+            className="inline-flex items-center gap-1 text-cat-human-text"
+            data-elapsed={elapsed}
+          >
             <Clock className="size-3" strokeWidth={1.75} aria-hidden="true" />
-            <span aria-label={`Waiting for ${formatElapsed(elapsed)}`}>
+            <span role="timer" aria-label={`Waiting for ${formatElapsed(elapsed)}`}>
               {formatElapsed(elapsed)}
             </span>
           </span>

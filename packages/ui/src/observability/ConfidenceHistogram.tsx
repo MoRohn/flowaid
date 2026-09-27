@@ -166,6 +166,7 @@ export const ConfidenceHistogram = forwardRef<HTMLDivElement, ConfidenceHistogra
               return (
                 <g
                   key={i}
+                  role="img"
                   tabIndex={b.count > 0 ? 0 : -1}
                   aria-label={`${formatProbability(b.x0)} to ${formatProbability(b.x1)}: ${b.count} (${GATE_ZONE[zone].label})`}
                   onPointerEnter={() => setActive(i)}

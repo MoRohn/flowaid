@@ -16,6 +16,8 @@ import path from "node:path";
 const PORT = 5178;
 export const UI_GALLERY_URL = `http://127.0.0.1:${PORT}`;
 const channel = process.env["PLAYWRIGHT_CHANNEL"];
+/** An already installed Chromium binary (offline machines); CI uses `playwright install`. */
+const executablePath = process.env["PLAYWRIGHT_EXECUTABLE"];
 
 export const uiGalleryProject: Project = {
   name: "ui-gallery",
@@ -24,6 +26,7 @@ export const uiGalleryProject: Project = {
   use: {
     ...devices["Desktop Chrome"],
     ...(channel ? { channel } : {}),
+    ...(executablePath ? { launchOptions: { executablePath } } : {}),
     baseURL: UI_GALLERY_URL,
     viewport: { width: 1440, height: 900 },
     colorScheme: "light",

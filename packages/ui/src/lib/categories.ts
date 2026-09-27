@@ -45,6 +45,11 @@ export const CATEGORY_LABEL: Record<NodeCategory, string> = {
 };
 
 /** CSS variable for a category's hue, e.g. `var(--cat-decision)`. */
+/** A category's hue as a text colour (AA on soft chips and surfaces): `var(--cat-<c>-text)`. */
+export function categoryTextVar(category: NodeCategory): string {
+  return `var(--cat-${category}-text)`;
+}
+
 export function categoryVar(category: NodeCategory): string {
   return `var(--cat-${category})`;
 }

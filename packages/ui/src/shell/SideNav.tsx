@@ -177,6 +177,7 @@ export const SideNav = forwardRef<HTMLElement, SideNavProps>(function SideNav(
         {item.count !== undefined && item.count > 0 ? (
           collapsed ? (
             <span
+              role="img"
               aria-label={`${item.count}`}
               className={cn(
                 "absolute right-1 top-1 size-1.5 rounded-full",

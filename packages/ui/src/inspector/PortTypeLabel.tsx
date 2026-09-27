@@ -45,13 +45,13 @@ export function portTypeFamily(type: string): PortTypeFamily {
 }
 
 const FAMILY_CLASS: Record<PortTypeFamily, string> = {
-  decision: "text-cat-decision [--chip:var(--cat-decision)]",
-  string: "text-cat-data [--chip:var(--cat-data)]",
-  number: "text-cat-state [--chip:var(--cat-state)]",
-  boolean: "text-cat-human [--chip:var(--cat-human)]",
-  object: "text-cat-tool [--chip:var(--cat-tool)]",
-  array: "text-cat-agent [--chip:var(--cat-agent)]",
-  message: "text-cat-generation [--chip:var(--cat-generation)]",
+  decision: "text-cat-decision-text [--chip:var(--cat-decision)]",
+  string: "text-cat-data-text [--chip:var(--cat-data)]",
+  number: "text-cat-state-text [--chip:var(--cat-state)]",
+  boolean: "text-cat-human-text [--chip:var(--cat-human)]",
+  object: "text-cat-tool-text [--chip:var(--cat-tool)]",
+  array: "text-cat-agent-text [--chip:var(--cat-agent)]",
+  message: "text-cat-generation-text [--chip:var(--cat-generation)]",
   any: "text-ink-3 [--chip:var(--ink-3)]",
 };
 

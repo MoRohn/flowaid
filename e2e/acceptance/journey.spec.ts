@@ -4,20 +4,8 @@
  * review link opened with no session, see the run complete, publish v1 to dev, and run the
  * deployed version with an environment-pinned API key.
  */
-import { existsSync, readFileSync } from "node:fs";
-import { parseEnv } from "node:util";
-import { expect, test, type Page } from "@playwright/test";
-
-function credentials(): { email: string; password: string } {
-  const file = ".flowaid/dev.env";
-  const local = existsSync(file)
-    ? (parseEnv(readFileSync(file, "utf8")) as Record<string, string>)
-    : {};
-  return {
-    email: process.env["E2E_EMAIL"] ?? local.FLOWAID_ADMIN_EMAIL ?? "owner@flowaid.local",
-    password: process.env["E2E_PASSWORD"] ?? local.FLOWAID_ADMIN_PASSWORD ?? "",
-  };
-}
+import { expect, test } from "@playwright/test";
+import { signIn } from "./helpers.ts";
 
 const NAME = `Acceptance ${Date.now().toString(36)}`;
 const DEFINITION = {
@@ -52,20 +40,10 @@ const DEFINITION = {
   ],
 };
 
-async function signIn(page: Page) {
-  const { email, password } = credentials();
-  await page.goto("/login");
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill(password);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).toHaveURL(/\/[a-z0-9-]+\/workflows$/);
-}
-
 test.describe.configure({ mode: "serial" });
 
 test("import → run → external review → publish → API run", async ({ page, browser }) => {
-  await signIn(page);
-  const ws = new URL(page.url()).pathname.split("/")[1] as string;
+  const ws = await signIn(page);
 
   // Import the definition as a new workflow; the builder opens with a clean compile.
   await page.goto(`/${ws}/workflows/new`);

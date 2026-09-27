@@ -19,6 +19,7 @@ import {
   GATE_LABEL,
   GATE_ORDER,
   gateColorVar,
+  gateTextVar,
   gateModel,
   gateShares,
   gateSoftVar,
@@ -83,8 +84,10 @@ function ZoneStrip({ t, disabled }: { t: ConfidenceThresholds; disabled: boolean
       : widthPct >= (text.length > 6 ? 24 : 9);
   return (
     <div
+      // the strip pictures what the slider and the two inputs already state
       aria-hidden="true"
-      className={cn("relative h-[18px] w-full", disabled && "opacity-50")}
+      data-disabled={disabled || undefined}
+      className="relative h-[18px] w-full"
       style={{ paddingInline: THUMB_INSET }}
     >
       <div ref={ref} className="relative h-full w-full overflow-hidden rounded-[3px] bg-surface-3">
@@ -106,14 +109,15 @@ function ZoneStrip({ t, disabled }: { t: ConfidenceThresholds; disabled: boolean
               style={{
                 left: `${(z.from * 100).toFixed(3)}%`,
                 width: `${widthPct.toFixed(3)}%`,
-                backgroundColor: gateSoftVar(z.outcome),
-                color: gateColorVar(z.outcome),
-                boxShadow: `inset 0 -2px 0 ${gateColorVar(z.outcome)}`,
+                // disabled: neutral zones, readable labels (fading the text would fail AA)
+                backgroundColor: disabled ? "var(--surface-3)" : gateSoftVar(z.outcome),
+                color: disabled ? "var(--ink-3)" : gateTextVar(z.outcome),
+                boxShadow: `inset 0 -2px 0 ${disabled ? "var(--border-strong)" : gateColorVar(z.outcome)}`,
               }}
             >
               {fits(widthPct, label) ? <span className="font-medium">{label}</span> : null}
               {fits(widthPct, `${label} ${range}`) ? (
-                <span className="opacity-70">{range}</span>
+                <span className="font-normal">{range}</span>
               ) : null}
             </span>
           );

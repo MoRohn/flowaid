@@ -127,11 +127,11 @@ describe("DateRangePanel / DateRangePicker", () => {
     render(
       <DateRangePanel value={{ preset: "7d" }} onChange={onChange} onDone={onDone} now={NOW} />,
     );
-    expect(screen.getByRole("option", { name: /Last 7 days/ })).toHaveAttribute(
-      "aria-selected",
+    expect(screen.getByRole("button", { name: /Last 7 days/ })).toHaveAttribute(
+      "aria-pressed",
       "true",
     );
-    await user.click(screen.getByRole("option", { name: /Last hour/ }));
+    await user.click(screen.getByRole("button", { name: /Last hour/ }));
     expect(onChange).toHaveBeenCalledWith({ preset: "1h" });
     expect(onDone).toHaveBeenCalled();
   });
@@ -154,8 +154,8 @@ describe("DateRangePanel / DateRangePicker", () => {
     render(<DateRangePicker value={null} onChange={onChange} now={NOW} label="Created" />);
     const trigger = screen.getByRole("button", { name: "Created: Any time" });
     await user.click(trigger);
-    await user.click(await screen.findByRole("option", { name: /Last 30 days/ }));
+    await user.click(await screen.findByRole("button", { name: /Last 30 days/ }));
     expect(onChange).toHaveBeenCalledWith({ preset: "30d" });
-    expect(screen.queryByRole("listbox", { name: "Presets" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Presets" })).not.toBeInTheDocument();
   });
 });

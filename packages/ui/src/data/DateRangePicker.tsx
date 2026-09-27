@@ -491,7 +491,7 @@ export const DateRangePanel = forwardRef<HTMLDivElement, DateRangePanelProps>(
     return (
       <div ref={ref} className={cn("flex flex-col sm:flex-row", className)} {...rest}>
         <ul
-          role="listbox"
+          role="list"
           aria-label="Presets"
           className="flex shrink-0 flex-row flex-wrap gap-0.5 border-b border-border p-1.5 sm:w-40 sm:flex-col sm:border-b-0 sm:border-r"
         >
@@ -501,8 +501,7 @@ export const DateRangePanel = forwardRef<HTMLDivElement, DateRangePanelProps>(
               <li key={p.key}>
                 <button
                   type="button"
-                  role="option"
-                  aria-selected={active}
+                  aria-pressed={active}
                   onClick={() => {
                     setDraft(null);
                     onChange?.({ preset: p.key });
@@ -522,8 +521,7 @@ export const DateRangePanel = forwardRef<HTMLDivElement, DateRangePanelProps>(
           })}
           <li>
             <span
-              role="option"
-              aria-selected={custom}
+              aria-current={custom ? "true" : undefined}
               className={cn(
                 "flex h-7 items-center px-2 text-xs",
                 custom ? "font-medium text-ink" : "text-ink-3",

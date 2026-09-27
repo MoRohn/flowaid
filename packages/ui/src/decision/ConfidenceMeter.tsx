@@ -119,6 +119,8 @@ export const ConfidenceMeter = forwardRef<HTMLDivElement, ConfidenceMeterProps>(
         aria-valuemax={1}
         aria-valuenow={c}
         aria-valuetext={gateDescription(c, t)}
+        // a meter needs a name; callers can pass their own through aria-label / aria-labelledby
+        aria-label="Confidence"
         data-outcome={outcome}
         className={cn("flex w-full min-w-0 items-center gap-2.5", className)}
         {...rest}

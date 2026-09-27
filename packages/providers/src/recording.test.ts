@@ -7,8 +7,10 @@ import {
   fixtureKey,
   recordingDecisionProvider,
   recordingEmbeddingProvider,
+  recordingFactory,
   recordingGenerationProvider,
 } from "./recording.js";
+import type { DecisionProvider, ProviderFactory } from "@flowaid/workflow-core";
 import { FileFixtureStore } from "./recording-fs.js";
 import { HEALTHY, ctx, scriptedDecider, scriptedGenerator } from "./test/fakes.js";
 
@@ -108,5 +110,36 @@ describe("FileFixtureStore", () => {
     ).toEqual(["typesafe/jev/a/1", "typesafe/jev/b/2"]);
     expect(new FileFixtureStore(dir).get("typesafe/jev/a/1")).toEqual({ v: 1 });
     expect(new FileFixtureStore(dir).get("openai/x/y/z")).toBeUndefined();
+  });
+});
+
+describe("recordingFactory", () => {
+  const created: unknown[] = [];
+  const factory = (live: ReturnType<typeof scriptedDecider>) => ({
+    id: "typesafe",
+    kind: "decision" as const,
+    credentialType: "typesafe",
+    create: (o: { credential: unknown }) => {
+      created.push(o.credential);
+      return live;
+    },
+  });
+  const opts = { model: "system-one", credential: undefined } as unknown as Parameters<
+    ProviderFactory<DecisionProvider>["create"]
+  >[0];
+
+  it("keeps the credential while recording and drops it for replay", async () => {
+    const store = new MemoryFixtureStore();
+    const record = recordingFactory(factory(scriptedDecider("typesafe", [0.7])), "record", store);
+    expect(record.credentialType).toBe("typesafe");
+    const recorded = await record.create(opts).decideBoolean("state", Q, ctx());
+
+    const never = scriptedDecider("typesafe", [new Error("must not be called")]);
+    const replay = recordingFactory(factory(never), "replay", store);
+    expect(replay.credentialType).toBeUndefined();
+    expect(await replay.create(opts).decideBoolean("state", Q, ctx())).toEqual(recorded);
+    expect(never.calls).toBe(0);
+    // the provider is constructed with a placeholder key, never a real one
+    expect(created).toEqual([undefined, { apiKey: "fixture-replay" }]);
   });
 });

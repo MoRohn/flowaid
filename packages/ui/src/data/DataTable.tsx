@@ -704,6 +704,10 @@ export function DataTable<TData extends RowData>(props: DataTableProps<TData>) {
             <table.FlexRender header={header} />
           </SortableHeader>
         )}
+        {column.columnDef.header === "" ? (
+          // an unlabelled column (row actions) still needs a header name for screen readers
+          <span className="sr-only">{column.id.charAt(0).toUpperCase() + column.id.slice(1)}</span>
+        ) : null}
         {resizable && column.getCanResize() ? (
           // A focusable window splitter (WAI-ARIA separator pattern): drag with the pointer,
           // or focus it and use ←/→ (Shift for larger steps); Enter or a double click resets.

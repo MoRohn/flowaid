@@ -19,7 +19,7 @@
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { parseArgs, parseEnv } from "node:util";
 
 import {
@@ -445,7 +445,16 @@ if (opts.playground) {
     CORS_ORIGINS: fileEnv.CORS_ORIGINS ?? webUrl,
     // the web app's proxy runs on this machine: trust its X-Forwarded-For (rate limits, audit)
     FLOWAID_TRUST_PROXY: fileEnv.FLOWAID_TRUST_PROXY ?? "loopback",
-    LOG_LEVEL: fileEnv.LOG_LEVEL ?? "warn",
+    LOG_LEVEL: process.env.LOG_LEVEL ?? fileEnv.LOG_LEVEL ?? "warn",
+    // provider record/replay (P5-03): off | record | replay, fixtures at the repo root whatever the cwd
+    FLOWAID_PROVIDER_FIXTURES:
+      process.env.FLOWAID_PROVIDER_FIXTURES ?? fileEnv.FLOWAID_PROVIDER_FIXTURES ?? "off",
+    FLOWAID_PROVIDER_FIXTURES_DIR: resolve(
+      ROOT,
+      process.env.FLOWAID_PROVIDER_FIXTURES_DIR ??
+        fileEnv.FLOWAID_PROVIDER_FIXTURES_DIR ??
+        "fixtures/providers",
+    ),
   };
   const bin = (dir: string, name: string) =>
     join(ROOT, dir, "node_modules/.bin", process.platform === "win32" ? `${name}.cmd` : name);

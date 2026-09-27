@@ -30,7 +30,7 @@ export const ConsequenceBadge = forwardRef<HTMLSpanElement, ConsequenceBadgeProp
         <Badge
           ref={ref}
           data-consequence={value}
-          className={cn("bg-danger text-surface", className)}
+          className={cn("bg-danger-text text-surface", className)}
           {...rest}
         >
           {label}
@@ -102,7 +102,7 @@ export const ContractRefChip = forwardRef<HTMLSpanElement, ContractRefChipProps>
           <span className="text-2xs text-ink-3">implicit</span>
         ) : null}
         {showHash && contract.hash ? (
-          <span className="text-2xs text-ink-4">#{shortHash(contract.hash)}</span>
+          <span className="text-2xs text-ink-3">#{shortHash(contract.hash)}</span>
         ) : null}
         {trailing}
       </span>
@@ -136,17 +136,17 @@ export function Stat({
       <span
         className={cn(
           "font-mono text-lg leading-none tabular",
-          tone === "ok" && "text-ok",
-          tone === "warn" && "text-warn",
-          tone === "danger" && "text-danger",
-          tone === "info" && "text-info",
+          tone === "ok" && "text-ok-text",
+          tone === "warn" && "text-warn-text",
+          tone === "danger" && "text-danger-text",
+          tone === "info" && "text-info-text",
           tone === "accent" && "text-accent-text",
           (!tone || tone === "neutral") && "text-ink",
         )}
       >
         {value}
       </span>
-      {hint ? <span className="truncate font-mono text-2xs text-ink-4 tabular">{hint}</span> : null}
+      {hint ? <span className="truncate font-mono text-2xs text-ink-3 tabular">{hint}</span> : null}
     </div>
   );
 }
@@ -156,7 +156,7 @@ export function BlockTitle({ children, meta }: { children: ReactNode; meta?: Rea
   return (
     <div className="flex items-baseline justify-between gap-3">
       <h4 className="m-0 text-eyebrow text-ink-3">{children}</h4>
-      {meta ? <span className="font-mono text-2xs text-ink-4 tabular">{meta}</span> : null}
+      {meta ? <span className="font-mono text-2xs text-ink-3 tabular">{meta}</span> : null}
     </div>
   );
 }

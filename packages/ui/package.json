@@ -33,10 +33,11 @@
     "build:playground": "vite build --config playground/vite.config.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint src playground",
-    "test": "vitest run",
+    "test": "vitest run --coverage",
     "clean": "rm -rf dist playground/dist .turbo",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:unit": "vitest run"
   },
   "peerDependencies": {
     "react": "^19.0.0",

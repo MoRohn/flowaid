@@ -15,10 +15,12 @@ import {
   type DecisionQuestion,
   type DecisionState,
   type EmbeddingProvider,
+  type RerankProvider,
   type GenerationChunk,
   type GenerationProvider,
   type GenerationRequest,
   type JsonValue,
+  type ProviderFactory,
   type ScoreQuestion,
 } from "@flowaid/workflow-core";
 
@@ -179,5 +181,42 @@ export function recordingEmbeddingProvider(
     embed: (texts: string[], ctx: DecisionCallContext) =>
       rec.call("embed", texts, () => inner.embed(texts, ctx)),
     health: () => inner.health(),
+  };
+}
+
+/**
+ * Wraps a registered factory so every provider it creates records or replays. In `replay` mode the
+ * factory stops asking for a credential and the provider gets a placeholder key: nothing reaches
+ * the vendor, so CI needs no API key.
+ */
+export function recordingFactory<
+  T extends DecisionProvider | GenerationProvider | EmbeddingProvider | RerankProvider,
+>(factory: ProviderFactory<T>, mode: FixtureMode, store: FixtureStore): ProviderFactory<T> {
+  const wrap = (provider: T): T => {
+    switch (factory.kind) {
+      case "decision":
+        return recordingDecisionProvider(provider as DecisionProvider, mode, store) as T;
+      case "generation":
+        return recordingGenerationProvider(provider as GenerationProvider, mode, store) as T;
+      case "embedding":
+        return recordingEmbeddingProvider(provider as EmbeddingProvider, mode, store) as T;
+      case "rerank":
+        // not recorded: rerank calls reach the vendor (or fail without a key) in every mode
+        return provider;
+    }
+  };
+  const { credentialType, ...rest } = factory;
+  return {
+    ...rest,
+    ...(mode === "record" && credentialType !== undefined ? { credentialType } : {}),
+    create: (opts) =>
+      wrap(
+        factory.create(
+          // replay never calls the vendor, but API-key providers refuse to construct without one
+          mode === "replay" && credentialType !== undefined && !opts.credential
+            ? { ...opts, credential: { apiKey: "fixture-replay" } }
+            : opts,
+        ),
+      ),
   };
 }

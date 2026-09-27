@@ -37,6 +37,7 @@
     "flowaid": "tsx --conditions=development packages/cli/src/main.ts"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
     "@flowaid/config": "workspace:*",
     "@playwright/test": "1.63.0",
     "@types/node": "24.13.6",
