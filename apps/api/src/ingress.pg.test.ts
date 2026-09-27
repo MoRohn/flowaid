@@ -213,6 +213,47 @@ describeDb("webhooks, schedules, events and audit (Postgres)", () => {
     });
   });
 
+  it("delivers correlated events only to the runs waiting with that key (RFC-0006)", async () => {
+    const wf = await deployWith("On payment", [
+      { type: "event", eventName: "order.paid", correlationKey: "/order" },
+    ]);
+    const ws = (await call(t.app, jar, "GET", "/v1/me")).json().principal.workspaceId as string;
+    const runFor = async () =>
+      (
+        await call(t.app, jar, "POST", `/v1/workflows/${wf.id}/run`, { input: { message: "x" } })
+      ).json().run_id as string;
+    const [a, b, any] = [await runFor(), await runFor(), await runFor()];
+    await t.db
+      .admin`insert into event_subscriptions (workspace_id, event_name, correlation_key, run_id, node_run_id) values
+        (${ws}, 'order.paid', 'A-1', ${a}, gen_random_uuid()),
+        (${ws}, 'order.paid', 'B-2', ${b}, gen_random_uuid()),
+        (${ws}, 'order.paid', null, ${any}, gen_random_uuid())`;
+
+    const keyed = await call(t.app, jar, "POST", "/v1/events/order.paid", {
+      payload: { order: "A-1", message: "paid" },
+      correlationKey: "A-1",
+    });
+    expect(keyed.statusCode).toBe(202);
+    expect([...keyed.json().delivered].sort()).toEqual([a, any].sort());
+    // the trigger's correlationKey pointer names the started run's session
+    const started = keyed.json().started[0] as string;
+    expect((await call(t.app, jar, "GET", `/v1/runs/${started}`)).json().sessionId).toBe("A-1");
+    for (
+      let i = 0;
+      i < 100 && !worker.jobs.some((j) => j.type === "run.signal" && j.runId === a);
+      i++
+    )
+      await new Promise((r) => setTimeout(r, 50));
+    expect(worker.jobs.find((j) => j.type === "run.signal" && j.runId === a)).toMatchObject({
+      signal: { type: "event", eventName: "order.paid", correlationKey: "A-1" },
+    });
+
+    const unkeyed = await call(t.app, jar, "POST", "/v1/events/order.paid", {
+      payload: { message: "no key" },
+    });
+    expect(unkeyed.json().delivered).toEqual([any]);
+  });
+
   it("lists audit events with filters and pagination", async () => {
     const page = (
       await call(t.app, jar, "GET", "/v1/audit?action=workflow.publish&limit=2")

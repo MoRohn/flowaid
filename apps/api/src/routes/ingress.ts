@@ -341,7 +341,7 @@ export function ingressRoutes(app: FastifyInstance, ctx: ApiContext): void {
         const deployed = await tx
           .select({
             workflowId: workflowDeployments.workflowId,
-            triggers: workflowVersions.definition,
+            definition: workflowVersions.definition,
           })
           .from(workflowDeployments)
           .innerJoin(workflowVersions, eq(workflowVersions.id, workflowDeployments.versionId))
@@ -368,24 +368,32 @@ export function ingressRoutes(app: FastifyInstance, ctx: ApiContext): void {
             ),
           );
         return {
-          targets: deployed
-            .filter((d) =>
-              d.triggers.triggers.some(
-                (t) => t.type === "event" && t.eventName === req.params.eventName,
-              ),
-            )
-            .map((d) => d.workflowId),
+          targets: deployed.flatMap((d) => {
+            const trigger = d.definition.triggers.find(
+              (t) => t.type === "event" && t.eventName === req.params.eventName,
+            );
+            return trigger?.type === "event"
+              ? [{ workflowId: d.workflowId, correlationKey: trigger.correlationKey }]
+              : [];
+          }),
           waiting: [...new Set(subs.map((s) => s.runId))],
         };
       });
       const started: string[] = [];
-      for (const workflowId of targets) {
+      for (const { workflowId, correlationKey } of targets) {
         if (p.workflowIds && !p.workflowIds.has(workflowId)) continue;
+        // RFC-0006: the trigger's correlationKey points into the payload; its value (or the
+        // published key) becomes the run's sessionId so related events and runs can be found
+        const session =
+          (correlationKey !== undefined
+            ? correlationValue(req.body.payload as JsonValue, correlationKey)
+            : undefined) ?? req.body.correlationKey;
         const run = await startRun(ctx, { ...p, environmentId: envId }, workflowId, {
           input: req.body.payload as JsonValue,
           mode: "async",
           environmentId: envId,
           labels: { event: req.params.eventName },
+          ...(session !== undefined ? { sessionId: session.slice(0, 128) } : {}),
         });
         started.push(run.run.id);
       }
@@ -397,10 +405,27 @@ export function ingressRoutes(app: FastifyInstance, ctx: ApiContext): void {
             type: "event",
             eventName: req.params.eventName,
             payload: req.body.payload as JsonValue,
+            ...(req.body.correlationKey !== undefined
+              ? { correlationKey: req.body.correlationKey }
+              : {}),
           },
         });
       req.audit.details = { started: started.length, delivered: waiting.length };
       return reply.code(202).send({ started, delivered: waiting });
     },
   );
+}
+
+/** The scalar at a JSON Pointer in the payload, as a correlation string (RFC-0006). */
+export function correlationValue(payload: JsonValue, pointer: string): string | undefined {
+  let cur: JsonValue | undefined = payload;
+  for (const raw of pointer.split("/").slice(1)) {
+    const key = raw.replace(/~1/g, "/").replace(/~0/g, "~");
+    if (Array.isArray(cur)) cur = cur[Number(key)];
+    else if (cur !== null && typeof cur === "object") cur = (cur as Record<string, JsonValue>)[key];
+    else return undefined;
+  }
+  return typeof cur === "string" || typeof cur === "number" || typeof cur === "boolean"
+    ? String(cur)
+    : undefined;
 }

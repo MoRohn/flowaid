@@ -221,7 +221,12 @@ function reduceNodeEvent(plan: ExecutionPlan, s: SchedulerState, e: NodeEvent): 
       return withNode(s, scope, nodeId, (n) => ({
         ...n,
         status: "waiting",
-        waiting: { reason: e.reason, ref: e.ref, state: e.state },
+        waiting: {
+          reason: e.reason,
+          ref: e.ref,
+          state: e.state,
+          ...(e.correlationKey !== undefined ? { correlationKey: e.correlationKey } : {}),
+        },
       }));
     case "TIMER_SET":
       return {

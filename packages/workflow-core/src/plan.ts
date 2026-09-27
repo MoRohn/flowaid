@@ -245,6 +245,8 @@ export const PlanOpSchema = z.discriminatedUnion("kind", [
         eventName: z.string(),
         timeoutMs: z.int().min(1),
         payloadSchema: JsonSchemaSchema.nullable(),
+        /** RFC-0006; absent when the node has no correlation */
+        correlation: CompiledBindingSchema.optional(),
       }),
     ]),
   }),

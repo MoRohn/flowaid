@@ -264,6 +264,15 @@ export function NodeInspector({
       {node.kind === "branch" ? (
         <BranchEditor key={`${node.id}:${epoch}`} node={node} store={store} readOnly={readOnly} />
       ) : null}
+      {node.kind === "wait" && node.until.type === "event" ? (
+        <EventWaitEditor
+          key={`${node.id}:${epoch}`}
+          node={node}
+          store={store}
+          scope={scope}
+          readOnly={readOnly}
+        />
+      ) : null}
       {node.kind === "human" ? (
         <HumanEditor
           key={`${node.id}:${epoch}`}
@@ -440,6 +449,82 @@ function BranchEditor({
           }
         />
       </div>
+    </section>
+  );
+}
+
+/** An event wait (RFC-0006): the event name, how long to wait, and an optional correlation key. */
+function EventWaitEditor({
+  node,
+  store,
+  scope,
+  readOnly,
+}: {
+  node: Extract<WorkflowNode, { kind: "wait" }>;
+  store: BuilderStore;
+  scope: ExpressionScope;
+  readOnly?: boolean | undefined;
+}) {
+  const s = store.getState();
+  if (node.until.type !== "event") return null;
+  const until = node.until;
+  const setUntil = (label: string, recipe: (u: Extract<typeof until, { type: "event" }>) => void) =>
+    s.updateNode(
+      node.id,
+      (n) => {
+        if (n.kind === "wait" && n.until.type === "event") recipe(n.until);
+      },
+      label,
+    );
+  return (
+    <section className="flex flex-col gap-3" aria-label="Event">
+      <FieldRow>
+        <Label htmlFor={`event-${node.id}`}>Event name</Label>
+        <Input
+          id={`event-${node.id}`}
+          className="font-mono"
+          defaultValue={until.eventName}
+          disabled={readOnly}
+          onBlur={(e) => {
+            const v = e.target.value.trim();
+            if (/^[a-z][a-z0-9_.-]{0,63}$/.test(v))
+              setUntil("Edit event name", (u) => (u.eventName = v));
+          }}
+        />
+      </FieldRow>
+      <FieldRow>
+        <Label htmlFor={`timeout-${node.id}`}>Timeout (seconds)</Label>
+        <Input
+          id={`timeout-${node.id}`}
+          type="number"
+          min={1}
+          defaultValue={Math.round(until.timeoutMs / 1000)}
+          disabled={readOnly}
+          onBlur={(e) => {
+            const v = Number(e.target.value);
+            if (Number.isFinite(v) && v >= 1)
+              setUntil("Edit timeout", (u) => (u.timeoutMs = Math.round(v * 1000)));
+          }}
+        />
+      </FieldRow>
+      <BindingField
+        label="Correlation key"
+        value={until.correlation}
+        scope={scope}
+        disabled={readOnly}
+        onChange={(v) =>
+          setUntil("Edit correlation key", (u) => {
+            const b = toBinding(v);
+            const empty = b?.kind === "literal" && (b.value === null || b.value === "");
+            if (!b || empty) delete u.correlation;
+            else u.correlation = b;
+          })
+        }
+      />
+      <FieldHint>
+        Only events published with this key resume the run (for example an order id). Leave it empty
+        to take the first event of this name.
+      </FieldHint>
     </section>
   );
 }

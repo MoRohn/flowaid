@@ -359,6 +359,54 @@ describe("waits and events", () => {
   });
 });
 
+describe("event correlation (RFC-0006)", () => {
+  const plan = planOf({
+    inputs: { type: "object", properties: { order: { type: "string" } } },
+    nodes: [
+      start,
+      {
+        id: "w",
+        kind: "wait",
+        name: "w",
+        until: {
+          type: "event",
+          eventName: "order.paid",
+          timeoutMs: 60_000,
+          correlation: ref("start", "order"),
+        },
+      },
+      out("paid", ref("w", "payload"), { outcome: "paid" }),
+    ],
+    edges: [edge("e0", "start", "done", "w"), edge("e1", "w", "done", "paid")],
+  });
+
+  it("two runs waiting on the same event receive only the payload with their key", async () => {
+    const a = await simulate({ plan, input: { order: "A-1" } });
+    const b = await simulate({ plan, input: { order: "B-2" } });
+    expect(a.of("NODE_WAITING")[0]).toMatchObject({ reason: "event", correlationKey: "A-1" });
+    for (const sim of [a, b]) {
+      await sim.sendEvent("order.paid", { order: "B-2", amount: 20 }, "B-2");
+      await sim.sendEvent("order.paid", { order: "A-1", amount: 10 }, "A-1");
+    }
+    expect(a.of("EVENT_RECEIVED")).toHaveLength(1);
+    expect(a.of("RUN_COMPLETED")[0]).toMatchObject({ output: { order: "A-1", amount: 10 } });
+    expect(b.of("EVENT_RECEIVED")).toHaveLength(1);
+    expect(b.of("RUN_COMPLETED")[0]).toMatchObject({ output: { order: "B-2", amount: 20 } });
+  });
+
+  it("an event without a key does not resume a correlated wait", async () => {
+    const a = await simulate({ plan, input: { order: "A-1" } });
+    await a.sendEvent("order.paid", { amount: 1 });
+    expect(a.of("EVENT_RECEIVED")).toHaveLength(0);
+    expect(a.status).toBe("waiting");
+  });
+
+  it("a correlation that evaluates to nothing fails the wait", async () => {
+    const sim = await simulate({ plan, input: {} });
+    expect(sim.status).toBe("failed");
+  });
+});
+
 describe("human tasks", () => {
   const human = (extra: Record<string, unknown> = {}) =>
     planOf({

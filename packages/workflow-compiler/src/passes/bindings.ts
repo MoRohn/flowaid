@@ -268,6 +268,16 @@ export class BindingCompiler {
             this.binding(node.until.at, site("at", at("until", "at"), "/until/at")),
           );
         }
+        if (node.until.type === "event" && node.until.correlation) {
+          // RFC-0006: the key an event must carry to resume this wait
+          info.compiled.set(
+            "correlation",
+            this.binding(
+              node.until.correlation,
+              site("correlation", at("until", "correlation"), "/until/correlation"),
+            ),
+          );
+        }
         return;
       case "human": {
         if (node.mode.type === "review") {

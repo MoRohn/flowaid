@@ -35,7 +35,13 @@ export interface NodeState {
   /** Inline output, or `{ "$artifact": id }` once spilled; undefined = no value. */
   output: JsonValue | undefined;
   error: ErrorInfo | null;
-  waiting: { reason: WaitReason; ref: string; state: JsonValue | null } | null;
+  /** `correlationKey` (RFC-0006): an event wait resumes only for events published with this key */
+  waiting: {
+    reason: WaitReason;
+    ref: string;
+    state: JsonValue | null;
+    correlationKey?: string;
+  } | null;
   retryTimerId: string | null;
   inputHash: string | null;
   batchId: string | null;

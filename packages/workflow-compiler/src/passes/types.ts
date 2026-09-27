@@ -140,6 +140,19 @@ export function typesPass(ctx: CompileContext): void {
         );
       }
     }
+    if (node.kind === "wait" && node.until.type === "event") {
+      // RFC-0006: a correlation key is a scalar (it is compared as a string)
+      const correlation = info.compiled.get("correlation");
+      if (correlation)
+        check(
+          node.id,
+          "correlation",
+          correlation.schema,
+          { type: ["string", "number", "boolean"] },
+          nodePath(info.index, "until", "correlation"),
+          describe(correlation),
+        );
+    }
     if (node.kind === "wait" && node.until.type === "timestamp") {
       const at = info.compiled.get("at");
       if (at)

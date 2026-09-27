@@ -252,8 +252,13 @@ export class Simulation {
     await this.trigger({ type: "human_response", humanTaskId: entry[0], response, by });
   }
 
-  async sendEvent(eventName: string, payload: JsonValue): Promise<void> {
-    await this.trigger({ type: "event", eventName, payload });
+  async sendEvent(eventName: string, payload: JsonValue, correlationKey?: string): Promise<void> {
+    await this.trigger({
+      type: "event",
+      eventName,
+      payload,
+      ...(correlationKey !== undefined ? { correlationKey } : {}),
+    });
   }
 
   async finishChild(

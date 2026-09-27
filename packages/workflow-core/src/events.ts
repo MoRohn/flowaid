@@ -193,6 +193,8 @@ export const RunEventSchema = z.discriminatedUnion("type", [
     reason: WaitReasonSchema,
     ref: z.string(),
     state: JsonValueSchema.nullable(),
+    /** RFC-0006: an event wait resumes only for events published with this key */
+    correlationKey: z.string().max(200).optional(),
   }),
   z.object({
     ...NodeEventBase,
