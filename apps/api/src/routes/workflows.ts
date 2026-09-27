@@ -817,6 +817,20 @@ export function workflowRoutes(app: FastifyInstance, ctx: ApiContext): void {
     builtIn: z.boolean(),
     requiredResources: z.unknown(),
     requiredSecrets: z.unknown(),
+    /** with `include=graph`: the template's shape, for previews */
+    graph: z
+      .object({
+        nodes: z.array(
+          z.object({
+            id: z.string(),
+            kind: z.string(),
+            type: z.string().nullable(),
+            name: z.string(),
+          }),
+        ),
+        edges: z.array(z.object({ source: z.string(), target: z.string() })),
+      })
+      .optional(),
   });
   r.get(
     "/v1/templates",
@@ -826,7 +840,11 @@ export function workflowRoutes(app: FastifyInstance, ctx: ApiContext): void {
         scope: "workflows:read",
         cli: { noun: "template", verb: "list" },
       },
-      schema: { tags: ["templates"], response: { 200: z.array(TemplateSchema) } },
+      schema: {
+        tags: ["templates"],
+        querystring: z.object({ include: z.enum(["graph"]).optional() }),
+        response: { 200: z.array(TemplateSchema) },
+      },
     },
     async (req) => {
       const p = req.principal;
@@ -847,9 +865,53 @@ export function workflowRoutes(app: FastifyInstance, ctx: ApiContext): void {
         builtIn: t.workspaceId === null,
         requiredResources: t.requiredResources,
         requiredSecrets: t.requiredSecrets,
+        ...(req.query.include === "graph" ? { graph: templateGraph(t.definition) } : {}),
       }));
     },
   );
+}
+
+/**
+ * Nodes (kind, task type, name) and edges of a template definition: control edges plus one edge per
+ * node that reads another node's port (`{ kind: "port", node }` refs anywhere in its bindings).
+ */
+export function templateGraph(definition: unknown) {
+  const d = definition as {
+    nodes?: ({ id: string; kind: string; type?: string; name?: string } & Record<
+      string,
+      unknown
+    >)[];
+    edges?: { from: { node: string }; to: { node: string } }[];
+  };
+  const nodes = d.nodes ?? [];
+  const ids = new Set(nodes.map((n) => n.id));
+  const seen = new Set<string>();
+  const edges: { source: string; target: string }[] = [];
+  const add = (source: string, target: string) => {
+    const key = `${source}\u0000${target}`;
+    if (source === target || !ids.has(source) || !ids.has(target) || seen.has(key)) return;
+    seen.add(key);
+    edges.push({ source, target });
+  };
+  for (const e of d.edges ?? []) add(e.from.node, e.to.node);
+  const refsIn = (value: unknown, target: string): void => {
+    if (Array.isArray(value)) for (const v of value) refsIn(v, target);
+    else if (value && typeof value === "object") {
+      const o = value as Record<string, unknown>;
+      if (o.kind === "port" && typeof o.node === "string") add(o.node, target);
+      for (const v of Object.values(o)) refsIn(v, target);
+    }
+  };
+  for (const n of nodes) refsIn(n, n.id);
+  return {
+    nodes: nodes.map((n) => ({
+      id: n.id,
+      kind: n.kind,
+      type: n.type ?? null,
+      name: n.name ?? n.id,
+    })),
+    edges,
+  };
 }
 
 /** 422: the publish gate's evaluation did not pass. */
