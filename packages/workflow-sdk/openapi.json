@@ -2748,6 +2748,14 @@
     "/v1/templates": {
       "get": {
         "tags": ["templates"],
+        "parameters": [
+          {
+            "schema": { "type": "string", "enum": ["graph"] },
+            "in": "query",
+            "name": "include",
+            "required": false
+          }
+        ],
         "x-cli": { "noun": "template", "verb": "list" },
         "x-auth": "session_or_api_key",
         "x-scopes": ["workflows:read"],
@@ -2768,7 +2776,40 @@
                       "category": { "type": "string" },
                       "builtIn": { "type": "boolean" },
                       "requiredResources": {},
-                      "requiredSecrets": {}
+                      "requiredSecrets": {},
+                      "graph": {
+                        "type": "object",
+                        "properties": {
+                          "nodes": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": { "type": "string" },
+                                "kind": { "type": "string" },
+                                "type": { "type": ["string", "null"] },
+                                "name": { "type": "string" }
+                              },
+                              "required": ["id", "kind", "type", "name"],
+                              "additionalProperties": false
+                            }
+                          },
+                          "edges": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "source": { "type": "string" },
+                                "target": { "type": "string" }
+                              },
+                              "required": ["source", "target"],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": ["nodes", "edges"],
+                        "additionalProperties": false
+                      }
                     },
                     "required": [
                       "id",

@@ -1314,7 +1314,7 @@ export const OPERATIONS: readonly CliOperation[] = [
     path: "/v1/templates",
     auth: "session_or_api_key",
     positional: [],
-    query: [],
+    query: [{ name: "include", type: "string", required: false, enum: ["graph"] }],
     body: null,
   },
   {

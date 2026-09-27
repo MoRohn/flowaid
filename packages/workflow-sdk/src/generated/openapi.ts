@@ -3716,7 +3716,9 @@ export interface paths {
     };
     get: {
       parameters: {
-        query?: never;
+        query?: {
+          include?: "graph";
+        };
         header?: never;
         path?: never;
         cookie?: never;
@@ -3733,6 +3735,18 @@ export interface paths {
               builtIn: boolean;
               category: string;
               description: string;
+              graph?: {
+                edges: {
+                  source: string;
+                  target: string;
+                }[];
+                nodes: {
+                  id: string;
+                  kind: string;
+                  name: string;
+                  type: string | null;
+                }[];
+              };
               id: string;
               name: string;
               requiredResources: unknown;
