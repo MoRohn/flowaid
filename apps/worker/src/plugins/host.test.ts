@@ -77,10 +77,15 @@ describe("plugin host process", () => {
     expect(c.requests).toEqual([{ url: "https://api.example.test/echo", body: "hello" }]);
     expect(c.logs).toEqual(["echoing"]);
     expect(c.deltas).toEqual(["hello"]);
+    // the host validates with the package's own schemas (the worker may only know the manifest)
+    const bad = await host.execute(echo as never, context({ config: {} as never }).ctx, {
+      text: "x",
+    });
+    expect(bad).toMatchObject({ kind: "error", error: { code: "SCHEMA_VALIDATION_ERROR" } });
   }, 30_000);
 
   it("propagates the worker's cancellation into the host", async () => {
-    const c = context();
+    const c = context({ config: {} as never });
     const pending = host.execute(wait as never, c.ctx, {});
     setTimeout(() => c.controller.abort(), 200);
     await expect(pending).resolves.toMatchObject({ kind: "ok", output: { aborted: true } });
@@ -118,7 +123,7 @@ describe("plugin host process", () => {
   }, 60_000);
 
   it("fails in-flight executions when the host crashes, then restarts it", async () => {
-    const c = context();
+    const c = context({ config: {} as never });
     await expect(host.execute(crash as never, c.ctx, {})).rejects.toMatchObject({
       code: "NODE_EXECUTION_ERROR",
       retryable: true,

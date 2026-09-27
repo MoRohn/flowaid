@@ -456,6 +456,9 @@ importers:
       '@flowaid/openapi-tools':
         specifier: workspace:*
         version: link:../../packages/openapi-tools
+      '@flowaid/plugins':
+        specifier: workspace:*
+        version: link:../../packages/plugins
       '@flowaid/provider-anthropic':
         specifier: workspace:*
         version: link:../../packages/provider-anthropic

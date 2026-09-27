@@ -11,7 +11,7 @@
  * process boundary for admin-trusted code, not a sandbox: user code belongs in the `code` pool.
  */
 import { fork, type ChildProcess } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type {
@@ -115,6 +115,8 @@ export interface PluginHostOptions {
   version?: string;
   /** an installed package's entry file; bundled packages load from the allow-list */
   modulePath?: string;
+  /** the installed package's root (readable by the host; defaults to the entry's directory) */
+  packageDir?: string;
   log: WorkerLogger;
   /** heap cap of the host process (MiB) */
   maxOldSpaceMb?: number;
@@ -144,8 +146,11 @@ export class PluginHost {
     const readable = [
       appDir,
       workspaceRoot(appDir),
-      this.o.modulePath ? dirname(this.o.modulePath) : null,
-    ].filter((d): d is string => d !== null);
+      this.o.packageDir ?? (this.o.modulePath ? dirname(this.o.modulePath) : null),
+    ]
+      .filter((d): d is string => d !== null)
+      // the permission model compares real paths (symlinked dirs, /var → /private/var)
+      .map((d) => (existsSync(d) ? realpathSync(d) : d));
     const execArgv = [
       ...entry.execArgv,
       "--disallow-code-generation-from-strings",

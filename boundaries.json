@@ -192,7 +192,8 @@
         "evaluation",
         "codegen",
         "langchain",
-        "nodes-langchain"
+        "nodes-langchain",
+        "plugins"
       ]
     },
     "web": {

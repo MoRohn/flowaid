@@ -1,6 +1,8 @@
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, expect, it } from "vitest";
+import { eq } from "drizzle-orm";
 import { plugins } from "@flowaid/database";
 import { describeDb } from "@flowaid/database/testing";
 import { packTarball } from "@flowaid/plugins";
@@ -177,5 +179,38 @@ describeDb("plugins: install, discovery and management (Postgres)", () => {
     expect((await call(t.app, jar, "GET", "/v1/me")).json().features.integrations_plugins).toBe(
       true,
     );
+  });
+
+  it("records where a local install lives, for the worker to load it from", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "flowaid-local-"));
+    writeFileSync(
+      join(dir, "package.json"),
+      JSON.stringify({
+        name: "@acme/local-nodes",
+        version: "0.3.0",
+        keywords: ["flowaid-node"],
+        flowaid: { sdk: "^0.1.0" },
+      }),
+    );
+    writeFileSync(join(dir, "manifest.json"), manifest("@acme/local-nodes"));
+    const config = t.ctx.config.plugins as { allowLocal: boolean };
+    config.allowLocal = true;
+    try {
+      const res = await call(t.app, jar, "POST", "/v1/plugins", {
+        packageName: "@acme/local-nodes",
+        source: "local",
+        path: dir,
+      });
+      expect(res.statusCode).toBe(201);
+      const [row] = await t.db.app.system((tx) =>
+        tx
+          .select()
+          .from(plugins)
+          .where(eq(plugins.id, res.json().plugin.id as string)),
+      );
+      expect(row).toMatchObject({ source: "local", location: dir, version: "0.3.0" });
+    } finally {
+      config.allowLocal = false;
+    }
   });
 });

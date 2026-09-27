@@ -483,7 +483,7 @@ const docs = {
   FLOWAID_PLUGIN_DIR: {
     group: "execution",
     description:
-      "Directory where `flowaid plugin add` installs node packages and from which the worker loads enabled plugins at boot.",
+      "Directory the worker extracts installed npm plugins into (`<name>/<version>/`, verified against the integrity recorded at install) and loads enabled plugins from at boot; it must be writable by the worker.",
     default: ".flowaid/plugins",
     required: false,
     example: "/var/lib/flowaid/plugins",
