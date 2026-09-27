@@ -1,0 +1,620 @@
+"use client";
+import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { use, useMemo, useState } from "react";
+import { FlaskConical, Pencil, Play, Plus, Trash2 } from "lucide-react";
+import {
+  Badge,
+  Button,
+  ConfirmDialog,
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  EmptyState,
+  FieldRow,
+  IconButton,
+  Input,
+  NumberInput,
+  ProgressBar,
+  Select,
+  SelectItem,
+  Switch,
+} from "@flowaid/ui/primitives";
+import {
+  DataTable,
+  RelativeTime,
+  createDataTableColumns,
+  type DataTableColumns,
+} from "@flowaid/ui/data";
+import { formatPercent } from "@flowaid/ui/lib";
+import { PageHeader } from "@flowaid/ui/shell";
+import { del, get, patch, post, qs } from "~/api/client";
+import type { Page, VersionSummary, WorkflowSummary } from "~/api/types";
+import {
+  expectationSummary,
+  expectationTemplate,
+  parseJsonObject,
+  parseJsonText,
+  parseTags,
+  pretty,
+  runTone,
+} from "~/admin/logic";
+import type { EvaluationCase, EvaluationRun, EvaluationSet } from "~/admin/types";
+import { JsonField, QueryView, Section, useConfirm, useMutate } from "~/admin/ui";
+import { useSession } from "~/session";
+import { AppFrame, PageBody } from "~/shell/AppFrame";
+import { errorMessage } from "~/shell/states";
+
+const DRAFT = "__draft";
+const NONE = "__none";
+
+function CaseDialog({
+  setId,
+  editing,
+  onClose,
+}: {
+  setId: string;
+  editing: EvaluationCase | "new" | null;
+  onClose: () => void;
+}) {
+  const s = useSession();
+  const existing = editing && editing !== "new" ? editing : null;
+  const [input, setInput] = useState(existing ? pretty(existing.input) : '{\n  "message": ""\n}');
+  const [expected, setExpected] = useState(pretty(existing?.expected ?? expectationTemplate()));
+  const [tags, setTags] = useState(existing?.tags.join(", ") ?? "");
+  const inputOk = parseJsonText(input);
+  const expectedOk = parseJsonObject(expected);
+  const save = useMutate(
+    () => {
+      const body = {
+        input: inputOk.ok ? inputOk.value : null,
+        expected: expectedOk.ok ? expectedOk.value : {},
+        tags: parseTags(tags),
+      };
+      return existing
+        ? patch(`/v1/evaluations/cases/${existing.id}`, body)
+        : post(`/v1/evaluations/sets/${setId}/cases`, body);
+    },
+    {
+      success: existing ? "Case saved" : "Case added",
+      invalidate: [["evaluation-cases", s.ws, setId]],
+      onSuccess: onClose,
+      errorTitle: "The case was not saved",
+    },
+  );
+  return (
+    <Dialog open={editing !== null} onOpenChange={(o) => (o ? undefined : onClose())}>
+      <DialogContent size="lg">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            save.mutate(undefined);
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle>{existing ? `Edit case ${existing.ordinal + 1}` : "New case"}</DialogTitle>
+            <DialogDescription>
+              The expectation uses the evaluation schema: <code className="font-mono">output</code>{" "}
+              matchers (equals, contains, regex, schema, range, judge),{" "}
+              <code className="font-mono">decisions</code>,{" "}
+              <code className="font-mono">branches</code>, tools, status, latency and cost bounds.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogBody className="grid max-h-[70vh] gap-4 overflow-auto lg:grid-cols-2">
+            <JsonField
+              id="case-input"
+              label="Input"
+              value={input}
+              onChange={setInput}
+              error={inputOk.ok ? null : inputOk.error}
+              minRows={10}
+            />
+            <JsonField
+              id="case-expected"
+              label="Expected"
+              value={expected}
+              onChange={setExpected}
+              error={expectedOk.ok ? null : expectedOk.error}
+              minRows={10}
+            />
+            <FieldRow
+              label="Tags"
+              htmlFor="case-tags"
+              hint="Comma separated"
+              className="lg:col-span-2"
+            >
+              <Input id="case-tags" value={tags} onChange={(e) => setTags(e.target.value)} />
+            </FieldRow>
+          </DialogBody>
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              loading={save.isPending}
+              disabled={!inputOk.ok || !expectedOk.ok}
+            >
+              {existing ? "Save case" : "Add case"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function RunDialog({
+  set,
+  open,
+  onOpenChange,
+  previous,
+}: {
+  set: EvaluationSet;
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  previous: EvaluationRun[];
+}) {
+  const s = useSession();
+  const router = useRouter();
+  const [workflowId, setWorkflowId] = useState(set.workflowId ?? "");
+  const [version, setVersion] = useState(DRAFT);
+  const [env, setEnv] = useState(s.environments[0]?.id ?? "");
+  const [baseline, setBaseline] = useState(NONE);
+  const [concurrency, setConcurrency] = useState<number | null>(4);
+  const [gated, setGated] = useState(false);
+  const [minPass, setMinPass] = useState<number | null>(0.9);
+  const workflows = useQuery({
+    queryKey: ["workflow-names", s.ws],
+    queryFn: () => get<Page<WorkflowSummary>>("/v1/workflows?limit=200"),
+    select: (p) => p.items,
+    enabled: open && !set.workflowId,
+  });
+  const versions = useQuery({
+    queryKey: ["versions", s.ws, workflowId],
+    queryFn: () => get<VersionSummary[]>(`/v1/workflows/${workflowId}/versions`),
+    enabled: open && Boolean(workflowId),
+    select: (v) =>
+      v.filter((x) => x.kind === "published").sort((a, b) => (b.version ?? 0) - (a.version ?? 0)),
+  });
+  const start = useMutate(
+    () =>
+      post<EvaluationRun>("/v1/evaluations/runs", {
+        setId: set.id,
+        workflowId,
+        ...(version === DRAFT ? { draft: true } : { versionId: version }),
+        environmentId: env,
+        concurrency: concurrency ?? 4,
+        ...(baseline !== NONE ? { baselineEvaluationRunId: baseline } : {}),
+        ...(gated && minPass !== null ? { gate: { minPassRate: minPass } } : {}),
+      }),
+    {
+      success: "Evaluation started",
+      invalidate: [["evaluation-runs", s.ws]],
+      onSuccess: (r) => router.push(`/${s.ws}/evaluations/runs/${r.id}`),
+    },
+  );
+  const baselines = previous.filter((r) => r.status === "completed" && r.workflowId === workflowId);
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent size="md">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            start.mutate(undefined);
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle>Run “{set.name}”</DialogTitle>
+            <DialogDescription>
+              Every case runs as a real workflow run (labelled as an evaluation), with human steps
+              auto-answered from the case.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogBody className="flex flex-col gap-4">
+            {!set.workflowId ? (
+              <FieldRow label="Workflow" htmlFor="run-wf" required>
+                <Select
+                  id="run-wf"
+                  value={workflowId}
+                  placeholder="Choose a workflow"
+                  onValueChange={(v) => {
+                    setWorkflowId(v);
+                    setVersion(DRAFT);
+                    setBaseline(NONE);
+                  }}
+                >
+                  {(workflows.data ?? []).map((w) => (
+                    <SelectItem key={w.id} value={w.id}>
+                      {w.name}
+                    </SelectItem>
+                  ))}
+                </Select>
+              </FieldRow>
+            ) : null}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FieldRow label="Version" htmlFor="run-version" required>
+                <Select id="run-version" value={version} onValueChange={setVersion} mono>
+                  <SelectItem value={DRAFT}>Current draft</SelectItem>
+                  {(versions.data ?? []).map((v) => (
+                    <SelectItem key={v.id} value={v.id}>
+                      v{v.version}
+                    </SelectItem>
+                  ))}
+                </Select>
+              </FieldRow>
+              <FieldRow
+                label="Environment"
+                htmlFor="run-env"
+                required
+                hint="Secrets and variables come from here"
+              >
+                <Select id="run-env" value={env} onValueChange={setEnv}>
+                  {s.environments.map((e) => (
+                    <SelectItem key={e.id} value={e.id}>
+                      {e.name}
+                    </SelectItem>
+                  ))}
+                </Select>
+              </FieldRow>
+              <FieldRow label="Compare with" htmlFor="run-baseline">
+                <Select id="run-baseline" value={baseline} onValueChange={setBaseline}>
+                  <SelectItem value={NONE}>No baseline</SelectItem>
+                  {baselines.map((r) => (
+                    <SelectItem
+                      key={r.id}
+                      value={r.id}
+                      meta={r.summary ? formatPercent(r.summary.passRate) : undefined}
+                    >
+                      {new Date(r.createdAt).toLocaleString()}
+                    </SelectItem>
+                  ))}
+                </Select>
+              </FieldRow>
+              <FieldRow
+                label="Concurrency"
+                htmlFor="run-conc"
+                hint="Cases in flight at once (1–16)"
+              >
+                <NumberInput
+                  id="run-conc"
+                  value={concurrency}
+                  min={1}
+                  max={16}
+                  onValueChange={setConcurrency}
+                />
+              </FieldRow>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="flex items-center gap-2 text-xs text-ink-2">
+                <Switch size="sm" checked={gated} onCheckedChange={setGated} />
+                Gate on pass rate
+              </label>
+              {gated ? (
+                <NumberInput
+                  aria-label="Minimum pass rate"
+                  value={minPass}
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  precision={2}
+                  onValueChange={setMinPass}
+                  className="w-28"
+                />
+              ) : null}
+            </div>
+          </DialogBody>
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              leadingIcon={<Play strokeWidth={1.75} />}
+              loading={start.isPending}
+              disabled={!workflowId || !env}
+            >
+              Start evaluation
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export default function SetPage({ params }: { params: Promise<{ setId: string }> }) {
+  const { setId } = use(params);
+  const s = useSession();
+  const router = useRouter();
+  const canWrite = s.can("evaluations:write");
+  const [editing, setEditing] = useState<EvaluationCase | "new" | null>(null);
+  const [running, setRunning] = useState(false);
+  const confirmCase = useConfirm<EvaluationCase>();
+  const [deleting, setDeleting] = useState(false);
+  const set = useQuery({
+    queryKey: ["evaluation-set", s.ws, setId],
+    queryFn: () => get<EvaluationSet>(`/v1/evaluations/sets/${setId}`),
+  });
+  const cases = useQuery({
+    queryKey: ["evaluation-cases", s.ws, setId],
+    queryFn: () => get<Page<EvaluationCase>>(`/v1/evaluations/sets/${setId}/cases?limit=200`),
+  });
+  const runs = useQuery({
+    queryKey: ["evaluation-runs", s.ws, setId],
+    queryFn: () => get<Page<EvaluationRun>>(`/v1/evaluations/runs${qs({ setId, limit: 50 })}`),
+    refetchInterval: (q) =>
+      q.state.data?.items.some((r) => r.status === "running" || r.status === "queued")
+        ? 3000
+        : false,
+  });
+  const versionNo = useQuery({
+    queryKey: ["versions", s.ws, set.data?.workflowId],
+    queryFn: () => get<VersionSummary[]>(`/v1/workflows/${set.data?.workflowId ?? ""}/versions`),
+    enabled: Boolean(set.data?.workflowId),
+    select: (vs) => new Map(vs.map((v) => [v.id, v.version])),
+  });
+  const removeCase = useMutate((c: EvaluationCase) => del(`/v1/evaluations/cases/${c.id}`), {
+    success: "Case deleted",
+    invalidate: [["evaluation-cases", s.ws, setId]],
+    onSuccess: confirmCase.close,
+  });
+  const removeSet = useMutate(() => del(`/v1/evaluations/sets/${setId}`), {
+    success: "Set deleted",
+    invalidate: [["evaluation-sets", s.ws]],
+    onSuccess: () => router.push(`/${s.ws}/evaluations`),
+  });
+
+  const col = createDataTableColumns<EvaluationCase>();
+  const columns = useMemo<DataTableColumns<EvaluationCase>>(
+    () =>
+      col.columns([
+        col.accessor("ordinal", {
+          header: "#",
+          size: 56,
+          meta: { numeric: true, mono: true },
+          cell: ({ getValue }) => getValue() + 1,
+        }),
+        col.accessor((c) => JSON.stringify(c.input), {
+          id: "input",
+          header: "Input",
+          size: 320,
+          meta: { grow: true, mono: true },
+          cell: ({ getValue }) => (
+            <span className="block truncate text-2xs text-ink-2">{getValue()}</span>
+          ),
+        }),
+        col.accessor((c) => expectationSummary(c.expected), {
+          id: "expects",
+          header: "Expects",
+          size: 240,
+          cell: ({ getValue }) => <span className="text-xs text-ink-2">{getValue()}</span>,
+        }),
+        col.accessor((c) => c.tags.join(" "), {
+          id: "tags",
+          header: "Tags",
+          size: 160,
+          cell: ({ row }) => (
+            <span className="flex flex-wrap gap-1">
+              {row.original.tags.map((t) => (
+                <Badge key={t} tone="outline" size="sm">
+                  {t}
+                </Badge>
+              ))}
+              {row.original.sourceRunId ? (
+                <Badge tone="info" size="sm">
+                  from run
+                </Badge>
+              ) : null}
+            </span>
+          ),
+        }),
+        col.display({
+          id: "actions",
+          header: "",
+          size: 80,
+          cell: ({ row }) =>
+            canWrite ? (
+              <span className="flex justify-end gap-1">
+                <IconButton
+                  size="sm"
+                  variant="ghost"
+                  label={`Edit case ${row.original.ordinal + 1}`}
+                  onClick={() => setEditing(row.original)}
+                >
+                  <Pencil strokeWidth={1.75} />
+                </IconButton>
+                <IconButton
+                  size="sm"
+                  variant="ghost"
+                  label={`Delete case ${row.original.ordinal + 1}`}
+                  onClick={() => confirmCase.ask(row.original)}
+                >
+                  <Trash2 strokeWidth={1.75} />
+                </IconButton>
+              </span>
+            ) : null,
+        }),
+      ]),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [canWrite],
+  );
+  const caseCount = cases.data?.items.length ?? 0;
+
+  return (
+    <AppFrame
+      crumbs={[
+        { label: s.workspaceName },
+        { label: "Evaluations", href: `/${s.ws}/evaluations` },
+        { label: set.data?.name ?? "…" },
+      ]}
+    >
+      <PageBody>
+        <QueryView query={set}>
+          {(x) => (
+            <>
+              <PageHeader
+                title={x.name}
+                description={x.description || undefined}
+                actions={
+                  canWrite ? (
+                    <>
+                      <Button variant="danger" onClick={() => setDeleting(true)}>
+                        Delete set
+                      </Button>
+                      <Button
+                        leadingIcon={<Plus strokeWidth={1.75} />}
+                        onClick={() => setEditing("new")}
+                      >
+                        Add case
+                      </Button>
+                      <Button
+                        variant="primary"
+                        leadingIcon={<Play strokeWidth={1.75} />}
+                        disabled={caseCount === 0}
+                        onClick={() => setRunning(true)}
+                      >
+                        Run evaluation
+                      </Button>
+                    </>
+                  ) : null
+                }
+              />
+              <div className="mt-5 flex flex-col gap-5">
+                <Section title={`Cases (${caseCount})`}>
+                  <DataTable
+                    columns={columns}
+                    data={cases.data?.items ?? []}
+                    getRowId={(c) => c.id}
+                    loading={cases.isPending}
+                    error={
+                      cases.isError
+                        ? {
+                            message: errorMessage(cases.error),
+                            onRetry: () => void cases.refetch(),
+                          }
+                        : null
+                    }
+                    emptyState={
+                      <EmptyState
+                        size="sm"
+                        icon={<FlaskConical strokeWidth={1.5} />}
+                        title="No cases yet"
+                        description="Add cases by hand, or open a finished run and choose “Add to evaluation” to capture its input and output."
+                      />
+                    }
+                    itemLabel={["case", "cases"]}
+                    aria-label="Cases"
+                  />
+                </Section>
+                <Section title="Runs">
+                  <QueryView query={runs} rows={2}>
+                    {(p) =>
+                      p.items.length === 0 ? (
+                        <p className="text-xs text-ink-3">This set has not been run yet.</p>
+                      ) : (
+                        <ul
+                          className="flex flex-col divide-y divide-border rounded-md border border-border"
+                          role="list"
+                        >
+                          {p.items.map((r) => (
+                            <li key={r.id}>
+                              <Link
+                                href={`/${s.ws}/evaluations/runs/${r.id}`}
+                                className="flex flex-wrap items-center gap-3 px-3 py-2 hover:bg-surface-3"
+                              >
+                                <Badge tone={runTone(r.status)} dot className="capitalize">
+                                  {r.status}
+                                </Badge>
+                                <span className="text-xs text-ink-2">
+                                  <RelativeTime date={r.createdAt} />
+                                </span>
+                                <span className="font-mono text-2xs text-ink-3">
+                                  {r.workflowVersionId
+                                    ? versionNo.data?.get(r.workflowVersionId)
+                                      ? `v${versionNo.data.get(r.workflowVersionId)}`
+                                      : "published"
+                                    : "draft"}
+                                </span>
+                                {r.status === "running" || r.status === "queued" ? (
+                                  <ProgressBar
+                                    value={r.total ? r.completed / r.total : 0}
+                                    className="w-40"
+                                    aria-label="Progress"
+                                  />
+                                ) : null}
+                                <span className="ml-auto flex items-center gap-2 text-xs">
+                                  {r.summary ? (
+                                    <span className="font-mono text-ink">
+                                      {formatPercent(r.summary.passRate)} pass
+                                    </span>
+                                  ) : null}
+                                  {r.report ? (
+                                    <Badge tone={r.report.verdict === "pass" ? "ok" : "danger"}>
+                                      {r.report.verdict === "pass" ? "Gate passed" : "Gate failed"}
+                                    </Badge>
+                                  ) : null}
+                                  <span className="text-ink-3">
+                                    {r.completed}/{r.total}
+                                  </span>
+                                </span>
+                              </Link>
+                            </li>
+                          ))}
+                        </ul>
+                      )
+                    }
+                  </QueryView>
+                </Section>
+              </div>
+              {running ? (
+                <RunDialog
+                  set={x}
+                  open={running}
+                  onOpenChange={setRunning}
+                  previous={runs.data?.items ?? []}
+                />
+              ) : null}
+            </>
+          )}
+        </QueryView>
+      </PageBody>
+      {editing !== null ? (
+        <CaseDialog
+          key={editing === "new" ? "new" : editing.id}
+          setId={setId}
+          editing={editing}
+          onClose={() => setEditing(null)}
+        />
+      ) : null}
+      <ConfirmDialog
+        open={confirmCase.target !== null}
+        onOpenChange={(o) => (o ? undefined : confirmCase.close())}
+        title={`Delete case ${(confirmCase.target?.ordinal ?? 0) + 1}?`}
+        variant="danger"
+        confirmLabel="Delete"
+        loading={removeCase.isPending}
+        onConfirm={() => {
+          if (confirmCase.target) removeCase.mutate(confirmCase.target);
+        }}
+      />
+      <ConfirmDialog
+        open={deleting}
+        onOpenChange={setDeleting}
+        title={`Delete ${set.data?.name ?? "this set"}?`}
+        description="Its cases and evaluation reports are deleted. Workflow runs made by evaluations are kept."
+        variant="danger"
+        confirmLabel="Delete set"
+        loading={removeSet.isPending}
+        onConfirm={() => removeSet.mutate(undefined)}
+      />
+    </AppFrame>
+  );
+}
