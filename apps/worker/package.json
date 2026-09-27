@@ -1,0 +1,50 @@
+{
+  "name": "@flowaid/worker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The flowaid worker: consumes run jobs, drives the orchestrator over Postgres, executes nodes with providers, tools (MCP, OpenAPI), state, artifacts and the sandbox, fires timers and schedules (ARCHITECTURE.md §5, §8).",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsx watch src/main.ts",
+    "start": "node dist/main.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src",
+    "test": "vitest run",
+    "clean": "rm -rf dist .turbo *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@flowaid/credentials": "workspace:*",
+    "@flowaid/database": "workspace:*",
+    "@flowaid/env": "workspace:*",
+    "@flowaid/evaluation": "workspace:*",
+    "@flowaid/mcp": "workspace:*",
+    "@flowaid/node-sdk": "workspace:*",
+    "@flowaid/nodes-core": "workspace:*",
+    "@flowaid/openapi-tools": "workspace:*",
+    "@flowaid/provider-anthropic": "workspace:*",
+    "@flowaid/provider-ollama": "workspace:*",
+    "@flowaid/provider-openai": "workspace:*",
+    "@flowaid/provider-typesafe": "workspace:*",
+    "@flowaid/providers": "workspace:*",
+    "@flowaid/sandbox": "workspace:*",
+    "@flowaid/shared": "workspace:*",
+    "@flowaid/workflow-compiler": "workspace:*",
+    "@flowaid/workflow-core": "workspace:*",
+    "@flowaid/workflow-runtime": "workspace:*",
+    "croner": "10.0.1",
+    "drizzle-orm": "0.45.3"
+  },
+  "devDependencies": {
+    "@flowaid/config": "workspace:*",
+    "@types/node": "24.13.6",
+    "eslint": "9.39.5",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "vitest": "4.1.11"
+  }
+}

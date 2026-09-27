@@ -45,6 +45,7 @@ export {
   REDACTED_PLACEHOLDER,
   deriveFlags,
   loadEnv,
+  pickEnv,
   redactEnv,
   safeLoadEnv,
   secretEnvValues,

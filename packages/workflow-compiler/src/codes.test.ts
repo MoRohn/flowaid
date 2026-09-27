@@ -670,3 +670,49 @@ describe("diagnostic codes", () => {
     ).toMatchFileSnapshot("../fixtures/diagnostics/codes.json");
   });
 });
+
+describe("controlPortsFromConfig with an unset field", () => {
+  const routes = (ports: Doc) =>
+    manifestLike("flowaid.test.routes", {
+      configSchema: {
+        type: "object",
+        properties: {
+          expr: { type: "string", "x-ui": { widget: "code", language: "flowexpr" } },
+          ports,
+        },
+        required: ["expr"],
+      },
+      portRules: [{ kind: "controlPortsFromConfig", path: "/ports" }],
+    });
+  const docWith = () => {
+    const d = clone();
+    d.nodes.push(transform("router", "1", { type: "flowaid.test.routes" }));
+    d.edges.push({ id: "c_router", from: { node: "start", port: "done" }, to: { node: "router" } });
+    return d;
+  };
+  const codes = (ports: Doc, required = false) => {
+    const m = routes(ports);
+    const manifest = required
+      ? NodeManifestSchema.parse({
+          ...m,
+          configSchema: { ...m.configSchema, required: ["expr", "ports"] },
+        })
+      : m;
+    return compile(docWith(), { catalog: withManifest(manifest) }).diagnostics.map((d) => d.code);
+  };
+
+  it("uses the schema default, or no ports, for an optional field", () => {
+    expect(codes({ type: "array", items: { type: "string" }, default: ["alt"] })).not.toContain(
+      "E_PORT_RULE_INVALID",
+    );
+    expect(codes({ type: "array", items: { type: "string" } })).not.toContain(
+      "E_PORT_RULE_INVALID",
+    );
+  });
+
+  it("still reports a required field that is unset", () => {
+    expect(codes({ type: "array", items: { type: "string" } }, true)).toContain(
+      "E_PORT_RULE_INVALID",
+    );
+  });
+});

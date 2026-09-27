@@ -15,6 +15,7 @@ import {
   DecisionResultJsonSchema,
   HumanDecisionSchema,
   escapePointerToken,
+  unescapePointerToken,
   parseTemplate,
   type Idempotency,
   type IdempotencySpec,
@@ -444,7 +445,16 @@ function applyPortRule(
 
   switch (rule.kind) {
     case "controlPortsFromConfig": {
-      const value = getAtPointer(config, rule.path);
+      let value = getAtPointer(config, rule.path);
+      // An unset optional field contributes its schema default, or no ports at all.
+      if (
+        value === undefined &&
+        !info.configBindings.has(rule.path) &&
+        !info.configTemplates.has(rule.path)
+      ) {
+        const unset = unsetFieldDefault(manifest, rule.path);
+        if (unset.optional) value = unset.default ?? [];
+      }
       if (value === undefined) {
         if (!info.configBindings.has(rule.path) && !info.configTemplates.has(rule.path)) {
           invalid(`Control ports come from config ${rule.path}, which is not set`, rule.path);
@@ -591,4 +601,23 @@ function toolSource(
   }
   const workflowId = str("workflowId");
   return workflowId ? { kind: "workflow", workflowId } : null;
+}
+
+/** For a top-level config pointer: whether the field is optional, and its schema default. */
+function unsetFieldDefault(
+  manifest: NodeManifest,
+  pointer: string,
+): { optional: boolean; default?: JsonValue } {
+  const tokens = pointer.split("/").slice(1);
+  if (tokens.length !== 1 || tokens[0] === undefined) return { optional: false };
+  const name = unescapePointerToken(tokens[0]);
+  const schema = manifest.configSchema;
+  const prop = isPlainObject(schema.properties) ? schema.properties[name] : undefined;
+  if (!prop) return { optional: false };
+  const required = Array.isArray(schema.required) && schema.required.includes(name);
+  const hasDefault = Object.hasOwn(prop, "default");
+  return {
+    optional: !required || hasDefault,
+    ...(hasDefault ? { default: prop.default } : {}),
+  };
 }

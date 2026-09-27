@@ -315,6 +315,88 @@ importers:
         specifier: 4.1.11
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(@vitest/coverage-v8@4.1.11)(happy-dom@20.14.5)(vite@8.3.0(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
+  apps/worker:
+    dependencies:
+      '@flowaid/credentials':
+        specifier: workspace:*
+        version: link:../../packages/credentials
+      '@flowaid/database':
+        specifier: workspace:*
+        version: link:../../packages/database
+      '@flowaid/env':
+        specifier: workspace:*
+        version: link:../../packages/env
+      '@flowaid/evaluation':
+        specifier: workspace:*
+        version: link:../../packages/evaluation
+      '@flowaid/mcp':
+        specifier: workspace:*
+        version: link:../../packages/mcp
+      '@flowaid/node-sdk':
+        specifier: workspace:*
+        version: link:../../packages/node-sdk
+      '@flowaid/nodes-core':
+        specifier: workspace:*
+        version: link:../../packages/nodes-core
+      '@flowaid/openapi-tools':
+        specifier: workspace:*
+        version: link:../../packages/openapi-tools
+      '@flowaid/provider-anthropic':
+        specifier: workspace:*
+        version: link:../../packages/provider-anthropic
+      '@flowaid/provider-ollama':
+        specifier: workspace:*
+        version: link:../../packages/provider-ollama
+      '@flowaid/provider-openai':
+        specifier: workspace:*
+        version: link:../../packages/provider-openai
+      '@flowaid/provider-typesafe':
+        specifier: workspace:*
+        version: link:../../packages/provider-typesafe
+      '@flowaid/providers':
+        specifier: workspace:*
+        version: link:../../packages/providers
+      '@flowaid/sandbox':
+        specifier: workspace:*
+        version: link:../../packages/sandbox
+      '@flowaid/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+      '@flowaid/workflow-compiler':
+        specifier: workspace:*
+        version: link:../../packages/workflow-compiler
+      '@flowaid/workflow-core':
+        specifier: workspace:*
+        version: link:../../packages/workflow-core
+      '@flowaid/workflow-runtime':
+        specifier: workspace:*
+        version: link:../../packages/workflow-runtime
+      croner:
+        specifier: 10.0.1
+        version: 10.0.1
+      drizzle-orm:
+        specifier: 0.45.3
+        version: 0.45.3(@opentelemetry/api@1.9.1)(postgres@3.4.9)
+    devDependencies:
+      '@flowaid/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@types/node':
+        specifier: 24.13.6
+        version: 24.13.6
+      eslint:
+        specifier: 9.39.5
+        version: 9.39.5(jiti@2.7.0)(supports-color@7.2.0)
+      tsx:
+        specifier: 4.23.15
+        version: 4.23.15
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: 4.1.11
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@24.13.6)(@vitest/coverage-v8@4.1.11)(happy-dom@20.14.5)(vite@8.3.0(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+
   packages/config:
     dependencies:
       eslint:

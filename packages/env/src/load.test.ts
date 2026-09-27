@@ -400,3 +400,12 @@ describe("testDatabaseUrl", () => {
     expect(testDatabaseUrl({})).toBeUndefined();
   });
 });
+
+describe("pickEnv", () => {
+  it("returns only the listed names that are set", async () => {
+    const { pickEnv } = await import("./load.js");
+    expect(
+      pickEnv(["HOME", "LANG", "MISSING"], { HOME: "/home/x", LANG: "C", OTHER: "y" }),
+    ).toEqual({ HOME: "/home/x", LANG: "C" });
+  });
+});

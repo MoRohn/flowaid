@@ -368,3 +368,19 @@ export function loadEnv(source: EnvSource = process.env): Env {
   }
   throw result.error;
 }
+
+/**
+ * Values of operator-listed variables outside the typed schema — the names the operator allows a
+ * stdio MCP server to inherit (`FLOWAID_MCP_STDIO_ENV_ALLOWLIST`). Unset names are omitted.
+ */
+export function pickEnv(
+  names: readonly string[],
+  source: EnvSource = process.env,
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const name of names) {
+    const value = source[name];
+    if (typeof value === "string") out[name] = value;
+  }
+  return out;
+}

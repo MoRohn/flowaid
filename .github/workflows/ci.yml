@@ -134,3 +134,6 @@ jobs:
 
       - name: HTTP API (identity, workflows, runs) against PostgreSQL 16
         run: pnpm --filter @flowaid/api test
+
+      - name: Worker (orchestrator, nodes, scheduler) against PostgreSQL 16
+        run: pnpm --filter @flowaid/worker test

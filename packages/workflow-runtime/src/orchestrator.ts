@@ -407,6 +407,8 @@ export class Orchestrator {
             : null,
         deadlineAt: held.state.run.deadlineAt,
       },
+      // A node that passes an empty chain gets the workflow's (execution.decisions).
+      decisions: [ex.decisions.primary, ...ex.decisions.failover],
     };
     const done = (async () => {
       const result = await executeTask(held.plan, this.o.registry, this.o.services ?? {}, {
