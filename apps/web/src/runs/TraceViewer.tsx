@@ -1,0 +1,333 @@
+"use client";
+/**
+ * The trace viewer (UI.md §7): RunHeader, then Timeline · Graph · Events · Output · Logs · Cost
+ * over one folded RunView, with node selection shared by every tab and a node-run detail panel.
+ * The initial state is the stored run (node runs + every durable event); while the run is
+ * active the SSE stream appends events and the fold re-derives the view.
+ */
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { FlaskConical, WifiOff } from "lucide-react";
+import type { NodeRunView } from "@flowaid/ui";
+import {
+  Button,
+  EmptyState,
+  Skeleton,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+  toast,
+} from "@flowaid/ui/primitives";
+import { JsonView } from "@flowaid/ui/data";
+import { EventLog, LogViewer, RunHeader, TraceTimeline } from "@flowaid/ui/trace";
+import { get, post } from "~/api/client";
+import { useSession } from "~/session";
+import { ErrorPanel, errorMessage } from "~/shell/states";
+import { AddToEvaluationDialog } from "./AddToEvaluationDialog";
+import { fetchAllEvents, useCatalog, useWorkflowNames } from "./api";
+import { CostPanel } from "./CostPanel";
+import { nodeCategory } from "./graph";
+import { NodeRunPanel } from "./NodeRunPanel";
+import { RunGraph } from "./RunGraph";
+import type { HumanTaskDetail, RunDetail, VersionDetail } from "./types";
+import { useRunStream } from "./useRunStream";
+import {
+  durableEvents,
+  environmentView,
+  isActiveRun,
+  lastDurableSeq,
+  mergeEvents,
+  nodeIndex,
+  taskToApproval,
+  toLiveRunView,
+} from "./views";
+
+const TABS = ["timeline", "graph", "events", "output", "logs", "cost"] as const;
+type Tab = (typeof TABS)[number];
+const TAB_LABEL: Record<Tab, string> = {
+  timeline: "Timeline",
+  graph: "Graph",
+  events: "Events",
+  output: "Output",
+  logs: "Logs",
+  cost: "Cost",
+};
+
+export function TraceViewer({ runId }: { runId: string }) {
+  const s = useSession();
+  const router = useRouter();
+  const qc = useQueryClient();
+  const [tab, setTab] = useState<Tab>("timeline");
+  const [selected, setSelected] = useState<string | undefined>();
+  const [live, setLive] = useState<unknown[]>([]);
+  const [evalOpen, setEvalOpen] = useState(false);
+
+  const detail = useQuery({
+    queryKey: ["run", s.ws, runId],
+    queryFn: () => get<RunDetail>(`/v1/runs/${runId}?include=node_runs`),
+  });
+  const events = useQuery({
+    queryKey: ["run-events", s.ws, runId],
+    queryFn: ({ signal }) => fetchAllEvents(runId, signal),
+    staleTime: Infinity,
+  });
+  const versionId = detail.data?.workflowVersionId;
+  const version = useQuery({
+    queryKey: ["version", s.ws, versionId],
+    queryFn: () => get<VersionDetail>(`/v1/workflow-versions/${versionId as string}`),
+    enabled: Boolean(versionId),
+    staleTime: Infinity,
+  });
+  const catalog = useCatalog(s.ws);
+  const names = useWorkflowNames(s.ws);
+
+  const active = detail.data ? isActiveRun(detail.data.status) : false;
+  const stream = useRunStream(runId, {
+    enabled: events.isSuccess && active,
+    afterSeq: lastDurableSeq(events.data ?? []),
+    onEvents: (batch) => setLive((l) => [...l, ...batch]),
+  });
+  // The stream ended (terminal or suspended): reload the stored projection for inputs/outputs.
+  useEffect(() => {
+    if (stream.status === "ended") void qc.invalidateQueries({ queryKey: ["run", s.ws, runId] });
+  }, [stream.status, qc, s.ws, runId]);
+
+  const allEvents = useMemo(() => mergeEvents(events.data ?? [], live), [events.data, live]);
+  const definition = version.data?.definition;
+  const cat = catalog.data;
+
+  const live0 = useMemo(() => {
+    if (!detail.data || !cat) return null;
+    const env = environmentView(s.environments, detail.data.environmentId);
+    return toLiveRunView({
+      run: detail.data,
+      nodeRuns: detail.data.node_runs,
+      events: allEvents,
+      ...(definition ? { definition } : {}),
+      catalog: cat,
+      workflowName: names.data?.get(detail.data.workflowId) ?? "Workflow",
+      version: version.data
+        ? version.data.kind === "draft" || version.data.version === null
+          ? "draft"
+          : version.data.version
+        : "draft",
+      ...(env ? { environment: env } : {}),
+    });
+  }, [detail.data, cat, allEvents, definition, names.data, version.data, s.environments]);
+
+  const openTaskId = live0 ? Object.values(live0.folded.openHumanTasks)[0] : undefined;
+  const task = useQuery({
+    queryKey: ["human-task", s.ws, openTaskId],
+    queryFn: () => get<HumanTaskDetail>(`/v1/human-tasks/${openTaskId as string}`),
+    enabled: Boolean(openTaskId),
+  });
+
+  const cancel = useMutation({
+    mutationFn: () => post(`/v1/runs/${runId}/cancel`, {}),
+    onSuccess: () => toast.success("Cancel requested; running nodes finish their current step"),
+    onError: (e) => toast.error(errorMessage(e)),
+  });
+  const replay = useMutation({
+    mutationFn: () => post<{ run_id: string }>(`/v1/runs/${runId}/replay`, {}),
+    onSuccess: (r) => router.push(`/${s.ws}/runs/${r.run_id}`),
+    onError: (e) => toast.error(errorMessage(e)),
+  });
+
+  if (detail.isError)
+    return <ErrorPanel error={detail.error} onRetry={() => void detail.refetch()} />;
+  if (events.isError)
+    return <ErrorPanel error={events.error} onRetry={() => void events.refetch()} />;
+  if (!live0) return <TraceSkeleton />;
+
+  const run = { ...live0.view };
+  if (task.data && openTaskId) {
+    const node = nodeIndex(definition).get(task.data.task.nodeId);
+    run.pendingApproval = taskToApproval(
+      task.data.task,
+      node?.name ?? task.data.task.nodeId,
+      run.nodeRuns,
+    );
+  }
+  const isLive = isActiveRun(run.status);
+  const byId = new Map(run.nodeRuns.map((n) => [n.id, n]));
+  const current = selected ? byId.get(selected) : undefined;
+  const attempts = current
+    ? run.nodeRuns
+        .filter((n) => n.nodeId === current.nodeId && (n.scope ?? "") === (current.scope ?? ""))
+        .sort((a, b) => a.attempt - b.attempt)
+    : [];
+  const selectNodeId = (nodeId: string) => {
+    const latest = [...run.nodeRuns].reverse().find((n) => n.nodeId === nodeId);
+    setSelected(latest?.id);
+  };
+  const defs = nodeIndex(definition);
+  const nodeInfo = Object.fromEntries(
+    [...defs.values()].map((n) => [
+      n.id,
+      { name: n.name, category: nodeCategory(n, cat ?? new Map()) },
+    ]),
+  );
+  const nodeNames = Object.fromEntries([...defs.values()].map((n) => [n.id, n.name]));
+  const logs = run.nodeRuns.flatMap((n) => n.logs ?? []).sort((a, b) => a.at.localeCompare(b.at));
+  const streamed = current ? live0.folded.streams[current.id] : undefined;
+
+  const panel = current ? (
+    <div className="w-[380px] shrink-0 border-l border-border bg-surface max-lg:hidden">
+      <NodeRunPanel
+        nodeRun={current}
+        attempts={attempts}
+        {...(streamed ? { streamed } : {})}
+        partial={stream.resumed && current.status === "running"}
+        onClose={() => setSelected(undefined)}
+      />
+    </div>
+  ) : null;
+
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex flex-col gap-3 border-b border-border px-6 py-4">
+        <RunHeader
+          run={run}
+          {...(isLive && s.can("runs:cancel") ? { onCancel: () => cancel.mutate() } : {})}
+          {...(s.can("runs:replay") ? { onReplay: () => replay.mutate() } : {})}
+          onOpenInBuilder={() => router.push(`/${s.ws}/workflows/${run.workflowId}`)}
+          {...(openTaskId
+            ? { onOpenReview: () => router.push(`/${s.ws}/human-tasks/${openTaskId}`) }
+            : {})}
+          cancelling={cancel.isPending}
+          actions={
+            s.features.evaluations && s.can("evaluations:write") && !isLive ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                leadingIcon={<FlaskConical strokeWidth={1.75} />}
+                onClick={() => setEvalOpen(true)}
+              >
+                Add to evaluation
+              </Button>
+            ) : undefined
+          }
+        />
+        {stream.status === "reconnecting" || stream.status === "failed" ? (
+          <p className="flex items-center gap-2 text-xs text-warn-text" role="status">
+            <WifiOff className="size-3.5" strokeWidth={1.75} />
+            {stream.status === "failed"
+              ? "Live updates stopped. Reload the page to see the latest state."
+              : `Live updates interrupted, reconnecting (attempt ${stream.attempt} of 5)…`}
+          </p>
+        ) : stream.resumed && isLive ? (
+          <p className="text-xs text-ink-3" role="status">
+            Stream resumed, partial text unavailable for nodes that were generating.
+          </p>
+        ) : null}
+      </div>
+      <Tabs
+        value={tab}
+        onValueChange={(v) => setTab(v as Tab)}
+        className="flex min-h-0 flex-1 flex-col"
+      >
+        <TabsList className="px-6">
+          {TABS.map((t) => (
+            <TabsTrigger key={t} value={t}>
+              {TAB_LABEL[t]}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+        <TabsContent value="timeline" className="flex min-h-0 flex-1">
+          <div className="min-w-0 flex-1 p-4">
+            <TraceTimeline
+              run={run}
+              live={isLive}
+              {...(selected ? { selectedNodeRunId: selected } : {})}
+              onSelectNode={(n: NodeRunView) => setSelected(n.id)}
+              className="h-full"
+            />
+          </div>
+          {panel}
+        </TabsContent>
+        <TabsContent value="graph" className="flex min-h-0 flex-1">
+          <div className="min-w-0 flex-1">
+            {definition && cat ? (
+              <RunGraph
+                definition={definition}
+                {...(version.data?.plan ? { plan: version.data.plan } : {})}
+                catalog={cat}
+                run={run}
+                follow={isLive}
+                onSelectNode={selectNodeId}
+              />
+            ) : version.isError ? (
+              <ErrorPanel error={version.error} />
+            ) : (
+              <Skeleton className="m-6 h-[420px]" />
+            )}
+          </div>
+          {panel}
+        </TabsContent>
+        <TabsContent value="events" className="min-h-0 flex-1 p-4">
+          <EventLog
+            events={durableEvents(allEvents)}
+            nodes={nodeInfo}
+            live={isLive}
+            className="h-full"
+          />
+        </TabsContent>
+        <TabsContent value="output" className="min-h-0 flex-1 overflow-auto p-6">
+          {run.error ? (
+            <div
+              className="mb-4 rounded-md border border-danger bg-danger-soft px-4 py-3 text-sm text-danger-text"
+              role="alert"
+            >
+              <p className="font-mono text-xs font-semibold">{run.error.code}</p>
+              <p className="mt-1">{run.error.message}</p>
+            </div>
+          ) : null}
+          {run.output !== undefined && run.output !== null ? (
+            <JsonView value={run.output} expandDepth={3} toolbar />
+          ) : !run.error ? (
+            <EmptyState
+              size="sm"
+              title={isLive ? "No output yet" : "This run produced no output"}
+              description={isLive ? "The output appears when an output node completes." : undefined}
+            />
+          ) : null}
+          <h3 className="mb-2 mt-8 text-2xs font-semibold uppercase tracking-wide text-ink-3">
+            Input
+          </h3>
+          <JsonView value={run.input ?? null} expandDepth={2} />
+        </TabsContent>
+        <TabsContent value="logs" className="min-h-0 flex-1 p-4">
+          <LogViewer lines={logs} nodeNames={nodeNames} live={isLive} className="h-full" />
+        </TabsContent>
+        <TabsContent value="cost" className="flex min-h-0 flex-1">
+          <div className="min-w-0 flex-1 overflow-auto p-6">
+            <CostPanel run={run} onSelect={(n) => setSelected(n.id)} />
+          </div>
+          {panel}
+        </TabsContent>
+      </Tabs>
+      {evalOpen ? (
+        <AddToEvaluationDialog
+          open={evalOpen}
+          onOpenChange={setEvalOpen}
+          ws={s.ws}
+          runId={runId}
+          workflowId={run.workflowId}
+          output={run.output}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+export function TraceSkeleton() {
+  return (
+    <div className="flex flex-col gap-4 px-6 py-5" aria-busy="true" aria-label="Loading run">
+      <Skeleton className="h-16 w-full" />
+      <Skeleton className="h-8 w-80" />
+      <Skeleton className="h-[420px] w-full" />
+    </div>
+  );
+}
