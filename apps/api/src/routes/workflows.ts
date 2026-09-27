@@ -8,6 +8,7 @@ import {
   createWorkflow,
   deploy,
   environments,
+  evaluationRuns,
   getVersion,
   publishVersion,
   saveDraft,
@@ -469,6 +470,44 @@ export function workflowRoutes(app: FastifyInstance, ctx: ApiContext): void {
           level: "publish",
         });
         if (!result.ok) throw new WorkflowValidationError(result.diagnostics);
+        if (req.body.requireEvaluation) {
+          const gate = req.body.requireEvaluation;
+          const [evaluated] = await tx
+            .select({ id: evaluationRuns.id, summary: evaluationRuns.summary })
+            .from(evaluationRuns)
+            .innerJoin(workflowVersions, eq(workflowVersions.id, evaluationRuns.workflowVersionId))
+            .where(
+              and(
+                eq(evaluationRuns.setId, gate.setId),
+                eq(evaluationRuns.status, "completed"),
+                eq(workflowVersions.planHash, result.plan.planHash),
+              ),
+            )
+            .orderBy(desc(evaluationRuns.createdAt))
+            .limit(1);
+          if (!evaluated)
+            throw new WorkflowValidationError([
+              {
+                code: "W_REGRESSION",
+                severity: "error",
+                message:
+                  "the publish gate needs a completed evaluation of this draft on the set; run it first (POST /v1/evaluations/runs with draft: true)",
+                location: { path: "/" },
+              },
+            ]);
+          const passRate = Number(
+            (evaluated.summary as { passRate?: number } | null)?.passRate ?? 0,
+          );
+          if (passRate < gate.minPassRate)
+            throw new EvaluationGateFailed(
+              `the evaluation pass rate ${(passRate * 100).toFixed(1)}% is below the gate of ${(gate.minPassRate * 100).toFixed(1)}%`,
+              {
+                evaluationRunId: evaluated.id,
+                summary: evaluated.summary,
+                gate,
+              },
+            );
+        }
         const hash = definitionHash(w.draft);
         if (w.latestVersionId) {
           const latest = await getVersion(tx, w.latestVersionId);
@@ -712,6 +751,13 @@ export function workflowRoutes(app: FastifyInstance, ctx: ApiContext): void {
       }));
     },
   );
+}
+
+/** 422: the publish gate's evaluation did not pass. */
+export class EvaluationGateFailed extends FlowaidError {
+  readonly code = "WORKFLOW_VALIDATION_ERROR" as const;
+  readonly retryable = false;
+  override readonly httpStatus = 422;
 }
 
 /** 412 for `If-Match` mismatches, with the current revision (API.md §2). */

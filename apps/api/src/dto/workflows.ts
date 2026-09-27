@@ -79,6 +79,10 @@ export const PublishRequestSchema = z.object({
   notes: z.string().max(4000).optional(),
   label: z.string().max(100).optional(),
   deployTo: z.array(z.uuid()).max(10).optional(),
+  /** publish only when an evaluation of this exact draft (by plan hash) on the set reaches minPassRate */
+  requireEvaluation: z
+    .object({ setId: z.uuid(), minPassRate: z.number().min(0).max(1) })
+    .optional(),
 });
 
 export const WorkflowVersionSummarySchema = z.object({

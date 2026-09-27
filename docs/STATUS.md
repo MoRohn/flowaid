@@ -70,4 +70,4 @@ restart from a known state. The repository is published at
 
 ## Loose ends
 
-None open from the 2026-09-23 list. Next on the critical path: the rest of P3-01 (evaluations with the worker job, external review links, the /mcp endpoint), then P3-02 hardening, then P3 (API, worker). Tracks J and L continue alongside where they are buildable.
+None open from the 2026-09-23 list. Next on the critical path: the rest of P3-01 (external review links, the /mcp endpoint), then P3-02 hardening, then P3 (API, worker). Tracks J and L continue alongside where they are buildable.

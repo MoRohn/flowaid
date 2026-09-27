@@ -138,6 +138,17 @@ async function resolveVersion(
   return v;
 }
 
+/** The version a run (or an evaluation) uses: pinned, the draft (compiled), or the deployment. */
+export function resolveRunVersion(
+  tx: Tx,
+  p: Principal,
+  workflowId: string,
+  environmentId: string,
+  r: { versionId?: string | undefined; draft?: boolean | undefined },
+): Promise<WorkflowVersionRow> {
+  return resolveVersion(tx, p, workflowId, environmentId, { input: null, mode: "async", ...r });
+}
+
 export function hashRequest(workflowId: string, r: StartRunRequest): string {
   return createHash("sha256")
     .update(

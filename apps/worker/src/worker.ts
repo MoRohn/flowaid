@@ -27,6 +27,7 @@ import { openaiFactories } from "@flowaid/provider-openai";
 import { typesafeFactory } from "@flowaid/provider-typesafe";
 import { uuidv7 } from "@flowaid/shared";
 import type {
+  DecisionProvider,
   EventBus,
   ExecutionPlan,
   Job,
@@ -52,6 +53,7 @@ import {
 } from "./services/credentials.js";
 import { stateAccessFor } from "./services/state.js";
 import { toolAccessFor } from "./services/tools.js";
+import { runEvaluationJob } from "./jobs/evaluation.js";
 
 export interface WorkerLogger {
   info(data: Record<string, unknown>, msg: string): void;
@@ -76,6 +78,8 @@ export interface WorkerDeps {
   concurrency?: number;
   allowPrivateNetwork?: boolean;
   log?: WorkerLogger;
+  /** judge provider and timing for evaluation runs */
+  evaluation?: { judge?: DecisionProvider; caseTimeoutMs?: number; pollMs?: number };
   maintenance?: { timerPollMs?: number; heartbeatMs?: number; reapMs?: number };
 }
 
@@ -366,9 +370,21 @@ export function createWorker(deps: WorkerDeps): Worker {
       const concurrency = deps.concurrency ?? 8;
       const general = await deps.queue.consume("run:general", handle, { concurrency });
       const control = await deps.queue.consume("run:control", handle, { concurrency: 2 });
+      const evaluation = await deps.queue.consume(
+        "evaluation",
+        async (job) => {
+          if (job.type === "evaluation.run")
+            await runEvaluationJob(
+              { db: deps.db, queue: deps.queue, ...(deps.evaluation ?? {}) },
+              job.evaluationRunId,
+            );
+        },
+        { concurrency: 2 },
+      );
       stops.push(
         () => general.stop(),
         () => control.stop(),
+        () => evaluation.stop(),
       );
       // Terminal runs: release their credentials and complete subflows into their parents.
       const unsub = await deps.bus.subscribe(RUN_EVENTS_CHANNEL, (m) => {

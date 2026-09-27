@@ -27,6 +27,7 @@ import { credentialRoutes } from "./routes/credentials.js";
 import { toolRoutes } from "./routes/tools.js";
 import { ingressRoutes } from "./routes/ingress.js";
 import { triggerRoutes } from "./routes/triggers.js";
+import { evaluationRoutes } from "./routes/evaluations.js";
 import { workflowRoutes } from "./routes/workflows.js";
 import "./types.js";
 
@@ -101,6 +102,7 @@ export async function buildServer(ctx: ApiContext, o: BuildOptions = {}): Promis
   toolRoutes(app, ctx);
   triggerRoutes(app, ctx);
   ingressRoutes(app, ctx);
+  evaluationRoutes(app, ctx);
   for (const register of o.routes ?? []) register(app, ctx);
   return app;
 }
