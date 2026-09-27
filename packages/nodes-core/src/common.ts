@@ -171,6 +171,33 @@ export async function decide(
   }
 }
 
+/** A chat message on a port (`flowaid.ai.prompt` builds them, `flowaid.ai.generate` accepts them). */
+export const chatMessageSchema = z.object({
+  role: z.enum(["system", "user", "assistant", "tool"]),
+  content: z.union([
+    z.string(),
+    z.array(
+      z.union([
+        z.object({ type: z.literal("text"), text: z.string() }),
+        z.object({ type: z.literal("image"), mimeType: z.string(), data: z.string() }),
+      ]),
+    ),
+  ]),
+  toolCallId: z.string().optional(),
+});
+
+/** OpenAI-compatible endpoint root and headers from an `openai.api_key` credential. */
+export function openaiEndpoint(cred: Record<string, string>): {
+  base: string;
+  headers: Record<string, string>;
+} {
+  const base = (cred.baseUrl ?? "https://api.openai.com/v1").replace(/\/+$/, "");
+  const headers: Record<string, string> = {};
+  if (cred.apiKey) headers.authorization = `Bearer ${cred.apiKey}`;
+  if (cred.organization) headers["openai-organization"] = cred.organization;
+  return { base, headers };
+}
+
 /** `ok` with the decision's usage and cost. */
 export function withSpend<T>(
   output: T,

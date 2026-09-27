@@ -128,6 +128,26 @@ export const CREDENTIAL_TYPES: readonly CredentialType[] = [
       ),
   },
   {
+    id: "cohere.api_key",
+    name: "Cohere API key",
+    description: "Key for Cohere's API (rerank models). Set baseUrl for a private deployment.",
+    schema: z.strictObject({ apiKey: secret(), baseUrl: url().optional() }),
+    test: (v, http, signal) =>
+      probe(
+        http,
+        signal,
+        `${v.baseUrl ?? "https://api.cohere.com"}/v1/models`,
+        bearer(v.apiKey ?? ""),
+        "Cohere",
+      ),
+  },
+  {
+    id: "jina.api_key",
+    name: "Jina AI API key",
+    description: "Key for Jina AI's API (rerank and embedding models).",
+    schema: z.strictObject({ apiKey: secret(), baseUrl: url().optional() }),
+  },
+  {
     id: "ollama.host",
     name: "Ollama server",
     description:

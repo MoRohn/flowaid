@@ -74,6 +74,9 @@ const TYPE_TAIL_VARIANT: Record<string, NodeCardVariant> = {
   "tools.code": "code",
   "tools.shell": "code",
   "ai.agent": "agent",
+  "ai.rerank": "retrieval",
+  "tools.db_query": "tool",
+  "tools.graphql": "tool",
 };
 const TYPE_GROUP_VARIANT: Record<string, NodeCardVariant> = {
   ai: "generation",

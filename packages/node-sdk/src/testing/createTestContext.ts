@@ -11,6 +11,7 @@ import {
   ProviderError,
   type DecisionProvider,
   type EmbeddingProvider,
+  type RerankProvider,
   type GenerationProvider,
   type Idempotency,
   type JsonObject,
@@ -60,6 +61,7 @@ export interface TestContextOptions<C = JsonObject> {
     decision?: DecisionProvider | ((chain: readonly ProviderHop[]) => DecisionProvider);
     generation?: GenerationProvider | ((ref: ModelRef) => GenerationProvider);
     embedding?: EmbeddingProvider | ((ref: ModelRef) => EmbeddingProvider);
+    rerank?: RerankProvider | ((ref: ModelRef) => RerankProvider);
   };
   tools?: readonly TestTool[];
   http?: SafeFetch;
@@ -167,6 +169,7 @@ export function createTestContext<C = JsonObject>(
       decision: (chain) => pick(options.providers?.decision, chain, "decision"),
       generation: (ref) => pick(options.providers?.generation, ref, "generation"),
       embedding: (ref) => pick(options.providers?.embedding, ref, "embedding"),
+      rerank: (ref) => pick(options.providers?.rerank, ref, "rerank"),
     },
     tools: {
       list: () => Promise.resolve(tools.map((t) => t.definition)),

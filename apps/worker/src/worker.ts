@@ -20,7 +20,7 @@ import {
 import { McpSessionPool, connectSession, type StdioPolicy } from "@flowaid/mcp";
 import type { NodePackage } from "@flowaid/node-sdk";
 import { coreNodes } from "@flowaid/nodes-core";
-import { DefaultModelCatalog, ProviderRegistry } from "@flowaid/providers";
+import { DefaultModelCatalog, ProviderRegistry, rerankFactories } from "@flowaid/providers";
 import { anthropicFactory } from "@flowaid/provider-anthropic";
 import { ollamaEmbeddingFactory, ollamaFactory } from "@flowaid/provider-ollama";
 import { openaiFactories } from "@flowaid/provider-openai";
@@ -100,6 +100,7 @@ export function defaultProviderRegistry(): ProviderRegistry {
   registry.register(anthropicFactory());
   registry.register(ollamaFactory());
   registry.register(ollamaEmbeddingFactory());
+  for (const f of rerankFactories()) registry.register(f);
   return registry;
 }
 

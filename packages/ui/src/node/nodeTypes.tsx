@@ -117,7 +117,7 @@ export type FlowNodeProps = NodeProps<FlowNode>;
 type CardComponent = ComponentType<NodeCardBaseProps & NodeCardExtras>;
 
 /** The card component per variant (notes render `NoteCard`, which takes no run or handles). */
-const VARIANT_CARDS: Record<Exclude<NodeCardVariant, "note">, CardComponent> = {
+export const VARIANT_CARDS: Record<Exclude<NodeCardVariant, "note">, CardComponent> = {
   start: StartNodeCard,
   end: EndNodeCard,
   decision: DecisionNodeCard,

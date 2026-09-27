@@ -1809,6 +1809,14 @@ export interface EmbeddingProvider {
   health(): ProviderHealth;
 }
 
+/** RFC-0004: reranks documents against a query; one relevance score per document, in input order. */
+export interface RerankProvider {
+  readonly id: string;
+  readonly model: string;
+  rerank(query: string, docs: string[], ctx: DecisionCallContext): Promise<{ scores: number[]; usage?: TokenUsage; costUsd: number }>;
+  health(): ProviderHealth;
+}
+
 export interface ModelInfo {
   provider: string;
   model: string;
@@ -1822,9 +1830,9 @@ export interface ModelInfo {
 }
 
 /** A provider factory registered by a provider package or a node package. */
-export interface ProviderFactory<T extends DecisionProvider | GenerationProvider | EmbeddingProvider> {
+export interface ProviderFactory<T extends DecisionProvider | GenerationProvider | EmbeddingProvider | RerankProvider> {
   id: string;
-  kind: 'decision' | 'generation' | 'embedding';
+  kind: 'decision' | 'generation' | 'embedding' | 'rerank';
   /** credential type this provider needs (undefined for rule/human/ollama-without-auth) */
   credentialType?: string;
   create(opts: { model: string; credential: Record<string, string> | undefined; options?: JsonObject; http: SafeFetch; catalog: ModelCatalog }): T;
@@ -1889,6 +1897,8 @@ export interface ProviderAccess {
   decision(chain: readonly ProviderHop[], opts?: { credentialSlot?: string }): DecisionProvider;
   generation(ref: ModelRef, opts?: { credentialSlot?: string }): GenerationProvider;
   embedding(ref: ModelRef, opts?: { credentialSlot?: string }): EmbeddingProvider;
+  /** RFC-0004 */
+  rerank(ref: ModelRef, opts?: { credentialSlot?: string }): RerankProvider;
 }
 export interface ToolAccess {
   list(): Promise<ToolDefinition[]>;
@@ -2029,7 +2039,7 @@ export interface NodePackage {
   version: Semver;
   nodes: readonly AnyNodeDefinition[];
   credentialTypes?: readonly CredentialTypeDefinition[];
-  providers?: readonly ProviderFactory<DecisionProvider | GenerationProvider | EmbeddingProvider>[];
+  providers?: readonly ProviderFactory<DecisionProvider | GenerationProvider | EmbeddingProvider | RerankProvider>[];
   /** SDK semver range the package was built against */
   sdk: string;
 }

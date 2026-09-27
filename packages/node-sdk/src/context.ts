@@ -43,6 +43,7 @@ export const CAPABILITY_SERVICES: Readonly<Record<string, NodeCapability>> = {
   "providers.decision": "decision",
   "providers.generation": "generation",
   "providers.embedding": "generation",
+  "providers.rerank": "generation",
   sandbox: "sandbox",
 };
 
@@ -95,6 +96,9 @@ export function scopeContext<C>(
     embedding: has("generation")
       ? (ref, opts) => ctx.providers.embedding(ref, opts)
       : () => forbidden("generation", "ctx.providers.embedding"),
+    rerank: has("generation")
+      ? (ref, opts) => ctx.providers.rerank(ref, opts)
+      : () => forbidden("generation", "ctx.providers.rerank"),
   };
   const sandbox: SandboxAccess | undefined = has("sandbox")
     ? ctx.sandbox

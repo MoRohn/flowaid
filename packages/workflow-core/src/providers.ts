@@ -201,6 +201,18 @@ export interface EmbeddingProvider {
   health(): ProviderHealth;
 }
 
+/** RFC-0004: reranks documents against a query; one relevance score per document, in input order. */
+export interface RerankProvider {
+  readonly id: string;
+  readonly model: string;
+  rerank(
+    query: string,
+    docs: string[],
+    ctx: DecisionCallContext,
+  ): Promise<{ scores: number[]; usage?: TokenUsage; costUsd: number }>;
+  health(): ProviderHealth;
+}
+
 /** Catalog entry for one model. */
 export interface ModelInfo {
   provider: string;
@@ -216,10 +228,10 @@ export interface ModelInfo {
 
 /** A provider factory registered by a provider package or a node package. */
 export interface ProviderFactory<
-  T extends DecisionProvider | GenerationProvider | EmbeddingProvider,
+  T extends DecisionProvider | GenerationProvider | EmbeddingProvider | RerankProvider,
 > {
   id: string;
-  kind: "decision" | "generation" | "embedding";
+  kind: "decision" | "generation" | "embedding" | "rerank";
   /** credential type this provider needs (undefined for rule/human/ollama-without-auth) */
   credentialType?: string;
   create(opts: {

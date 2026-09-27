@@ -2136,9 +2136,87 @@
           "inputs": [
             {
               "name": "prompt",
-              "required": true,
+              "required": false,
               "schema": {
                 "type": "string"
+              }
+            },
+            {
+              "name": "messages",
+              "required": false,
+              "schema": {
+                "items": {
+                  "properties": {
+                    "content": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "items": {
+                            "anyOf": [
+                              {
+                                "properties": {
+                                  "text": {
+                                    "type": "string"
+                                  },
+                                  "type": {
+                                    "const": "text",
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "type",
+                                  "text"
+                                ],
+                                "type": "object"
+                              },
+                              {
+                                "properties": {
+                                  "data": {
+                                    "type": "string"
+                                  },
+                                  "mimeType": {
+                                    "type": "string"
+                                  },
+                                  "type": {
+                                    "const": "image",
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "type",
+                                  "mimeType",
+                                  "data"
+                                ],
+                                "type": "object"
+                              }
+                            ]
+                          },
+                          "type": "array"
+                        }
+                      ]
+                    },
+                    "role": {
+                      "enum": [
+                        "system",
+                        "user",
+                        "assistant",
+                        "tool"
+                      ],
+                      "type": "string"
+                    },
+                    "toolCallId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "role",
+                    "content"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
               }
             }
           ],
@@ -6185,7 +6263,7 @@
     ],
     "type": "object"
   },
-  "planHash": "8f9fad259fd31808a823a50aa6d4ec48cc7a0c5b769d81a5dc6addc21e62af0f",
+  "planHash": "bd667947ae656e3f86b17e161b3ad2aad20bfcda5fdcb97b1593be07478f52fe",
   "planVersion": 1,
   "pools": [
     "general"

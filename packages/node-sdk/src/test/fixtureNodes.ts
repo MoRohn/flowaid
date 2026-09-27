@@ -232,7 +232,26 @@ export const generateNode = defineNode({
     maxOutputTokens: z.int().min(1).max(65536).default(1024),
     stream: z.boolean().default(true),
   }),
-  inputSchema: z.object({ prompt: z.string() }),
+  inputSchema: z.object({
+    prompt: z.string().optional(),
+    messages: z
+      .array(
+        z.object({
+          role: z.enum(["system", "user", "assistant", "tool"]),
+          content: z.union([
+            z.string(),
+            z.array(
+              z.union([
+                z.object({ type: z.literal("text"), text: z.string() }),
+                z.object({ type: z.literal("image"), mimeType: z.string(), data: z.string() }),
+              ]),
+            ),
+          ]),
+          toolCallId: z.string().optional(),
+        }),
+      )
+      .optional(),
+  }),
   outputSchema: z.object({ text: z.string(), finish_reason: z.string(), usage: usage.loose() }),
   credentials: [
     { name: "llm", types: ["openai.api_key", "anthropic.api_key", "ollama.none"], required: true },

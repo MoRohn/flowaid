@@ -18,6 +18,7 @@ import type {
   DecisionResult,
   DecisionState,
   EmbeddingProvider,
+  RerankProvider,
   GenerationChunk,
   GenerationProvider,
   GenerationRequest,
@@ -217,5 +218,16 @@ export function registryProviderAccess(
     };
   };
 
-  return { decision, generation, embedding };
+  const rerank = (ref: ModelRef): RerankProvider => {
+    let resolved: Promise<RerankProvider> | null = null;
+    const get = () => (resolved ??= registry.rerank(ref, resolveCtx));
+    return {
+      id: ref.provider,
+      model: ref.model,
+      rerank: async (query, docs, ctx) => (await get()).rerank(query, docs, ctx),
+      health: () => HEALTHY,
+    };
+  };
+
+  return { decision, generation, embedding, rerank };
 }

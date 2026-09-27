@@ -221,9 +221,87 @@
       "inputs": [
         {
           "name": "prompt",
-          "required": true,
+          "required": false,
           "schema": {
             "type": "string"
+          }
+        },
+        {
+          "name": "messages",
+          "required": false,
+          "schema": {
+            "items": {
+              "properties": {
+                "content": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "items": {
+                        "anyOf": [
+                          {
+                            "properties": {
+                              "text": {
+                                "type": "string"
+                              },
+                              "type": {
+                                "const": "text",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "type",
+                              "text"
+                            ],
+                            "type": "object"
+                          },
+                          {
+                            "properties": {
+                              "data": {
+                                "type": "string"
+                              },
+                              "mimeType": {
+                                "type": "string"
+                              },
+                              "type": {
+                                "const": "image",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "type",
+                              "mimeType",
+                              "data"
+                            ],
+                            "type": "object"
+                          }
+                        ]
+                      },
+                      "type": "array"
+                    }
+                  ]
+                },
+                "role": {
+                  "enum": [
+                    "system",
+                    "user",
+                    "assistant",
+                    "tool"
+                  ],
+                  "type": "string"
+                },
+                "toolCallId": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "role",
+                "content"
+              ],
+              "type": "object"
+            },
+            "type": "array"
           }
         }
       ],
@@ -282,6 +360,680 @@
       "pool": "general",
       "portRules": [],
       "streams": true,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [
+        "network",
+        "credentials",
+        "artifacts"
+      ],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "default": 1,
+            "maximum": 10,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "model": {
+            "default": "gpt-image-1",
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "prompt": {
+            "maxLength": 32000,
+            "minLength": 1,
+            "type": "string",
+            "x-ui": {
+              "widget": "template"
+            }
+          },
+          "quality": {
+            "default": "auto",
+            "enum": [
+              "auto",
+              "low",
+              "medium",
+              "high"
+            ],
+            "type": "string",
+            "x-ui": {
+              "widget": "select"
+            }
+          },
+          "size": {
+            "default": "1024x1024",
+            "enum": [
+              "auto",
+              "1024x1024",
+              "1024x1536",
+              "1536x1024",
+              "512x512",
+              "256x256"
+            ],
+            "type": "string",
+            "x-ui": {
+              "widget": "select"
+            }
+          }
+        },
+        "required": [
+          "prompt"
+        ],
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [
+        {
+          "name": "llm",
+          "required": true,
+          "types": [
+            "openai.api_key"
+          ]
+        }
+      ],
+      "defaultPolicy": {
+        "timeoutMs": 300000
+      },
+      "generation": false,
+      "id": "flowaid.ai.image",
+      "idempotency": "none",
+      "inputs": [],
+      "metadata": {
+        "category": "generation",
+        "description": "Generates images from a prompt with an OpenAI-compatible /images/generations endpoint and stores each as an artifact.",
+        "icon": "image",
+        "name": "Generate image",
+        "summary": "{{ config.model }} {{ config.size }}",
+        "tags": [
+          "image",
+          "generation"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "artifacts",
+          "required": true,
+          "schema": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "$artifact": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "$artifact"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "name": "revised_prompts",
+          "required": true,
+          "schema": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "historyLimit": {
+            "default": 20,
+            "maximum": 200,
+            "minimum": 0,
+            "type": "integer",
+            "x-ui": {
+              "help": "Most recent history messages kept; system messages in history are dropped."
+            }
+          },
+          "system": {
+            "maxLength": 32000,
+            "type": "string",
+            "x-ui": {
+              "help": "Rendered with the upstream values ({{ node.port }}).",
+              "widget": "template"
+            }
+          },
+          "user": {
+            "maxLength": 64000,
+            "minLength": 1,
+            "type": "string",
+            "x-ui": {
+              "widget": "template"
+            }
+          }
+        },
+        "required": [
+          "user"
+        ],
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [],
+      "defaultPolicy": {
+        "timeoutMs": 5000
+      },
+      "generation": false,
+      "id": "flowaid.ai.prompt",
+      "idempotency": "safe",
+      "inputs": [
+        {
+          "name": "history",
+          "required": false,
+          "schema": {
+            "items": {
+              "properties": {
+                "content": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "items": {
+                        "anyOf": [
+                          {
+                            "properties": {
+                              "text": {
+                                "type": "string"
+                              },
+                              "type": {
+                                "const": "text",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "type",
+                              "text"
+                            ],
+                            "type": "object"
+                          },
+                          {
+                            "properties": {
+                              "data": {
+                                "type": "string"
+                              },
+                              "mimeType": {
+                                "type": "string"
+                              },
+                              "type": {
+                                "const": "image",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "type",
+                              "mimeType",
+                              "data"
+                            ],
+                            "type": "object"
+                          }
+                        ]
+                      },
+                      "type": "array"
+                    }
+                  ]
+                },
+                "role": {
+                  "enum": [
+                    "system",
+                    "user",
+                    "assistant",
+                    "tool"
+                  ],
+                  "type": "string"
+                },
+                "toolCallId": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "role",
+                "content"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        }
+      ],
+      "metadata": {
+        "category": "generation",
+        "description": "Builds a chat conversation from a system and a user template plus the recent history (for example from session state). Feed `messages` to Generate text.",
+        "icon": "message-square-text",
+        "name": "Prompt",
+        "summary": "prompt",
+        "tags": [
+          "llm",
+          "prompt",
+          "messages"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "messages",
+          "required": true,
+          "schema": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "content": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "items": {
+                        "anyOf": [
+                          {
+                            "additionalProperties": false,
+                            "properties": {
+                              "text": {
+                                "type": "string"
+                              },
+                              "type": {
+                                "const": "text",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "type",
+                              "text"
+                            ],
+                            "type": "object"
+                          },
+                          {
+                            "additionalProperties": false,
+                            "properties": {
+                              "data": {
+                                "type": "string"
+                              },
+                              "mimeType": {
+                                "type": "string"
+                              },
+                              "type": {
+                                "const": "image",
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "type",
+                              "mimeType",
+                              "data"
+                            ],
+                            "type": "object"
+                          }
+                        ]
+                      },
+                      "type": "array"
+                    }
+                  ]
+                },
+                "role": {
+                  "enum": [
+                    "system",
+                    "user",
+                    "assistant",
+                    "tool"
+                  ],
+                  "type": "string"
+                },
+                "toolCallId": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "role",
+                "content"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "name": "count",
+          "required": true,
+          "schema": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [
+        "generation",
+        "credentials"
+      ],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "minScore": {
+            "maximum": 1000,
+            "minimum": -1000,
+            "type": "number"
+          },
+          "model": {
+            "properties": {
+              "model": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "provider": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "provider",
+              "model"
+            ],
+            "type": "object",
+            "x-ui": {
+              "widget": "model"
+            }
+          },
+          "textField": {
+            "default": "text",
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string",
+            "x-ui": {
+              "help": "Field read when documents are objects."
+            }
+          },
+          "topK": {
+            "default": 5,
+            "maximum": 1000,
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "model"
+        ],
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [
+        {
+          "description": "Key for the rerank provider (openai.api_key with a baseUrl for rerank-compatible servers).",
+          "name": "rerank",
+          "required": true,
+          "types": [
+            "cohere.api_key",
+            "jina.api_key",
+            "openai.api_key"
+          ]
+        }
+      ],
+      "defaultPolicy": {
+        "timeoutMs": 60000
+      },
+      "generation": true,
+      "id": "flowaid.ai.rerank",
+      "idempotency": "safe",
+      "inputs": [
+        {
+          "name": "query",
+          "required": true,
+          "schema": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        {
+          "name": "documents",
+          "required": true,
+          "schema": {
+            "items": {},
+            "type": "array"
+          }
+        }
+      ],
+      "metadata": {
+        "category": "retrieval",
+        "description": "Orders documents by relevance to a query with a rerank model (Cohere, Jina or any OpenAI-compatible /rerank endpoint) and keeps the best `topK` above `minScore`.",
+        "icon": "list-ordered",
+        "name": "Rerank",
+        "summary": "{{ config.model.provider }}/{{ config.model.model }}",
+        "tags": [
+          "retrieval",
+          "rerank",
+          "rag"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "documents",
+          "required": true,
+          "schema": {
+            "items": {},
+            "type": "array"
+          }
+        },
+        {
+          "name": "scores",
+          "required": true,
+          "schema": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "name": "indices",
+          "required": true,
+          "schema": {
+            "items": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": "array"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [
+        "network",
+        "credentials",
+        "artifacts"
+      ],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "default": "mp3",
+            "enum": [
+              "mp3",
+              "opus",
+              "aac",
+              "flac",
+              "wav",
+              "pcm"
+            ],
+            "type": "string",
+            "x-ui": {
+              "showWhen": {
+                "equals": "synthesize",
+                "path": "/mode"
+              },
+              "widget": "select"
+            }
+          },
+          "language": {
+            "pattern": "^[a-z]{2}(-[A-Z]{2})?$",
+            "type": "string",
+            "x-ui": {
+              "showWhen": {
+                "equals": "transcribe",
+                "path": "/mode"
+              }
+            }
+          },
+          "mode": {
+            "default": "transcribe",
+            "enum": [
+              "transcribe",
+              "synthesize"
+            ],
+            "type": "string",
+            "x-ui": {
+              "widget": "select"
+            }
+          },
+          "model": {
+            "default": "gpt-4o-mini-transcribe",
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string",
+            "x-ui": {
+              "help": "e.g. gpt-4o-mini-transcribe or whisper-1; gpt-4o-mini-tts or tts-1."
+            }
+          },
+          "voice": {
+            "default": "alloy",
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string",
+            "x-ui": {
+              "showWhen": {
+                "equals": "synthesize",
+                "path": "/mode"
+              }
+            }
+          }
+        },
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [
+        {
+          "name": "llm",
+          "required": true,
+          "types": [
+            "openai.api_key"
+          ]
+        }
+      ],
+      "defaultPolicy": {
+        "timeoutMs": 180000
+      },
+      "generation": false,
+      "id": "flowaid.ai.speech",
+      "idempotency": "safe",
+      "inputs": [
+        {
+          "name": "audio",
+          "required": false,
+          "schema": {
+            "properties": {
+              "$artifact": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "$artifact"
+            ],
+            "type": "object"
+          }
+        },
+        {
+          "name": "text",
+          "required": false,
+          "schema": {
+            "maxLength": 4096,
+            "type": "string"
+          }
+        }
+      ],
+      "metadata": {
+        "category": "generation",
+        "description": "Transcribes audio to text, or synthesises speech from text into an audio artifact, with an OpenAI-compatible /audio endpoint.",
+        "icon": "audio-lines",
+        "name": "Speech",
+        "summary": "{{ config.mode }} {{ config.model }}",
+        "tags": [
+          "audio",
+          "speech",
+          "transcription",
+          "tts"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "text",
+          "required": true,
+          "schema": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        {
+          "name": "audio",
+          "required": true,
+          "schema": {
+            "anyOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "$artifact": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "$artifact"
+                ],
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
       "version": "1.0.0"
     },
     {
@@ -426,6 +1178,176 @@
           "port": "structured"
         }
       ],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [
+        "generation",
+        "credentials",
+        "artifacts"
+      ],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "maxOutputTokens": {
+            "default": 1024,
+            "maximum": 65536,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "model": {
+            "properties": {
+              "model": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "provider": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "provider",
+              "model"
+            ],
+            "type": "object",
+            "x-ui": {
+              "widget": "model"
+            }
+          },
+          "prompt": {
+            "maxLength": 32000,
+            "minLength": 1,
+            "type": "string",
+            "x-ui": {
+              "widget": "template"
+            }
+          },
+          "system": {
+            "maxLength": 32000,
+            "type": "string",
+            "x-ui": {
+              "widget": "template"
+            }
+          },
+          "temperature": {
+            "default": 0.2,
+            "maximum": 2,
+            "minimum": 0,
+            "type": "number"
+          }
+        },
+        "required": [
+          "model",
+          "prompt"
+        ],
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [
+        {
+          "name": "llm",
+          "required": true,
+          "types": [
+            "openai.api_key",
+            "anthropic.api_key",
+            "ollama.none"
+          ]
+        }
+      ],
+      "defaultPolicy": {
+        "timeoutMs": 120000
+      },
+      "generation": true,
+      "id": "flowaid.ai.vision",
+      "idempotency": "safe",
+      "inputs": [
+        {
+          "name": "images",
+          "required": true,
+          "schema": {
+            "items": {
+              "anyOf": [
+                {
+                  "properties": {
+                    "$artifact": {
+                      "minLength": 1,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "$artifact"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "description": "A data: URL or base64 image",
+                  "minLength": 1,
+                  "type": "string"
+                }
+              ]
+            },
+            "maxItems": 16,
+            "minItems": 1,
+            "type": "array"
+          }
+        }
+      ],
+      "metadata": {
+        "category": "generation",
+        "description": "Asks a vision-capable chat model about one or more images (artifacts or data URLs) and returns its answer.",
+        "icon": "scan-eye",
+        "name": "Vision",
+        "summary": "{{ config.model.provider }}/{{ config.model.model }}",
+        "tags": [
+          "llm",
+          "vision",
+          "image"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "text",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "finish_reason",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "usage",
+          "required": true,
+          "schema": {
+            "additionalProperties": false,
+            "properties": {
+              "inputTokens": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "outputTokens": {
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "inputTokens",
+              "outputTokens"
+            ],
+            "type": "object"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
       "streams": false,
       "version": "1.0.0"
     },
@@ -3600,6 +4522,92 @@
       "configSchema": {
         "additionalProperties": false,
         "properties": {
+          "includeVars": {
+            "default": false,
+            "type": "boolean",
+            "x-ui": {
+              "widget": "switch"
+            }
+          },
+          "label": {
+            "default": "debug",
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "level": {
+            "default": "debug",
+            "enum": [
+              "debug",
+              "info",
+              "warn"
+            ],
+            "type": "string",
+            "x-ui": {
+              "widget": "select"
+            }
+          },
+          "show": {
+            "default": "value",
+            "enum": [
+              "value",
+              "shape"
+            ],
+            "type": "string",
+            "x-ui": {
+              "help": "The shape hides the content (types, sizes, keys).",
+              "widget": "select"
+            }
+          }
+        },
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [],
+      "defaultPolicy": {
+        "timeoutMs": 5000
+      },
+      "generation": false,
+      "id": "flowaid.dev.debug",
+      "idempotency": "safe",
+      "inputs": [
+        {
+          "name": "value",
+          "required": false,
+          "schema": {}
+        }
+      ],
+      "metadata": {
+        "category": "developer",
+        "description": "Logs a value (in full or its shape) with a label, the run's variables when asked, and passes the value through unchanged.",
+        "icon": "bug",
+        "name": "Debug",
+        "summary": "{{ config.label }}",
+        "tags": [
+          "developer",
+          "debug",
+          "log"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "value",
+          "required": true,
+          "schema": {}
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
           "includeValue": {
             "default": true,
             "type": "boolean",
@@ -3851,6 +4859,213 @@
           "path": "/ports"
         }
       ],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "assertions": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "check": {
+                  "maxLength": 4000,
+                  "minLength": 1,
+                  "type": "string",
+                  "x-ui": {
+                    "help": "Must be true. `$scope.item` is the actual value, `$vars` the workflow variables.",
+                    "language": "flowexpr-item",
+                    "widget": "code"
+                  }
+                },
+                "name": {
+                  "maxLength": 200,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "check"
+              ],
+              "type": "object"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "type": "array"
+          }
+        },
+        "required": [
+          "assertions"
+        ],
+        "type": "object"
+      },
+      "controlPorts": [
+        {
+          "description": "Every assertion held.",
+          "label": "Pass",
+          "name": "pass"
+        },
+        {
+          "description": "At least one assertion did not hold.",
+          "label": "Fail",
+          "name": "fail"
+        }
+      ],
+      "credentials": [],
+      "defaultPolicy": {
+        "timeoutMs": 10000
+      },
+      "generation": false,
+      "id": "flowaid.dev.test",
+      "idempotency": "safe",
+      "inputs": [
+        {
+          "name": "actual",
+          "required": true,
+          "schema": {}
+        }
+      ],
+      "metadata": {
+        "category": "developer",
+        "description": "Runs named assertions (FlowExpr) against a value and fires `pass` or `fail` with every result, without failing the run. Meant for drafts and evaluations, not production traffic.",
+        "icon": "flask-conical",
+        "name": "Test",
+        "summary": "{{ config.assertions.length }} assertions",
+        "tags": [
+          "developer",
+          "test",
+          "assertion"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "passed",
+          "required": true,
+          "schema": {
+            "type": "boolean"
+          }
+        },
+        {
+          "name": "results",
+          "required": true,
+          "schema": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "error": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "passed": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "name",
+                "passed"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "name": "failures",
+          "required": true,
+          "schema": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "attributes": {
+            "additionalProperties": {
+              "maxLength": 256,
+              "type": "string"
+            },
+            "default": {},
+            "propertyNames": {
+              "pattern": "^[a-z][a-z0-9_]{0,63}$"
+            },
+            "type": "object",
+            "x-ui": {
+              "help": "Templated values are rendered per run.",
+              "widget": "keyvalue"
+            }
+          },
+          "name": {
+            "pattern": "^[a-z][a-z0-9_.-]{0,63}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [],
+      "defaultPolicy": {
+        "timeoutMs": 5000
+      },
+      "generation": false,
+      "id": "flowaid.dev.trace",
+      "idempotency": "safe",
+      "inputs": [
+        {
+          "name": "value",
+          "required": false,
+          "schema": {}
+        }
+      ],
+      "metadata": {
+        "category": "developer",
+        "description": "Puts a named marker on the run timeline (a log line and a `trace.marker` metric with the name as a label), with optional attributes, and passes the value through.",
+        "icon": "milestone",
+        "name": "Trace marker",
+        "summary": "{{ config.name }}",
+        "tags": [
+          "developer",
+          "trace",
+          "observability"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "value",
+          "required": true,
+          "schema": {}
+        },
+        {
+          "name": "at",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
       "streams": false,
       "version": "1.0.0"
     },
@@ -4340,6 +5555,139 @@
       "version": "1.0.0"
     },
     {
+      "capabilities": [
+        "credentials"
+      ],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "mode": {
+            "default": "all",
+            "enum": [
+              "all",
+              "any"
+            ],
+            "type": "string",
+            "x-ui": {
+              "widget": "select"
+            }
+          },
+          "require": {
+            "items": {
+              "pattern": "^(\\*|[a-z][a-z0-9_.-]*(:[a-z0-9_.*-]+)*)$",
+              "type": "string"
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "type": "array",
+            "x-ui": {
+              "help": "Capabilities such as refunds:write; a granted scope refunds:* covers every refunds capability."
+            }
+          }
+        },
+        "required": [
+          "require"
+        ],
+        "type": "object"
+      },
+      "controlPorts": [
+        {
+          "label": "Granted",
+          "name": "granted"
+        },
+        {
+          "label": "Denied",
+          "name": "denied"
+        }
+      ],
+      "credentials": [
+        {
+          "description": "A credential whose `scopes` field lists what it may do.",
+          "name": "subject",
+          "required": false,
+          "types": [
+            "oauth2.client_credentials",
+            "github.token",
+            "http.bearer",
+            "mcp.oauth"
+          ]
+        }
+      ],
+      "defaultPolicy": {
+        "timeoutMs": 5000
+      },
+      "generation": false,
+      "id": "flowaid.safety.permission_check",
+      "idempotency": "safe",
+      "inputs": [
+        {
+          "description": "The caller's scopes; used when no subject credential is bound.",
+          "name": "scopes",
+          "required": false,
+          "schema": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          }
+        }
+      ],
+      "metadata": {
+        "category": "safety",
+        "description": "Checks that the required capabilities are covered by the scopes of a bound credential or of the caller (`scopes` input). Fires `granted` or `denied`.",
+        "icon": "key-round",
+        "name": "Permission check",
+        "summary": "{{ config.require }}",
+        "tags": [
+          "safety",
+          "permissions",
+          "authorization"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "granted",
+          "required": true,
+          "schema": {
+            "type": "boolean"
+          }
+        },
+        {
+          "name": "missing",
+          "required": true,
+          "schema": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "name": "scopes",
+          "required": true,
+          "schema": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
       "capabilities": [],
       "configSchema": {
         "additionalProperties": false,
@@ -4511,6 +5859,442 @@
     },
     {
       "capabilities": [
+        "decision",
+        "credentials"
+      ],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "question": {
+            "additionalProperties": false,
+            "properties": {
+              "instructions": {
+                "maxLength": 4000,
+                "minLength": 1,
+                "type": "string",
+                "x-ui": {
+                  "help": "A yes/no question; yes means the subject violates the policy.",
+                  "widget": "textarea"
+                }
+              },
+              "threshold": {
+                "default": 0.5,
+                "maximum": 1,
+                "minimum": 0.5,
+                "type": "number"
+              }
+            },
+            "required": [
+              "instructions"
+            ],
+            "type": "object"
+          },
+          "rules": {
+            "default": [],
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                  "type": "string"
+                },
+                "message": {
+                  "maxLength": 500,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "when": {
+                  "maxLength": 4000,
+                  "minLength": 1,
+                  "type": "string",
+                  "x-ui": {
+                    "help": "True means the rule is violated. `$scope.item` is the subject, `$vars` the workflow variables.",
+                    "language": "flowexpr-item",
+                    "widget": "code"
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "when",
+                "message"
+              ],
+              "type": "object"
+            },
+            "maxItems": 100,
+            "type": "array"
+          },
+          "stopAtFirst": {
+            "default": false,
+            "type": "boolean",
+            "x-ui": {
+              "help": "Skip the remaining checks after the first violation.",
+              "widget": "switch"
+            }
+          }
+        },
+        "type": "object"
+      },
+      "controlPorts": [
+        {
+          "description": "No rule was violated.",
+          "label": "Allow",
+          "name": "allow"
+        },
+        {
+          "description": "At least one rule was violated.",
+          "label": "Deny",
+          "name": "deny"
+        }
+      ],
+      "credentials": [
+        {
+          "name": "typesafe",
+          "required": false,
+          "types": [
+            "typesafe.api_key"
+          ]
+        },
+        {
+          "description": "Optional LLM decision provider used when a failover hop (or the workspace chain) routes decisions to a chat model.",
+          "name": "llm",
+          "required": false,
+          "types": [
+            "openai.api_key",
+            "anthropic.api_key",
+            "ollama.none"
+          ]
+        }
+      ],
+      "defaultPolicy": {
+        "timeoutMs": 30000
+      },
+      "generation": false,
+      "id": "flowaid.safety.policy_check",
+      "idempotency": "safe",
+      "inputs": [
+        {
+          "name": "subject",
+          "required": true,
+          "schema": {}
+        }
+      ],
+      "metadata": {
+        "category": "safety",
+        "description": "Checks a subject against deterministic rules (FlowExpr) and, optionally, a yes/no policy question answered by a decision model. Fires `allow` or `deny` with every violation listed.",
+        "icon": "scale",
+        "name": "Policy check",
+        "summary": "{{ config.rules.length }} rules",
+        "tags": [
+          "safety",
+          "policy",
+          "compliance"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "allowed",
+          "required": true,
+          "schema": {
+            "type": "boolean"
+          }
+        },
+        {
+          "name": "violations",
+          "required": true,
+          "schema": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "message": {
+                  "type": "string"
+                },
+                "rule": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "rule",
+                "message"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "name": "decision",
+          "required": true,
+          "schema": {}
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [
+        "state"
+      ],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "burst": {
+            "maximum": 1000000,
+            "minimum": 1,
+            "type": "integer",
+            "x-ui": {
+              "help": "Bucket size; defaults to the limit."
+            }
+          },
+          "cost": {
+            "default": 1,
+            "maximum": 1000,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "key": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string",
+            "x-ui": {
+              "help": "Who the limit applies to, e.g. customer:{{ ticket.customer_id }}.",
+              "widget": "template"
+            }
+          },
+          "limit": {
+            "maximum": 1000000,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "scope": {
+            "default": "workspace",
+            "enum": [
+              "workspace",
+              "session",
+              "run"
+            ],
+            "type": "string",
+            "x-ui": {
+              "widget": "select"
+            }
+          },
+          "windowMs": {
+            "default": 60000,
+            "maximum": 31536000000,
+            "minimum": 1000,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "key",
+          "limit"
+        ],
+        "type": "object"
+      },
+      "controlPorts": [
+        {
+          "description": "Within the limit; the cost was taken.",
+          "label": "Pass",
+          "name": "pass"
+        },
+        {
+          "description": "Over the limit; nothing was taken.",
+          "label": "Limited",
+          "name": "limited"
+        }
+      ],
+      "credentials": [],
+      "defaultPolicy": {
+        "timeoutMs": 10000
+      },
+      "generation": false,
+      "id": "flowaid.safety.rate_limit",
+      "idempotency": "keyed",
+      "inputs": [
+        {
+          "name": "value",
+          "required": false,
+          "schema": {}
+        }
+      ],
+      "metadata": {
+        "category": "safety",
+        "description": "A token bucket kept in workspace state and keyed by a template (per user, per customer, per workflow…): fires `pass` while the budget allows, `limited` otherwise.",
+        "icon": "gauge",
+        "name": "Rate limit",
+        "summary": "{{ config.limit }} / {{ config.windowMs }} ms",
+        "tags": [
+          "safety",
+          "rate limit",
+          "quota"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "allowed",
+          "required": true,
+          "schema": {
+            "type": "boolean"
+          }
+        },
+        {
+          "name": "remaining",
+          "required": true,
+          "schema": {
+            "minimum": 0,
+            "type": "number"
+          }
+        },
+        {
+          "name": "retry_after_ms",
+          "required": true,
+          "schema": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        {
+          "name": "value",
+          "required": true,
+          "schema": {}
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [
+        "state"
+      ],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "pattern": "^[a-z][a-z0-9_.-]{0,63}$",
+            "type": "string"
+          },
+          "namespace": {
+            "default": "session",
+            "enum": [
+              "run",
+              "session",
+              "workspace"
+            ],
+            "type": "string",
+            "x-ui": {
+              "help": "run: this run only; session: the conversation/session; workspace: shared across runs.",
+              "widget": "select"
+            }
+          },
+          "op": {
+            "default": "save",
+            "enum": [
+              "save",
+              "load"
+            ],
+            "type": "string",
+            "x-ui": {
+              "widget": "select"
+            }
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [],
+      "defaultPolicy": {
+        "timeoutMs": 10000
+      },
+      "generation": false,
+      "id": "flowaid.state.checkpoint",
+      "idempotency": {
+        "byConfig": "/op",
+        "cases": {
+          "load": "safe",
+          "save": "keyed"
+        },
+        "default": "keyed"
+      },
+      "inputs": [
+        {
+          "name": "value",
+          "required": false,
+          "schema": {}
+        },
+        {
+          "description": "Save only if the checkpoint is still at this version (0 = does not exist yet).",
+          "name": "expected_version",
+          "required": false,
+          "schema": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        }
+      ],
+      "metadata": {
+        "category": "state",
+        "description": "Saves a named snapshot of a value with a version number, or loads the latest one. A save can require the version it read (compare-and-set), so concurrent writers never overwrite each other silently.",
+        "icon": "save",
+        "name": "Checkpoint",
+        "summary": "{{ config.op }} {{ config.name }}",
+        "tags": [
+          "state",
+          "checkpoint",
+          "snapshot"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "value",
+          "required": true,
+          "schema": {}
+        },
+        {
+          "name": "version",
+          "required": true,
+          "schema": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        {
+          "name": "found",
+          "required": true,
+          "schema": {
+            "type": "boolean"
+          }
+        },
+        {
+          "name": "saved_at",
+          "required": true,
+          "schema": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [
         "state"
       ],
       "configSchema": {
@@ -4580,6 +6364,108 @@
           "required": true,
           "schema": {
             "type": "boolean"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [
+        "state"
+      ],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "default": "conversation",
+            "pattern": "^[a-z][a-z0-9_.-]{0,63}$",
+            "type": "string"
+          },
+          "lastN": {
+            "default": 20,
+            "maximum": 500,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "maxTurns": {
+            "default": 200,
+            "maximum": 10000,
+            "minimum": 1,
+            "type": "integer",
+            "x-ui": {
+              "help": "Older turns are dropped beyond this many."
+            }
+          },
+          "op": {
+            "default": "append_and_read",
+            "enum": [
+              "append",
+              "read",
+              "append_and_read"
+            ],
+            "type": "string",
+            "x-ui": {
+              "widget": "select"
+            }
+          },
+          "ttlMs": {
+            "maximum": 31536000000,
+            "minimum": 60000,
+            "type": "integer",
+            "x-ui": {
+              "help": "The session is forgotten this long after its last append."
+            }
+          }
+        },
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [],
+      "defaultPolicy": {
+        "timeoutMs": 10000
+      },
+      "generation": false,
+      "id": "flowaid.state.session",
+      "idempotency": "keyed",
+      "inputs": [
+        {
+          "name": "turn",
+          "required": false,
+          "schema": {}
+        }
+      ],
+      "metadata": {
+        "category": "state",
+        "description": "Conversation memory for the run's session: appends a turn and/or reads the last N turns, with a sliding time-to-live. Appends are safe under concurrent runs of the same session.",
+        "icon": "messages-square",
+        "name": "Session memory",
+        "summary": "{{ config.op }} {{ config.key }}",
+        "tags": [
+          "state",
+          "memory",
+          "conversation"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "turns",
+          "required": true,
+          "schema": {
+            "items": {},
+            "type": "array"
+          }
+        },
+        {
+          "name": "count",
+          "required": true,
+          "schema": {
+            "minimum": 0,
+            "type": "integer"
           }
         }
       ],
@@ -4862,6 +6748,275 @@
           "port": "result"
         }
       ],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [
+        "network",
+        "credentials"
+      ],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "maxRows": {
+            "default": 1000,
+            "maximum": 10000,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "readOnly": {
+            "default": true,
+            "type": "boolean",
+            "x-ui": {
+              "help": "Runs in a READ ONLY transaction.",
+              "widget": "switch"
+            }
+          },
+          "sql": {
+            "maxLength": 100000,
+            "minLength": 1,
+            "type": "string",
+            "x-ui": {
+              "help": "Values come only from params ($1, $2, …); the text is never templated.",
+              "language": "sql",
+              "widget": "code"
+            }
+          },
+          "timeoutMs": {
+            "default": 10000,
+            "maximum": 300000,
+            "minimum": 100,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "sql"
+        ],
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [
+        {
+          "description": "The postgres:// connection string the statement runs with.",
+          "name": "database",
+          "required": true,
+          "types": [
+            "postgres.dsn"
+          ]
+        }
+      ],
+      "defaultPolicy": {
+        "timeoutMs": 60000
+      },
+      "generation": false,
+      "id": "flowaid.tools.db_query",
+      "idempotency": {
+        "byConfig": "/readOnly",
+        "cases": {
+          "false": "none",
+          "true": "safe"
+        },
+        "default": "safe"
+      },
+      "inputs": [
+        {
+          "name": "params",
+          "required": false,
+          "schema": {
+            "items": {},
+            "type": "array"
+          }
+        }
+      ],
+      "metadata": {
+        "category": "tool",
+        "description": "Runs one parameterised SQL statement against PostgreSQL ($1, $2, … from `params`), in a transaction with a statement timeout and, by default, read-only. Returns at most 10,000 rows.",
+        "icon": "database",
+        "name": "Database query",
+        "summary": "postgres",
+        "tags": [
+          "sql",
+          "postgres",
+          "database",
+          "tool"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "rows",
+          "required": true,
+          "schema": {
+            "items": {
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "name": "row_count",
+          "required": true,
+          "schema": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        {
+          "name": "truncated",
+          "required": true,
+          "schema": {
+            "type": "boolean"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [
+        "network",
+        "credentials"
+      ],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "document": {
+            "maxLength": 100000,
+            "minLength": 1,
+            "type": "string",
+            "x-ui": {
+              "language": "graphql",
+              "widget": "code"
+            }
+          },
+          "failOnErrors": {
+            "default": true,
+            "type": "boolean",
+            "x-ui": {
+              "help": "Fail the node when the response has errors and no data.",
+              "widget": "switch"
+            }
+          },
+          "headers": {
+            "additionalProperties": {
+              "maxLength": 4096,
+              "type": "string"
+            },
+            "default": {},
+            "type": "object",
+            "x-ui": {
+              "widget": "keyvalue"
+            }
+          },
+          "operation": {
+            "default": "query",
+            "enum": [
+              "query",
+              "mutation"
+            ],
+            "type": "string",
+            "x-ui": {
+              "help": "Must match the document's operation.",
+              "widget": "select"
+            }
+          },
+          "operationName": {
+            "maxLength": 200,
+            "type": "string"
+          },
+          "timeoutMs": {
+            "default": 30000,
+            "maximum": 300000,
+            "minimum": 100,
+            "type": "integer"
+          },
+          "url": {
+            "maxLength": 2048,
+            "minLength": 1,
+            "type": "string",
+            "x-ui": {
+              "placeholder": "https://api.example.com/graphql",
+              "widget": "template"
+            }
+          }
+        },
+        "required": [
+          "url",
+          "document"
+        ],
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [
+        {
+          "description": "Applied as Authorization or a custom header.",
+          "name": "auth",
+          "required": false,
+          "types": [
+            "http.bearer",
+            "http.basic",
+            "http.header",
+            "http.api_key"
+          ]
+        }
+      ],
+      "defaultPolicy": {
+        "timeoutMs": 30000
+      },
+      "generation": false,
+      "id": "flowaid.tools.graphql",
+      "idempotency": {
+        "byConfig": "/operation",
+        "cases": {
+          "mutation": "none",
+          "query": "safe"
+        },
+        "default": "safe"
+      },
+      "inputs": [
+        {
+          "name": "variables",
+          "required": false,
+          "schema": {
+            "type": "object"
+          }
+        }
+      ],
+      "metadata": {
+        "category": "tool",
+        "description": "Sends one GraphQL query or mutation to an endpoint with variables from the flow; returns `data` and any `errors`. Queries are safe to retry, mutations are not.",
+        "icon": "waypoints",
+        "name": "GraphQL",
+        "summary": "{{ config.operation }} {{ config.url }}",
+        "tags": [
+          "graphql",
+          "api",
+          "tool"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "data",
+          "required": true,
+          "schema": {}
+        },
+        {
+          "name": "errors",
+          "required": true,
+          "schema": {
+            "items": {},
+            "type": "array"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
       "streams": false,
       "version": "1.0.0"
     },
