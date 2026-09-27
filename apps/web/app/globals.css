@@ -1,13 +1,4 @@
 @import "@flowaid/ui/styles.css";
-/*
- * The ui groups import their own stylesheets from their index.ts, which the bundler drops as
- * side-effect-free when only named exports are used; load them here once for the whole app.
- */
-@import "@xyflow/react/dist/base.css";
-@import "../../../packages/ui/src/primitives/primitives.css";
-@import "../../../packages/ui/src/node/node.css";
-@import "../../../packages/ui/src/canvas/canvas.css";
-@import "../../../packages/ui/src/builder/builder.css";
 
 /* Brand fonts, self-hosted (OFL; licences in /fonts). */
 @font-face {

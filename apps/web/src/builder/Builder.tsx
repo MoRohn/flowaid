@@ -47,7 +47,7 @@ import {
   EmptyState,
   toast,
 } from "@flowaid/ui/primitives";
-import { ApiError, del, get, post, put } from "~/api/client";
+import { ApiError, del, get, patch, post, put } from "~/api/client";
 import type { WorkflowDetail } from "~/api/types";
 import { useSession } from "~/session";
 import { AppFrame } from "~/shell/AppFrame";
@@ -177,6 +177,7 @@ function BuilderView({
   );
   const [starting, setStarting] = useState(false);
   const [bottomTab, setBottomTab] = useState("run");
+  const [title, setTitle] = useState(workflow.name);
   const lookup = useMemo(
     () => ({
       categoryFor: (id: string) => {
@@ -192,7 +193,7 @@ function BuilderView({
     ? {
         id: live.runId,
         workflowId: workflow.id,
-        workflowName: definition.name,
+        workflowName: title,
         version: "draft",
         status: live.status,
         origin: "ui",
@@ -636,14 +637,24 @@ function BuilderView({
       crumbs={[
         { label: s.workspaceName },
         { label: "Workflows", href: `/${s.ws}/workflows` },
-        { label: definition.name },
+        { label: title },
       ]}
       {...(!readOnly
         ? {
-            onRename: (name: string) =>
+            // the workflow's name (lists, runs) and the definition's name move together
+            onRename: (name: string) => {
+              const next = name.trim().slice(0, 120);
+              if (!next || next === title) return;
+              setTitle(next);
               store.getState().updateDefinition((d) => {
-                d.name = name.trim().slice(0, 120) || d.name;
-              }, "Rename workflow"),
+                d.name = next;
+              }, "Rename workflow");
+              void patch(`/v1/workflows/${workflow.id}`, { name: next })
+                .then(() => qc.invalidateQueries({ queryKey: ["workflows", s.ws] }))
+                .catch((e: unknown) =>
+                  toast.error(e instanceof Error ? e.message : "Rename failed"),
+                );
+            },
           }
         : {})}
       saveState={saveState}
@@ -754,7 +765,7 @@ function BuilderView({
       <ConfirmDialog
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
-        title={`Delete “${definition.name}”?`}
+        title={`Delete “${title}”?`}
         description="The workflow is archived with its versions and runs; triggers stop firing."
         confirmLabel="Delete workflow"
         variant="danger"
