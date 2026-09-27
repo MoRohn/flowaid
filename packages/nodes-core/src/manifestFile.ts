@@ -4,7 +4,45 @@
  */
 import type { NodeManifest } from "@flowaid/workflow-core";
 import file from "../manifest.json" with { type: "json" };
+import githubIssueTriage from "../templates/github-issue-triage.json" with { type: "json" };
+import githubIssueTriageResources from "../templates/github-issue-triage.resources.json" with { type: "json" };
+import researchAgent from "../templates/research-agent.json" with { type: "json" };
+import researchAgentResources from "../templates/research-agent.resources.json" with { type: "json" };
+import supportTriage from "../templates/support-triage.json" with { type: "json" };
+import supportTriageResources from "../templates/support-triage.resources.json" with { type: "json" };
 
 export const coreManifests: readonly NodeManifest[] = (file as unknown as { nodes: NodeManifest[] })
   .nodes;
 export const coreManifestPackage = { name: file.package, version: file.version };
+
+export interface CoreTemplate {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  definition: unknown;
+  requiredResources: {
+    kind: string;
+    key: string;
+    name: string;
+    description: string;
+    tools: { name: string }[];
+  }[];
+}
+
+/** The built-in templates as data (definitions with `$template.<kind>.<key>` sentinels). */
+export const coreTemplates: readonly CoreTemplate[] = [
+  [supportTriage, supportTriageResources],
+  [githubIssueTriage, githubIssueTriageResources],
+  [researchAgent, researchAgentResources],
+].map(([definition, r]) => {
+  const res = r as unknown as Omit<CoreTemplate, "definition">;
+  return {
+    id: res.id,
+    name: res.name,
+    description: res.description,
+    category: res.category,
+    definition,
+    requiredResources: res.requiredResources,
+  };
+});

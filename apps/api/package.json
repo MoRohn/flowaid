@@ -1,0 +1,54 @@
+{
+  "name": "@flowaid/api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The flowaid HTTP API: Fastify 5 with Zod-typed routes, OpenAPI 3.1, sessions and API keys, workflows, runs with SSE, human tasks, credentials, tools, evaluations and triggers (docs/design/API.md). Never executes nodes.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsx watch src/main.ts",
+    "start": "node dist/main.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src",
+    "test": "vitest run",
+    "clean": "rm -rf dist .turbo *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@fastify/cookie": "11.1.2",
+    "@fastify/cors": "11.3.0",
+    "@fastify/helmet": "13.1.1",
+    "@fastify/rate-limit": "11.2.0",
+    "@fastify/swagger": "9.9.0",
+    "@flowaid/credentials": "workspace:*",
+    "@flowaid/database": "workspace:*",
+    "@flowaid/env": "workspace:*",
+    "@flowaid/evaluation": "workspace:*",
+    "@flowaid/nodes-core": "workspace:*",
+    "@flowaid/observability": "workspace:*",
+    "@flowaid/providers": "workspace:*",
+    "@flowaid/shared": "workspace:*",
+    "@flowaid/workflow-compiler": "workspace:*",
+    "@flowaid/workflow-core": "workspace:*",
+    "@flowaid/workflow-runtime": "workspace:*",
+    "@scalar/fastify-api-reference": "1.72.1",
+    "argon2": "0.45.1",
+    "drizzle-orm": "0.45.3",
+    "fastify": "5.12.5",
+    "fastify-type-provider-zod": "7.0.0",
+    "jose": "6.2.12",
+    "openapi-types": "12.1.3",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@flowaid/config": "workspace:*",
+    "@types/node": "24.13.6",
+    "eslint": "9.39.5",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "vitest": "4.1.11"
+  }
+}

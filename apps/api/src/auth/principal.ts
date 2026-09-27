@@ -1,0 +1,42 @@
+/** The authenticated caller of a request (API.md §1). */
+import type { WorkspaceRole } from "@flowaid/database";
+import type { Scope } from "./scopes.js";
+
+export type PrincipalType =
+  "user" | "api_key" | "review_token" | "mcp_token" | "webhook" | "system";
+
+export interface Principal {
+  type: PrincipalType;
+  id: string;
+  /** the user behind a session (and the creator of an api key, when still a member) */
+  userId: string | null;
+  workspaceId: string;
+  workspaceSlug: string;
+  role: WorkspaceRole | null;
+  scopes: ReadonlySet<Scope>;
+  environmentId: string | null;
+  workflowIds: ReadonlySet<string> | null;
+  /** session id (refresh family) for sessions */
+  sid?: string;
+  /** session expiry (epoch s) */
+  exp?: number;
+  rateLimitPerMin?: number | null;
+}
+
+/** A session that authenticated but has no workspace yet (e.g. a new user before creating one). */
+export interface SessionOnly {
+  type: "session_only";
+  userId: string;
+  sid: string;
+  exp: number;
+}
+
+export type AuthMode = "public" | "session" | "api_key" | "session_or_api_key";
+
+export function hasScope(p: Principal, scope: Scope): boolean {
+  return p.scopes.has(scope) || p.scopes.has("admin");
+}
+
+export function canSeeWorkflow(p: Principal, workflowId: string): boolean {
+  return p.workflowIds === null || p.workflowIds.has(workflowId);
+}

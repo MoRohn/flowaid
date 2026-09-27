@@ -131,3 +131,6 @@ jobs:
 
       - name: BullMQ queue and Redis event bus against the store contract suite
         run: pnpm --filter @flowaid/workflow-runtime test
+
+      - name: HTTP API (identity, workflows, runs) against PostgreSQL 16
+        run: pnpm --filter @flowaid/api test
