@@ -1,0 +1,22 @@
+{
+  "extends": "@flowaid/config/tsconfig.react.json",
+  "compilerOptions": {
+    "jsx": "preserve",
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "~/*": ["src/*"],
+      "@/*": ["../../packages/ui/src/*"]
+    }
+  },
+  "include": [
+    "next-env.d.ts",
+    "../../packages/ui/src/primitives/css-vars.d.ts",
+    "app",
+    "src",
+    ".next/types/**/*.ts",
+    "next.config.ts",
+    "vitest.config.ts"
+  ],
+  "exclude": ["node_modules", ".next"]
+}

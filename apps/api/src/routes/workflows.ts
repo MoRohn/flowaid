@@ -13,6 +13,7 @@ import {
   publishVersion,
   saveDraft,
   templates,
+  workflowDeployments,
   workflowVersions,
   workflows,
   type WorkflowRow,
@@ -96,6 +97,92 @@ function withId(definition: unknown, id: string, name?: string): unknown {
   };
 }
 
+const EMPTY_ACTIVITY = {
+  deployments: [],
+  runs24h: Array.from({ length: 24 }, () => 0),
+  lastRun: null,
+};
+
+/**
+ * `include=activity` on the list: deployed version per environment, runs per hour over the last 24
+ * hours (oldest first) and the latest run, for one page of workflows in two queries.
+ */
+async function workflowActivity(ctx: ApiContext, workspaceId: string, ids: string[]) {
+  const out = new Map<
+    string,
+    {
+      deployments: { environmentId: string; version: number | null }[];
+      runs24h: number[];
+      lastRun: { id: string; status: string; createdAt: string } | null;
+    }
+  >();
+  if (ids.length === 0) return out;
+  const now = ctx.clock.now();
+  const since = new Date(now - 24 * 3600_000).toISOString();
+  const idList = sql.join(
+    ids.map((id) => sql`${id}::uuid`),
+    sql`, `,
+  );
+  const [deps, hours, latest] = await ctx.db.tenant(workspaceId, (tx) =>
+    Promise.all([
+      tx
+        .select({
+          workflowId: workflowDeployments.workflowId,
+          environmentId: workflowDeployments.environmentId,
+          version: workflowVersions.version,
+        })
+        .from(workflowDeployments)
+        .innerJoin(workflowVersions, eq(workflowVersions.id, workflowDeployments.versionId))
+        .where(
+          and(
+            eq(workflowDeployments.workspaceId, workspaceId),
+            eq(workflowDeployments.active, true),
+            inArray(workflowDeployments.workflowId, ids),
+          ),
+        ),
+      tx.execute<{ workflow_id: string; bucket: number; n: number }>(sql`
+        select workflow_id, floor(extract(epoch from (created_at - ${since}::timestamptz)) / 3600)::int as bucket, count(*)::int as n
+        from runs
+        where workspace_id = ${workspaceId} and workflow_id in (${idList}) and created_at >= ${since}::timestamptz
+        group by 1, 2`),
+      tx.execute<{
+        workflow_id: string;
+        id: string;
+        status: string;
+        created_at: Date | string;
+      }>(sql`
+        select distinct on (workflow_id) workflow_id, id, status, created_at
+        from runs
+        where workspace_id = ${workspaceId} and workflow_id in (${idList})
+        order by workflow_id, created_at desc`),
+    ]),
+  );
+  for (const id of ids)
+    out.set(id, {
+      deployments: [],
+      runs24h: Array.from({ length: 24 }, () => 0),
+      lastRun: null,
+    });
+  for (const d of deps)
+    out.get(d.workflowId)?.deployments.push({ environmentId: d.environmentId, version: d.version });
+  for (const h of hours) {
+    const a = out.get(h.workflow_id);
+    // runs newer than the reference clock count toward the current hour
+    if (a && h.bucket >= 0)
+      a.runs24h[Math.min(h.bucket, 23)] = (a.runs24h[Math.min(h.bucket, 23)] ?? 0) + h.n;
+  }
+  for (const r of latest) {
+    const a = out.get(r.workflow_id);
+    if (a)
+      a.lastRun = {
+        id: r.id,
+        status: r.status,
+        createdAt: new Date(r.created_at).toISOString(),
+      };
+  }
+  return out;
+}
+
 export function workflowRoutes(app: FastifyInstance, ctx: ApiContext): void {
   const r = app.withTypeProvider<ZodTypeProvider>();
 
@@ -113,6 +200,7 @@ export function workflowRoutes(app: FastifyInstance, ctx: ApiContext): void {
           q: z.string().max(200).optional(),
           tag: z.string().max(40).optional(),
           archived: z.coerce.boolean().default(false),
+          include: z.enum(["activity"]).optional(),
         }),
         response: { 200: page(WorkflowSummarySchema) },
       },
@@ -156,8 +244,19 @@ export function workflowRoutes(app: FastifyInstance, ctx: ApiContext): void {
       );
       const items = rows.slice(0, limit);
       const last = items.at(-1);
+      const activity =
+        req.query.include === "activity"
+          ? await workflowActivity(
+              ctx,
+              p.workspaceId,
+              items.map((x) => x.w.id),
+            )
+          : null;
       return {
-        items: items.map((x) => summaryDto(x.w, x.latest)),
+        items: items.map((x) => ({
+          ...summaryDto(x.w, x.latest),
+          ...(activity ? (activity.get(x.w.id) ?? EMPTY_ACTIVITY) : {}),
+        })),
         next_cursor:
           rows.length > limit && last
             ? encodeCursor(last.w.updatedAt.toISOString(), last.w.id)

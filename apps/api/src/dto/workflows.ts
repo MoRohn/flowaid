@@ -19,6 +19,15 @@ export const WorkflowSummarySchema = z.object({
   errors: z.number(),
   warnings: z.number(),
   updatedAt: z.string(),
+  /** with `include=activity` */
+  deployments: z
+    .array(z.object({ environmentId: z.uuid(), version: z.number().nullable() }))
+    .optional(),
+  runs24h: z.array(z.int()).optional(),
+  lastRun: z
+    .object({ id: z.uuid(), status: z.string(), createdAt: z.string() })
+    .nullable()
+    .optional(),
 });
 
 export const DeploymentSchema = z.object({

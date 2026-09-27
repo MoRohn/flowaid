@@ -253,4 +253,23 @@ describeDb("runs, streams and human tasks (Postgres)", () => {
     });
     expect(wrong.statusCode).toBe(403);
   });
+
+  it("lists workflows with deployments, 24 h run activity and the last run", async () => {
+    await run({ input: { message: "activity" }, mode: "sync", waitTimeoutMs: 20_000 });
+    const list = (await call(t.app, jar, "GET", "/v1/workflows?include=activity")).json() as {
+      items: {
+        id: string;
+        deployments: { environmentId: string; version: number }[];
+        runs24h: number[];
+        lastRun: { status: string } | null;
+      }[];
+    };
+    const echo = list.items.find((w) => w.id === workflowId);
+    expect(echo?.deployments).toEqual([{ environmentId: envs.dev, version: 1 }]);
+    expect(echo?.runs24h).toHaveLength(24);
+    expect(echo?.runs24h.reduce((a, b) => a + b, 0)).toBeGreaterThan(0);
+    expect(echo?.lastRun).not.toBeNull();
+    const plain = (await call(t.app, jar, "GET", "/v1/workflows")).json();
+    expect(plain.items[0]).not.toHaveProperty("runs24h");
+  });
 });
