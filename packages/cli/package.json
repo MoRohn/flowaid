@@ -30,6 +30,7 @@
   },
   "dependencies": {
     "@flowaid/nodes-core": "workspace:*",
+    "@flowaid/plugins": "workspace:*",
     "@flowaid/provider-anthropic": "workspace:*",
     "@flowaid/provider-ollama": "workspace:*",
     "@flowaid/provider-openai": "workspace:*",

@@ -84,6 +84,9 @@ flowaid/
     langchain/          @flowaid/langchain: LangChain ⇄ flowaid adapters (providers, tools, decisions, callbacks). Only place besides nodes-langchain that imports @langchain/* (LANGCHAIN.md).
     nodes-langchain/    @flowaid/nodes-langchain: LangChain-powered node package (chat, runnable, agent, loaders, splitters, embed, vector stores, retrievers, parsers).
     sandbox/            isolated-vm / container executors for the code pool.
+    plugins/            Plugin discovery and install checks: npm registry client (packuments, search), allow-list, semver, SRI integrity,
+                        safe tarball reading, manifests shipped as data (§3.5). Never loads plugin code.
+    create-flowaid-node/ `npx @flowaid/create-flowaid-node <name>`: scaffold of a publishable node package (docs/plugins/publishing.md).
     ui/                 (exists) React components + tokens; no data fetching.
 ```
 
@@ -107,8 +110,10 @@ workflow-runtime  → workflow-core, workflow-compiler, node-sdk, providers, cre
 database          → workflow-core, shared, env                 (implements RunStore/QueueDriver/EventBus/ArtifactStore/CredentialRepository)
 evaluation        → workflow-core, providers, shared            (RunLauncher injected)
 workflow-sdk      → workflow-core (types), shared
-cli               → workflow-sdk, workflow-compiler, workflow-runtime, nodes-core, providers, provider-typesafe, provider-openai, provider-anthropic, provider-ollama, credentials, sandbox, workflow-core, shared   (runtime, nodes and providers only for `workflow run --local`)
+cli               → workflow-sdk, workflow-compiler, workflow-runtime, nodes-core, providers, provider-typesafe, provider-openai, provider-anthropic, provider-ollama, credentials, sandbox, plugins, workflow-core, shared   (runtime, nodes and providers only for `workflow run --local`)
 importer          → workflow-core, shared
+plugins           → workflow-core, shared
+create-flowaid-node → node-sdk, plugins
 codegen           → workflow-core, workflow-compiler, workflow-sdk (builders subpath only: round-trip evaluation of the generated module), shared
 langchain         → providers, node-sdk, workflow-core, shared, @langchain/core (peer)
 nodes-langchain   → langchain, node-sdk, providers, workflow-core, shared, @langchain/*

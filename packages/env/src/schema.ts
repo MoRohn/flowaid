@@ -221,6 +221,14 @@ const packageNameSchema = z
     "must be an npm package name such as @flowaid/nodes-langchain",
   );
 
+/** A plugin allow-list entry: an npm scope (`@acme`), a package name, or `*`. */
+const pluginScopeSchema = z
+  .string()
+  .regex(
+    /^(\*|@[a-z0-9-~][a-z0-9-._~]*|(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*)$/,
+    "must be an npm scope (@acme), a package name or *",
+  );
+
 /** An environment variable name. */
 const envNameSchema = z
   .string()
@@ -809,6 +817,15 @@ export const EnvSchema = z
     FLOWAID_PLUGIN_DIR: stringWithDefault("FLOWAID_PLUGIN_DIR"),
     FLOWAID_BUNDLED_PLUGINS: listWithDefault("FLOWAID_BUNDLED_PLUGINS", packageNameSchema),
     FLOWAID_PLUGIN_ALLOW_LOCAL: boolWithDefault("FLOWAID_PLUGIN_ALLOW_LOCAL"),
+    FLOWAID_PLUGIN_ALLOWED_SCOPES: listWithDefault(
+      "FLOWAID_PLUGIN_ALLOWED_SCOPES",
+      pluginScopeSchema,
+    ),
+    FLOWAID_PLUGIN_REGISTRY: urlWithDefault(
+      "FLOWAID_PLUGIN_REGISTRY",
+      /^https?$/,
+      "http:// or https://",
+    ),
     FLOWAID_MCP_STDIO_ALLOWED_COMMANDS: optionalStdioCommands("FLOWAID_MCP_STDIO_ALLOWED_COMMANDS"),
     FLOWAID_MCP_STDIO_ENV_ALLOWLIST: optionalList("FLOWAID_MCP_STDIO_ENV_ALLOWLIST", envNameSchema),
     FLOWAID_EXPORT_MODE: enumWithDefault("FLOWAID_EXPORT_MODE", EXPORT_MODES),

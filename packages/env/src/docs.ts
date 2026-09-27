@@ -507,6 +507,24 @@ const docs = {
     example: "true",
     secret: false,
   },
+  FLOWAID_PLUGIN_ALLOWED_SCOPES: {
+    group: "execution",
+    description:
+      "Plugin allow-list (ARCHITECTURE.md §3.5): comma-separated npm scopes (`@acme`) and exact package names that `flowaid plugin add` and `POST /v1/plugins` may install; `*` allows any package that declares the `flowaid-node` keyword and the `flowaid` package.json field. Bundled plugins are always allowed.",
+    default: "@flowaid",
+    required: false,
+    example: "@flowaid,@acme,flowaid-node-weather",
+    secret: false,
+  },
+  FLOWAID_PLUGIN_REGISTRY: {
+    group: "execution",
+    description:
+      "npm registry the api resolves plugin versions and tarball integrity from, the worker downloads installed plugins from, and `flowaid plugin search` queries (`/-/v1/search`).",
+    default: "https://registry.npmjs.org",
+    required: false,
+    example: "https://npm.internal.example.com",
+    secret: false,
+  },
   FLOWAID_MCP_STDIO_ALLOWED_COMMANDS: {
     group: "execution",
     description:

@@ -1,0 +1,63 @@
+{
+  "objects": [
+    {
+      "package": {
+        "name": "@acme/nodes-crm",
+        "scope": "acme",
+        "version": "1.2.0",
+        "description": "CRM lookups and updates as FlowAId nodes",
+        "keywords": ["flowaid-node", "crm"],
+        "date": "2026-09-12T10:21:03.117Z",
+        "links": {
+          "npm": "https://www.npmjs.com/package/%40acme%2Fnodes-crm",
+          "repository": "https://github.com/acme/nodes-crm"
+        },
+        "publisher": { "username": "acme-bot", "email": "bot@acme.example" },
+        "maintainers": [{ "username": "acme-bot", "email": "bot@acme.example" }]
+      },
+      "flags": { "insecure": 0 },
+      "score": {
+        "final": 0.61,
+        "detail": { "quality": 0.72, "popularity": 0.08, "maintenance": 0.99 }
+      },
+      "searchScore": 0.00019
+    },
+    {
+      "package": {
+        "name": "flowaid-node-weather",
+        "scope": "unscoped",
+        "version": "0.4.1",
+        "description": "Weather forecasts for FlowAId workflows",
+        "keywords": ["flowaid-node", "weather"],
+        "date": "2026-08-30T08:00:00.000Z",
+        "links": { "npm": "https://www.npmjs.com/package/flowaid-node-weather" },
+        "publisher": { "username": "wx", "email": "wx@example.com" },
+        "maintainers": [{ "username": "wx", "email": "wx@example.com" }]
+      },
+      "flags": { "insecure": 0 },
+      "score": {
+        "final": 0.44,
+        "detail": { "quality": 0.6, "popularity": 0.02, "maintenance": 0.9 }
+      },
+      "searchScore": 0.00011
+    },
+    {
+      "package": {
+        "name": "unrelated-crm-sdk",
+        "scope": "unscoped",
+        "version": "3.0.0",
+        "description": "Matches the text but is not a FlowAId node package",
+        "keywords": ["crm"],
+        "date": "2026-01-01T00:00:00.000Z",
+        "links": {},
+        "publisher": { "username": "x", "email": "x@example.com" },
+        "maintainers": []
+      },
+      "flags": {},
+      "score": { "final": 0.2, "detail": {} },
+      "searchScore": 0.00001
+    }
+  ],
+  "total": 3,
+  "time": "Sun Sep 27 2026 14:00:00 GMT+0000 (Coordinated Universal Time)"
+}
