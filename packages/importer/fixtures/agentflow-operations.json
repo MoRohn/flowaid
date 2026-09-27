@@ -1,0 +1,236 @@
+{
+  "name": "Ticket operations",
+  "nodes": [
+    {
+      "id": "startAgentflow_0",
+      "type": "agentFlow",
+      "position": { "x": 0, "y": 0 },
+      "data": {
+        "id": "startAgentflow_0",
+        "name": "startAgentflow",
+        "label": "Start",
+        "inputs": {
+          "startInputType": "formInput",
+          "formInputTypes": [
+            { "type": "string", "label": "Ticket id", "name": "ticketId" },
+            { "type": "number", "label": "Priority", "name": "priority" }
+          ],
+          "startState": [{ "key": "items", "value": "[]" }]
+        }
+      }
+    },
+    {
+      "id": "httpAgentflow_0",
+      "type": "agentFlow",
+      "position": { "x": 260, "y": 0 },
+      "data": {
+        "id": "httpAgentflow_0",
+        "name": "httpAgentflow",
+        "label": "Fetch ticket",
+        "inputs": {
+          "method": "GET",
+          "url": "https://api.example.com/tickets/{{ $form.ticketId }}",
+          "headers": [
+            { "key": "Authorization", "value": "Bearer sk-live-should-never-be-imported" },
+            { "key": "Accept", "value": "application/json" }
+          ],
+          "responseType": "json"
+        }
+      }
+    },
+    {
+      "id": "conditionAgentflow_0",
+      "type": "agentFlow",
+      "position": { "x": 520, "y": 0 },
+      "data": {
+        "id": "conditionAgentflow_0",
+        "name": "conditionAgentflow",
+        "label": "Urgent?",
+        "inputs": {
+          "conditions": [
+            {
+              "type": "number",
+              "value1": "{{ $form.priority }}",
+              "operation": "larger",
+              "value2": "3"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "customFunctionAgentflow_0",
+      "type": "agentFlow",
+      "position": { "x": 780, "y": -120 },
+      "data": {
+        "id": "customFunctionAgentflow_0",
+        "name": "customFunctionAgentflow",
+        "label": "Extract lines",
+        "inputs": {
+          "customFunctionInputVariables": [
+            { "variableName": "ticket", "variableValue": "{{ httpAgentflow_0 }}" }
+          ],
+          "customFunctionJavascriptFunction": "return ($ticket.lines ?? []).map((l) => l.text);"
+        }
+      }
+    },
+    {
+      "id": "iterationAgentflow_0",
+      "type": "iteration",
+      "position": { "x": 1040, "y": -160 },
+      "data": {
+        "id": "iterationAgentflow_0",
+        "name": "iterationAgentflow",
+        "label": "Each line",
+        "inputs": { "iterationInput": "{{ customFunctionAgentflow_0 }}" }
+      }
+    },
+    {
+      "id": "llmAgentflow_1",
+      "type": "agentFlow",
+      "parentNode": "iterationAgentflow_0",
+      "position": { "x": 40, "y": 60 },
+      "data": {
+        "id": "llmAgentflow_1",
+        "name": "llmAgentflow",
+        "label": "Summarise line",
+        "inputs": {
+          "llmModel": "chatGoogleGenerativeAI",
+          "llmModelConfig": { "modelName": "gemini-2.0-flash" },
+          "llmMessages": [{ "role": "user", "content": "Summarise: {{ $iteration }}" }]
+        }
+      }
+    },
+    {
+      "id": "llmAgentflow_2",
+      "type": "agentFlow",
+      "position": { "x": 780, "y": 140 },
+      "data": {
+        "id": "llmAgentflow_2",
+        "name": "llmAgentflow",
+        "label": "Draft",
+        "inputs": {
+          "llmModel": "chatOpenAI",
+          "llmModelConfig": { "modelName": "gpt-4o" },
+          "llmMessages": [
+            { "role": "user", "content": "Draft a status update for ticket {{ $form.ticketId }}." },
+            { "role": "assistant", "content": "Status: investigating." }
+          ],
+          "llmUpdateState": [{ "key": "draft", "value": "{{ output }}" }]
+        }
+      }
+    },
+    {
+      "id": "loopAgentflow_0",
+      "type": "agentFlow",
+      "position": { "x": 1040, "y": 140 },
+      "data": {
+        "id": "loopAgentflow_0",
+        "name": "loopAgentflow",
+        "label": "Refine",
+        "inputs": { "loopBackToNode": "llmAgentflow_2-Draft", "maxLoopCount": 3 }
+      }
+    },
+    {
+      "id": "agentAgentflow_0",
+      "type": "agentFlow",
+      "position": { "x": 1300, "y": 140 },
+      "data": {
+        "id": "agentAgentflow_0",
+        "name": "agentAgentflow",
+        "label": "Research agent",
+        "inputs": {
+          "agentModel": "chatOpenAI",
+          "agentModelConfig": { "modelName": "gpt-4o" },
+          "agentMessages": [{ "role": "system", "content": "You research ticket context." }],
+          "agentTools": [{ "agentSelectedTool": "googleCustomSearch" }],
+          "agentUserMessage": "Find context for {{ llmAgentflow_2 }}"
+        }
+      }
+    },
+    {
+      "id": "toolAgentflow_0",
+      "type": "agentFlow",
+      "position": { "x": 1560, "y": 140 },
+      "data": {
+        "id": "toolAgentflow_0",
+        "name": "toolAgentflow",
+        "label": "Calculator",
+        "inputs": {
+          "toolAgentflowSelectedTool": "calculator",
+          "toolInputArgs": [{ "inputArgName": "input", "inputArgValue": "2+2" }]
+        }
+      }
+    },
+    {
+      "id": "executeFlowAgentflow_0",
+      "type": "agentFlow",
+      "position": { "x": 1300, "y": -160 },
+      "data": {
+        "id": "executeFlowAgentflow_0",
+        "name": "executeFlowAgentflow",
+        "label": "Notify team",
+        "inputs": {
+          "executeFlowSelectedFlow": "b0c9-flow",
+          "executeFlowInput": "{{ iterationAgentflow_0 }}"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "a",
+      "source": "startAgentflow_0",
+      "sourceHandle": "startAgentflow_0-output-startAgentflow",
+      "target": "httpAgentflow_0"
+    },
+    {
+      "id": "b",
+      "source": "httpAgentflow_0",
+      "sourceHandle": "httpAgentflow_0-output-httpAgentflow",
+      "target": "conditionAgentflow_0"
+    },
+    {
+      "id": "c",
+      "source": "conditionAgentflow_0",
+      "sourceHandle": "conditionAgentflow_0-output-0",
+      "target": "customFunctionAgentflow_0"
+    },
+    {
+      "id": "d",
+      "source": "conditionAgentflow_0",
+      "sourceHandle": "conditionAgentflow_0-output-1",
+      "target": "llmAgentflow_2"
+    },
+    {
+      "id": "e",
+      "source": "customFunctionAgentflow_0",
+      "sourceHandle": "customFunctionAgentflow_0-output-customFunctionAgentflow",
+      "target": "iterationAgentflow_0"
+    },
+    {
+      "id": "f",
+      "source": "iterationAgentflow_0",
+      "sourceHandle": "iterationAgentflow_0-output-iterationAgentflow",
+      "target": "executeFlowAgentflow_0"
+    },
+    {
+      "id": "g",
+      "source": "llmAgentflow_2",
+      "sourceHandle": "llmAgentflow_2-output-llmAgentflow",
+      "target": "loopAgentflow_0"
+    },
+    {
+      "id": "h",
+      "source": "loopAgentflow_0",
+      "sourceHandle": "loopAgentflow_0-output-loopAgentflow",
+      "target": "agentAgentflow_0"
+    },
+    {
+      "id": "i",
+      "source": "agentAgentflow_0",
+      "sourceHandle": "agentAgentflow_0-output-agentAgentflow",
+      "target": "toolAgentflow_0"
+    }
+  ]
+}

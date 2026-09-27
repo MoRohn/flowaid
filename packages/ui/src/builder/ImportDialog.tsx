@@ -148,8 +148,8 @@ export function ImportDialog({
         <DialogHeader>
           <DialogTitle>Import a flow</DialogTitle>
           <DialogDescription>
-            Chat models become generation nodes, condition nodes become TypeSafe decisions, tools
-            keep their credentials as placeholders.
+            The FlowAId importer maps each node of an agent flow or LangChain chat flow export and
+            reports what changed. Credentials are never imported; you bind secrets afterwards.
           </DialogDescription>
         </DialogHeader>
         <DialogBody className="flex flex-col gap-4">
@@ -201,7 +201,7 @@ export function ImportDialog({
                 {busy ? (
                   <Spinner
                     size="sm"
-                    label={status === "reading" ? "Reading file" : "Analysing chatflow"}
+                    label={status === "reading" ? "Reading file" : "Analysing flow"}
                   />
                 ) : (
                   <Upload className="size-4" strokeWidth={1.75} aria-hidden="true" />
@@ -211,13 +211,11 @@ export function ImportDialog({
                 {status === "reading"
                   ? "Reading file"
                   : status === "analysing"
-                    ? "Analysing chatflow"
+                    ? "Analysing flow"
                     : "Drop a flow export here"}
               </span>
               <span className="text-xs text-ink-3">
-                {busy
-                  ? "This takes a moment for large chatflows."
-                  : "or click to choose a .json file"}
+                {busy ? "This takes a moment for large flows." : "or click to choose a .json file"}
               </span>
             </label>
           ) : null}

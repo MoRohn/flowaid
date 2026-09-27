@@ -2038,7 +2038,8 @@ export const OPERATIONS: readonly CliOperation[] = [
     verb: "import",
     method: "POST",
     path: "/v1/workflows/import",
-    summary: "Import a definition (JSON or YAML) as a new workflow",
+    summary:
+      "Import a definition (JSON or YAML), or an external flow export translated by the FlowAId importer, as a new workflow",
     auth: "session_or_api_key",
     positional: [],
     query: [],
@@ -2047,6 +2048,25 @@ export const OPERATIONS: readonly CliOperation[] = [
       properties: [
         { name: "definition", type: "any", required: false },
         { name: "yaml", type: "string", required: false },
+        { name: "external", type: "any", required: false },
+        { name: "name", type: "string", required: false },
+      ],
+    },
+  },
+  {
+    noun: "workflow",
+    verb: "import-preview",
+    method: "POST",
+    path: "/v1/workflows/import/preview",
+    summary:
+      "Translate an external flow export without saving it: the migration report and the compiler's diagnostics",
+    auth: "session_or_api_key",
+    positional: [],
+    query: [],
+    body: {
+      required: true,
+      properties: [
+        { name: "external", type: "any", required: true },
         { name: "name", type: "string", required: false },
       ],
     },

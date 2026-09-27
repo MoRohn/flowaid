@@ -61,6 +61,8 @@ evaluation results <id> {--out}
 evaluation start {--set-id --workflow-id --version-id --draft --environment-id --baseline-evaluation-run-id --concurrency --gate --body --out}
 event
 event publish <eventName> {--payload --correlation-key --environment-id --body --out}
+import
+import external <file> {--name --dry-run --local --out}
 job
 job get <id> {--out}
 login
@@ -194,7 +196,8 @@ workflow critique <id> {--definition --judge --body --out}
 workflow delete <id> {--purge --out}
 workflow export <id> {--version --format --out}
 workflow get <id> {--out}
-workflow import {--definition --yaml --name --body --out}
+workflow import {--definition --yaml --external --name --body --out}
+workflow import-preview {--external --name --body --out}
 workflow list {--limit --cursor --order --q --tag --archived --include --out}
 workflow optimize <id> {--definition --days --body --out}
 workflow package <id> {--version --out --mode}
@@ -233,6 +236,7 @@ Commands:
   dev [options]                     start the local stack (docker compose) and open the web app
   validate [options] <path>         compile a workflow definition locally (bundled core nodes) and
                                     list diagnostics
+  import                            import workflows from other tools
   agent|agents                      agent operations
   alerts                            alerts operations
   api-key|api-keys                  api-key operations

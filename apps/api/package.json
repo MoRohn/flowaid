@@ -33,6 +33,7 @@
     "@flowaid/database": "workspace:*",
     "@flowaid/env": "workspace:*",
     "@flowaid/evaluation": "workspace:*",
+    "@flowaid/importer": "workspace:*",
     "@flowaid/mcp": "workspace:*",
     "@flowaid/nodes-core": "workspace:*",
     "@flowaid/observability": "workspace:*",

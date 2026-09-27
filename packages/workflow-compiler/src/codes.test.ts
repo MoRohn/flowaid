@@ -18,12 +18,8 @@ import { describe, expect, it } from "vitest";
 import { compile, verifyPlanHash, type CompileInput } from "./index.js";
 import { FIXTURE_MANIFESTS, catalogOf, readJson } from "./test/support.js";
 
-/** Codes owned by other packages: evaluation-gated publish and the importer. */
-const NOT_COMPILER: DiagnosticCode[] = [
-  "W_REGRESSION",
-  "E_IMPORT_UNSUPPORTED",
-  "I_COST_SUGGESTION",
-];
+/** Codes owned by other packages: evaluation-gated publish and the advisor. */
+const NOT_COMPILER: DiagnosticCode[] = ["W_REGRESSION", "I_COST_SUGGESTION"];
 
 type Doc = Record<string, any>;
 
@@ -138,6 +134,14 @@ const CASES: Case[] = [
   {
     code: "E_UNKNOWN_NODE_TYPE",
     edit: (d) => void (node(d, "intent").type = "flowaid.decision.nope"),
+  },
+  {
+    code: "E_IMPORT_UNSUPPORTED",
+    edit: (d) => {
+      const n = node(d, "intent");
+      n.type = "flowaid.dev.todo";
+      n.config = { sourceType: "agentAgentflow", reason: "no FlowAId equivalent" };
+    },
   },
   {
     code: "E_NODE_VERSION_UNSUPPORTED",
@@ -647,7 +651,7 @@ describe("diagnostic codes", () => {
   it("covers every compiler-owned code exactly once", () => {
     const owned = DiagnosticCodeSchema.options.filter((c) => !NOT_COMPILER.includes(c));
     expect(CASES.map((c) => c.code).sort()).toEqual([...owned].sort());
-    expect(owned).toHaveLength(94);
+    expect(owned).toHaveLength(95);
   });
 
   const snapshot: Record<string, Diagnostic[]> = {};

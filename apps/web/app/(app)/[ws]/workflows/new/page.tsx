@@ -26,6 +26,8 @@ import { advisorAvailability } from "~/builder/advisor";
 import { planFromGenerated, type GeneratedWorkflow } from "~/builder/aiPlan";
 import { useSession } from "~/session";
 import { AppFrame, PageBody } from "~/shell/AppFrame";
+import { useExternalImport } from "~/importer/ExternalImport";
+import { looksLikeExternalExport, parseJson } from "~/importer/report";
 
 interface Created {
   id: string;
@@ -49,6 +51,10 @@ export default function NewWorkflowPage() {
         ...(description ? { description } : {}),
       }),
     onSuccess: done,
+  });
+  const external = useExternalImport({
+    ...(name.trim() ? { name: name.trim() } : {}),
+    onImported: (id) => done({ id }),
   });
   const importer = useMutation({
     mutationFn: async () => {
@@ -232,8 +238,8 @@ export default function NewWorkflowPage() {
               <FileUp className="size-5 text-ink-3" strokeWidth={1.5} aria-hidden />
               <CardTitle>Import</CardTitle>
               <CardDescription>
-                A FlowAId definition as JSON or YAML. The compiler migrates older versions and
-                reports what changed.
+                A FlowAId definition as JSON or YAML, or a flow exported from another visual
+                builder. The compiler migrates older versions and reports what changed.
               </CardDescription>
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
@@ -265,10 +271,25 @@ export default function NewWorkflowPage() {
                 variant="secondary"
                 disabled={!source.trim()}
                 loading={importer.isPending}
-                onClick={() => importer.mutate()}
+                onClick={() =>
+                  // an external flow export goes through the FlowAId importer and its report
+                  looksLikeExternalExport(parseJson(source))
+                    ? external.analyse(source, "pasted flow")
+                    : importer.mutate()
+                }
               >
                 Import
               </Button>
+              <div className="border-t border-border pt-3">
+                <Button variant="ghost" onClick={() => external.setOpen(true)}>
+                  Import an external flow export…
+                </Button>
+                <FieldHint>
+                  Agent flows and LangChain chat flows from other visual builders. You see what each
+                  node becomes before anything is saved.
+                </FieldHint>
+              </div>
+              {external.dialog}
             </CardBody>
           </Card>
         </div>

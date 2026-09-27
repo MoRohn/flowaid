@@ -107,6 +107,7 @@
         "provider-ollama",
         "credentials",
         "sandbox",
+        "importer",
         "workflow-core",
         "shared",
         "plugins"

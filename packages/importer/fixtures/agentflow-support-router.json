@@ -1,0 +1,182 @@
+{
+  "name": "Support router",
+  "nodes": [
+    {
+      "id": "startAgentflow_0",
+      "type": "agentFlow",
+      "position": { "x": 0, "y": 0 },
+      "data": {
+        "id": "startAgentflow_0",
+        "name": "startAgentflow",
+        "label": "Start",
+        "inputs": {
+          "startInputType": "chatInput",
+          "startState": [{ "key": "tier", "value": "standard" }]
+        }
+      }
+    },
+    {
+      "id": "conditionAgentAgentflow_0",
+      "type": "agentFlow",
+      "position": { "x": 260, "y": 0 },
+      "data": {
+        "id": "conditionAgentAgentflow_0",
+        "name": "conditionAgentAgentflow",
+        "label": "Classify ticket",
+        "inputs": {
+          "conditionAgentModel": "chatOpenAI",
+          "conditionAgentModelConfig": {
+            "modelName": "gpt-4o-mini",
+            "credential": "7c1f7d2e-cred"
+          },
+          "conditionAgentInstructions": "<p>Decide which team should handle the customer's message.</p>",
+          "conditionAgentInput": "<p>{{ question }}</p>",
+          "conditionAgentScenarios": [
+            { "scenario": "Billing question" },
+            { "scenario": "Technical issue" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "llmAgentflow_0",
+      "type": "agentFlow",
+      "position": { "x": 560, "y": -120 },
+      "data": {
+        "id": "llmAgentflow_0",
+        "name": "llmAgentflow",
+        "label": "Billing reply",
+        "inputs": {
+          "llmModel": "chatOpenAI",
+          "llmModelConfig": {
+            "modelName": "gpt-4o-mini",
+            "temperature": 0.2,
+            "credential": "7c1f7d2e-cred"
+          },
+          "llmMessages": [
+            {
+              "role": "system",
+              "content": "<p>You answer billing questions for a {{ $flow.state.tier }} customer.</p>"
+            },
+            { "role": "user", "content": "<p>{{ question }}</p>" }
+          ],
+          "llmReturnResponseAs": "userMessage"
+        }
+      }
+    },
+    {
+      "id": "humanInputAgentflow_0",
+      "type": "agentFlow",
+      "position": { "x": 860, "y": -120 },
+      "data": {
+        "id": "humanInputAgentflow_0",
+        "name": "humanInputAgentflow",
+        "label": "Approve reply",
+        "inputs": {
+          "humanInputDescriptionType": "fixed",
+          "humanInputDescription": "<p>Send this reply? <span data-type=\"mention\" data-id=\"llmAgentflow_0\">{{ llmAgentflow_0 }}</span></p>"
+        }
+      }
+    },
+    {
+      "id": "directReplyAgentflow_0",
+      "type": "agentFlow",
+      "position": { "x": 1160, "y": -160 },
+      "data": {
+        "id": "directReplyAgentflow_0",
+        "name": "directReplyAgentflow",
+        "label": "Send reply",
+        "inputs": { "directReplyMessage": "{{ llmAgentflow_0.output.content }}" }
+      }
+    },
+    {
+      "id": "directReplyAgentflow_1",
+      "type": "agentFlow",
+      "position": { "x": 1160, "y": -40 },
+      "data": {
+        "id": "directReplyAgentflow_1",
+        "name": "directReplyAgentflow",
+        "label": "Escalate",
+        "inputs": { "directReplyMessage": "A billing specialist will follow up." }
+      }
+    },
+    {
+      "id": "llmAgentflow_1",
+      "type": "agentFlow",
+      "position": { "x": 560, "y": 120 },
+      "data": {
+        "id": "llmAgentflow_1",
+        "name": "llmAgentflow",
+        "label": "Technical reply",
+        "inputs": {
+          "llmModel": "chatAnthropic",
+          "llmModelConfig": { "modelName": "claude-sonnet-4-5", "credential": "a91f-cred" },
+          "llmMessages": [
+            { "role": "user", "content": "Help with this technical issue: {{ question }}" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "stickyNoteAgentflow_0",
+      "type": "stickyNote",
+      "position": { "x": 0, "y": 200 },
+      "data": {
+        "id": "stickyNoteAgentflow_0",
+        "name": "stickyNoteAgentflow",
+        "label": "Sticky Note",
+        "inputs": { "note": "Billing replies are reviewed before sending." }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "startAgentflow_0",
+      "sourceHandle": "startAgentflow_0-output-startAgentflow",
+      "target": "conditionAgentAgentflow_0",
+      "targetHandle": "conditionAgentAgentflow_0",
+      "type": "agentFlow"
+    },
+    {
+      "id": "e2",
+      "source": "conditionAgentAgentflow_0",
+      "sourceHandle": "conditionAgentAgentflow_0-output-0",
+      "target": "llmAgentflow_0",
+      "targetHandle": "llmAgentflow_0",
+      "type": "agentFlow"
+    },
+    {
+      "id": "e3",
+      "source": "conditionAgentAgentflow_0",
+      "sourceHandle": "conditionAgentAgentflow_0-output-1",
+      "target": "llmAgentflow_1",
+      "targetHandle": "llmAgentflow_1",
+      "type": "agentFlow"
+    },
+    {
+      "id": "e4",
+      "source": "llmAgentflow_0",
+      "sourceHandle": "llmAgentflow_0-output-llmAgentflow",
+      "target": "humanInputAgentflow_0",
+      "targetHandle": "humanInputAgentflow_0",
+      "type": "agentFlow"
+    },
+    {
+      "id": "e5",
+      "source": "humanInputAgentflow_0",
+      "sourceHandle": "humanInputAgentflow_0-output-0",
+      "target": "directReplyAgentflow_0",
+      "targetHandle": "directReplyAgentflow_0",
+      "type": "agentFlow"
+    },
+    {
+      "id": "e6",
+      "source": "humanInputAgentflow_0",
+      "sourceHandle": "humanInputAgentflow_0-output-1",
+      "target": "directReplyAgentflow_1",
+      "targetHandle": "directReplyAgentflow_1",
+      "type": "agentFlow"
+    }
+  ]
+}

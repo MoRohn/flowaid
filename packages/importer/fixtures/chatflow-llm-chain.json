@@ -1,0 +1,76 @@
+{
+  "nodes": [
+    {
+      "id": "chatAnthropic_0",
+      "type": "customNode",
+      "position": { "x": 0, "y": 0 },
+      "data": {
+        "id": "chatAnthropic_0",
+        "name": "chatAnthropic",
+        "label": "ChatAnthropic",
+        "category": "Chat Models",
+        "inputs": {
+          "modelName": "claude-sonnet-4-5",
+          "temperature": 0.7,
+          "credential": "cred-anthropic"
+        }
+      }
+    },
+    {
+      "id": "promptTemplate_0",
+      "type": "customNode",
+      "position": { "x": 0, "y": 300 },
+      "data": {
+        "id": "promptTemplate_0",
+        "name": "promptTemplate",
+        "label": "Prompt Template",
+        "category": "Prompts",
+        "inputs": {
+          "template": "Translate the following text to {language}:\n\n{text}",
+          "promptValues": "{\"text\":\"{{question}}\",\"language\":\"French\"}"
+        }
+      }
+    },
+    {
+      "id": "llmChain_0",
+      "type": "customNode",
+      "position": { "x": 400, "y": 100 },
+      "data": {
+        "id": "llmChain_0",
+        "name": "llmChain",
+        "label": "LLM Chain",
+        "category": "Chains",
+        "inputs": {
+          "model": "{{chatAnthropic_0.data.instance}}",
+          "prompt": "{{promptTemplate_0.data.instance}}"
+        }
+      }
+    },
+    {
+      "id": "customJSFunction_0",
+      "type": "customNode",
+      "position": { "x": 400, "y": 400 },
+      "data": {
+        "id": "customJSFunction_0",
+        "name": "customJSFunction",
+        "label": "Custom JS Function",
+        "category": "Utilities",
+        "inputs": { "javascriptFunction": "return 1;" }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "source": "chatAnthropic_0",
+      "target": "llmChain_0",
+      "sourceHandle": "chatAnthropic_0-output-chatAnthropic-BaseChatModel",
+      "targetHandle": "llmChain_0-input-model-BaseLanguageModel"
+    },
+    {
+      "source": "promptTemplate_0",
+      "target": "llmChain_0",
+      "sourceHandle": "promptTemplate_0-output-promptTemplate-PromptTemplate",
+      "targetHandle": "llmChain_0-input-prompt-BasePromptTemplate"
+    }
+  ]
+}

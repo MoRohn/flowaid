@@ -1,0 +1,11 @@
+{
+  "extends": "@flowaid/config/tsconfig.library.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "types": ["node"],
+    "incremental": false
+  },
+  "include": ["src"],
+  "exclude": ["dist", "node_modules", "**/*.test.ts", "src/test/**"]
+}

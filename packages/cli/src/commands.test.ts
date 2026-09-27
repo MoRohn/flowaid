@@ -304,3 +304,66 @@ describe("local commands", () => {
     expect(JSON.parse(t.stdout.join(""))).toMatchObject({ ok: true });
   });
 });
+
+describe("import external", () => {
+  const exportFile = readFileSync(
+    join(
+      dirname(fileURLToPath(import.meta.url)),
+      "..",
+      "..",
+      "importer",
+      "fixtures",
+      "chatflow-llm-chain.json",
+    ),
+    "utf8",
+  );
+
+  it("--local translates on this machine and writes the definition and a report", async () => {
+    const t = fakeIo([], { files: { "flow.json": exportFile } });
+    const code = await runCli(
+      ["import", "external", "flow.json", "--local", "--out", "wf.json", "--name", "Translator"],
+      t.io,
+    );
+    expect(code).toBe(1); // the export has one unsupported component
+    process.exitCode = 0;
+    const def = JSON.parse(t.files.get("wf.json") as string) as {
+      name: string;
+      nodes: { type?: string }[];
+    };
+    expect(def.name).toBe("Translator");
+    expect(def.nodes.some((n) => n.type === "flowaid.dev.todo")).toBe(true);
+    expect(t.stderr.join("\n")).toMatch(
+      /1 imported, 2 converted, 0 need configuration, 1 unsupported/,
+    );
+  });
+
+  it("sends the export to the server, or previews it with --dry-run", async () => {
+    const report = {
+      format: "chatflow",
+      workflowName: "Translator",
+      counts: { imported: 1, converted: 2, needsConfig: 0, unsupported: 1 },
+      nodes: [],
+      issues: [],
+      secrets: ["ANTHROPIC_API_KEY"],
+    };
+    const t = fakeIo(
+      [
+        (c) =>
+          c.url.pathname === "/v1/workflows/import/preview"
+            ? json(200, { report, definition: {}, diagnostics: [] })
+            : c.url.pathname === "/v1/workflows/import"
+              ? json(201, { report, workflow: { id: WF, name: "Translator" }, diagnostics: [] })
+              : undefined,
+      ],
+      { files: { "flow.json": exportFile }, env: { FLOWAID_API_KEY: "fa_live_x" } },
+    );
+    expect(await runCli(["import", "external", "flow.json", "--dry-run"], t.io)).toBe(0);
+    expect(t.calls[0]?.body).toMatchObject({ external: { nodes: expect.any(Array) } });
+    expect(t.stdout.at(-1)).toBe("dry run: nothing was saved");
+    expect(await runCli(["import", "external", "flow.json", "--name", "Translator"], t.io)).toBe(0);
+    expect(t.calls[1]?.url.pathname).toBe("/v1/workflows/import");
+    expect(t.calls[1]?.body).toMatchObject({ name: "Translator" });
+    expect(t.stdout.at(-1)).toBe(`created workflow ${WF} "Translator"`);
+    expect(t.stdout.join("\n")).toContain("secrets to bind: ANTHROPIC_API_KEY");
+  });
+});
