@@ -1,0 +1,51 @@
+{
+  "name": "@flowaid/cli",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The flowaid command line: every API operation as a generated noun/verb command (from the OpenAPI x-cli extension), plus login, dev, workflow run (remote with --watch, or embedded with --local), workflow export/package and runs events --follow (API.md §8.3).",
+  "license": "Apache-2.0",
+  "type": "module",
+  "bin": {
+    "flowaid": "./dist/main.js"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src",
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsx src/main.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src",
+    "test": "vitest run",
+    "clean": "rm -rf dist .turbo *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@flowaid/nodes-core": "workspace:*",
+    "@flowaid/provider-anthropic": "workspace:*",
+    "@flowaid/provider-ollama": "workspace:*",
+    "@flowaid/provider-openai": "workspace:*",
+    "@flowaid/provider-typesafe": "workspace:*",
+    "@flowaid/providers": "workspace:*",
+    "@flowaid/sandbox": "workspace:*",
+    "@flowaid/shared": "workspace:*",
+    "@flowaid/workflow-compiler": "workspace:*",
+    "@flowaid/workflow-core": "workspace:*",
+    "@flowaid/workflow-runtime": "workspace:*",
+    "@flowaid/workflow-sdk": "workspace:*",
+    "commander": "15.0.0",
+    "yaml": "2.9.1"
+  },
+  "devDependencies": {
+    "@flowaid/config": "workspace:*",
+    "@types/node": "24.13.6",
+    "eslint": "9.39.5",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "vitest": "4.1.11"
+  }
+}

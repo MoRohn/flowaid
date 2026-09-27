@@ -6,6 +6,21 @@ import { jsonSchemaTransform } from "fastify-type-provider-zod";
 
 export const API_VERSION = "1.1.0";
 
+/**
+ * Recursive Zod schemas (JSON values inside `HumanResponse`) come out of the type provider as
+ * `#/components/schemas/schemaN` references whose definitions it never emits; the document
+ * registers no components, so such a reference would dangle. Inline them as `{}` (any JSON).
+ */
+function inlineDanglingRefs(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(inlineDanglingRefs);
+  if (value === null || typeof value !== "object") return value;
+  const ref = (value as { $ref?: unknown }).$ref;
+  if (typeof ref === "string" && ref.startsWith("#/components/schemas/")) return {};
+  return Object.fromEntries(
+    Object.entries(value).map(([k, v]) => [k, inlineDanglingRefs(v)] as const),
+  );
+}
+
 export async function registerOpenApi(app: FastifyInstance): Promise<void> {
   await app.register(swagger, {
     openapi: {
@@ -29,7 +44,11 @@ export async function registerOpenApi(app: FastifyInstance): Promise<void> {
       security: [{ apiKey: [] }, { session: [] }],
     },
     transform: (input) => {
-      const out = jsonSchemaTransform(input);
+      const transformed = jsonSchemaTransform(input);
+      const out = {
+        ...transformed,
+        schema: inlineDanglingRefs(transformed.schema) as typeof transformed.schema,
+      };
       const config = (input.route.config ?? {}) as {
         cli?: unknown;
         auth?: string;
