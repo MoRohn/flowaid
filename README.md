@@ -16,7 +16,7 @@
   <img alt="Status: beta" src="https://img.shields.io/badge/status-beta-2f5be8">
   <img alt="TypeScript 5.9 strict" src="https://img.shields.io/badge/TypeScript-5.9%20strict-17171c">
   <img alt="Node.js 24+" src="https://img.shields.io/badge/node-%E2%89%A524-17171c">
-  <img alt="Tests: 5,008 passing" src="https://img.shields.io/badge/tests-5%2C008%20passing-1f9d64">
+  <img alt="Tests: 5,399 passing" src="https://img.shields.io/badge/tests-5%2C399%20passing-1f9d64">
 </p>
 
 ---
@@ -59,9 +59,16 @@ What that makes possible:
   builder runs the same compiler in your browser as you edit.
 - **Quality is measured, not assumed.** Evaluation sets score decisions, branches and outputs,
   report calibration, and can gate publishing a new version.
+- **Models are routed, not hard-coded.** A generation node lists candidate models and a
+  strategy (ordered, cheapest, fastest, healthiest) and fails over between them; a cost
+  optimiser, an AI workflow builder and an AI critic suggest changes as reviewable diagnostics.
+- **Agents, knowledge and plugins are first-class.** A bounded agent node calls tools and other
+  workflows, knowledge bases give retrieval nodes hybrid pgvector search, and installable plugins
+  run in their own host process.
 - **Nothing is locked in.** Self-hosted on PostgreSQL, every AI provider optional, a flow can be
-  downloaded as a runnable code package, workflows are served as MCP tools, and LangChain is
-  supported behind a strict boundary.
+  downloaded as a runnable code package, workflows are served as MCP tools, external flow
+  exports come in through the FlowAId importer, and LangChain is supported behind a strict
+  boundary.
 
 ## Product tour
 
@@ -280,8 +287,9 @@ cron schedules and event subscriptions when a version is deployed to an environm
 ## Deploy with Docker Compose
 
 The same images the release gate tests run the production stack: PostgreSQL 16 with pgvector,
-the API, the worker and the web app. Queues and the event bus run over PostgreSQL; Redis and
-worker replicas are an optional profile.
+the API, the worker, the `worker-code` sandbox host and the web app. Queues and the event bus
+run over PostgreSQL; Redis and worker replicas are an optional profile, and so is a bundled
+S3-compatible artifact store.
 
 ```sh
 cp .env.example .env
@@ -308,31 +316,44 @@ put it on a network:
   log see real client addresses.
 - **Scale out** with `docker compose --profile scale up -d` (Redis and `WORKER_REPLICAS`
   workers) when one worker is not enough.
+- **Keep code nodes apart.** The worker delegates the `code` pool to `worker-code`, which runs
+  isolated-vm isolates as a restricted database role without `.env`, the data volume or the
+  master key. Remove it from the `edge` network for a sandbox host without egress. Plugin nodes
+  run in a separate plugin host process of the worker.
+- **Store artifacts in S3.** Set `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY` and `S3_SECRET_KEY`
+  (any S3-compatible store), or run `docker compose --profile s3 up -d` for the bundled one.
+  Without them, run artifacts and code-export packages live in `flowaid-data`.
 
 Every variable is documented in [`packages/env/README.md`](packages/env/README.md); the
 services, networks and secret scoping are described in [`docker/README.md`](docker/README.md).
 
 ## What is inside
 
-| Area                                                                 | What it does                                                                                                                                                                                                                                                                                                 |
-| -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `apps/web`                                                           | Next.js 16 app: builder with an in-browser compiler (Web Worker), undo/redo, autosave with conflict detection and a live run overlay; runs and trace viewer; human tasks and the external review page; credentials, integrations, evaluations, templates, versions, deployments and settings. 71 tests       |
-| `apps/api`                                                           | Fastify 5 REST API with OpenAPI 3.1: auth (sessions, API keys, CSRF, rate limits, audit), workflows, versions and deployments, runs with SSE, human tasks and review links, credentials, tools and MCP servers, triggers and ingress, evaluations, code export and the `/mcp` server. 67 tests on PostgreSQL |
-| `apps/worker`                                                        | Runs workflows: the orchestrator over the event store, core and bundled plugin nodes, providers, tools, sandboxed code, human waits, subflows, the scheduler, evaluations and the export job. 17 tests on PostgreSQL                                                                                         |
-| `@flowaid/workflow-sdk`, `@flowaid/cli`                              | Typed client generated from the OpenAPI document with resumable SSE streams, total workflow builders; the `flowaid` command line with a command for every operation, local runs and validation. 37 tests                                                                                                     |
-| `@flowaid/workflow-core`                                             | Workflow contracts, the FlowExpr expression language, templates and a JSON Schema compatibility checker. 2,665 tests                                                                                                                                                                                         |
-| `@flowaid/workflow-compiler`                                         | Definition → content-hashed execution plan: 8 passes, 94 diagnostics, guard analysis, batching, redaction, diff and migrate. 167 tests                                                                                                                                                                       |
-| `@flowaid/workflow-runtime`                                          | Event-sourced scheduler for all ten node kinds, orchestrator with fenced appends, leases and crash recovery, recorded replay, `runLocally()`, Postgres, BullMQ and Redis drivers. 78 tests                                                                                                                   |
-| `@flowaid/database`                                                  | PostgreSQL 16 schema (45 tables), migrations with forced row-level security, event-sourced run store, Postgres queue and event bus, retention. 56 tests on PostgreSQL                                                                                                                                        |
-| `@flowaid/nodes-core`                                                | 36 core nodes: typed decisions with human failover, generation and embeddings, HTTP, MCP and OpenAPI tools, sandboxed code and shell, data shaping, state, safety and developer nodes; the templates. 90 tests                                                                                               |
-| `@flowaid/provider-*`, `@flowaid/providers`                          | TypeSafe Jev (exact distributions, batching, contract tests on recorded fixtures), OpenAI and compatible endpoints, Anthropic, Ollama; registry, pricing, failover and circuit breaking. 140 tests                                                                                                           |
-| `@flowaid/mcp`, `@flowaid/openapi-tools`                             | MCP client pool with policy-gated stdio and workflows exposed as tools; OpenAPI import with SSRF-safe references and one tool per operation. 75 tests                                                                                                                                                        |
-| `@flowaid/langchain`, `@flowaid/nodes-langchain`                     | LangChain adapters both ways, a callback handler with budgets, and a bundled node package (chat, agent, loaders, splitters, embeddings, vector stores, retrievers). 53 tests                                                                                                                                 |
-| `@flowaid/codegen`                                                   | Download code: a flow as a runnable TypeScript package with its own tests and a recorded replay, in npm or vendored mode. 29 tests                                                                                                                                                                           |
-| `@flowaid/evaluation`, `@flowaid/jev`                                | Evaluation sets, scoring, calibration and regression gates; the Jev decision-contract library (packets, routing, receipts, shadow comparison). 209 tests                                                                                                                                                     |
-| `@flowaid/credentials`, `@flowaid/sandbox`, `@flowaid/observability` | Envelope encryption with rotatable master keys; isolated-vm and container executors; redacting logs, tracing, metrics and run timelines. 133 tests                                                                                                                                                           |
-| `@flowaid/ui`                                                        | The React component library behind the web app: canvas, nodes, trace viewer, inspector, forms, decision visuals and dashboards, with a playground. 872 tests                                                                                                                                                 |
-| Release gate                                                         | CI runs the audit, boundaries, generated-file, format, lint, typecheck, build and test gates and the PostgreSQL suites; E2E drives the acceptance journey in a browser against the production builds                                                                                                         |
+| Area                                                           | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web`                                                     | Next.js 16 app: builder with an in-browser compiler (Web Worker), undo/redo, autosave with conflict detection, a live run overlay and the AI builder and critic; runs with restart, fork and retry-node, and the trace viewer; human tasks and the external review page; agents, knowledge, triggers (schedules, webhooks, MCP exposures), the observability dashboard, credentials, integrations and plugins, evaluations, templates, versions, deployments and settings with notification channels. 116 tests |
+| `apps/api`                                                     | Fastify 5 REST API with OpenAPI 3.1: auth (sessions, API keys, CSRF, rate limits, audit), workflows, versions and deployments, runs with SSE and run actions, human tasks and review links, credentials, tools, MCP servers and plugins, triggers, ingress and event correlation, knowledge, agents, metrics and Prometheus, alerts and notifications, evaluations, the advisor, code export, the importer and the `/mcp` server. 110 tests on PostgreSQL                                                       |
+| `apps/worker`                                                  | Runs workflows: the orchestrator over the event store, core nodes, plugin nodes in a plugin host process, providers with failover and routing, tools, human waits, subflows, agents, delegated pools (code nodes on the `worker-code` sandbox host), the scheduler, knowledge ingestion, trace reviews, alerts, evaluations and the export job. 47 tests on PostgreSQL                                                                                                                                          |
+| `apps/docs`                                                    | The documentation site: getting started, importing external flow exports, and the guides. 7 tests                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `@flowaid/workflow-sdk`, `@flowaid/cli`                        | Typed client generated from the OpenAPI document with resumable SSE streams, total workflow builders; the `flowaid` command line with a command for every operation, local runs, validation, plugin search and `import external`. 43 tests                                                                                                                                                                                                                                                                      |
+| `@flowaid/workflow-core`                                       | Workflow contracts, the FlowExpr expression language, templates and a JSON Schema compatibility checker. 2,665 tests                                                                                                                                                                                                                                                                                                                                                                                            |
+| `@flowaid/workflow-compiler`                                   | Definition → content-hashed execution plan: 8 passes, 94 diagnostics, guard analysis, batching, redaction, diff and migrate. 177 tests                                                                                                                                                                                                                                                                                                                                                                          |
+| `@flowaid/workflow-runtime`                                    | Event-sourced scheduler for all ten node kinds, orchestrator with fenced appends, leases and crash recovery, recorded replay, restart, fork and retry-node, `runLocally()`, Postgres, BullMQ and Redis drivers. 89 tests                                                                                                                                                                                                                                                                                        |
+| `@flowaid/database`                                            | PostgreSQL 16 schema (47 tables), migrations with forced row-level security, event-sourced run store, Postgres queue and event bus, retention. 56 tests on PostgreSQL                                                                                                                                                                                                                                                                                                                                           |
+| `@flowaid/nodes-core`                                          | 60 core nodes: typed decisions with human failover, generation, embeddings and rerank, the agent, retrieval, HTTP, MCP and OpenAPI tools, sandboxed code and shell, data shaping, state, safety and developer nodes; the templates. 153 tests                                                                                                                                                                                                                                                                   |
+| `@flowaid/provider-*`, `@flowaid/providers`                    | TypeSafe Jev (exact distributions, batching, contract tests on recorded fixtures), OpenAI and compatible endpoints, Anthropic, Ollama; registry, pricing, failover, model routing, circuit breaking and record/replay fixtures. 163 tests                                                                                                                                                                                                                                                                       |
+| `@flowaid/advisor`                                             | The cost optimiser, the AI workflow builder and the AI critic, each returning diagnostics with reviewable fixes. 22 tests                                                                                                                                                                                                                                                                                                                                                                                       |
+| `@flowaid/knowledge`                                           | Knowledge sources: ingestion, chunking, embeddings per source, pgvector vector, keyword and hybrid search (RRF). 33 tests                                                                                                                                                                                                                                                                                                                                                                                       |
+| `@flowaid/mcp`, `@flowaid/openapi-tools`                       | MCP client pool with policy-gated stdio and workflows exposed as tools; OpenAPI import with SSRF-safe references and one tool per operation. 75 tests                                                                                                                                                                                                                                                                                                                                                           |
+| `@flowaid/plugins`, `create-flowaid-node`                      | Plugin registry discovery, allow-lists, installation and the plugin host process; the scaffold for new node packages. 25 tests                                                                                                                                                                                                                                                                                                                                                                                  |
+| `@flowaid/importer`                                            | The FlowAId importer: external flow exports → FlowAId workflows, with a migration report. 20 tests                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `@flowaid/langchain`, `@flowaid/nodes-langchain`               | LangChain adapters both ways, a callback handler with budgets, and a bundled node package (chat, agent, loaders, splitters, embeddings, vector stores, retrievers). 53 tests                                                                                                                                                                                                                                                                                                                                    |
+| `@flowaid/codegen`                                             | Download code: a flow as a runnable TypeScript package with its own tests and a recorded replay, in npm or vendored mode. 29 tests                                                                                                                                                                                                                                                                                                                                                                              |
+| `@flowaid/evaluation`, `@flowaid/jev`                          | Evaluation sets, scoring, calibration and regression gates; the Jev decision-contract library (packets, routing, receipts, shadow comparison). 209 tests                                                                                                                                                                                                                                                                                                                                                        |
+| `@flowaid/credentials`, `@flowaid/sandbox`, `@flowaid/storage` | Envelope encryption with rotatable master keys; isolated-vm and container executors; local and S3 artifact storage. 87 tests                                                                                                                                                                                                                                                                                                                                                                                    |
+| `@flowaid/observability`                                       | Redacting logs, tracing, metrics with Prometheus and OpenTelemetry export, run timelines, trace reviews, alerts to email, Slack and signed webhooks. 71 tests                                                                                                                                                                                                                                                                                                                                                   |
+| `@flowaid/ui`                                                  | The React component library behind the web app: canvas, nodes, trace viewer, inspector, forms, decision visuals and dashboards, with a playground and an accessibility regression gallery. 899 tests                                                                                                                                                                                                                                                                                                            |
+| Release gate                                                   | CI runs the audit, boundaries, generated-file, format, lint, typecheck, build and test gates, the PostgreSQL suites and the UI accessibility gallery; E2E drives the acceptance journey in a browser against the production builds, with recorded provider replay and secret-canary log checks                                                                                                                                                                                                                  |
 
 The live snapshot is [`docs/STATUS.md`](docs/STATUS.md).
 
@@ -354,11 +375,13 @@ The live snapshot is [`docs/STATUS.md`](docs/STATUS.md).
      Runtime (pure reducer over an append-only event log, in the worker)
        ├─ Jev decisions     typed answer + distribution → auto / improve / human
        ├─ LLM generation    streamed, budgeted, cost-accounted
-       ├─ Tools             HTTP, MCP, OpenAPI, sandboxed code
+       ├─ Tools             HTTP, MCP, OpenAPI, sandboxed code, plugins
+       ├─ Agents            bounded tool loops; workflows as tools
+       ├─ Knowledge         hybrid retrieval over the workspace's sources
        └─ Humans            approval, review, form, choice; durable suspension
                      │
                      ▼
-   Events · traces · human tasks · evaluations · code export
+   Events · traces · metrics · alerts · human tasks · evaluations · code export
 ```
 
 ## Core concepts
@@ -381,6 +404,10 @@ The live snapshot is [`docs/STATUS.md`](docs/STATUS.md).
   typed requests and responses, an inbox, and single-use external review links.
 - **Evaluation.** Datasets of expected decisions, branches and outputs; reports with
   calibration and regressions that can gate publishing.
+- **Run actions.** Replay a run from its log, restart it on the same input, fork it onto another
+  version from a chosen node, or retry one failed node in place.
+- **Triggers.** Schedules, webhooks with signature checks, events correlated to waiting runs, and
+  workflows exposed as MCP tools; failures and rejections reach your notification channels.
 
 ## Use the libraries directly
 
@@ -455,8 +482,9 @@ route({ contract, decision, calibrated: true });
 ```
 apps/
   api/                  Fastify REST API, SSE, webhooks, the MCP server endpoint
-  worker/               Orchestrator, node executors, scheduler, evaluation and export jobs
+  worker/               Orchestrator, node executors, sandbox and plugin hosts, scheduler, jobs
   web/                  Next.js web app: builder, runs, human tasks, evaluations, settings
+  docs/                 The documentation site
 brand/                  Identity: logo, design tokens, fonts (OFL), style guide
 docker/                 Compose stack and the one Dockerfile (api, worker, web targets)
 docs/                   Design, guides, research, plan and status (index: docs/README.md)
@@ -475,12 +503,17 @@ packages/
   provider-openai/  provider-anthropic/  provider-ollama/
   mcp/  openapi-tools/  MCP client and exposure · OpenAPI tools
   sandbox/              isolated-vm and container executors for code and shell nodes
+  storage/              Artifact storage: local volume or S3
   credentials/          Envelope encryption, master keys, external secrets, redaction
   database/             PostgreSQL schema, migrations, RLS, run store, queue, repositories
   evaluation/  jev/     Evaluation runner and reports · Jev decision-contract library
   codegen/              Download code: flows as runnable TypeScript packages
+  advisor/              Cost optimiser, AI workflow builder and AI critic
+  knowledge/            Knowledge sources, ingestion, hybrid pgvector search
+  importer/             The FlowAId importer for external flow exports
+  plugins/  create-flowaid-node/   Plugin registry, install and host · node package scaffold
   langchain/  nodes-langchain/   LangChain adapters · bundled LangChain nodes
-  observability/        Redacting logger, tracing, metrics, run timelines
+  observability/        Redacting logger, tracing, metrics, alerts, run timelines
   ui/                   React component library and playground
 scripts/                pnpm start, preflight, generators and repository checks
 boundaries.json         The allowed dependency graph between packages
@@ -495,23 +528,22 @@ boundaries.json         The allowed dependency graph between packages
 | [Architecture](docs/design/ARCHITECTURE.md) · [API](docs/design/API.md)             | How it is built, and the REST, SSE, SDK and CLI surface                  |
 | [Jev engineering](docs/jev/overview.md)                                             | Decision contracts, packets, routing, calibration, shadow mode, receipts |
 | [Download code](docs/design/CODE_EXPORT.md) · [LangChain](docs/design/LANGCHAIN.md) | Code export and the LangChain boundary                                   |
+| [Importing](apps/docs/content/importing.md)                                         | Bringing external flow exports into FlowAId                              |
 | [Environment](packages/env/README.md) · [Docker](docker/README.md)                  | Every setting, and the production stack                                  |
 | [Upgrade plan](docs/UPGRADE_PLAN.md) · [Status](docs/STATUS.md)                     | What is next, and where things stand                                     |
 
 ## Roadmap
 
-Phases 0–5 of the [upgrade plan](docs/UPGRADE_PLAN.md) are complete: the compiler, runtime,
-database, providers, API, worker, SDK and CLI, code export, the LangChain packages, the web app
-and the acceptance gate. Next:
+Phases 0–6 of the [upgrade plan](docs/UPGRADE_PLAN.md) are complete except identity (P6-07):
+the compiler, runtime, database, providers, API, worker, SDK and CLI, code export, the LangChain
+packages, the web app and the acceptance gate; then model routing, the advisor, the full node
+catalog, observability, the importer and docs site, event correlation, plugins, knowledge,
+agents and the trigger UIs. Next:
 
-1. **Routing and advice:** generation failover and model routing, a cost optimiser, and an AI
-   workflow builder and critic.
-2. **Operations:** observability dashboards, notifications, retention controls in the UI, and a
-   separate sandbox host for the `code` pool.
-3. **Identity and extension:** OIDC single sign-on, invitations and password resets, installable
-   plugins, knowledge sources, and agents.
-4. **The FlowAId importer** for external flow exports, and more templates.
-5. **Alongside:** track J (Jev decision contracts across the platform) and track L (a Lean 4
+1. **Identity:** OIDC single sign-on with role mapping, invitations and password resets, TOTP
+   MFA, service accounts, and Azure and GCP master keys and secret references.
+2. **Release automation:** versioned releases, changesets and published images.
+3. **Alongside:** track J (Jev decision contracts across the platform) and track L (a Lean 4
    checker that certifies run and evaluation results, see
    [LEAN_VERIFICATION.md](docs/design/LEAN_VERIFICATION.md)).
 
