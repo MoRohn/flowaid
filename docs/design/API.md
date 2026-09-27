@@ -219,6 +219,7 @@ Every route also declares `x-cli: { noun, verb, positional[] }`, from which the 
 | GET `/v1/metrics/overview` · `/v1/metrics/timeseries`                                                                                                                         | runs:read                          | `?workflowId&environmentId&versionId&from&to&bucket=1h` → `DashboardMetrics` / `{ series }`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | POST `/v1/artifacts/upload-url` · POST `/v1/artifacts/:id/complete` · GET `/v1/artifacts/:id` · GET `/v1/artifacts/:id/download`                                              | runs:create / runs:read (see note) | presigned PUT with pinned `Content-Type` and `Content-Length` (workspace max, default 100 MiB) → the row stays `pending` until `complete` verifies size and sha256 / metadata / download. Authorisation: an artifact with `run_id` requires `runs:read` on that run; `kind='export'` requires `workflows:read` on `artifacts.workflow_id`. Downloads are always `Content-Disposition: attachment` with `X-Content-Type-Options: nosniff` (inline preview only for `image/png\|jpeg\|gif\|webp`, `text/plain`, `application/json`); `storage_key` is server-generated `ws/<workspaceId>/<artifactId>`                             |
 | GET `/v1/health` · `/v1/ready` (db, queue, bus) · `GET /metrics` (Prometheus, internal listener) · `GET /v1/openapi.json` · `GET /docs`                                       | public / internal                  |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| GET `/v1/alerts/deliveries`                                                                                                                                                   | audit:read                         | observability alerts sent to notification channels (`alert_deliveries`: one per channel and occurrence; `human_task.created`, `run.failed`, `trace_review.page`, `schedule.failed`, `webhook.rejected`), newest first                                                                                                                                                                                                                                                                                                                                                                                                            |
 
 ## 4. Running a workflow
 
@@ -334,11 +335,12 @@ export const FeatureKeySchema = z.enum([
   "oidc",
   "schedules",
   "mcp_exposures",
+  "dashboard",
 ]);
 export type FeatureKey = z.infer<typeof FeatureKeySchema>;
 // features = FEATURES_SHIPPED (release constant) minus FLOWAID_FEATURES_DISABLED (env csv), then runtime conditions:
 // oidc ⇔ OIDC_ISSUER set; langchain ⇔ the bundled plugin row is enabled; code_export ⇔ FLOWAID_EXPORT_MODE resolves (npm, or vendored with FLOWAID_VENDOR_DIR present);
-// schedules ⇔ the scheduler job is enabled; knowledge/agents/ai_builder/advisor stay false until their packages ship.
+// schedules ⇔ the scheduler job is enabled; dashboard ⇔ the metrics routes ship (P6-04); knowledge/agents/ai_builder/advisor stay false until their packages ship.
 export const JobSchema = z.object({
   id: z.uuid(),
   kind: z.enum(["export.package"]),

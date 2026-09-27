@@ -11,6 +11,7 @@ describe("feature-keyed navigation", () => {
     // Agents stays hidden until the API reports the feature (P6-10)
     expect(ids({ workflows: true })).not.toContain("agents");
     expect(ids({ workflows: true, agents: true })).toEqual(["workflows", "agents"]);
+    expect(ids({ dashboard: true, workflows: true })).toEqual(["dashboard", "workflows"]);
   });
   it("keeps settings reachable for every signed-in user", () => {
     expect(visibleNav(NAV_SECONDARY, {}).map((e) => e.id)).toEqual(["settings"]);

@@ -12,3 +12,4 @@ export * from "./stores/PgEventBus.js";
 export * from "./stores/PgCredentialRepository.js";
 export * from "./stores/PgArtifactIndex.js";
 export * from "./repositories/index.js";
+export * from "./alerts.js";

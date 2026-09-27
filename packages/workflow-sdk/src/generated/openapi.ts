@@ -271,6 +271,56 @@ export interface paths {
     };
     trace?: never;
   };
+  "/v1/alerts/deliveries": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Observability alerts sent (or attempted) to notification channels, newest first */
+    get: {
+      parameters: {
+        query?: {
+          before?: string;
+          limit?: number;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              items: {
+                channelId: string;
+                createdAt: string;
+                error: string | null;
+                event: string;
+                id: string;
+                key: string;
+                sentAt: string | null;
+                status: string;
+              }[];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/api-keys": {
     parameters: {
       query?: never;
@@ -3029,6 +3079,142 @@ export interface paths {
         };
       };
     };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/metrics/overview": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Runs, success, latency, cost, confidence and review rates for a time range */
+    get: {
+      parameters: {
+        query?: {
+          environmentId?: string;
+          from?: string;
+          to?: string;
+          versionId?: string;
+          workflowId?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              aiCostUsd: number;
+              decisionConfidence: {
+                histogram: {
+                  count: number;
+                  hi: number;
+                  lo: number;
+                }[];
+                mean: number | null;
+              };
+              errorRate: number | null;
+              from: string;
+              humanReviewRate: number | null;
+              latencyMs: {
+                p50: number | null;
+                p95: number | null;
+                p99: number | null;
+              };
+              providerFailures: {
+                code: string;
+                count: number;
+                provider: string;
+              }[];
+              retryRate: number | null;
+              runs: {
+                byStatus: {
+                  [key: string]: number;
+                };
+                total: number;
+              };
+              successRate: number | null;
+              to: string;
+              tokens: {
+                input: number;
+                output: number;
+              };
+              toolLatencyMs: {
+                p50: number | null;
+                p95: number | null;
+              };
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/metrics/timeseries": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Runs, failures, cost, p95 latency and human reviews per time bucket */
+    get: {
+      parameters: {
+        query?: {
+          bucket?: "1m" | "1h" | "1d";
+          environmentId?: string;
+          from?: string;
+          to?: string;
+          versionId?: string;
+          workflowId?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              bucket: "1m" | "1h" | "1d";
+              series: {
+                costUsd: number[];
+                failed: number[];
+                humanReviews: number[];
+                p95LatencyMs: (number | null)[];
+                runs: number[];
+              };
+              timestamps: string[];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
     options?: never;
     head?: never;
     patch?: never;

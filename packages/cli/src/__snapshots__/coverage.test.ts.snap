@@ -7,6 +7,8 @@ agent delete <id> {--out}
 agent get <id> {--out}
 agent list {--out}
 agent update <id> {--name --description --config --body --out}
+alerts
+alerts deliveries {--limit --before --out}
 api-key
 api-key create {--name --scopes --mode --environment-id --workflow-ids --expires-at --rate-limit-per-min --service-account --body --out}
 api-key list {--out}
@@ -92,6 +94,9 @@ member add <id> {--email --role --body --out}
 member list <id> {--out}
 member remove <id> <userId> {--out}
 member update <id> <userId> {--role --body --out}
+metrics
+metrics overview {--workflow-id --environment-id --version-id --from --to --out}
+metrics timeseries {--workflow-id --environment-id --version-id --from --to --bucket --out}
 model
 model list {--provider --kind --out}
 node
@@ -221,6 +226,7 @@ Commands:
   validate [options] <path>         compile a workflow definition locally (bundled core nodes) and
                                     list diagnostics
   agent|agents                      agent operations
+  alerts                            alerts operations
   api-key|api-keys                  api-key operations
   artifact|artifacts                artifact operations
   audit|audits                      audit operations
@@ -238,6 +244,7 @@ Commands:
   mcp-token|mcp-tokens              mcp-token operations
   me|mes                            me operations
   member|members                    member operations
+  metrics                           metrics operations
   model|models                      model operations
   node|nodes                        node operations
   plugin|plugins                    plugin operations

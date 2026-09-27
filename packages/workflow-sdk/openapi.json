@@ -513,7 +513,8 @@
                           "langchain",
                           "oidc",
                           "schedules",
-                          "mcp_exposures"
+                          "mcp_exposures",
+                          "dashboard"
                         ]
                       },
                       "additionalProperties": { "type": "boolean" },
@@ -538,7 +539,8 @@
                         "langchain",
                         "oidc",
                         "schedules",
-                        "mcp_exposures"
+                        "mcp_exposures",
+                        "dashboard"
                       ]
                     }
                   },
@@ -7638,6 +7640,386 @@
         "x-auth": "session_or_api_key",
         "x-scopes": ["tools:write"],
         "responses": { "200": { "description": "Default Response" } }
+      }
+    },
+    "/v1/metrics/overview": {
+      "get": {
+        "summary": "Runs, success, latency, cost, confidence and review rates for a time range",
+        "tags": ["metrics"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "query",
+            "name": "workflowId",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "query",
+            "name": "environmentId",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "query",
+            "name": "versionId",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+            },
+            "in": "query",
+            "name": "from",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+            },
+            "in": "query",
+            "name": "to",
+            "required": false
+          }
+        ],
+        "x-cli": { "noun": "metrics", "verb": "overview" },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["runs:read"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "from": { "type": "string" },
+                    "to": { "type": "string" },
+                    "runs": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "byStatus": {
+                          "type": "object",
+                          "propertyNames": { "type": "string" },
+                          "additionalProperties": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          }
+                        }
+                      },
+                      "required": ["total", "byStatus"],
+                      "additionalProperties": false
+                    },
+                    "successRate": { "type": ["number", "null"] },
+                    "errorRate": { "type": ["number", "null"] },
+                    "latencyMs": {
+                      "type": "object",
+                      "properties": {
+                        "p50": { "type": ["number", "null"] },
+                        "p95": { "type": ["number", "null"] },
+                        "p99": { "type": ["number", "null"] }
+                      },
+                      "required": ["p50", "p95", "p99"],
+                      "additionalProperties": false
+                    },
+                    "aiCostUsd": { "type": "number" },
+                    "tokens": {
+                      "type": "object",
+                      "properties": {
+                        "input": { "type": "number" },
+                        "output": { "type": "number" }
+                      },
+                      "required": ["input", "output"],
+                      "additionalProperties": false
+                    },
+                    "toolLatencyMs": {
+                      "type": "object",
+                      "properties": {
+                        "p50": { "type": ["number", "null"] },
+                        "p95": { "type": ["number", "null"] }
+                      },
+                      "required": ["p50", "p95"],
+                      "additionalProperties": false
+                    },
+                    "decisionConfidence": {
+                      "type": "object",
+                      "properties": {
+                        "histogram": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "lo": { "type": "number" },
+                              "hi": { "type": "number" },
+                              "count": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              }
+                            },
+                            "required": ["lo", "hi", "count"],
+                            "additionalProperties": false
+                          }
+                        },
+                        "mean": { "type": ["number", "null"] }
+                      },
+                      "required": ["histogram", "mean"],
+                      "additionalProperties": false
+                    },
+                    "humanReviewRate": { "type": ["number", "null"] },
+                    "retryRate": { "type": ["number", "null"] },
+                    "providerFailures": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "provider": { "type": "string" },
+                          "code": { "type": "string" },
+                          "count": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": ["provider", "code", "count"],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "from",
+                    "to",
+                    "runs",
+                    "successRate",
+                    "errorRate",
+                    "latencyMs",
+                    "aiCostUsd",
+                    "tokens",
+                    "toolLatencyMs",
+                    "decisionConfidence",
+                    "humanReviewRate",
+                    "retryRate",
+                    "providerFailures"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/metrics/timeseries": {
+      "get": {
+        "summary": "Runs, failures, cost, p95 latency and human reviews per time bucket",
+        "tags": ["metrics"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "query",
+            "name": "workflowId",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "query",
+            "name": "environmentId",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "query",
+            "name": "versionId",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+            },
+            "in": "query",
+            "name": "from",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+            },
+            "in": "query",
+            "name": "to",
+            "required": false
+          },
+          {
+            "schema": { "default": "1h", "type": "string", "enum": ["1m", "1h", "1d"] },
+            "in": "query",
+            "name": "bucket",
+            "required": false
+          }
+        ],
+        "x-cli": { "noun": "metrics", "verb": "timeseries" },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["runs:read"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "bucket": { "type": "string", "enum": ["1m", "1h", "1d"] },
+                    "timestamps": { "type": "array", "items": { "type": "string" } },
+                    "series": {
+                      "type": "object",
+                      "properties": {
+                        "runs": {
+                          "type": "array",
+                          "items": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "failed": {
+                          "type": "array",
+                          "items": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "costUsd": { "type": "array", "items": { "type": "number" } },
+                        "p95LatencyMs": {
+                          "type": "array",
+                          "items": { "type": ["number", "null"] }
+                        },
+                        "humanReviews": {
+                          "type": "array",
+                          "items": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          }
+                        }
+                      },
+                      "required": ["runs", "failed", "costUsd", "p95LatencyMs", "humanReviews"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["bucket", "timestamps", "series"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/alerts/deliveries": {
+      "get": {
+        "summary": "Observability alerts sent (or attempted) to notification channels, newest first",
+        "tags": ["metrics"],
+        "parameters": [
+          {
+            "schema": { "default": 50, "type": "integer", "minimum": 1, "maximum": 200 },
+            "in": "query",
+            "name": "limit",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+            },
+            "in": "query",
+            "name": "before",
+            "required": false
+          }
+        ],
+        "x-cli": { "noun": "alerts", "verb": "deliveries" },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["audit:read"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": { "type": "string" },
+                          "channelId": { "type": "string" },
+                          "event": { "type": "string" },
+                          "key": { "type": "string" },
+                          "status": { "type": "string" },
+                          "error": { "type": ["string", "null"] },
+                          "createdAt": { "type": "string" },
+                          "sentAt": { "type": ["string", "null"] }
+                        },
+                        "required": [
+                          "id",
+                          "channelId",
+                          "event",
+                          "key",
+                          "status",
+                          "error",
+                          "createdAt",
+                          "sentAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["items"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/v1/workflows/{id}/optimize": {

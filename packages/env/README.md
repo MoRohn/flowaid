@@ -134,7 +134,7 @@ lists them empty for you to generate (`openssl rand -hex 16`).
 | `FLOWAID_API_INTERNAL_URL` | no | — | URL the web app's server side uses to reach the api over the deployment's private network (compose: `http://api:3000`). Unset means `FLOWAID_BASE_URL`. Example: `http://api:3000`. |
 | `FLOWAID_TRUST_PROXY` | no | `false` | Reverse proxies whose `X-Forwarded-*` headers are trusted (Fastify `trustProxy`): `false` trusts none, `true` trusts every hop (only when the api is not reachable directly), or a comma-separated list of IPs, CIDRs or the names `loopback`, `linklocal`, `uniquelocal`. Client IPs feed rate limits and audit logs. |
 | `FLOWAID_SSE_MAX_STREAMS_PER_PRINCIPAL` | no | `20` | Maximum concurrent SSE streams (run events, evaluations) one principal may hold open; the next one is refused with 429 `RATE_LIMIT_ERROR`. The per-workspace cap is ten times this value. |
-| `FLOWAID_FEATURES_DISABLED` | no | — | Comma-separated feature keys (`FeatureKey`, API.md §7) the operator turns off: `GET /v1/me` reports them as false and the web app hides their navigation. Unset disables nothing. Values: `workflows`, `runs`, `human_tasks`, `templates`, `integrations_mcp`, `integrations_openapi`, `integrations_providers`, `integrations_plugins`, `knowledge`, `evaluations`, `credentials`, `settings_audit`, `settings_notifications`, `agents`, `ai_builder`, `advisor`, `code_export`, `langchain`, `oidc`, `schedules`, `mcp_exposures`. Example: `agents,ai_builder`. |
+| `FLOWAID_FEATURES_DISABLED` | no | — | Comma-separated feature keys (`FeatureKey`, API.md §7) the operator turns off: `GET /v1/me` reports them as false and the web app hides their navigation. Unset disables nothing. Values: `workflows`, `runs`, `human_tasks`, `templates`, `integrations_mcp`, `integrations_openapi`, `integrations_providers`, `integrations_plugins`, `knowledge`, `evaluations`, `credentials`, `settings_audit`, `settings_notifications`, `agents`, `ai_builder`, `advisor`, `code_export`, `langchain`, `oidc`, `schedules`, `mcp_exposures`, `dashboard`. Example: `agents,ai_builder`. |
 
 ### Database (PostgreSQL 16 + pgvector)
 
@@ -224,6 +224,8 @@ lists them empty for you to generate (`openssl rand -hex 16`).
 |---|---|---|---|
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | no | — | OTLP/HTTP endpoint for traces and metrics. Unset disables the OpenTelemetry exporter (spans are still created for logs). Example: `http://localhost:4318`. |
 | `PROMETHEUS_PORT` | no | — | Port of the internal Prometheus `/metrics` listener in the api and worker. Unset disables it. Example: `9464`. |
+| `SMTP_URL` | no | — | SMTP server for email alert channels: `smtp://user:password@host:587` (STARTTLS when the server offers it) or `smtps://…:465`. Unset disables email channels; Slack and webhook channels still work. Example: `smtp://alerts:<password>@smtp.example.com:587`. Secret. |
+| `SMTP_FROM` | no | — | Sender address of email alerts. Email channels need both `SMTP_URL` and `SMTP_FROM`. Example: `flowaid@example.com`. |
 
 ### Docker Compose stack (read by docker compose, not by the api)
 

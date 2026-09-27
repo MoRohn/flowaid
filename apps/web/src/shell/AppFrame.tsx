@@ -48,7 +48,7 @@ export function AppFrame({
   const router = useRouter();
   // "/<ws>/<section>/…": the section picks the active nav entry
   const section = usePathname().split("/")[2] ?? "";
-  const go = (path: string) => router.push(`/${s.ws}/${path}`);
+  const go = (path: string) => router.push(path ? `/${s.ws}/${path}` : `/${s.ws}`);
   const items = visibleNav(NAV, s.features);
   const secondary = visibleNav(NAV_SECONDARY, s.features);
   const active = [...items, ...secondary].find((e) => section === e.path)?.id ?? section;
@@ -56,7 +56,7 @@ export function AppFrame({
     id: e.id,
     label: e.label,
     icon: e.icon,
-    href: `/${s.ws}/${e.path}`,
+    href: e.path ? `/${s.ws}/${e.path}` : `/${s.ws}`,
     shortcut: e.shortcut,
   });
 

@@ -1,7 +1,24 @@
-import { redirect } from "next/navigation";
+"use client";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+import { Dashboard } from "~/dashboard/Dashboard";
+import { FullPageSpinner, useSession } from "~/session";
+import { AppFrame, PageBody } from "~/shell/AppFrame";
 
-/** The dashboard ships with the metrics overview (P6-04); until then the workspace opens on its workflows. */
-export default async function WorkspaceHome({ params }: { params: Promise<{ ws: string }> }) {
-  const { ws } = await params;
-  redirect(`/${ws}/workflows`);
+/** The workspace home: the metrics overview when `features.dashboard`, otherwise its workflows. */
+export default function WorkspaceHome() {
+  const s = useSession();
+  const router = useRouter();
+  const enabled = s.features.dashboard === true;
+  useEffect(() => {
+    if (!enabled) router.replace(`/${s.ws}/workflows`);
+  }, [enabled, router, s.ws]);
+  if (!enabled) return <FullPageSpinner />;
+  return (
+    <AppFrame crumbs={[{ label: s.workspaceName }, { label: "Overview" }]}>
+      <PageBody wide>
+        <Dashboard ws={s.ws} environments={s.environments} />
+      </PageBody>
+    </AppFrame>
+  );
 }

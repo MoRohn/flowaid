@@ -1371,6 +1371,32 @@ export const notifications = pgTable(
   (t) => [index("notifications_ws_idx").on(t.workspaceId)],
 );
 
+export const alertDeliveries = pgTable(
+  "alert_deliveries",
+  {
+    // observability alerts sent to notification channels: one row per (channel, occurrence) claims the send, then records it
+    id: uuid("id").primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    channelId: uuid("channel_id")
+      .notNull()
+      .references(() => notifications.id, { onDelete: "cascade" }),
+    event: text("event").notNull(), // 'human_task.created' | 'run.failed' | 'trace_review.page' | 'schedule.failed' | 'webhook.rejected' | 'test'
+    key: text("key").notNull(), // stable id of the occurrence, e.g. 'run.failed:<runId>'
+    status: text("status", { enum: ["pending", "sent", "failed"] })
+      .notNull()
+      .default("pending"),
+    error: text("error"),
+    createdAt: createdAt(),
+    sentAt: ts("sent_at"),
+  },
+  (t) => [
+    uniqueIndex("alert_deliveries_key_uq").on(t.channelId, t.key),
+    index("alert_deliveries_ws_idx").on(t.workspaceId, t.createdAt.desc()),
+  ],
+);
+
 /* ───────────────────────── audit ───────────────────────── */
 export const auditEvents = pgTable(
   "audit_events",

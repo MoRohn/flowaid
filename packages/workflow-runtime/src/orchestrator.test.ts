@@ -322,6 +322,31 @@ describe("Orchestrator on shared stores", () => {
     ).rejects.toThrow(/not leased/);
   });
 
+  it("reports every appended event once to onEvents, in order", async () => {
+    const { plan, store, create } = setup([
+      start,
+      task("add", "@test/kit.add", { amount: 1 }, { value: ref("start", "x") }),
+      { id: "out", kind: "output", name: "out", value: ref("add", "value") },
+    ]);
+    const seen: string[] = [];
+    const o = new Orchestrator({
+      store,
+      queue: new MemoryQueueDriver(),
+      registry: new NodeRegistry([testPackage]),
+      workerId: "worker-events",
+      loadPlan: () => Promise.resolve(plan),
+      onEvents: (_run, events) => seen.push(...events.map((e) => e.type)),
+    });
+    orchestrators.push(o);
+    const runId = await create();
+    await o.handle(runId, { type: "start" });
+    for (let i = 0; i < 100 && !seen.includes("RUN_COMPLETED"); i++)
+      await new Promise((r) => setTimeout(r, 10));
+    const stored = (await store.listEvents(runId, 1, 1000)).map((e) => e.type);
+    expect(seen.filter((t) => t === "RUN_COMPLETED")).toHaveLength(1);
+    expect(seen).toEqual(stored.filter((t) => seen.includes(t)));
+  });
+
   it("serialises two workers on one run through the lease", async () => {
     const { store, make, create } = setup([
       start,

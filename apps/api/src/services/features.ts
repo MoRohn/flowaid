@@ -23,6 +23,7 @@ export const FEATURES_SHIPPED: ReadonlySet<FeatureKey> = new Set<FeatureKey>([
   "advisor",
   "integrations_plugins",
   "agents",
+  "dashboard",
 ]);
 
 export function featuresFor(

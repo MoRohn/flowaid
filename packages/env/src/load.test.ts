@@ -334,6 +334,7 @@ describe("secret-safe serialisation", () => {
         "TYPESAFE_API_KEY",
         "OPENAI_API_KEY",
         "ANTHROPIC_API_KEY",
+        "SMTP_URL",
       ].sort(),
     );
   });

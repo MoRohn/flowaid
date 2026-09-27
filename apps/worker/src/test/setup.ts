@@ -36,7 +36,7 @@ import {
   type WorkerPool,
 } from "@flowaid/workflow-core";
 import { and, eq } from "drizzle-orm";
-import { createWorker, type Worker } from "../worker.js";
+import { createWorker, type Worker, type WorkerDeps } from "../worker.js";
 
 export const catalog: NodeCatalog = {
   get: (id) => coreManifests.find((m) => m.id === id),
@@ -80,6 +80,7 @@ export interface Harness {
   queue: PgQueueDriver;
   workspaceId: string;
   environmentId: string;
+  credentials: CredentialService;
   /** where the worker writes artifacts (and export zips) */
   artifactsDir: string;
   deploy(
@@ -104,6 +105,11 @@ export async function createHarness(
     pools?: readonly WorkerPool[];
     sandbox?: SandboxExecutor;
     storage?: ArtifactStorage;
+    /** extra worker dependencies built over the harness database (observability tests) */
+    extra?: (deps: {
+      db: TestDatabase["app"];
+      credentials: CredentialService;
+    }) => Partial<WorkerDeps>;
   } = {},
 ): Promise<Harness> {
   const db = await createTestDatabase();
@@ -143,6 +149,7 @@ export async function createHarness(
     ...(o.pools ? { pools: o.pools } : {}),
     ...(o.sandbox ? { sandbox: o.sandbox } : {}),
     ...(o.storage ? { storage: o.storage } : {}),
+    ...(o.extra?.({ db: db.app, credentials }) ?? {}),
   });
   await worker.start();
   const store = new PgRunStore(db.app);
@@ -154,6 +161,7 @@ export async function createHarness(
     queue,
     workspaceId,
     environmentId,
+    credentials,
     artifactsDir,
     async deploy(name, body) {
       const workflowId = uuidv7();

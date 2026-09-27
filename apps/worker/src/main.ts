@@ -30,6 +30,10 @@ import { startScheduler } from "./jobs/scheduler.js";
 import { loadBundledPlugins, registerPluginProviders } from "./plugins/bundled.js";
 import { PluginHost, hostedPackage } from "./plugins/host.js";
 import { createWorker, defaultProviderRegistry, type WorkerLogger } from "./worker.js";
+import { eq } from "drizzle-orm";
+import { schedules, workspaces } from "@flowaid/database";
+import { setupTelemetry, startMetricsListener } from "@flowaid/observability";
+import { createAlertDispatcher, smtpFromEnv } from "./services/alerts.js";
 
 const log: WorkerLogger = {
   info: (data, msg) =>
@@ -48,6 +52,21 @@ const log: WorkerLogger = {
 
 async function main(): Promise<void> {
   const env = loadEnv();
+  // OpenTelemetry export when OTEL_EXPORTER_OTLP_ENDPOINT is set; Prometheus on PROMETHEUS_PORT.
+  const telemetry = setupTelemetry({
+    serviceName: "flowaid-worker",
+    ...(env.OTEL_EXPORTER_OTLP_ENDPOINT
+      ? { otlpEndpoint: String(env.OTEL_EXPORTER_OTLP_ENDPOINT) }
+      : {}),
+    prometheus: env.PROMETHEUS_PORT !== undefined,
+  });
+  const metricsListener =
+    env.PROMETHEUS_PORT !== undefined && telemetry.prometheusHandler
+      ? await startMetricsListener({
+          port: Number(env.PROMETHEUS_PORT),
+          handler: telemetry.prometheusHandler,
+        })
+      : null;
   const db = createDatabaseFromEnv(env, { applicationName: "flowaid-worker" });
   const redisUrl = env.REDIS_URL ? String(env.REDIS_URL) : null;
   const queue = redisUrl
@@ -138,7 +157,19 @@ async function main(): Promise<void> {
         log.error({ err: String(error) }, "plugin host failed to start; it retries on first use"),
       );
 
+  const alerts = createAlertDispatcher({
+    db,
+    credentials,
+    fetch: http,
+    smtp: smtpFromEnv(env),
+    onError: (error, context) =>
+      log.error({ err: String(error), ...context }, "alert delivery failed"),
+  });
+  const webUrl = String(env.FLOWAID_WEB_URL ?? env.FLOWAID_BASE_URL ?? "");
   const worker = createWorker({
+    instruments: telemetry.instruments,
+    alerts,
+    ...(webUrl ? { webUrl } : {}),
     db,
     queue,
     bus,
@@ -177,8 +208,38 @@ async function main(): Promise<void> {
   const stopScheduler = startScheduler({
     db,
     queue,
-    onError: (error, id) =>
-      log.error({ scheduleId: id, err: String(error) }, "schedule fire failed"),
+    onError: (error, id) => {
+      log.error({ scheduleId: id, err: String(error) }, "schedule fire failed");
+      void db
+        .system((tx) =>
+          tx
+            .select({
+              workspaceId: schedules.workspaceId,
+              workflowId: schedules.workflowId,
+              slug: workspaces.slug,
+            })
+            .from(schedules)
+            .innerJoin(workspaces, eq(workspaces.id, schedules.workspaceId))
+            .where(eq(schedules.id, id)),
+        )
+        .then(([row]) => {
+          if (!row) return;
+          const hour = new Date().toISOString().slice(0, 13);
+          return alerts.dispatch(row.workspaceId, `schedule.failed:${id}:${hour}`, {
+            event: "schedule.failed",
+            severity: "warning",
+            title: "A schedule failed to start its run",
+            text: error instanceof Error ? error.message : String(error),
+            ...(webUrl
+              ? {
+                  url: `${webUrl.replace(/\/$/, "")}/${row.slug}/workflows/${row.workflowId}/settings`,
+                }
+              : {}),
+            data: { scheduleId: id, workflowId: row.workflowId },
+          });
+        })
+        .catch(() => undefined);
+    },
   });
   const stopHeartbeat = startHeartbeat(heartbeatPath(env));
 
@@ -192,6 +253,8 @@ async function main(): Promise<void> {
     await Promise.all(hosts.map((h) => h.stop()));
     await queue.close();
     await db.close();
+    await metricsListener?.close();
+    await telemetry.shutdown().catch(() => undefined);
     process.exit(0);
   };
   process.once("SIGTERM", () => void shutdown("SIGTERM"));
