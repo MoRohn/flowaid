@@ -1,0 +1,218 @@
+/** Catalog: node manifests, tool signatures, subflow signatures, providers and models (API.md §3.2). */
+import { createHash } from "node:crypto";
+import type { FastifyInstance } from "fastify";
+import type { ZodTypeProvider } from "fastify-type-provider-zod";
+import { z } from "zod";
+import { and, eq } from "drizzle-orm";
+import { coreManifests } from "@flowaid/nodes-core/manifest";
+import { DefaultModelCatalog } from "@flowaid/providers";
+import {
+  environments,
+  mcpServers,
+  tools,
+  workflowDeployments,
+  workflowVersions,
+} from "@flowaid/database";
+import { ForbiddenError, NotFoundError, type ToolDefinition } from "@flowaid/workflow-core";
+import type { ApiContext } from "../context.js";
+import { visibleWorkflow } from "../services/workflows.js";
+
+const ETAG = `"${createHash("sha256").update(JSON.stringify(coreManifests)).digest("base64url").slice(0, 20)}"`;
+
+export function catalogRoutes(app: FastifyInstance, ctx: ApiContext): void {
+  const r = app.withTypeProvider<ZodTypeProvider>();
+  const models = new DefaultModelCatalog();
+
+  r.get(
+    "/v1/nodes",
+    {
+      config: {
+        auth: "session_or_api_key",
+        scope: "workflows:read",
+        cli: { noun: "node", verb: "list" },
+      },
+      schema: { tags: ["catalog"], summary: "Node manifests (core, bundled and enabled plugins)" },
+    },
+    async (req, reply) => {
+      void reply.header("etag", ETAG).header("cache-control", "private, max-age=60");
+      if (req.headers["if-none-match"] === ETAG) return reply.code(304).send();
+      return coreManifests;
+    },
+  );
+
+  r.get(
+    "/v1/nodes/:typeId",
+    {
+      config: {
+        auth: "session_or_api_key",
+        scope: "workflows:read",
+        cli: { noun: "node", verb: "get", positional: ["typeId"] },
+      },
+      schema: {
+        tags: ["catalog"],
+        params: z.object({ typeId: z.string().min(1).max(200) }),
+        querystring: z.object({ version: z.string().optional() }),
+      },
+    },
+    (req) => {
+      const id = decodeURIComponent(req.params.typeId);
+      const m = coreManifests
+        .filter((x) => x.id === id && (!req.query.version || x.version === req.query.version))
+        .sort((a, b) => (a.version < b.version ? 1 : -1))[0];
+      if (!m) throw new NotFoundError(`node type ${id} not found`);
+      return m;
+    },
+  );
+
+  r.get(
+    "/v1/tools/catalog",
+    {
+      config: {
+        auth: "session_or_api_key",
+        scope: "workflows:read",
+        cli: { noun: "tool", verb: "catalog" },
+      },
+      schema: {
+        tags: ["catalog"],
+        summary: "Tool signatures the compiler resolves (MCP, OpenAPI, workflows)",
+      },
+    },
+    async (req) => {
+      const p = req.principal;
+      if (!p) throw new ForbiddenError("no principal");
+      return ctx.db.tenant(p.workspaceId, async (tx) => {
+        const out: ToolDefinition[] = [];
+        for (const s of await tx
+          .select()
+          .from(mcpServers)
+          .where(eq(mcpServers.workspaceId, p.workspaceId)))
+          if (s.status !== "disabled") out.push(...s.discoveredTools);
+        for (const t of await tx.select().from(tools).where(eq(tools.workspaceId, p.workspaceId)))
+          out.push(...t.definitions);
+        return out;
+      });
+    },
+  );
+
+  r.get(
+    "/v1/workflows/:id/signature",
+    {
+      config: {
+        auth: "session_or_api_key",
+        scope: "workflows:read",
+        cli: { noun: "workflow", verb: "signature", positional: ["id"] },
+      },
+      schema: {
+        tags: ["catalog"],
+        params: z.object({ id: z.uuid() }),
+        querystring: z.object({
+          environmentId: z.uuid().optional(),
+          versionId: z.uuid().optional(),
+        }),
+      },
+    },
+    async (req) => {
+      const p = req.principal;
+      if (!p) throw new ForbiddenError("no principal");
+      return ctx.db.tenant(p.workspaceId, async (tx) => {
+        await visibleWorkflow(tx, p, req.params.id);
+        let versionId = req.query.versionId ?? null;
+        if (!versionId) {
+          const envId =
+            req.query.environmentId ??
+            (
+              await tx
+                .select()
+                .from(environments)
+                .where(
+                  and(
+                    eq(environments.workspaceId, p.workspaceId),
+                    eq(environments.protected, true),
+                  ),
+                )
+            )[0]?.id;
+          const [d] = envId
+            ? await tx
+                .select()
+                .from(workflowDeployments)
+                .where(
+                  and(
+                    eq(workflowDeployments.workflowId, req.params.id),
+                    eq(workflowDeployments.environmentId, envId),
+                    eq(workflowDeployments.active, true),
+                  ),
+                )
+            : [];
+          versionId = d?.versionId ?? null;
+        }
+        if (!versionId) throw new NotFoundError("the workflow has no deployed version there");
+        const [v] = await tx
+          .select()
+          .from(workflowVersions)
+          .where(eq(workflowVersions.id, versionId));
+        if (!v || v.workflowId !== req.params.id) throw new NotFoundError("version not found");
+        return {
+          versionId: v.id,
+          inputs: v.plan.inputs,
+          outputs: v.plan.outputs,
+          references: [...new Set(v.plan.subflows.map((s) => s.workflowId))],
+        };
+      });
+    },
+  );
+
+  r.get(
+    "/v1/models",
+    {
+      config: {
+        auth: "session_or_api_key",
+        scope: "workflows:read",
+        cli: { noun: "model", verb: "list" },
+      },
+      schema: {
+        tags: ["catalog"],
+        querystring: z.object({
+          provider: z.string().optional(),
+          kind: z.enum(["decision", "chat", "embedding", "rerank"]).optional(),
+        }),
+      },
+    },
+    (req) =>
+      models.list({
+        ...(req.query.provider ? { provider: req.query.provider } : {}),
+        ...(req.query.kind ? { kind: req.query.kind } : {}),
+      }),
+  );
+
+  r.get(
+    "/v1/providers",
+    {
+      config: {
+        auth: "session_or_api_key",
+        scope: "workflows:read",
+        cli: { noun: "provider", verb: "list" },
+      },
+      schema: {
+        tags: ["catalog"],
+        summary: "Providers with their credential types and whether the server has them configured",
+      },
+    },
+    () => {
+      const flags = ctx.env?.flags;
+      const byProvider = new Map<string, number>();
+      for (const m of models.list())
+        byProvider.set(m.provider, (byProvider.get(m.provider) ?? 0) + 1);
+      const configured: Record<string, boolean> = {
+        typesafe: flags?.hasTypeSafe ?? false,
+        openai: flags?.hasOpenAI ?? false,
+        anthropic: flags?.hasAnthropic ?? false,
+        ollama: flags?.hasOllama ?? false,
+      };
+      return [...byProvider].map(([id, modelCount]) => ({
+        id,
+        models: modelCount,
+        configuredOnServer: configured[id] ?? false,
+      }));
+    },
+  );
+}

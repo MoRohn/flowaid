@@ -21,6 +21,10 @@ export default [
       // HTTP tests read untyped JSON bodies (res.json()).
       "@typescript-eslint/no-unsafe-member-access": "off",
       "@typescript-eslint/no-unsafe-return": "off",
+      "@typescript-eslint/no-unsafe-call": "off",
+      "@typescript-eslint/no-unsafe-argument": "off",
+      // res.json() is `any`; casts document the expected shape even when lint calls them redundant.
+      "@typescript-eslint/no-unnecessary-type-assertion": "off",
     },
   },
 ];

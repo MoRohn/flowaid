@@ -20,6 +20,9 @@ import { apiKeyRoutes } from "./routes/apiKeys.js";
 import { authRoutes } from "./routes/auth.js";
 import { healthRoutes } from "./routes/health.js";
 import { workspaceRoutes } from "./routes/workspaces.js";
+import { catalogRoutes } from "./routes/catalog.js";
+import { versionRoutes } from "./routes/versions.js";
+import { workflowRoutes } from "./routes/workflows.js";
 import "./types.js";
 
 export interface BuildOptions {
@@ -85,6 +88,9 @@ export async function buildServer(ctx: ApiContext, o: BuildOptions = {}): Promis
   authRoutes(app, ctx);
   workspaceRoutes(app, ctx);
   apiKeyRoutes(app, ctx);
+  catalogRoutes(app, ctx);
+  workflowRoutes(app, ctx);
+  versionRoutes(app, ctx);
   for (const register of o.routes ?? []) register(app, ctx);
   return app;
 }

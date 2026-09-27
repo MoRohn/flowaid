@@ -1,0 +1,722 @@
+/** Workflows, drafts, compile/validate, publish, clone, import/export, templates (API.md §3.3, §3.9). */
+import type { FastifyInstance } from "fastify";
+import type { ZodTypeProvider } from "fastify-type-provider-zod";
+import { z } from "zod";
+import { and, desc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
+import { parse as parseYaml, stringify as toYaml } from "yaml";
+import {
+  createWorkflow,
+  deploy,
+  environments,
+  getVersion,
+  publishVersion,
+  saveDraft,
+  templates,
+  workflowVersions,
+  workflows,
+  type WorkflowRow,
+} from "@flowaid/database";
+import { uuidv7 } from "@flowaid/shared";
+import {
+  BadRequestError,
+  ConflictError,
+  FlowaidError,
+  ForbiddenError,
+  NotFoundError,
+  WorkflowDefinitionSchema,
+  WorkflowValidationError,
+  definitionHash,
+  type Diagnostic,
+  type JsonObject,
+} from "@flowaid/workflow-core";
+import type { ApiContext } from "../context.js";
+import { hasScope } from "../auth/principal.js";
+import { IdParams, ListQuery, NoContent, decodeCursor, encodeCursor, page } from "../dto/common.js";
+import {
+  CompileResponseSchema,
+  CreateWorkflowRequestSchema,
+  DraftResponseSchema,
+  PatchWorkflowRequestSchema,
+  PublishRequestSchema,
+  ValidateRequestSchema,
+  ValidateResponseSchema,
+  WorkflowSchema,
+  WorkflowSummarySchema,
+  WorkflowVersionSchema,
+} from "../dto/workflows.js";
+import { catalogSnapshot, compileIn } from "../services/compile.js";
+import { materialiseTriggers } from "../services/triggers.js";
+import {
+  blankDefinition,
+  deploymentDto,
+  deploymentsOf,
+  instantiateTemplate,
+  slugify,
+  uniqueSlug,
+  visibleWorkflow,
+} from "../services/workflows.js";
+import { versionDto } from "./versions.js";
+
+const counts = (d: Diagnostic[]) => ({
+  errors: d.filter((x) => x.severity === "error").length,
+  warnings: d.filter((x) => x.severity === "warning").length,
+});
+
+export function summaryDto(w: WorkflowRow, latestVersion: number | null) {
+  return {
+    id: w.id,
+    name: w.name,
+    slug: w.slug,
+    description: w.description,
+    tags: w.tags,
+    draftRevision: w.draftRevision,
+    latestVersionId: w.latestVersionId,
+    latestVersion,
+    archived: w.archivedAt !== null,
+    ...counts(w.draftDiagnostics),
+    updatedAt: w.updatedAt.toISOString(),
+  };
+}
+
+/** Only E_SCHEMA (the document is not a workflow definition) blocks saving a draft. */
+function assertSaveable(diagnostics: Diagnostic[]): void {
+  const schema = diagnostics.filter((d) => d.code === "E_SCHEMA" && d.severity === "error");
+  if (schema.length > 0) throw new WorkflowValidationError(schema);
+}
+
+/** Keeps the definition's `id` equal to the workflow's. */
+function withId(definition: unknown, id: string, name?: string): unknown {
+  if (typeof definition !== "object" || definition === null || Array.isArray(definition))
+    return definition;
+  return {
+    ...(definition as JsonObject),
+    id,
+    ...(name && !(definition as JsonObject).name ? { name } : {}),
+  };
+}
+
+export function workflowRoutes(app: FastifyInstance, ctx: ApiContext): void {
+  const r = app.withTypeProvider<ZodTypeProvider>();
+
+  r.get(
+    "/v1/workflows",
+    {
+      config: {
+        auth: "session_or_api_key",
+        scope: "workflows:read",
+        cli: { noun: "workflow", verb: "list" },
+      },
+      schema: {
+        tags: ["workflows"],
+        querystring: ListQuery.extend({
+          q: z.string().max(200).optional(),
+          tag: z.string().max(40).optional(),
+          archived: z.coerce.boolean().default(false),
+        }),
+        response: { 200: page(WorkflowSummarySchema) },
+      },
+    },
+    async (req) => {
+      const p = req.principal;
+      if (!p) throw new ForbiddenError("no principal");
+      const { limit, q, tag, archived } = req.query;
+      const cursor = decodeCursor(req.query.cursor);
+      const rows = await ctx.db.tenant(p.workspaceId, (tx) =>
+        tx
+          .select({ w: workflows, latest: workflowVersions.version })
+          .from(workflows)
+          .leftJoin(workflowVersions, eq(workflowVersions.id, workflows.latestVersionId))
+          .where(
+            and(
+              eq(workflows.workspaceId, p.workspaceId),
+              archived ? undefined : isNull(workflows.archivedAt),
+              q
+                ? sql`(${workflows.name} ilike ${`%${q}%`} or ${workflows.slug} ilike ${`%${q}%`})`
+                : undefined,
+              tag ? sql`${workflows.tags} @> ${JSON.stringify([tag])}::jsonb` : undefined,
+              p.workflowIds
+                ? p.workflowIds.size > 0
+                  ? inArray(workflows.id, [...p.workflowIds])
+                  : sql`false`
+                : undefined,
+              cursor
+                ? or(
+                    lt(workflows.updatedAt, new Date(String(cursor[0]))),
+                    and(
+                      eq(workflows.updatedAt, new Date(String(cursor[0]))),
+                      lt(workflows.id, cursor[1]),
+                    ),
+                  )
+                : undefined,
+            ),
+          )
+          .orderBy(desc(workflows.updatedAt), desc(workflows.id))
+          .limit(limit + 1),
+      );
+      const items = rows.slice(0, limit);
+      const last = items.at(-1);
+      return {
+        items: items.map((x) => summaryDto(x.w, x.latest)),
+        next_cursor:
+          rows.length > limit && last
+            ? encodeCursor(last.w.updatedAt.toISOString(), last.w.id)
+            : null,
+      };
+    },
+  );
+
+  r.post(
+    "/v1/workflows",
+    {
+      config: {
+        auth: "session_or_api_key",
+        scope: "workflows:write",
+        audit: { action: "workflow.create", resource: "workflow" },
+        cli: { noun: "workflow", verb: "create" },
+      },
+      schema: {
+        tags: ["workflows"],
+        summary: "Create a workflow from a definition, a template or blank",
+        body: CreateWorkflowRequestSchema,
+        response: { 201: WorkflowSchema },
+      },
+    },
+    async (req, reply) => {
+      const p = req.principal;
+      if (!p) throw new ForbiddenError("no principal");
+      const id = uuidv7();
+      const row = await ctx.db.tenant(p.workspaceId, async (tx) => {
+        let definition: unknown;
+        if (req.body.templateId) {
+          const [t] = await tx
+            .select()
+            .from(templates)
+            .where(
+              and(
+                or(
+                  eq(templates.slug, req.body.templateId),
+                  sql`${templates.id}::text = ${req.body.templateId}`,
+                ),
+                or(isNull(templates.workspaceId), eq(templates.workspaceId, p.workspaceId)),
+              ),
+            );
+          if (!t) throw new NotFoundError(`template ${req.body.templateId} not found`);
+          definition = instantiateTemplate(t.definition, req.body.resources ?? {});
+        } else definition = req.body.definition ?? blankDefinition(id, req.body.name);
+        definition = withId(definition, id, req.body.name);
+        const compiled = await compileIn(tx, definition, {
+          workspaceId: p.workspaceId,
+          level: "draft",
+        });
+        assertSaveable(compiled.diagnostics);
+        const slug = await uniqueSlug(tx, p.workspaceId, req.body.slug ?? slugify(req.body.name));
+        const created = await createWorkflow(tx, {
+          workspaceId: p.workspaceId,
+          name: req.body.name,
+          slug,
+          draft: WorkflowDefinitionSchema.parse(definition),
+          ...(req.body.description !== undefined ? { description: req.body.description } : {}),
+          ...(req.body.tags ? { tags: req.body.tags } : {}),
+          createdBy: p.userId,
+        });
+        const [withIdRow] = await tx
+          .update(workflows)
+          .set({ id, draftDiagnostics: compiled.diagnostics })
+          .where(eq(workflows.id, created.id))
+          .returning();
+        return withIdRow as WorkflowRow;
+      });
+      req.audit = { resourceId: row.id, details: { templateId: req.body.templateId ?? null } };
+      return reply.code(201).send({
+        ...summaryDto(row, null),
+        draft: row.draft,
+        draftDiagnostics: row.draftDiagnostics,
+        evaluationSetId: row.evaluationSetId,
+        deployments: [],
+        createdAt: row.createdAt.toISOString(),
+      });
+    },
+  );
+
+  r.get(
+    "/v1/workflows/:id",
+    {
+      config: {
+        auth: "session_or_api_key",
+        scope: "workflows:read",
+        cli: { noun: "workflow", verb: "get", positional: ["id"] },
+      },
+      schema: { tags: ["workflows"], params: IdParams, response: { 200: WorkflowSchema } },
+    },
+    async (req) => {
+      const p = req.principal;
+      if (!p) throw new ForbiddenError("no principal");
+      return ctx.db.tenant(p.workspaceId, async (tx) => {
+        const w = await visibleWorkflow(tx, p, req.params.id);
+        const latest = w.latestVersionId ? await getVersion(tx, w.latestVersionId) : null;
+        const deployments = await deploymentsOf(tx, w.id);
+        return {
+          ...summaryDto(w, latest?.version ?? null),
+          draft: w.draft,
+          draftDiagnostics: w.draftDiagnostics,
+          evaluationSetId: w.evaluationSetId,
+          deployments: deployments.map(deploymentDto),
+          createdAt: w.createdAt.toISOString(),
+        };
+      });
+    },
+  );
+
+  r.patch(
+    "/v1/workflows/:id",
+    {
+      config: {
+        auth: "session_or_api_key",
+        scope: "workflows:write",
+        audit: { action: "workflow.update", resource: "workflow" },
+        cli: { noun: "workflow", verb: "update", positional: ["id"] },
+      },
+      schema: {
+        tags: ["workflows"],
+        params: IdParams,
+        body: PatchWorkflowRequestSchema,
+        response: { 200: WorkflowSummarySchema },
+      },
+    },
+    async (req) => {
+      const p = req.principal;
+      if (!p) throw new ForbiddenError("no principal");
+      const row = await ctx.db.tenant(p.workspaceId, async (tx) => {
+        const w = await visibleWorkflow(tx, p, req.params.id);
+        if (req.body.slug && req.body.slug !== w.slug) {
+          const [dup] = await tx
+            .select()
+            .from(workflows)
+            .where(
+              and(eq(workflows.workspaceId, p.workspaceId), eq(workflows.slug, req.body.slug)),
+            );
+          if (dup) throw new ConflictError(`the slug '${req.body.slug}' is taken`);
+        }
+        const [u] = await tx
+          .update(workflows)
+          .set({
+            ...(req.body.name ? { name: req.body.name } : {}),
+            ...(req.body.slug ? { slug: req.body.slug } : {}),
+            ...(req.body.description !== undefined ? { description: req.body.description } : {}),
+            ...(req.body.tags ? { tags: req.body.tags } : {}),
+            ...(req.body.evaluationSetId !== undefined
+              ? { evaluationSetId: req.body.evaluationSetId }
+              : {}),
+            updatedAt: new Date(),
+          })
+          .where(eq(workflows.id, w.id))
+          .returning();
+        return u as WorkflowRow;
+      });
+      req.audit.details = { fields: Object.keys(req.body) };
+      return summaryDto(row, null);
+    },
+  );
+
+  r.delete(
+    "/v1/workflows/:id",
+    {
+      config: {
+        auth: "session_or_api_key",
+        scope: "workflows:delete",
+        audit: { action: "workflow.delete", resource: "workflow" },
+        cli: { noun: "workflow", verb: "delete", positional: ["id"] },
+      },
+      schema: {
+        tags: ["workflows"],
+        summary: "Archive (or purge with ?purge=true)",
+        params: IdParams,
+        querystring: z.object({ purge: z.coerce.boolean().default(false) }),
+        response: { 204: NoContent },
+      },
+    },
+    async (req, reply) => {
+      const p = req.principal;
+      if (!p) throw new ForbiddenError("no principal");
+      await ctx.db.tenant(p.workspaceId, async (tx) => {
+        const w = await visibleWorkflow(tx, p, req.params.id);
+        if (req.query.purge) await tx.delete(workflows).where(eq(workflows.id, w.id));
+        else
+          await tx.update(workflows).set({ archivedAt: new Date() }).where(eq(workflows.id, w.id));
+      });
+      req.audit.details = { purge: req.query.purge };
+      return reply.code(204).send(null);
+    },
+  );
+
+  r.put(
+    "/v1/workflows/:id/draft",
+    {
+      config: {
+        auth: "session_or_api_key",
+        scope: "workflows:write",
+        audit: { action: "workflow.draft_saved", resource: "workflow" },
+        cli: { noun: "workflow", verb: "save-draft", positional: ["id"] },
+      },
+      schema: {
+        tags: ["workflows"],
+        summary:
+          "Save the draft (If-Match: <draftRevision>); diagnostics are stored, only E_SCHEMA rejects",
+        params: IdParams,
+        headers: z.object({ "if-match": z.string().regex(/^"?\d+"?$/) }).loose(),
+        body: z.object({ definition: z.unknown() }),
+        response: { 200: DraftResponseSchema },
+      },
+    },
+    async (req) => {
+      const p = req.principal;
+      if (!p) throw new ForbiddenError("no principal");
+      const expected = Number(req.headers["if-match"].replace(/"/g, ""));
+      const out = await ctx.db.tenant(p.workspaceId, async (tx) => {
+        const w = await visibleWorkflow(tx, p, req.params.id);
+        const definition = withId(req.body.definition, w.id);
+        const compiled = await compileIn(tx, definition, {
+          workspaceId: p.workspaceId,
+          level: "draft",
+        });
+        assertSaveable(compiled.diagnostics);
+        try {
+          const revision = await saveDraft(
+            tx,
+            w.id,
+            expected,
+            WorkflowDefinitionSchema.parse(definition),
+            compiled.diagnostics,
+          );
+          return { draftRevision: revision, diagnostics: compiled.diagnostics };
+        } catch (error) {
+          if (error instanceof ConflictError)
+            throw new PreconditionFailed(error.message, error.toInfo({}).details ?? {});
+          throw error;
+        }
+      });
+      req.audit.details = { revision: out.draftRevision, errors: counts(out.diagnostics).errors };
+      return out;
+    },
+  );
+
+  for (const [path, verb, includePlan] of [
+    ["/v1/workflows/:id/validate", "validate", false],
+    ["/v1/workflows/:id/compile", "compile", true],
+  ] as const) {
+    r.post(
+      path,
+      {
+        config: {
+          auth: "session_or_api_key",
+          scope: "workflows:read",
+          audit: false,
+          cli: { noun: "workflow", verb, positional: ["id"] },
+        },
+        schema: {
+          tags: ["workflows"],
+          params: IdParams,
+          body: ValidateRequestSchema,
+          response: { 200: includePlan ? CompileResponseSchema : ValidateResponseSchema },
+        },
+      },
+      async (req) => {
+        const p = req.principal;
+        if (!p) throw new ForbiddenError("no principal");
+        return ctx.db.tenant(p.workspaceId, async (tx) => {
+          const w = await visibleWorkflow(tx, p, req.params.id);
+          const definition = withId(req.body.definition ?? w.draft, w.id);
+          const result = await compileIn(tx, definition, {
+            workspaceId: p.workspaceId,
+            environmentId: req.body.environmentId ?? null,
+            level: req.body.level,
+          });
+          return {
+            ok: result.ok,
+            diagnostics: result.diagnostics,
+            planHash: result.ok ? result.plan.planHash : null,
+            ...(includePlan && result.ok ? { plan: result.plan } : {}),
+          };
+        });
+      },
+    );
+  }
+
+  r.post(
+    "/v1/workflows/:id/publish",
+    {
+      config: {
+        auth: "session_or_api_key",
+        scope: "workflows:publish",
+        audit: { action: "workflow.publish", resource: "workflow" },
+        cli: { noun: "workflow", verb: "publish", positional: ["id"] },
+      },
+      schema: {
+        tags: ["workflows"],
+        summary: "Compile the draft strictly and publish it as the next version",
+        params: IdParams,
+        body: PublishRequestSchema.default({}),
+        response: { 201: WorkflowVersionSchema },
+      },
+    },
+    async (req, reply) => {
+      const p = req.principal;
+      if (!p) throw new ForbiddenError("no principal");
+      const version = await ctx.db.tenant(p.workspaceId, async (tx) => {
+        const w = await visibleWorkflow(tx, p, req.params.id);
+        const result = await compileIn(tx, w.draft, {
+          workspaceId: p.workspaceId,
+          level: "publish",
+        });
+        if (!result.ok) throw new WorkflowValidationError(result.diagnostics);
+        const hash = definitionHash(w.draft);
+        if (w.latestVersionId) {
+          const latest = await getVersion(tx, w.latestVersionId);
+          if (latest?.definitionHash === hash)
+            throw new ConflictError("nothing changed since the latest version", {
+              latestVersionId: latest.id,
+            });
+        }
+        const v = await publishVersion(tx, {
+          workflowId: w.id,
+          definition: w.draft,
+          definitionHash: hash,
+          plan: result.plan,
+          planHash: result.plan.planHash,
+          compilerVersion: result.plan.compilerVersion,
+          catalogSnapshot: catalogSnapshot(result.plan),
+          diagnostics: result.diagnostics,
+          notes: req.body.notes ?? null,
+          label: req.body.label ?? null,
+          publishedBy: p.userId,
+        });
+        for (const envId of req.body.deployTo ?? []) {
+          const [env] = await tx
+            .select()
+            .from(environments)
+            .where(and(eq(environments.id, envId), eq(environments.workspaceId, p.workspaceId)));
+          if (!env) throw new BadRequestError(`unknown environment ${envId}`);
+          if (env.protected && !hasScope(p, "admin"))
+            throw new ForbiddenError(`deploying to ${env.name} requires admin`);
+          await deploy(tx, {
+            workflowId: w.id,
+            environmentId: envId,
+            versionId: v.id,
+            deployedBy: p.userId,
+          });
+          await materialiseTriggers(tx, {
+            workspaceId: p.workspaceId,
+            workspaceSlug: p.workspaceSlug,
+            workflowId: w.id,
+            environmentId: envId,
+            triggers: w.draft.triggers,
+            baseUrl: ctx.config.baseUrl,
+            now: new Date(ctx.clock.now()),
+          });
+        }
+        return v;
+      });
+      req.audit.details = {
+        versionId: version.id,
+        version: version.version,
+        deployTo: req.body.deployTo ?? [],
+      };
+      return reply.code(201).send(versionDto(version, true));
+    },
+  );
+
+  r.post(
+    "/v1/workflows/:id/clone",
+    {
+      config: {
+        auth: "session_or_api_key",
+        scope: "workflows:write",
+        audit: { action: "workflow.clone", resource: "workflow" },
+        cli: { noun: "workflow", verb: "clone", positional: ["id"] },
+      },
+      schema: {
+        tags: ["workflows"],
+        params: IdParams,
+        body: z.object({ name: z.string().min(1).max(200).optional() }).default({}),
+        response: { 201: WorkflowSummarySchema },
+      },
+    },
+    async (req, reply) => {
+      const p = req.principal;
+      if (!p) throw new ForbiddenError("no principal");
+      const row = await ctx.db.tenant(p.workspaceId, async (tx) => {
+        const w = await visibleWorkflow(tx, p, req.params.id);
+        const name = req.body.name ?? `${w.name} (copy)`;
+        const id = uuidv7();
+        const definition = { ...w.draft, id, name };
+        const created = await createWorkflow(tx, {
+          workspaceId: p.workspaceId,
+          name,
+          slug: await uniqueSlug(tx, p.workspaceId, slugify(name)),
+          draft: definition,
+          description: w.description,
+          tags: w.tags,
+          createdBy: p.userId,
+        });
+        const [u] = await tx
+          .update(workflows)
+          .set({ id, draftDiagnostics: w.draftDiagnostics })
+          .where(eq(workflows.id, created.id))
+          .returning();
+        return u as WorkflowRow;
+      });
+      req.audit = { resourceId: row.id, details: { from: req.params.id } };
+      return reply.code(201).send(summaryDto(row, null));
+    },
+  );
+
+  r.post(
+    "/v1/workflows/import",
+    {
+      config: {
+        auth: "session_or_api_key",
+        scope: "workflows:write",
+        audit: { action: "workflow.import", resource: "workflow" },
+        cli: { noun: "workflow", verb: "import" },
+      },
+      schema: {
+        tags: ["workflows"],
+        summary: "Import a definition (JSON or YAML) as a new workflow",
+        body: z.object({
+          definition: z.unknown().optional(),
+          yaml: z
+            .string()
+            .max(2 * 1024 * 1024)
+            .optional(),
+          name: z.string().min(1).max(200).optional(),
+        }),
+        response: {
+          201: z.object({ workflow: WorkflowSummarySchema, diagnostics: z.array(z.unknown()) }),
+        },
+      },
+    },
+    async (req, reply) => {
+      const p = req.principal;
+      if (!p) throw new ForbiddenError("no principal");
+      let definition: unknown = req.body.definition;
+      if (req.body.yaml !== undefined) {
+        try {
+          definition = parseYaml(req.body.yaml, {
+            schema: "core",
+            merge: false,
+            maxAliasCount: 100,
+          }) as unknown;
+        } catch (error) {
+          throw new BadRequestError(
+            `the YAML does not parse: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+      }
+      if (definition === undefined) throw new BadRequestError("send `definition` or `yaml`");
+      const docName =
+        typeof definition === "object" && definition !== null
+          ? (definition as JsonObject).name
+          : undefined;
+      const name = req.body.name ?? (typeof docName === "string" ? docName : "Imported workflow");
+      const id = uuidv7();
+      const out = await ctx.db.tenant(p.workspaceId, async (tx) => {
+        const def = withId(definition, id, name);
+        const compiled = await compileIn(tx, def, { workspaceId: p.workspaceId, level: "draft" });
+        assertSaveable(compiled.diagnostics);
+        const created = await createWorkflow(tx, {
+          workspaceId: p.workspaceId,
+          name,
+          slug: await uniqueSlug(tx, p.workspaceId, slugify(name)),
+          draft: WorkflowDefinitionSchema.parse(def),
+          createdBy: p.userId,
+        });
+        const [u] = await tx
+          .update(workflows)
+          .set({ id, draftDiagnostics: compiled.diagnostics })
+          .where(eq(workflows.id, created.id))
+          .returning();
+        return { row: u as WorkflowRow, diagnostics: compiled.diagnostics };
+      });
+      req.audit.resourceId = out.row.id;
+      return reply
+        .code(201)
+        .send({ workflow: summaryDto(out.row, null), diagnostics: out.diagnostics });
+    },
+  );
+
+  r.get(
+    "/v1/workflows/:id/draft/export",
+    {
+      config: {
+        auth: "session_or_api_key",
+        scope: "workflows:read",
+        cli: { noun: "workflow", verb: "export", positional: ["id"] },
+      },
+      schema: {
+        tags: ["workflows"],
+        summary: "The draft as one file (secrets stay symbolic)",
+        params: IdParams,
+        querystring: z.object({ format: z.enum(["json", "yaml"]).default("json") }),
+      },
+    },
+    async (req, reply) => {
+      const p = req.principal;
+      if (!p) throw new ForbiddenError("no principal");
+      const w = await ctx.db.tenant(p.workspaceId, (tx) => visibleWorkflow(tx, p, req.params.id));
+      const filename = `${w.slug}.${req.query.format}`;
+      void reply.header("content-disposition", `attachment; filename="${filename}"`);
+      if (req.query.format === "yaml") return reply.type("application/yaml").send(toYaml(w.draft));
+      return reply.type("application/json").send(`${JSON.stringify(w.draft, null, 2)}\n`);
+    },
+  );
+
+  const TemplateSchema = z.object({
+    id: z.string(),
+    slug: z.string(),
+    name: z.string(),
+    description: z.string(),
+    category: z.string(),
+    builtIn: z.boolean(),
+    requiredResources: z.unknown(),
+    requiredSecrets: z.unknown(),
+  });
+  r.get(
+    "/v1/templates",
+    {
+      config: {
+        auth: "session_or_api_key",
+        scope: "workflows:read",
+        cli: { noun: "template", verb: "list" },
+      },
+      schema: { tags: ["templates"], response: { 200: z.array(TemplateSchema) } },
+    },
+    async (req) => {
+      const p = req.principal;
+      if (!p) throw new ForbiddenError("no principal");
+      const rows = await ctx.db.tenant(p.workspaceId, (tx) =>
+        tx
+          .select()
+          .from(templates)
+          .where(or(isNull(templates.workspaceId), eq(templates.workspaceId, p.workspaceId)))
+          .orderBy(templates.name),
+      );
+      return rows.map((t) => ({
+        id: t.id,
+        slug: t.slug,
+        name: t.name,
+        description: t.description,
+        category: t.category,
+        builtIn: t.workspaceId === null,
+        requiredResources: t.requiredResources,
+        requiredSecrets: t.requiredSecrets,
+      }));
+    },
+  );
+}
+
+/** 412 for `If-Match` mismatches, with the current revision (API.md §2). */
+export class PreconditionFailed extends FlowaidError {
+  readonly code = "CONFLICT" as const;
+  readonly retryable = false;
+  override readonly httpStatus = 412;
+}
