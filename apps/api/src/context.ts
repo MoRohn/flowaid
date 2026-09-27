@@ -1,6 +1,7 @@
 /** Everything a route needs, built once in `buildServer` (tests build it over a test database). */
 import type { Database } from "@flowaid/database";
-import type { QueueDriver } from "@flowaid/workflow-core";
+import type { CredentialService } from "@flowaid/credentials";
+import type { QueueDriver, SafeFetch } from "@flowaid/workflow-core";
 import type { RunEventHub } from "./services/hub.js";
 import type { Env } from "@flowaid/env";
 import type { AuthService } from "./auth/service.js";
@@ -19,6 +20,8 @@ export interface ApiConfig {
   featuresDisabled: readonly string[];
   hasRedis: boolean;
   hasOidc: boolean;
+  /** Development and tests only: outbound calls may reach private addresses. Never in production. */
+  allowPrivateNetwork: boolean;
 }
 
 export interface Clock {
@@ -35,6 +38,10 @@ export interface ApiContext {
   queue: QueueDriver;
   /** run notifications for SSE and sync waits */
   hub: RunEventHub;
+  /** envelope encryption of credential values */
+  credentials: CredentialService;
+  /** SSRF-guarded fetch for outbound calls the API makes (OpenAPI import, MCP discovery, credential tests) */
+  http: SafeFetch;
   env?: Env;
 }
 
@@ -55,6 +62,7 @@ export function configFromEnv(env: Env): ApiConfig {
     featuresDisabled: env.FLOWAID_FEATURES_DISABLED ?? [],
     hasRedis: env.flags.hasRedis,
     hasOidc: env.flags.hasOidc,
+    allowPrivateNetwork: false,
   };
 }
 
@@ -72,6 +80,7 @@ export function defaultConfig(over: Partial<ApiConfig> = {}): ApiConfig {
     featuresDisabled: [],
     hasRedis: false,
     hasOidc: false,
+    allowPrivateNetwork: false,
     ...over,
   };
 }

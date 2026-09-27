@@ -2,7 +2,11 @@
 import type { FastifyInstance, LightMyRequestResponse } from "fastify";
 import { PgEventBus, PgQueueDriver } from "@flowaid/database";
 import { createTestDatabase, type TestDatabase } from "@flowaid/database/testing";
+import { randomBytes } from "node:crypto";
+import { envMasterKey } from "@flowaid/credentials";
+import { createSafeFetch } from "@flowaid/providers";
 import { RunEventHub } from "../services/hub.js";
+import { createCredentialService } from "../services/credentials.js";
 import { AuthService } from "../auth/service.js";
 import { JwtKeys } from "../auth/jwt.js";
 import { firstBoot } from "../bootstrap/firstBoot.js";
@@ -34,13 +38,18 @@ export async function createTestApp(
   const queue = new PgQueueDriver(db.app.sql, { pollMs: 50 });
   const hub = new RunEventHub(new PgEventBus(db.app.sql));
   const ctx: ApiContext = {
-    config: defaultConfig(config),
+    config: defaultConfig({ allowPrivateNetwork: true, ...config }),
     db: db.app,
     keys,
     auth: new AuthService(db.app, keys, () => clock.now()),
     clock,
     queue,
     hub,
+    credentials: await createCredentialService(
+      db.app,
+      envMasterKey(randomBytes(32).toString("base64")),
+    ),
+    http: createSafeFetch({ allowPrivate: config.allowPrivateNetwork ?? true }),
   };
   await firstBoot(db.app, { adminEmail: OWNER.email, adminPassword: OWNER.password });
   const app = await buildServer(ctx, o);

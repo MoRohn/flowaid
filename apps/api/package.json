@@ -27,8 +27,10 @@
     "@flowaid/database": "workspace:*",
     "@flowaid/env": "workspace:*",
     "@flowaid/evaluation": "workspace:*",
+    "@flowaid/mcp": "workspace:*",
     "@flowaid/nodes-core": "workspace:*",
     "@flowaid/observability": "workspace:*",
+    "@flowaid/openapi-tools": "workspace:*",
     "@flowaid/providers": "workspace:*",
     "@flowaid/shared": "workspace:*",
     "@flowaid/workflow-compiler": "workspace:*",
@@ -48,6 +50,7 @@
   },
   "devDependencies": {
     "@flowaid/config": "workspace:*",
+    "@modelcontextprotocol/sdk": "1.30.1",
     "@types/node": "24.13.6",
     "eslint": "9.39.5",
     "tsx": "4.23.15",

@@ -21,6 +21,8 @@ describe("route registration guard", () => {
       clock: { now: () => Date.now() },
       queue: {} as never,
       hub: {} as never,
+      credentials: {} as never,
+      http: {} as never,
     };
   };
 

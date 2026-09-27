@@ -5,6 +5,8 @@
 import { PgEventBus, PgQueueDriver, createDatabaseFromEnv, migrate } from "@flowaid/database";
 import { BullMqQueueDriver, RedisEventBus } from "@flowaid/workflow-runtime";
 import { RunEventHub } from "./services/hub.js";
+import { createCredentialService, masterKeyFromEnv } from "./services/credentials.js";
+import { createSafeFetch } from "@flowaid/providers";
 import { loadEnv } from "@flowaid/env";
 import { AuthService } from "./auth/service.js";
 import { JwtKeys } from "./auth/jwt.js";
@@ -33,6 +35,19 @@ async function main(): Promise<void> {
     : new PgQueueDriver(db.sql);
   const bus = redisUrl ? new RedisEventBus(redisUrl) : new PgEventBus(db.sql);
   const hub = new RunEventHub(bus);
+  const credentials = await createCredentialService(
+    db,
+    await masterKeyFromEnv(env, db, (path) =>
+      process.stderr.write(
+        `WARNING: generated a new master key at ${path}; back it up — losing it loses every credential\n`,
+      ),
+    ),
+  );
+  const http = createSafeFetch({
+    maxBytes: 25 * 1024 * 1024,
+    timeoutMs: 30_000,
+    userAgent: "FlowAId-API/1",
+  });
   const ctx: ApiContext = {
     config: configFromEnv(env),
     db,
@@ -41,6 +56,8 @@ async function main(): Promise<void> {
     clock,
     queue,
     hub,
+    credentials,
+    http,
     env,
   };
   const boot = await firstBoot(db, {

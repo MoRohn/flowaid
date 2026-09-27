@@ -11,3 +11,4 @@ export * from "./openai-compatible.js";
 export * from "./recording.js";
 export * from "./registry.js";
 export * from "./streams.js";
+export * from "./safeFetch.js";

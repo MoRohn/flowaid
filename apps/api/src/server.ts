@@ -23,6 +23,8 @@ import { workspaceRoutes } from "./routes/workspaces.js";
 import { catalogRoutes } from "./routes/catalog.js";
 import { versionRoutes } from "./routes/versions.js";
 import { runRoutes } from "./routes/runs.js";
+import { credentialRoutes } from "./routes/credentials.js";
+import { toolRoutes } from "./routes/tools.js";
 import { workflowRoutes } from "./routes/workflows.js";
 import "./types.js";
 
@@ -93,6 +95,8 @@ export async function buildServer(ctx: ApiContext, o: BuildOptions = {}): Promis
   workflowRoutes(app, ctx);
   versionRoutes(app, ctx);
   runRoutes(app, ctx);
+  credentialRoutes(app, ctx);
+  toolRoutes(app, ctx);
   for (const register of o.routes ?? []) register(app, ctx);
   return app;
 }
