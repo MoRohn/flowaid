@@ -16,6 +16,7 @@
     "next-env.d.ts",
     "../../packages/ui/src/primitives/css-vars.d.ts",
     "app",
+    "app/.well-known/**/*",
     "src",
     ".next/types/**/*.ts",
     "next.config.ts",

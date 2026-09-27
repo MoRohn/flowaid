@@ -2,13 +2,21 @@
   "name": "@flowaid/nodes-core",
   "version": "0.1.0",
   "private": true,
-  "description": "flowaid's core nodes: typed decisions (boolean, choice, score, batch, confidence gate, router, consensus, validator), generation, HTTP, data, developer, state and safety nodes, the manifest build and the demo templates (ARCHITECTURE.md \u00a73, \u00a76.3).",
+  "description": "flowaid's core nodes: typed decisions (boolean, choice, score, batch, confidence gate, router, consensus, validator), generation, HTTP, data, developer, state and safety nodes, the manifest build and the demo templates (ARCHITECTURE.md §3, §6.3).",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
   "exports": {
-    ".": "./src/index.ts",
-    "./manifest": "./src/manifestFile.ts",
+    ".": {
+      "types": "./src/index.ts",
+      "development": "./src/index.ts",
+      "default": "./dist/index.js"
+    },
+    "./manifest": {
+      "types": "./src/manifestFile.ts",
+      "development": "./src/manifestFile.ts",
+      "default": "./dist/manifestFile.js"
+    },
     "./manifest.json": "./manifest.json",
     "./templates/*": "./templates/*"
   },
@@ -21,8 +29,8 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "manifest": "tsx scripts/build-manifest.ts",
-    "manifest:check": "tsx scripts/build-manifest.ts --check",
+    "manifest": "tsx --conditions=development scripts/build-manifest.ts",
+    "manifest:check": "tsx --conditions=development scripts/build-manifest.ts --check",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint src",
     "test": "vitest run",

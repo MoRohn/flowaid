@@ -11,14 +11,14 @@
  * 5. Builds what the apps import, then starts the API, the worker and the web app with prefixed
  *    logs, waits for /v1/ready and prints where to sign in. Ctrl+C stops everything.
  *
- * `--prod` runs the production builds (`next start`, compiled API and worker) instead of watch
+ * `--prod` runs the production builds (Next's standalone server, compiled API and worker) instead of watch
  * mode; `--playground` serves the @flowaid/ui component playground instead of the stack.
  *
  * Runs on plain Node (native type stripping) so it works before `pnpm install`.
  */
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseArgs, parseEnv } from "node:util";
 
@@ -441,6 +441,10 @@ if (opts.playground) {
     FLOWAID_BASE_URL: fileEnv.FLOWAID_BASE_URL ?? apiUrl,
     FLOWAID_WEB_URL: fileEnv.FLOWAID_WEB_URL ?? webUrl,
     FLOWAID_API_INTERNAL_URL: `http://127.0.0.1:${apiPort}`,
+    // the browser reaches the API through the web app's proxy; direct calls come from here
+    CORS_ORIGINS: fileEnv.CORS_ORIGINS ?? webUrl,
+    // the web app's proxy runs on this machine: trust its X-Forwarded-For (rate limits, audit)
+    FLOWAID_TRUST_PROXY: fileEnv.FLOWAID_TRUST_PROXY ?? "loopback",
     LOG_LEVEL: fileEnv.LOG_LEVEL ?? "warn",
   };
   const bin = (dir: string, name: string) =>
@@ -452,7 +456,7 @@ if (opts.playground) {
     "api",
     34,
     opts.prod ? process.execPath : bin("apps/api", "tsx"),
-    opts.prod ? ["dist/main.js"] : ["watch", "src/main.ts"],
+    opts.prod ? ["dist/main.js"] : ["watch", "--conditions=development", "src/main.ts"],
     api,
     { ...env, HOST: host, PORT: String(apiPort) },
   );
@@ -463,18 +467,32 @@ if (opts.playground) {
     "worker",
     33,
     opts.prod ? process.execPath : bin("apps/worker", "tsx"),
-    opts.prod ? ["dist/main.js"] : ["watch", "src/main.ts"],
+    opts.prod ? ["dist/main.js"] : ["watch", "--conditions=development", "src/main.ts"],
     worker,
     env,
   );
-  start(
-    "web",
-    36,
-    bin("apps/web", "next"),
-    [opts.prod ? "start" : "dev", "--port", String(webPort), "--hostname", host],
-    web,
-    { ...env, PORT: String(webPort) },
-  );
+  if (opts.prod) {
+    // the standalone server is what the Docker image runs; it serves static files from beside it
+    const standalone = join(web, ".next/standalone/apps/web");
+    cpSync(join(web, ".next/static"), join(standalone, ".next/static"), { recursive: true });
+    cpSync(join(web, "public"), join(standalone, "public"), { recursive: true });
+    start("web", 36, process.execPath, ["server.js"], standalone, {
+      ...env,
+      PORT: String(webPort),
+      HOSTNAME: host,
+    });
+  } else
+    start(
+      "web",
+      36,
+      bin("apps/web", "next"),
+      ["dev", "--port", String(webPort), "--hostname", host],
+      web,
+      {
+        ...env,
+        PORT: String(webPort),
+      },
+    );
   if (!(await waitFor(`http://127.0.0.1:${webPort}/login`, 180_000)))
     fail("the web app did not start (see the web lines above)");
 

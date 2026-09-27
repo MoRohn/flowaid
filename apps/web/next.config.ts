@@ -1,18 +1,18 @@
 /**
- * Next.js config. The browser talks to the API through this server (`/v1/*`, `/hooks/*` and
- * `/mcp/*` are rewritten to FLOWAID_API_INTERNAL_URL), so the session cookie is first-party and no
- * CORS is involved. Config files are the one place outside @flowaid/env that read process.env.
+ * Next.js config. The browser talks to the API through this server: `/v1/*`, `/hooks/*` and
+ * `/mcp/*` are route handlers that forward to FLOWAID_API_INTERNAL_URL at request time
+ * (src/server/proxy.ts), so the session cookie is first-party and no CORS is involved.
  */
 import path from "node:path";
 import type { NextConfig } from "next";
-
-const api = (process.env.FLOWAID_API_INTERNAL_URL ?? "http://localhost:3000").replace(/\/$/, "");
 
 const config: NextConfig = {
   output: "standalone",
   outputFileTracingRoot: path.resolve(import.meta.dirname, "../.."),
   reactStrictMode: true,
   poweredByHeader: false,
+  // responses stream through the API proxy (SSE); compress at the edge instead
+  compress: false,
   devIndicators: false,
   // @flowaid/ui ships TypeScript source; the NodeNext libraries (whose sources import "./x.js")
   // are consumed from their tsc output, which turbo builds before this app.
@@ -26,14 +26,6 @@ const config: NextConfig = {
       "@flowaid/workflow-compiler": "../../packages/workflow-compiler/dist/index.js",
       "@flowaid/shared": "../../packages/shared/dist/index.js",
     },
-  },
-  async rewrites() {
-    return [
-      { source: "/v1/:path*", destination: `${api}/v1/:path*` },
-      { source: "/hooks/:path*", destination: `${api}/hooks/:path*` },
-      { source: "/mcp/:path*", destination: `${api}/mcp/:path*` },
-      { source: "/.well-known/jwks.json", destination: `${api}/.well-known/jwks.json` },
-    ];
   },
   async headers() {
     return [

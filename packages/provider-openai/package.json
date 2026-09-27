@@ -2,12 +2,16 @@
   "name": "@flowaid/provider-openai",
   "version": "0.1.0",
   "private": true,
-  "description": "OpenAI and OpenAI-compatible generation and embedding providers for flowaid \u2014 OpenAI, Google Gemini (OpenAI-compatible endpoint), Groq, Mistral, xAI, OpenRouter, Together, vLLM and custom endpoints \u2014 as registry factories over the shared streaming client (ARCHITECTURE.md \u00a76.6).",
+  "description": "OpenAI and OpenAI-compatible generation and embedding providers for flowaid — OpenAI, Google Gemini (OpenAI-compatible endpoint), Groq, Mistral, xAI, OpenRouter, Together, vLLM and custom endpoints — as registry factories over the shared streaming client (ARCHITECTURE.md §6.6).",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./src/index.ts",
+      "development": "./src/index.ts",
+      "default": "./dist/index.js"
+    }
   },
   "files": [
     "src",

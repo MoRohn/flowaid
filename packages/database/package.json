@@ -7,9 +7,21 @@
   "type": "module",
   "sideEffects": false,
   "exports": {
-    ".": "./src/index.ts",
-    "./schema": "./src/schema.ts",
-    "./testing": "./src/testing.ts"
+    ".": {
+      "types": "./src/index.ts",
+      "development": "./src/index.ts",
+      "default": "./dist/index.js"
+    },
+    "./schema": {
+      "types": "./src/schema.ts",
+      "development": "./src/schema.ts",
+      "default": "./dist/schema.js"
+    },
+    "./testing": {
+      "types": "./src/testing.ts",
+      "development": "./src/testing.ts",
+      "default": "./dist/testing.js"
+    }
   },
   "files": [
     "src",
@@ -24,8 +36,8 @@
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
     "clean": "rm -rf dist .turbo *.tsbuildinfo",
-    "seed:templates": "tsx scripts/seed-templates.ts",
-    "seed:environments": "tsx scripts/seed-environments.ts"
+    "seed:templates": "tsx --conditions=development scripts/seed-templates.ts",
+    "seed:environments": "tsx --conditions=development scripts/seed-environments.ts"
   },
   "dependencies": {
     "@flowaid/env": "workspace:*",

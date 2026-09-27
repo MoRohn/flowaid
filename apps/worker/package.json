@@ -2,15 +2,19 @@
   "name": "@flowaid/worker",
   "version": "0.1.0",
   "private": true,
-  "description": "The flowaid worker: consumes run jobs, drives the orchestrator over Postgres, executes nodes with providers, tools (MCP, OpenAPI), state, artifacts and the sandbox, fires timers and schedules (ARCHITECTURE.md \u00a75, \u00a78).",
+  "description": "The flowaid worker: consumes run jobs, drives the orchestrator over Postgres, executes nodes with providers, tools (MCP, OpenAPI), state, artifacts and the sandbox, fires timers and schedules (ARCHITECTURE.md §5, §8).",
   "license": "Apache-2.0",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./src/index.ts",
+      "development": "./src/index.ts",
+      "default": "./dist/index.js"
+    }
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "dev": "tsx watch src/main.ts",
+    "dev": "tsx watch --conditions=development src/main.ts",
     "start": "node dist/main.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint src",

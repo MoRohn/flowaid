@@ -1,0 +1,83 @@
+name: E2E
+
+# The release gate (docs/UPGRADE_PLAN.md P5-03): the acceptance journey in a browser against the
+# production builds that `pnpm start --prod` runs (the web app's standalone server, the compiled
+# API and worker) over Postgres with pgvector. No provider keys are needed.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: true
+  TURBO_TELEMETRY_DISABLED: 1
+  NEXT_TELEMETRY_DISABLED: 1
+
+jobs:
+  acceptance:
+    name: acceptance journey
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.6-pg16@sha256:ccc6e83d6e35e931dc7c5def2022729d5a6c370318d099181995567ff1fb4d6b
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Start the stack (production builds)
+        run: |
+          nohup node scripts/start.ts --prod --skip-install \
+            --database-url postgres://postgres:postgres@localhost:5432/postgres > stack.log 2>&1 &
+          for i in $(seq 1 300); do
+            if grep -q "Ctrl+C to stop" stack.log; then exit 0; fi
+            if grep -q "✗" stack.log; then cat stack.log; exit 1; fi
+            sleep 2
+          done
+          cat stack.log
+          exit 1
+
+      - name: Acceptance journey
+        run: pnpm test:acceptance
+        env:
+          E2E_BASE_URL: http://127.0.0.1:3001
+
+      - name: Keep the logs and the report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-${{ github.run_id }}
+          path: |
+            stack.log
+            playwright-report
+            test-results
+          retention-days: 7

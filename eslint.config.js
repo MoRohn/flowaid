@@ -28,6 +28,6 @@ export default [
   // for local runs (ARCHITECTURE.md §1.1, "Environment boundary"). Mirrors their eslint.config.js.
   {
     ...allowProcessEnv,
-    files: ["packages/env/**", "packages/cli/**", "scripts/start.ts"],
+    files: ["packages/env/**", "packages/cli/**", "scripts/start.ts", "e2e/**"],
   },
 ];

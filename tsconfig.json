@@ -13,6 +13,8 @@
   },
   "include": [
     "scripts",
+    "e2e",
+    "playwright.config.ts",
     "docker/**/*.test.ts",
     "vitest.config.ts",
     "eslint.config.js",

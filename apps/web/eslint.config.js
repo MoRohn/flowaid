@@ -1,4 +1,4 @@
-import react from "@flowaid/config/eslint-react";
+import react, { allowProcessEnv } from "@flowaid/config/eslint-react";
 import { boundaryConfig, testBoundaryConfig } from "../../eslint.boundaries.js";
 
 // The web app: browser code plus Next.js config (next.config.ts may read process.env; config
@@ -8,4 +8,6 @@ export default [
   { ignores: [".next/**", "next-env.d.ts", "public/**"] },
   boundaryConfig("web"),
   testBoundaryConfig("web"),
+  // the server-only API proxy reads its target at request time (one image, any deployment)
+  { ...allowProcessEnv, files: ["src/server/**"] },
 ];

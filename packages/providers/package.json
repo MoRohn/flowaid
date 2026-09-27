@@ -2,13 +2,21 @@
   "name": "@flowaid/providers",
   "version": "0.1.0",
   "private": true,
-  "description": "flowaid provider infrastructure: the provider registry, model catalog and pricing, failover chains, health tracking with a circuit breaker, rate limiting, the LLM and rule decision providers, an OpenAI-compatible client and a record/replay provider for deterministic runs (ARCHITECTURE.md \u00a76).",
+  "description": "flowaid provider infrastructure: the provider registry, model catalog and pricing, failover chains, health tracking with a circuit breaker, rate limiting, the LLM and rule decision providers, an OpenAI-compatible client and a record/replay provider for deterministic runs (ARCHITECTURE.md §6).",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
   "exports": {
-    ".": "./src/index.ts",
-    "./recording-fs": "./src/recording-fs.ts"
+    ".": {
+      "types": "./src/index.ts",
+      "development": "./src/index.ts",
+      "default": "./dist/index.js"
+    },
+    "./recording-fs": {
+      "types": "./src/recording-fs.ts",
+      "development": "./src/recording-fs.ts",
+      "default": "./dist/recording-fs.js"
+    }
   },
   "files": [
     "src",

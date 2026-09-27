@@ -2,12 +2,16 @@
   "name": "@flowaid/codegen",
   "version": "0.1.0",
   "private": true,
-  "description": "FlowAId code export: a workflow as typed code over the SDK builders (round-trip checked) and as a runnable package \u2014 runner, HTTP wrapper, server client, tests, Dockerfile, vendored runtime (CODE_EXPORT.md).",
+  "description": "FlowAId code export: a workflow as typed code over the SDK builders (round-trip checked) and as a runnable package — runner, HTTP wrapper, server client, tests, Dockerfile, vendored runtime (CODE_EXPORT.md).",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./src/index.ts",
+      "development": "./src/index.ts",
+      "default": "./dist/index.js"
+    }
   },
   "files": [
     "src",
