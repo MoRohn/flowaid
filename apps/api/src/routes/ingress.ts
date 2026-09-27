@@ -88,6 +88,17 @@ function webhookPrincipal(w: typeof webhooks.$inferSelect, slug: string): Princi
 
 export function ingressRoutes(app: FastifyInstance, ctx: ApiContext): void {
   const replays = new ReplayCache(() => ctx.clock.now());
+  // `webhook.rejected` at most once per webhook every 5 minutes: a flood of bad calls must not
+  // become a flood of notifications.
+  const lastRejectNotice = new Map<string, number>();
+  const shouldNotifyReject = (webhookId: string): boolean => {
+    const now = ctx.clock.now();
+    const last = lastRejectNotice.get(webhookId);
+    if (last !== undefined && now - last < 5 * 60_000) return false;
+    if (lastRejectNotice.size > 10_000) lastRejectNotice.clear();
+    lastRejectNotice.set(webhookId, now);
+    return true;
+  };
 
   void app.register((scope, _opts, done) => {
     // Raw bytes for signature checks; parsing happens after verification.
@@ -148,6 +159,16 @@ export function ingressRoutes(app: FastifyInstance, ctx: ApiContext): void {
             }),
           );
           req.log.warn({ webhookId: w.id, reason }, "webhook rejected");
+          if (ctx.notifier && shouldNotifyReject(w.id))
+            void ctx.notifier.notify({
+              event: "webhook.rejected",
+              workspaceId: w.workspaceId,
+              title: `A call to webhook /${w.path} was rejected`,
+              text: `${reason} (HTTP ${status}, environment ${env.name}).`,
+              url: `${ctx.config.webUrl.replace(/\/$/, "")}/${slug}/triggers?tab=webhooks&webhook=${w.id}`,
+              details: { webhookId: w.id, workflowId: w.workflowId, reason, httpStatus: status },
+              at: new Date(ctx.clock.now()).toISOString(),
+            });
           return reply
             .code(status)
             .send(

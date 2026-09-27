@@ -31,6 +31,7 @@
     "@flowaid/node-sdk": "workspace:*",
     "@flowaid/nodes-core": "workspace:*",
     "@flowaid/nodes-langchain": "workspace:*",
+    "@flowaid/observability": "workspace:*",
     "@flowaid/openapi-tools": "workspace:*",
     "@flowaid/provider-anthropic": "workspace:*",
     "@flowaid/provider-ollama": "workspace:*",

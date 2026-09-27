@@ -12,7 +12,9 @@ import {
   PgKekStore,
   PgQueueDriver,
   createDatabaseFromEnv,
+  workspaces,
 } from "@flowaid/database";
+import { eq } from "drizzle-orm";
 import { loadEnv, pickEnv } from "@flowaid/env";
 import { createSafeFetch } from "@flowaid/providers";
 import { createSandbox } from "@flowaid/sandbox";
@@ -22,6 +24,7 @@ import { startHeartbeat } from "./heartbeat.js";
 import { startScheduler } from "./jobs/scheduler.js";
 import { loadBundledPlugins, registerPluginProviders } from "./plugins/bundled.js";
 import { createWorker, defaultProviderRegistry, type WorkerLogger } from "./worker.js";
+import { workspaceNotifier } from "./services/notify.js";
 
 const log: WorkerLogger = {
   info: (data, msg) =>
@@ -65,6 +68,22 @@ async function main(): Promise<void> {
     ? { packages: [], skipped: [] }
     : await loadBundledPlugins(env.FLOWAID_BUNDLED_PLUGINS, { db, log });
   const registry = defaultProviderRegistry();
+  const webUrl = env.FLOWAID_WEB_URL ? String(env.FLOWAID_WEB_URL) : null;
+  const notifier = workspaceNotifier({
+    db,
+    credentials,
+    http,
+    ...(env.SMTP_URL
+      ? {
+          smtp: {
+            url: String(env.SMTP_URL),
+            from: String(env.SMTP_FROM ?? "FlowAId <noreply@localhost>"),
+          },
+        }
+      : {}),
+    onError: (error, channel, event) =>
+      log.warn({ channel, event, err: String(error) }, "notification not delivered"),
+  });
   registerPluginProviders(registry, bundled.packages);
 
   const worker = createWorker({
@@ -95,6 +114,7 @@ async function main(): Promise<void> {
       : {}),
     exports: { vendorDir: String(env.FLOWAID_VENDOR_DIR ?? "/opt/flowaid/vendor") },
     concurrency: Number(env.WORKER_CONCURRENCY ?? 8),
+    notify: { notifier, webUrl },
     log,
   });
   await worker.start();
@@ -103,6 +123,28 @@ async function main(): Promise<void> {
     queue,
     onError: (error, id) =>
       log.error({ scheduleId: id, err: String(error) }, "schedule fire failed"),
+    onFailed: (f) =>
+      void (async () => {
+        const [ws] = await db.system((tx) =>
+          tx
+            .select({ slug: workspaces.slug })
+            .from(workspaces)
+            .where(eq(workspaces.id, f.workspaceId)),
+        );
+        await notifier.notify({
+          event: "schedule.failed",
+          workspaceId: f.workspaceId,
+          title: "A schedule could not start its run",
+          text: f.error,
+          ...(webUrl && ws
+            ? { url: `${webUrl.replace(/\/$/, "")}/${ws.slug}/triggers?tab=schedules` }
+            : {}),
+          details: { scheduleId: f.scheduleId, workflowId: f.workflowId },
+          at: new Date().toISOString(),
+        });
+      })().catch((error: unknown) =>
+        log.warn({ err: String(error) }, "schedule.failed notification not sent"),
+      ),
   });
   const stopHeartbeat = startHeartbeat(join(dataDir, "worker.heartbeat"));
 

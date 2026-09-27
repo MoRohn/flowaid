@@ -659,6 +659,21 @@ const docs = {
     example: "9464",
     secret: false,
   },
+  SMTP_URL: {
+    group: "observability",
+    description:
+      "SMTP server for `email` notification channels (`smtp://user:password@host:587`, or `smtps://` for implicit TLS). Unset leaves email channels undeliverable; Slack and webhook channels work without it.",
+    required: false,
+    example: "smtps://notifications:<password>@smtp.example.com:465",
+    secret: true,
+  },
+  SMTP_FROM: {
+    group: "observability",
+    description: "Sender address of notification emails.",
+    required: false,
+    example: "FlowAId <notifications@example.com>",
+    secret: false,
+  },
 
   // ── compose (docker compose only; never parsed) ─────────────────────────────────
   POSTGRES_USER: {

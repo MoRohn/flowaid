@@ -5,6 +5,7 @@ import { ApiKeysTab } from "~/admin/settings/ApiKeysTab";
 import { AuditTab } from "~/admin/settings/AuditTab";
 import { EnvironmentsTab } from "~/admin/settings/EnvironmentsTab";
 import { MembersTab } from "~/admin/settings/MembersTab";
+import { NotificationsTab } from "~/admin/settings/NotificationsTab";
 import { ProfileTab } from "~/admin/settings/ProfileTab";
 import { WorkspaceTab } from "~/admin/settings/WorkspaceTab";
 import { useQueryTab } from "~/admin/ui";
@@ -16,6 +17,11 @@ const TABS = [
   { id: "members", label: "Members", visible: (s: Session) => s.can("workflows:read") },
   { id: "api-keys", label: "API keys", visible: (s: Session) => s.can("api_keys:manage") },
   { id: "environments", label: "Environments", visible: () => true },
+  {
+    id: "notifications",
+    label: "Notifications",
+    visible: (s: Session) => s.can("admin") && s.features.settings_notifications === true,
+  },
   {
     id: "audit",
     label: "Audit log",
@@ -47,6 +53,8 @@ function Settings() {
           <ApiKeysTab />
         ) : tab === "environments" ? (
           <EnvironmentsTab />
+        ) : tab === "notifications" ? (
+          <NotificationsTab />
         ) : tab === "audit" ? (
           <AuditTab />
         ) : (

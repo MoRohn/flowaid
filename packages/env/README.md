@@ -222,6 +222,8 @@ lists them empty for you to generate (`openssl rand -hex 16`).
 |---|---|---|---|
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | no | — | OTLP/HTTP endpoint for traces and metrics. Unset disables the OpenTelemetry exporter (spans are still created for logs). Example: `http://localhost:4318`. |
 | `PROMETHEUS_PORT` | no | — | Port of the internal Prometheus `/metrics` listener in the api and worker. Unset disables it. Example: `9464`. |
+| `SMTP_URL` | no | — | SMTP server for `email` notification channels (`smtp://user:password@host:587`, or `smtps://` for implicit TLS). Unset leaves email channels undeliverable; Slack and webhook channels work without it. Example: `smtps://notifications:<password>@smtp.example.com:465`. Secret. |
+| `SMTP_FROM` | no | — | Sender address of notification emails. Example: `FlowAId <notifications@example.com>`. |
 
 ### Docker Compose stack (read by docker compose, not by the api)
 

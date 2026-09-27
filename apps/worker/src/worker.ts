@@ -15,6 +15,8 @@ import {
   runs,
   workflowDeployments,
   workflowVersions,
+  workflows,
+  workspaces,
   type Database,
 } from "@flowaid/database";
 import { McpSessionPool, connectSession, type StdioPolicy } from "@flowaid/mcp";
@@ -28,6 +30,7 @@ import { typesafeFactory } from "@flowaid/provider-typesafe";
 import { uuidv7 } from "@flowaid/shared";
 import type {
   DecisionProvider,
+  DurableRunEvent,
   EventBus,
   ExecutionPlan,
   Job,
@@ -56,6 +59,8 @@ import { stateAccessFor } from "./services/state.js";
 import { toolAccessFor } from "./services/tools.js";
 import { runEvaluationJob } from "./jobs/evaluation.js";
 import { runExportJob } from "./jobs/export.js";
+import type { Notifier } from "@flowaid/observability";
+import { runNotifications } from "./services/notify.js";
 
 export interface WorkerLogger {
   info(data: Record<string, unknown>, msg: string): void;
@@ -85,6 +90,8 @@ export interface WorkerDeps {
   maintenance?: { timerPollMs?: number; heartbeatMs?: number; reapMs?: number };
   /** code export (`export.package` on the `jobs` queue): FLOWAID_VENDOR_DIR for vendored mode */
   exports?: { vendorDir?: string | null };
+  /** workspace notification channels (`human_task.created`, `run.failed`); off when absent */
+  notify?: { notifier: Notifier; webUrl: string | null };
 }
 
 const TERMINAL = new Set(["RUN_COMPLETED", "RUN_FAILED", "RUN_CANCELLED", "RUN_TIMED_OUT"]);
@@ -425,6 +432,36 @@ export function createWorker(deps: WorkerDeps): Worker {
         () => evaluation.stop(),
         () => background.stop(),
       );
+      // Human waits and failures reach the workspace's channels (evaluation runs stay quiet).
+      const notifyFor = async (
+        n: NonNullable<WorkerDeps["notify"]>,
+        runId: string,
+        events: readonly DurableRunEvent[],
+      ) => {
+        if (!events.some((e) => e.type === "HUMAN_APPROVAL_REQUESTED" || e.type === "RUN_FAILED"))
+          return;
+        const [row] = await deps.db.system((tx) =>
+          tx
+            .select({
+              workspaceId: runs.workspaceId,
+              origin: runs.origin,
+              workflowName: workflows.name,
+              workspaceSlug: workspaces.slug,
+            })
+            .from(runs)
+            .innerJoin(workflows, eq(workflows.id, runs.workflowId))
+            .innerJoin(workspaces, eq(workspaces.id, runs.workspaceId))
+            .where(eq(runs.id, runId)),
+        );
+        if (!row || row.origin === "evaluation") return;
+        const messages = runNotifications(
+          events,
+          { id: runId, ...row },
+          n.webUrl,
+          () => new Date(),
+        );
+        await Promise.all(messages.map((m) => n.notifier.notify(m)));
+      };
       // Terminal runs: release their credentials and complete subflows into their parents.
       const unsub = await deps.bus.subscribe(RUN_EVENTS_CHANNEL, (m) => {
         const msg = m as { runId?: string; fromSeq?: number; toSeq?: number };
@@ -433,6 +470,7 @@ export function createWorker(deps: WorkerDeps): Worker {
         void store
           .listEvents(runId, (msg.fromSeq ?? 1) - 1, (msg.toSeq ?? 0) - (msg.fromSeq ?? 0) + 1)
           .then(async (events) => {
+            if (deps.notify) await notifyFor(deps.notify, runId, events);
             if (!events.some((e) => TERMINAL.has(e.type))) return;
             cache.release(runId);
             const run = await store.getRun(runId);

@@ -168,6 +168,8 @@ describe("environment variable documentation", () => {
       "OLLAMA_HOST",
       "OTEL_EXPORTER_OTLP_ENDPOINT",
       "PROMETHEUS_PORT",
+      "SMTP_URL",
+      "SMTP_FROM",
       "FLOWAID_PLUGIN_DIR",
       "FLOWAID_ADMIN_EMAIL",
       "FLOWAID_ADMIN_PASSWORD",

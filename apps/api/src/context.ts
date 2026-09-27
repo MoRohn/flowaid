@@ -8,6 +8,7 @@ import type { RunEventHub } from "./services/hub.js";
 import type { Env } from "@flowaid/env";
 import type { ProviderRegistry } from "@flowaid/providers";
 import type { AuthService } from "./auth/service.js";
+import type { Notifier, SmtpSettings } from "@flowaid/observability";
 import type { JwtKeys } from "./auth/jwt.js";
 
 export interface ApiConfig {
@@ -54,6 +55,10 @@ export interface ApiContext {
   env?: Env;
   /** providers the advisor generates and judges with (P6-02); built from the server's factories */
   providers?: ProviderRegistry;
+  /** workspace notification channels (`webhook.rejected`); absent → nothing is sent */
+  notifier?: Notifier;
+  /** SMTP for `email` channels (SMTP_URL, SMTP_FROM); test sends explain its absence */
+  smtp?: SmtpSettings;
 }
 
 export function configFromEnv(env: Env): ApiConfig {

@@ -33,7 +33,7 @@ import {
   type Run,
 } from "@flowaid/workflow-core";
 import { and, eq } from "drizzle-orm";
-import { createWorker, type Worker } from "../worker.js";
+import { createWorker, type Worker, type WorkerDeps } from "../worker.js";
 
 export const catalog: NodeCatalog = {
   get: (id) => coreManifests.find((m) => m.id === id),
@@ -95,7 +95,9 @@ export interface Harness {
   close(): Promise<void>;
 }
 
-export async function createHarness(o: { registry?: ProviderRegistry } = {}): Promise<Harness> {
+export async function createHarness(
+  o: { registry?: ProviderRegistry; notify?: WorkerDeps["notify"] } = {},
+): Promise<Harness> {
   const db = await createTestDatabase();
   const credentials = new CredentialService({
     repository: new PgCredentialRepository(db.app),
@@ -130,6 +132,7 @@ export async function createHarness(o: { registry?: ProviderRegistry } = {}): Pr
     artifactsDir,
     registry: o.registry ?? fakeTypesafeRegistry(),
     maintenance: { timerPollMs: 100 },
+    ...(o.notify ? { notify: o.notify } : {}),
   });
   await worker.start();
   const store = new PgRunStore(db.app);

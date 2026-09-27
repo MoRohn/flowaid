@@ -3,3 +3,4 @@ export * from "./metrics.js";
 export * from "./tracer.js";
 export * from "./timeline.js";
 export * from "./traceReviewer.js";
+export * from "./notify.js";

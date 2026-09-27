@@ -13,6 +13,7 @@ import { JwtKeys } from "./auth/jwt.js";
 import { firstBoot } from "./bootstrap/firstBoot.js";
 import { configFromEnv, type ApiContext } from "./context.js";
 import { buildServer } from "./server.js";
+import { apiNotifier } from "./services/notify.js";
 
 async function main(): Promise<void> {
   const env = loadEnv();
@@ -48,6 +49,9 @@ async function main(): Promise<void> {
     timeoutMs: 30_000,
     userAgent: "FlowAId-API/1",
   });
+  const smtp = env.SMTP_URL
+    ? { url: String(env.SMTP_URL), from: String(env.SMTP_FROM ?? "FlowAId <noreply@localhost>") }
+    : undefined;
   const ctx: ApiContext = {
     config: configFromEnv(env),
     db,
@@ -59,7 +63,18 @@ async function main(): Promise<void> {
     credentials,
     http,
     env,
+    ...(smtp ? { smtp } : {}),
   };
+  ctx.notifier = apiNotifier({
+    db,
+    credentials,
+    http,
+    smtp,
+    onError: (error, channel, event) =>
+      process.stderr.write(
+        `${JSON.stringify({ level: "warn", msg: "notification not delivered", channel, event, err: String(error) })}\n`,
+      ),
+  });
   const boot = await firstBoot(db, {
     ...(env.FLOWAID_ADMIN_EMAIL ? { adminEmail: String(env.FLOWAID_ADMIN_EMAIL) } : {}),
     ...(env.FLOWAID_ADMIN_PASSWORD ? { adminPassword: String(env.FLOWAID_ADMIN_PASSWORD) } : {}),

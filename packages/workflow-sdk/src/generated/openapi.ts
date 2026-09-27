@@ -2871,6 +2871,320 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/notifications": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              config: {
+                [key: string]: unknown;
+              };
+              createdAt: string;
+              enabled: boolean;
+              events: string[];
+              /** Format: uuid */
+              id: string;
+              /** @enum {string} */
+              kind: "email" | "slack_webhook" | "webhook";
+              name: string;
+              secretSet: boolean;
+            }[];
+          };
+        };
+      };
+    };
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            /** @default {} */
+            config?: {
+              [key: string]: unknown;
+            };
+            /** @default true */
+            enabled?: boolean;
+            events: (
+              | "human_task.created"
+              | "run.failed"
+              | "trace_review.page"
+              | "schedule.failed"
+              | "webhook.rejected"
+            )[];
+            /** @enum {string} */
+            kind: "email" | "slack_webhook" | "webhook";
+            name: string;
+            /** Format: uri */
+            slackWebhookUrl?: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Default Response */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              channel: {
+                config: {
+                  [key: string]: unknown;
+                };
+                createdAt: string;
+                enabled: boolean;
+                events: string[];
+                /** Format: uuid */
+                id: string;
+                /** @enum {string} */
+                kind: "email" | "slack_webhook" | "webhook";
+                name: string;
+                secretSet: boolean;
+              };
+              signingSecret?: string;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/notifications/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description No content */
+        204: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            config?: {
+              [key: string]: unknown;
+            };
+            enabled?: boolean;
+            events?: (
+              | "human_task.created"
+              | "run.failed"
+              | "trace_review.page"
+              | "schedule.failed"
+              | "webhook.rejected"
+            )[];
+            name?: string;
+            /** Format: uri */
+            slackWebhookUrl?: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              config: {
+                [key: string]: unknown;
+              };
+              createdAt: string;
+              enabled: boolean;
+              events: string[];
+              /** Format: uuid */
+              id: string;
+              /** @enum {string} */
+              kind: "email" | "slack_webhook" | "webhook";
+              name: string;
+              secretSet: boolean;
+            };
+          };
+        };
+      };
+    };
+    trace?: never;
+  };
+  "/v1/notifications/{id}/rotate-secret": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** A new HMAC signing secret for a webhook channel (returned once) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              signingSecret: string;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/notifications/{id}/test": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Send a test message now */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              error?: string;
+              ok: boolean;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/notifications/events": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The events a channel can subscribe to */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              id: string;
+              label: string;
+            }[];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/providers": {
     parameters: {
       query?: never;

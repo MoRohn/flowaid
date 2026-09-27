@@ -91,6 +91,14 @@ model list {--provider --kind --out}
 node
 node get <typeId> {--version --out}
 node list {--out}
+notification
+notification create {--kind --name --config --events --enabled --slack-webhook-url --body --out}
+notification delete <id> {--out}
+notification events {--out}
+notification list {--out}
+notification rotate-secret <id> {--out}
+notification test <id> {--out}
+notification update <id> {--name --config --events --enabled --slack-webhook-url --body --out}
 provider
 provider list {--out}
 review
@@ -222,6 +230,7 @@ Commands:
   member|members                    member operations
   model|models                      model operations
   node|nodes                        node operations
+  notification|notifications        notification operations
   provider|providers                provider operations
   review|reviews                    review operations
   run|runs                          run operations

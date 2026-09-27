@@ -6679,6 +6679,366 @@
         }
       }
     },
+    "/v1/notifications/events": {
+      "get": {
+        "summary": "The events a channel can subscribe to",
+        "tags": ["notifications"],
+        "x-cli": { "noun": "notification", "verb": "events" },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["admin"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": { "id": { "type": "string" }, "label": { "type": "string" } },
+                    "required": ["id", "label"],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/notifications": {
+      "get": {
+        "tags": ["notifications"],
+        "x-cli": { "noun": "notification", "verb": "list" },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["admin"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "kind": { "type": "string", "enum": ["email", "slack_webhook", "webhook"] },
+                      "name": { "type": "string" },
+                      "config": {
+                        "type": "object",
+                        "propertyNames": { "type": "string" },
+                        "additionalProperties": {}
+                      },
+                      "events": { "type": "array", "items": { "type": "string" } },
+                      "enabled": { "type": "boolean" },
+                      "secretSet": { "type": "boolean" },
+                      "createdAt": { "type": "string" }
+                    },
+                    "required": [
+                      "id",
+                      "kind",
+                      "name",
+                      "config",
+                      "events",
+                      "enabled",
+                      "secretSet",
+                      "createdAt"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["notifications"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "kind": { "type": "string", "enum": ["email", "slack_webhook", "webhook"] },
+                  "name": { "type": "string", "minLength": 1, "maxLength": 100 },
+                  "config": {
+                    "default": {},
+                    "type": "object",
+                    "propertyNames": { "type": "string" },
+                    "additionalProperties": {}
+                  },
+                  "events": {
+                    "minItems": 1,
+                    "maxItems": 5,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "human_task.created",
+                        "run.failed",
+                        "trace_review.page",
+                        "schedule.failed",
+                        "webhook.rejected"
+                      ]
+                    }
+                  },
+                  "enabled": { "default": true, "type": "boolean" },
+                  "slackWebhookUrl": { "type": "string", "format": "uri" }
+                },
+                "required": ["kind", "name", "events"]
+              }
+            }
+          }
+        },
+        "x-cli": { "noun": "notification", "verb": "create" },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["admin"],
+        "responses": {
+          "201": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "channel": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "kind": { "type": "string", "enum": ["email", "slack_webhook", "webhook"] },
+                        "name": { "type": "string" },
+                        "config": {
+                          "type": "object",
+                          "propertyNames": { "type": "string" },
+                          "additionalProperties": {}
+                        },
+                        "events": { "type": "array", "items": { "type": "string" } },
+                        "enabled": { "type": "boolean" },
+                        "secretSet": { "type": "boolean" },
+                        "createdAt": { "type": "string" }
+                      },
+                      "required": [
+                        "id",
+                        "kind",
+                        "name",
+                        "config",
+                        "events",
+                        "enabled",
+                        "secretSet",
+                        "createdAt"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "signingSecret": { "type": "string" }
+                  },
+                  "required": ["channel"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/notifications/{id}": {
+      "patch": {
+        "tags": ["notifications"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string", "minLength": 1, "maxLength": 100 },
+                  "config": {
+                    "type": "object",
+                    "propertyNames": { "type": "string" },
+                    "additionalProperties": {}
+                  },
+                  "events": {
+                    "minItems": 1,
+                    "maxItems": 5,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "human_task.created",
+                        "run.failed",
+                        "trace_review.page",
+                        "schedule.failed",
+                        "webhook.rejected"
+                      ]
+                    }
+                  },
+                  "enabled": { "type": "boolean" },
+                  "slackWebhookUrl": { "type": "string", "format": "uri" }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "x-cli": { "noun": "notification", "verb": "update", "positional": ["id"] },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["admin"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "kind": { "type": "string", "enum": ["email", "slack_webhook", "webhook"] },
+                    "name": { "type": "string" },
+                    "config": {
+                      "type": "object",
+                      "propertyNames": { "type": "string" },
+                      "additionalProperties": {}
+                    },
+                    "events": { "type": "array", "items": { "type": "string" } },
+                    "enabled": { "type": "boolean" },
+                    "secretSet": { "type": "boolean" },
+                    "createdAt": { "type": "string" }
+                  },
+                  "required": [
+                    "id",
+                    "kind",
+                    "name",
+                    "config",
+                    "events",
+                    "enabled",
+                    "secretSet",
+                    "createdAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["notifications"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "x-cli": { "noun": "notification", "verb": "delete", "positional": ["id"] },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["admin"],
+        "responses": { "204": { "description": "No content" } }
+      }
+    },
+    "/v1/notifications/{id}/rotate-secret": {
+      "post": {
+        "summary": "A new HMAC signing secret for a webhook channel (returned once)",
+        "tags": ["notifications"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "x-cli": { "noun": "notification", "verb": "rotate-secret", "positional": ["id"] },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["admin"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "signingSecret": { "type": "string" } },
+                  "required": ["signingSecret"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/notifications/{id}/test": {
+      "post": {
+        "summary": "Send a test message now",
+        "tags": ["notifications"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "x-cli": { "noun": "notification", "verb": "test", "positional": ["id"] },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["admin"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "ok": { "type": "boolean" }, "error": { "type": "string" } },
+                  "required": ["ok"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/evaluations/sets": {
       "get": {
         "tags": ["datasets"],

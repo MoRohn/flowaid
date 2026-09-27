@@ -3,3 +3,4 @@ export * from "./identity.js";
 export * from "./apiKeys.js";
 export * from "./workflows.js";
 export * from "./runs.js";
+export * from "./notifications.js";
