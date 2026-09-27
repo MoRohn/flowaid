@@ -54,6 +54,7 @@ import {
 import { stateAccessFor } from "./services/state.js";
 import { toolAccessFor } from "./services/tools.js";
 import { runEvaluationJob } from "./jobs/evaluation.js";
+import { runExportJob } from "./jobs/export.js";
 
 export interface WorkerLogger {
   info(data: Record<string, unknown>, msg: string): void;
@@ -81,6 +82,8 @@ export interface WorkerDeps {
   /** judge provider and timing for evaluation runs */
   evaluation?: { judge?: DecisionProvider; caseTimeoutMs?: number; pollMs?: number };
   maintenance?: { timerPollMs?: number; heartbeatMs?: number; reapMs?: number };
+  /** code export (`export.package` on the `jobs` queue): FLOWAID_VENDOR_DIR for vendored mode */
+  exports?: { vendorDir?: string | null };
 }
 
 const TERMINAL = new Set(["RUN_COMPLETED", "RUN_FAILED", "RUN_CANCELLED", "RUN_TIMED_OUT"]);
@@ -341,6 +344,10 @@ export function createWorker(deps: WorkerDeps): Worker {
       case "ingest.source":
       case "evaluation.run":
       case "trace_review.run":
+      case "export.package":
+      case "retention.sweep":
+      case "partition.ensure":
+      case "draft_versions.gc":
         log.warn({ type: job.type }, "job type not handled by this worker");
         return;
     }
@@ -381,10 +388,26 @@ export function createWorker(deps: WorkerDeps): Worker {
         },
         { concurrency: 2 },
       );
+      const background = await deps.queue.consume(
+        "jobs",
+        async (job) => {
+          if (job.type === "export.package")
+            await runExportJob(
+              {
+                db: deps.db,
+                artifactsDir: deps.artifactsDir,
+                vendorDir: deps.exports?.vendorDir ?? null,
+              },
+              job,
+            );
+        },
+        { concurrency: 1 },
+      );
       stops.push(
         () => general.stop(),
         () => control.stop(),
         () => evaluation.stop(),
+        () => background.stop(),
       );
       // Terminal runs: release their credentials and complete subflows into their parents.
       const unsub = await deps.bus.subscribe(RUN_EVENTS_CHANNEL, (m) => {

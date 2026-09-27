@@ -1,0 +1,30 @@
+/**
+ * The vendored FlowAId packages are exactly the ones the server shipped: every tarball in
+ * `vendor/` is listed in `vendor/SHA256SUMS` with a matching SHA-256, and nothing is missing.
+ */
+import { createHash } from "node:crypto";
+import { readFileSync, readdirSync } from "node:fs";
+import { describe, expect, it } from "vitest";
+
+const VENDOR = new URL("../vendor/", import.meta.url);
+
+function sums(): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const line of readFileSync(new URL("SHA256SUMS", VENDOR), "utf8").split("\n")) {
+    const match = /^([0-9a-f]{64}) [ *](.+)$/.exec(line.trim());
+    if (match?.[1] && match[2]) out.set(match[2], match[1]);
+  }
+  return out;
+}
+
+describe("vendor/", () => {
+  it("every tarball matches SHA256SUMS", () => {
+    const expected = sums();
+    const tarballs = readdirSync(VENDOR).filter((f) => f.endsWith(".tgz")).sort();
+    expect(tarballs).toEqual([...expected.keys()].sort());
+    for (const file of tarballs) {
+      const actual = createHash("sha256").update(readFileSync(new URL(file, VENDOR))).digest("hex");
+      expect(actual, file).toBe(expected.get(file));
+    }
+  });
+});

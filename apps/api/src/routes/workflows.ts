@@ -2,6 +2,7 @@
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
+import { generateWorkflowTs } from "@flowaid/codegen";
 import { and, desc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { parse as parseYaml, stringify as toYaml } from "yaml";
 import {
@@ -695,7 +696,7 @@ export function workflowRoutes(app: FastifyInstance, ctx: ApiContext): void {
         tags: ["workflows"],
         summary: "The draft as one file (secrets stay symbolic)",
         params: IdParams,
-        querystring: z.object({ format: z.enum(["json", "yaml"]).default("json") }),
+        querystring: z.object({ format: z.enum(["json", "yaml", "ts"]).default("json") }),
       },
     },
     async (req, reply) => {
@@ -704,6 +705,10 @@ export function workflowRoutes(app: FastifyInstance, ctx: ApiContext): void {
       const w = await ctx.db.tenant(p.workspaceId, (tx) => visibleWorkflow(tx, p, req.params.id));
       const filename = `${w.slug}.${req.query.format}`;
       void reply.header("content-disposition", `attachment; filename="${filename}"`);
+      if (req.query.format === "ts")
+        return reply
+          .type("text/plain; charset=utf-8")
+          .send(await generateWorkflowTs(w.draft, { title: `${w.name} (draft)` }));
       if (req.query.format === "yaml") return reply.type("application/yaml").send(toYaml(w.draft));
       return reply.type("application/json").send(`${JSON.stringify(w.draft, null, 2)}\n`);
     },

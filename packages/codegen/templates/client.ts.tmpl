@@ -1,0 +1,46 @@
+/**
+ * `pnpm remote -- --input inputs/example.json`: runs the workflow on a FlowAId server instead of
+ * locally (FLOWAID_BASE_URL + FLOWAID_API_KEY with the `runs:create` scope; optional
+ * FLOWAID_ENVIRONMENT_ID). Sync mode: waits up to two minutes, then prints the run.
+ */
+import { existsSync, readFileSync } from "node:fs";
+import { parseArgs } from "node:util";
+
+export const WORKFLOW_ID = "__WORKFLOW_ID__";
+
+export interface RemoteRunOptions {
+  baseUrl?: string;
+  apiKey?: string;
+  environmentId?: string;
+  waitTimeoutMs?: number;
+}
+
+/** Starts a run on the server and waits for it (sync mode, the platform API's §4 flow). */
+export async function runRemote(input: unknown, opts: RemoteRunOptions = {}): Promise<unknown> {
+  const baseUrl = (opts.baseUrl ?? process.env.FLOWAID_BASE_URL ?? "http://localhost:3001").replace(/\/$/, "");
+  const apiKey = opts.apiKey ?? process.env.FLOWAID_API_KEY;
+  if (!apiKey) throw new Error("set FLOWAID_API_KEY (an API key with the runs:create scope)");
+  const environmentId = opts.environmentId ?? process.env.FLOWAID_ENVIRONMENT_ID;
+  const res = await fetch(`${baseUrl}/v1/workflows/${WORKFLOW_ID}/run`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
+    body: JSON.stringify({
+      input,
+      mode: "sync",
+      waitTimeoutMs: opts.waitTimeoutMs ?? 120_000,
+      ...(environmentId ? { environmentId } : {}),
+    }),
+  });
+  const body: unknown = await res.json();
+  if (!res.ok && res.status !== 202) throw new Error(`${res.status}: ${JSON.stringify(body)}`);
+  return body;
+}
+
+if (import.meta.url === new URL(process.argv[1] ?? "", "file://").href) {
+  if (existsSync(".env")) process.loadEnvFile(".env");
+  const { values } = parseArgs({
+    options: { input: { type: "string", short: "i", default: "inputs/example.json" } },
+  });
+  const result = await runRemote(JSON.parse(readFileSync(values.input, "utf8")));
+  process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+}

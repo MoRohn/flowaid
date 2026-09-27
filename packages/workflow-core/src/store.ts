@@ -128,7 +128,16 @@ export interface ArtifactStore {
 
 /** Queue names: one per worker pool plus control and background queues. */
 export type QueueName =
-  `run:${WorkerPool}` | "run:control" | "schedule" | "ingest" | "evaluation" | "trace_review";
+  | `run:${WorkerPool}`
+  | "run:control"
+  | "schedule"
+  | "ingest"
+  | "evaluation"
+  | "trace_review"
+  /** RFC-0001: API-initiated background jobs with an artifact result (`jobs` table). */
+  | "jobs"
+  /** RFC-0001: retention, partitions and draft-version garbage collection. */
+  | "maintenance";
 /** Every job payload. */
 export type Job =
   | { type: "run.start"; runId: string }
@@ -147,7 +156,23 @@ export type Job =
   | { type: "schedule.tick"; scheduleId: string; at: string }
   | { type: "ingest.source"; sourceId: string }
   | { type: "evaluation.run"; evaluationRunId: string }
-  | { type: "trace_review.run"; runId: string };
+  | { type: "trace_review.run"; runId: string }
+  /** RFC-0001: build a code-export zip for a version (or a draft revision) of a workflow. */
+  | {
+      type: "export.package";
+      jobId: string;
+      workspaceId: string;
+      workflowId: string;
+      versionId: string | null;
+      draftRevision?: number;
+      mode: "npm" | "vendored";
+      includeSampleFromRunId?: string;
+      includeRecordedRunId?: string;
+      requestedBy: string;
+    }
+  | { type: "retention.sweep"; at: string }
+  | { type: "partition.ensure"; monthsAhead: number }
+  | { type: "draft_versions.gc" };
 
 /** Job queue (BullMQ or Postgres). */
 export interface QueueDriver {

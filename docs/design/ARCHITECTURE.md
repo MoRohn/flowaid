@@ -109,7 +109,7 @@ evaluation        → workflow-core, providers, shared            (RunLauncher i
 workflow-sdk      → workflow-core (types), shared
 cli               → workflow-sdk, workflow-compiler, workflow-runtime, nodes-core, providers, provider-typesafe, provider-openai, provider-anthropic, provider-ollama, credentials, sandbox, workflow-core, shared   (runtime, nodes and providers only for `workflow run --local`)
 importer          → workflow-core, shared
-codegen           → workflow-core, workflow-compiler, shared
+codegen           → workflow-core, workflow-compiler, workflow-sdk (builders subpath only: round-trip evaluation of the generated module), shared
 langchain         → providers, node-sdk, workflow-core, shared, @langchain/core (peer)
 nodes-langchain   → langchain, node-sdk, providers, workflow-core, shared, @langchain/*
 ui                → workflow-core (types), react, xyflow, tailwind

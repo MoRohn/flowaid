@@ -75,6 +75,8 @@ export interface Harness {
   queue: PgQueueDriver;
   workspaceId: string;
   environmentId: string;
+  /** where the worker writes artifacts (and export zips) */
+  artifactsDir: string;
   deploy(
     name: string,
     definition: Record<string, unknown>,
@@ -114,13 +116,14 @@ export async function createHarness(o: { registry?: ProviderRegistry } = {}): Pr
       .where(and(eq(environments.workspaceId, workspace.id), eq(environments.name, "dev")));
     return { workspaceId: workspace.id, environmentId: dev?.id as string };
   });
+  const artifactsDir = mkdtempSync(join(tmpdir(), "flowaid-artifacts-"));
   const worker = createWorker({
     db: db.app,
     queue,
     bus,
     credentials,
     http: (url, init) => fetch(url, init),
-    artifactsDir: mkdtempSync(join(tmpdir(), "flowaid-artifacts-")),
+    artifactsDir,
     registry: o.registry ?? fakeTypesafeRegistry(),
     maintenance: { timerPollMs: 100 },
   });
@@ -134,6 +137,7 @@ export async function createHarness(o: { registry?: ProviderRegistry } = {}): Pr
     queue,
     workspaceId,
     environmentId,
+    artifactsDir,
     async deploy(name, body) {
       const workflowId = uuidv7();
       const definition = { $schema: WORKFLOW_SCHEMA_URI, id: workflowId, name, ...body };

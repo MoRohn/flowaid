@@ -82,6 +82,7 @@ async function main(): Promise<void> {
           },
         }
       : {}),
+    exports: { vendorDir: String(env.FLOWAID_VENDOR_DIR ?? "/opt/flowaid/vendor") },
     concurrency: Number(env.WORKER_CONCURRENCY ?? 8),
     log,
   });

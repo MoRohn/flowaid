@@ -1,0 +1,80 @@
+/**
+ * `pnpm test`: the exported workflow compiles, `src/workflow.ts` is exactly the exported
+ * definition, it runs end to end on fake providers without network access, and — when the package
+ * carries a recorded run — replaying it takes the same branches and ends the same way (loosely
+ * when the export replaced personal data in the recording).
+ */
+import { existsSync, readFileSync } from "node:fs";
+import { describe, expect, it } from "vitest";
+import { definitionHash, type JsonValue, type NodeRun } from "@flowaid/workflow-core";
+import { recordedKey, type RecordedOutput } from "@flowaid/workflow-runtime";
+import { compileWorkflow, plan, runWorkflow, workflow } from "../src/flow.js";
+import { fakeProviders, fakeSecrets, offline } from "./fakes.js";
+
+const read = (path: string): unknown =>
+  JSON.parse(readFileSync(new URL(`../${path}`, import.meta.url), "utf8"));
+const example = read("inputs/example.json") as JsonValue;
+const RECORDED = new URL("./recorded-run.json", import.meta.url);
+
+interface RecordedRun {
+  /** false when the export replaced personal data in the recording (then replay is loose). */
+  exact: boolean;
+  input: JsonValue;
+  status: string;
+  outcome: string | null;
+  output: JsonValue;
+  nodeRuns: Pick<
+    NodeRun,
+    "id" | "nodeId" | "scope" | "status" | "inputHash" | "output" | "firedPorts" | "decision"
+  >[];
+}
+
+describe(__WORKFLOW_NAME__, () => {
+  it("src/workflow.ts is the exported definition", () => {
+    expect(definitionHash(workflow)).toBe(plan.definitionHash);
+  });
+
+  it("compiles with zero errors", () => {
+    const result = compileWorkflow();
+    expect(result.diagnostics.filter((d) => d.severity === "error")).toEqual([]);
+  });
+
+  it("runs the example input on fake providers", async () => {
+    const result = await runWorkflow(example, {
+      providers: fakeProviders(),
+      secrets: fakeSecrets(plan.secrets.map((s) => s.name)),
+      http: offline,
+    });
+    expect(result.events[0]?.type).toBe("RUN_CREATED");
+    expect(["completed", "failed", "waiting_for_human"]).toContain(result.status);
+  });
+
+  it.runIf(existsSync(RECORDED))("replays the recorded run", async () => {
+    const recorded = JSON.parse(readFileSync(RECORDED, "utf8")) as RecordedRun;
+    const outputs = new Map<string, RecordedOutput>();
+    for (const n of recorded.nodeRuns)
+      if (n.status === "completed" && n.inputHash)
+        outputs.set(recordedKey(n.nodeId, n.scope, n.inputHash), {
+          nodeRunId: n.id,
+          output: n.output as JsonValue,
+          firedPorts: n.firedPorts,
+          decision: n.decision,
+        });
+    const result = await runWorkflow(recorded.input, {
+      providers: fakeProviders(),
+      secrets: fakeSecrets(plan.secrets.map((s) => s.name)),
+      http: offline,
+      recorded: outputs,
+      human: () => Promise.resolve({ action: "approve" }),
+    });
+    if (!recorded.exact) {
+      expect(["completed", "failed", "waiting_for_human"]).toContain(result.status);
+      return;
+    }
+    const taken = (runs: { nodeId: string; status: string }[]) =>
+      [...new Set(runs.filter((r) => r.status === "completed").map((r) => r.nodeId))].sort();
+    expect(taken(result.nodeRuns)).toEqual(taken(recorded.nodeRuns));
+    expect(result.status).toBe(recorded.status);
+    expect(result.outcome).toBe(recorded.outcome);
+  });
+});

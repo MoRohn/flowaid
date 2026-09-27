@@ -2,7 +2,7 @@
   "name": "@flowaid/worker",
   "version": "0.1.0",
   "private": true,
-  "description": "The flowaid worker: consumes run jobs, drives the orchestrator over Postgres, executes nodes with providers, tools (MCP, OpenAPI), state, artifacts and the sandbox, fires timers and schedules (ARCHITECTURE.md §5, §8).",
+  "description": "The flowaid worker: consumes run jobs, drives the orchestrator over Postgres, executes nodes with providers, tools (MCP, OpenAPI), state, artifacts and the sandbox, fires timers and schedules (ARCHITECTURE.md \u00a75, \u00a78).",
   "license": "Apache-2.0",
   "type": "module",
   "exports": {
@@ -18,6 +18,7 @@
     "clean": "rm -rf dist .turbo *.tsbuildinfo"
   },
   "dependencies": {
+    "@flowaid/codegen": "workspace:*",
     "@flowaid/credentials": "workspace:*",
     "@flowaid/database": "workspace:*",
     "@flowaid/env": "workspace:*",

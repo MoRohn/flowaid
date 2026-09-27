@@ -1,0 +1,134 @@
+/**
+ * `pnpm serve`: the workflow behind a small HTTP API with the platform's wire format.
+ *
+ *   POST /run                 { input, mode?: "sync" | "async" }  → 200 run (sync) | 202 { run_id } (async)
+ *   GET  /runs/:id            the run: status, output, outcome, error, usage, cost
+ *   GET  /runs/:id/stream     the run's events as Server-Sent Events (replayed, then live)
+ *   GET  /healthz             200
+ *
+ * Human tasks are not answered here: such a run stays `waiting_for_human` (use a FlowAId server
+ * for review flows). Runs live in memory; restart loses them.
+ */
+import { randomUUID } from "node:crypto";
+import { existsSync } from "node:fs";
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import type { DurableRunEvent, JsonValue } from "@flowaid/workflow-core";
+import type { LocalRunResult } from "@flowaid/workflow-runtime";
+import { runWorkflow } from "./flow.js";
+
+if (existsSync(".env")) process.loadEnvFile(".env");
+
+interface Tracked {
+  id: string;
+  events: DurableRunEvent[];
+  listeners: Set<(e: DurableRunEvent | null) => void>;
+  result: LocalRunResult | null;
+  error: string | null;
+  done: Promise<void>;
+}
+const runs = new Map<string, Tracked>();
+const MAX_BODY = 1024 * 1024;
+
+function start(input: JsonValue): Tracked {
+  const id = randomUUID();
+  const tracked: Tracked = {
+    id,
+    events: [],
+    listeners: new Set(),
+    result: null,
+    error: null,
+    done: Promise.resolve(),
+  };
+  tracked.done = runWorkflow(input, {
+    onEvent: (e) => {
+      tracked.events.push(e);
+      for (const l of tracked.listeners) l(e);
+    },
+  })
+    .then((r) => {
+      tracked.result = r;
+    })
+    .catch((error: unknown) => {
+      tracked.error = error instanceof Error ? error.message : String(error);
+    })
+    .finally(() => {
+      for (const l of tracked.listeners) l(null);
+    });
+  runs.set(id, tracked);
+  return tracked;
+}
+
+const view = (t: Tracked) =>
+  t.result
+    ? {
+        run_id: t.id,
+        status: t.result.status,
+        output: t.result.output,
+        outcome: t.result.outcome,
+        error: t.result.error,
+        usage: t.result.usage,
+        cost_usd: t.result.costUsd,
+      }
+    : { run_id: t.id, status: t.error ? "failed" : "running", error: t.error };
+
+function send(res: ServerResponse, status: number, body: unknown) {
+  res.writeHead(status, { "content-type": "application/json" }).end(JSON.stringify(body));
+}
+
+async function readJson(req: IncomingMessage): Promise<unknown> {
+  let size = 0;
+  const chunks: Buffer[] = [];
+  for await (const chunk of req) {
+    size += (chunk as Buffer).length;
+    if (size > MAX_BODY) throw new Error("request body too large");
+    chunks.push(chunk as Buffer);
+  }
+  return chunks.length ? JSON.parse(Buffer.concat(chunks).toString("utf8")) : {};
+}
+
+const server = createServer((req, res) => {
+  void (async () => {
+    const url = new URL(req.url ?? "/", "http://localhost");
+    const [, first, id, tail] = url.pathname.split("/");
+    if (req.method === "GET" && url.pathname === "/healthz") return send(res, 200, { ok: true });
+    if (req.method === "POST" && url.pathname === "/run") {
+      const body = (await readJson(req)) as { input?: JsonValue; mode?: "sync" | "async" };
+      const tracked = start(body.input ?? {});
+      if (body.mode === "async")
+        return send(res, 202, {
+          run_id: tracked.id,
+          status: "queued",
+          links: { self: `/runs/${tracked.id}`, stream: `/runs/${tracked.id}/stream` },
+        });
+      await tracked.done;
+      return send(res, tracked.error ? 500 : 200, view(tracked));
+    }
+    const tracked = first === "runs" && id ? runs.get(id) : undefined;
+    if (req.method === "GET" && tracked && !tail) return send(res, 200, view(tracked));
+    if (req.method === "GET" && tracked && tail === "stream") {
+      res.writeHead(200, {
+        "content-type": "text/event-stream",
+        "cache-control": "no-cache",
+        connection: "keep-alive",
+      });
+      res.write("retry: 2000\n\n");
+      const write = (e: DurableRunEvent | null) => {
+        if (e === null) return void res.end();
+        res.write(`id: ${e.seq}\nevent: ${e.type}\ndata: ${JSON.stringify(e)}\n\n`);
+      };
+      tracked.events.forEach(write);
+      if (tracked.result || tracked.error) return void res.end();
+      tracked.listeners.add(write);
+      req.on("close", () => tracked.listeners.delete(write));
+      return;
+    }
+    send(res, 404, { error: { code: "NOT_FOUND", message: "not found" } });
+  })().catch((error: unknown) =>
+    send(res, 400, {
+      error: { code: "BAD_REQUEST", message: error instanceof Error ? error.message : String(error) },
+    }),
+  );
+});
+
+const port = Number(process.env.PORT ?? 8080);
+server.listen(port, () => process.stderr.write(`listening on http://localhost:${port}\n`));
