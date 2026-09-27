@@ -56,6 +56,8 @@ export const TraceJsonBlock = forwardRef<HTMLDivElement, TraceJsonBlockProps>(
           />
         ) : null}
         <pre
+          // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a scrollable region must be reachable by keyboard
+          tabIndex={0}
           className="overflow-auto rounded-sm border border-border bg-surface-2 px-2.5 py-2 font-mono text-2xs leading-[1.5] whitespace-pre-wrap break-words text-ink-2 tabular"
           style={{ maxHeight: expanded ? undefined : maxHeight }}
         >

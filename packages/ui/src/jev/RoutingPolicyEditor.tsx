@@ -30,6 +30,14 @@ import type {
 import { CONSEQUENCE_MEANING, ILLUSTRATIVE_THRESHOLDS, IMPROVE_ACTION_LABEL } from "./vocabulary";
 
 /** Fill, text and border tokens per cell. Routes reuse the gate tones; the consequence lock is danger-soft. */
+/** Cell labels as text (AA on the soft backgrounds). */
+const CELL_TEXT: Record<RoutingCell, string> = {
+  act: "var(--ok-text)",
+  verify: "var(--info-text)",
+  escalate: "var(--warn-text)",
+  human: "var(--danger-text)",
+};
+
 const CELL_STYLE: Record<RoutingCell, { bg: string; fg: string }> = {
   act: { bg: "var(--ok-soft)", fg: "var(--ok)" },
   verify: { bg: "var(--info-soft)", fg: "var(--info)" },
@@ -158,7 +166,7 @@ export const RoutingPolicyEditor = forwardRef<HTMLDivElement, RoutingPolicyEdito
               className="grid grid-cols-[112px_1fr] gap-3 sm:grid-cols-[112px_1fr_292px]"
             >
               <span />
-              <div className="relative h-3 font-mono text-2xs text-ink-4 tabular">
+              <div className="relative h-3 font-mono text-2xs text-ink-3 tabular">
                 {[0, 0.25, 0.5, 0.75, 1].map((t) => (
                   <span
                     key={t}
@@ -403,7 +411,7 @@ function MatrixRow({
     >
       <div role="rowheader" className="flex flex-col items-start gap-1">
         <ConsequenceBadge value={cc} />
-        <span className="text-2xs text-ink-4">
+        <span className="text-2xs text-ink-3">
           {isDefault
             ? "contract default"
             : locked
@@ -428,7 +436,7 @@ function MatrixRow({
               style={{
                 width: pct(s.to - s.from),
                 backgroundColor: CELL_STYLE[s.cell].bg,
-                color: CELL_STYLE[s.cell].fg,
+                color: CELL_TEXT[s.cell],
               }}
             >
               <span className="truncate font-mono text-2xs font-medium tabular">

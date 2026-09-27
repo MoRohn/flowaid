@@ -134,6 +134,7 @@ export function RunConfidenceCell({
       }
     >
       <span
+        role="img"
         data-gate={gate}
         className={cn("inline-flex items-center", className)}
         aria-label={`Lowest confidence ${formatProbability(value.confidence)} at ${value.nodeName}`}

@@ -148,10 +148,10 @@ export const DecisionContractCard = forwardRef<HTMLDivElement, DecisionContractC
                   <li key={key}>
                     <Badge tone={spec.escape ? "outline" : "neutral"} mono>
                       {key}
-                      {spec.escape ? <span className="text-ink-4">escape</span> : null}
+                      {spec.escape ? <span className="text-ink-3">escape</span> : null}
                       {spec.consequenceClass &&
                       spec.consequenceClass !== contract.routing.consequenceClass ? (
-                        <span className="text-warn">{spec.consequenceClass}</span>
+                        <span className="text-warn-text">{spec.consequenceClass}</span>
                       ) : null}
                     </Badge>
                   </li>
@@ -162,7 +162,7 @@ export const DecisionContractCard = forwardRef<HTMLDivElement, DecisionContractC
                 {q.levels.map((l, i) => (
                   <li key={i}>
                     <Badge tone="neutral">
-                      <span className="font-mono text-ink-4">{i}</span> {l}
+                      <span className="font-mono text-ink-3">{i}</span> {l}
                     </Badge>
                   </li>
                 ))}
@@ -180,7 +180,7 @@ export const DecisionContractCard = forwardRef<HTMLDivElement, DecisionContractC
                     return (
                       <div key={cc} className="contents">
                         <dt className="text-ink-3">{cc}</dt>
-                        <dd className={cn("m-0", z.illustrative ? "text-ink-4" : "text-ink")}>
+                        <dd className={cn("m-0", z.illustrative ? "text-ink-3" : "text-ink")}>
                           {z.zones ? thresholdText(z.zones.autoAt, z.zones.improveAt) : "human"}
                           {z.illustrative ? " (illustrative)" : ""}
                         </dd>
@@ -289,16 +289,16 @@ export const DecisionContractCard = forwardRef<HTMLDivElement, DecisionContractC
             data-warnings={warnings}
           >
             {errors === 0 && warnings === 0 ? (
-              <span className="text-ok">Lint clean</span>
+              <span className="text-ok-text">Lint clean</span>
             ) : (
               <>
                 {errors > 0 ? (
-                  <span className="text-danger">
+                  <span className="text-danger-text">
                     {errors} error{errors === 1 ? "" : "s"}
                   </span>
                 ) : null}
                 {warnings > 0 ? (
-                  <span className="text-warn">
+                  <span className="text-warn-text">
                     {warnings} warning{warnings === 1 ? "" : "s"}
                   </span>
                 ) : null}

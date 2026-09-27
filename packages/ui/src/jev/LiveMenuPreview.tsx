@@ -87,7 +87,7 @@ export const LiveMenuPreview = forwardRef<HTMLDivElement, LiveMenuPreviewProps>(
                   escape {e.escape}
                 </Badge>
               ) : (
-                <span className="truncate font-mono text-2xs text-ink-4">{e.sourceId}</span>
+                <span className="truncate font-mono text-2xs text-ink-3">{e.sourceId}</span>
               )}
             </div>
             <p className="m-0 text-xs text-ink-2">{e.description}</p>
@@ -163,7 +163,7 @@ export const LiveMenuPreview = forwardRef<HTMLDivElement, LiveMenuPreviewProps>(
                 <span className="text-right font-mono text-ink tabular">
                   {f.value.toLocaleString("en")}
                   {f.removed > 0 ? (
-                    <span className="text-ink-4"> −{f.removed.toLocaleString("en")}</span>
+                    <span className="text-ink-3"> −{f.removed.toLocaleString("en")}</span>
                   ) : null}
                 </span>
               </li>
@@ -220,7 +220,7 @@ export const LiveMenuPreview = forwardRef<HTMLDivElement, LiveMenuPreviewProps>(
             ) : (
               <p
                 role="alert"
-                className="m-0 border-t border-border bg-danger-soft px-3 py-2 text-xs text-danger"
+                className="m-0 border-t border-border bg-danger-soft px-3 py-2 text-xs text-danger-text"
               >
                 No escape outcome: a dynamic menu needs stop or review
                 (E_JEV_DYNAMIC_MENU_NO_ESCAPE).

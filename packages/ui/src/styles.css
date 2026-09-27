@@ -18,6 +18,25 @@
 /* The playground's Vite root is ./playground, so tell Tailwind to scan the library sources too. */
 @source "../src";
 
+/*
+ * Category hues as text: each hue mixed toward ink (darker in light, lighter in dark), so
+ * small category-coloured labels meet WCAG AA on their soft chips and on every surface.
+ * Derived here rather than in tokens.css, which is synced verbatim from brand/tokens.css.
+ */
+:root {
+  --cat-flow-text: color-mix(in oklab, var(--cat-flow) 62%, var(--ink));
+  --cat-decision-text: color-mix(in oklab, var(--cat-decision) 62%, var(--ink));
+  --cat-generation-text: color-mix(in oklab, var(--cat-generation) 62%, var(--ink));
+  --cat-agent-text: color-mix(in oklab, var(--cat-agent) 62%, var(--ink));
+  --cat-tool-text: color-mix(in oklab, var(--cat-tool) 62%, var(--ink));
+  --cat-data-text: color-mix(in oklab, var(--cat-data) 62%, var(--ink));
+  --cat-retrieval-text: color-mix(in oklab, var(--cat-retrieval) 62%, var(--ink));
+  --cat-state-text: color-mix(in oklab, var(--cat-state) 62%, var(--ink));
+  --cat-human-text: color-mix(in oklab, var(--cat-human) 62%, var(--ink));
+  --cat-safety-text: color-mix(in oklab, var(--cat-safety) 62%, var(--ink));
+  --cat-developer-text: color-mix(in oklab, var(--cat-developer) 62%, var(--ink));
+}
+
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 @theme inline {
@@ -67,6 +86,17 @@
   --color-cat-human: var(--cat-human);
   --color-cat-safety: var(--cat-safety);
   --color-cat-developer: var(--cat-developer);
+  --color-cat-flow-text: var(--cat-flow-text);
+  --color-cat-decision-text: var(--cat-decision-text);
+  --color-cat-generation-text: var(--cat-generation-text);
+  --color-cat-agent-text: var(--cat-agent-text);
+  --color-cat-tool-text: var(--cat-tool-text);
+  --color-cat-data-text: var(--cat-data-text);
+  --color-cat-retrieval-text: var(--cat-retrieval-text);
+  --color-cat-state-text: var(--cat-state-text);
+  --color-cat-human-text: var(--cat-human-text);
+  --color-cat-safety-text: var(--cat-safety-text);
+  --color-cat-developer-text: var(--cat-developer-text);
 
   --color-p-1: var(--p-1);
   --color-p-2: var(--p-2);

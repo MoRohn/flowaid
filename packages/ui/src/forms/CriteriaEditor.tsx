@@ -200,6 +200,7 @@ function CriteriaPreview({ criteria }: { criteria: DecisionCriteria }) {
   const chosen = entries[0]?.key;
   return (
     <div
+      role="group"
       className="flex flex-col gap-2 rounded-md border border-border bg-surface-2 p-3"
       aria-label="Decision preview"
     >

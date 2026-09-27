@@ -5,6 +5,7 @@
  * violations (colour contrast included: this is the real-layout half of `src/a11y.test.tsx`),
  * and stores a full-page screenshot as a test attachment.
  */
+import { appendFileSync } from "node:fs";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { GALLERY } from "../playground/gallery";
@@ -36,6 +37,8 @@ function recordProblems(page: Page): string[] {
   const problems: string[] = [];
   page.on("console", (message) => {
     const type = message.type();
+    // motion's development-build notice for the reduced-motion preference this suite sets
+    if (message.text().startsWith("You have Reduced Motion enabled")) return;
     if (type === "error" || type === "warning") problems.push(`console.${type}: ${message.text()}`);
   });
   page.on("pageerror", (error) => problems.push(`pageerror: ${error.message}`));
@@ -43,7 +46,8 @@ function recordProblems(page: Page): string[] {
 }
 
 async function openGallery(page: Page, slug: string, theme: Theme): Promise<void> {
-  await page.emulateMedia({ colorScheme: theme });
+  // reduced motion: audit the settled state, not a fade-in caught mid-flight
+  await page.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });
   await page.goto(`/#/${slug}`);
   await page.getByRole("navigation").getByRole("button", { name: theme, exact: true }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
@@ -65,13 +69,32 @@ for (const theme of THEMES) {
         const problems = recordProblems(page);
         await openGallery(page, gallery.slug, theme);
 
-        const axe = await new AxeBuilder({ page }).analyze();
+        // Page-structure rules are checked on the web app's real routes (e2e/acceptance/a11y):
+        // a gallery shows several instances of a component on one page (duplicate landmark
+        // labels, nested <main> from shell demos, component headings under gallery sections).
+        const axe = await new AxeBuilder({ page })
+          .disableRules([
+            "landmark-unique",
+            "landmark-no-duplicate-main",
+            "landmark-main-is-top-level",
+            "heading-order",
+          ])
+          .analyze();
         const violations = axe.violations.flatMap((v) =>
           v.nodes.map(
             (n) =>
               `${v.id} (${v.impact ?? "n/a"}): ${n.target.join(" ")} — ${n.failureSummary ?? v.help}`,
           ),
         );
+        // AXE_DUMP=<file> appends every violation as a JSON line (for triage across the whole run).
+        const dump = process.env["AXE_DUMP"];
+        if (dump)
+          for (const v of axe.violations)
+            for (const n of v.nodes)
+              appendFileSync(
+                dump,
+                `${JSON.stringify({ gallery: gallery.slug, theme, rule: v.id, target: n.target.join(" "), html: n.html.slice(0, 300), summary: n.failureSummary })}\n`,
+              );
         expect(violations, `axe violations on #/${gallery.slug} (${theme})`).toEqual([]);
 
         // The playground scrolls inside <main>; let the document grow so the screenshot holds the whole page.

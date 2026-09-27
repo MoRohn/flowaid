@@ -283,12 +283,19 @@ export const EventLog = forwardRef<HTMLDivElement, EventLogProps>(function Event
             failure && "bg-danger-soft/40",
           )}
         >
-          <span className="text-right font-mono text-2xs text-ink-3 tabular">{e.seq}</span>
-          <span className="font-mono text-2xs text-ink-3 tabular">{formatClock(e.at)}</span>
-          <span className="col-start-3 row-start-2 @[640px]:row-start-1">
+          <span role="gridcell" className="text-right font-mono text-2xs text-ink-3 tabular">
+            {e.seq}
+          </span>
+          <span role="gridcell" className="font-mono text-2xs text-ink-3 tabular">
+            {formatClock(e.at)}
+          </span>
+          <span role="gridcell" className="col-start-3 row-start-2 @[640px]:row-start-1">
             <EventBadge event={e} category={info?.category} />
           </span>
-          <span className="col-start-3 flex min-w-0 items-center gap-1.5 @[640px]:col-start-4">
+          <span
+            role="gridcell"
+            className="col-start-3 flex min-w-0 items-center gap-1.5 @[640px]:col-start-4"
+          >
             {hasPayload ? (
               <ChevronRight
                 className={cn(
@@ -307,8 +314,10 @@ export const EventLog = forwardRef<HTMLDivElement, EventLogProps>(function Event
           </span>
         </div>
         {isOpen && hasPayload ? (
-          <div className="px-3 pb-3 pl-[145px]">
-            <TraceJsonBlock value={payload} label="payload" maxChars={1600} maxHeight={220} />
+          <div role="row" className="px-3 pb-3 pl-[145px]">
+            <div role="gridcell">
+              <TraceJsonBlock value={payload} label="payload" maxChars={1600} maxHeight={220} />
+            </div>
           </div>
         ) : null}
       </div>
@@ -378,7 +387,7 @@ export const EventLog = forwardRef<HTMLDivElement, EventLogProps>(function Event
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        role="grid"
+        role="treegrid"
         aria-label="Run events"
         aria-rowcount={filtered.length}
         className="relative min-h-0 flex-1 overflow-auto"

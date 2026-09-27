@@ -112,7 +112,7 @@ export const WaitNodeCard = forwardRef<HTMLDivElement, WaitNodeCardProps>(functi
         waiting ? (
           <span className="inline-flex items-center gap-1 text-warn-text" data-elapsed={elapsed}>
             <Clock className="size-3" strokeWidth={1.75} aria-hidden="true" />
-            <span aria-label={`Waiting for ${formatElapsed(elapsed)}`}>
+            <span role="timer" aria-label={`Waiting for ${formatElapsed(elapsed)}`}>
               {formatElapsed(elapsed)}
             </span>
           </span>

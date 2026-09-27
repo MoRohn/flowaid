@@ -97,6 +97,8 @@ export const PageHeader = forwardRef<HTMLElement, PageHeaderProps>(function Page
                     count={t.count}
                     icon={t.icon}
                     disabled={t.disabled}
+                    // navigation tabs: the page below is the panel, there is no tabpanel to control
+                    aria-controls={undefined}
                   >
                     {t.label}
                   </TabsTrigger>

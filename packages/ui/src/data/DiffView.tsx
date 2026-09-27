@@ -98,17 +98,24 @@ function CollapsedRow({ count, onExpand }: { count: number; onExpand: () => void
       role="row"
       data-collapsed={count}
     >
-      <button
-        type="button"
-        onClick={onExpand}
-        className="inline-flex h-5 cursor-pointer items-center gap-1 rounded-xs px-1 font-sans font-medium text-accent-text hover:bg-accent-soft"
-      >
-        <UnfoldVertical className="size-3.5" strokeWidth={1.75} aria-hidden="true" />
-        Expand {count} {count === 1 ? "line" : "lines"}
-      </button>
-      <span className="font-mono">unchanged</span>
+      <div role="cell" className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onExpand}
+          className="inline-flex h-5 cursor-pointer items-center gap-1 rounded-xs px-1 font-sans font-medium text-accent-text hover:bg-accent-soft"
+        >
+          <UnfoldVertical className="size-3.5" strokeWidth={1.75} aria-hidden="true" />
+          Expand {count} {count === 1 ? "line" : "lines"}
+        </button>
+        <span className="font-mono">unchanged</span>
+      </div>
     </div>
   );
+}
+
+/** What a line's sign means, for screen readers (the sign itself is decorative). */
+function srPrefix(type: DiffOp["type"]): string {
+  return type === "equal" ? "" : type === "add" ? "added: " : "removed: ";
 }
 
 export interface DiffViewProps extends Omit<HTMLAttributes<HTMLDivElement>, "children"> {
@@ -194,7 +201,10 @@ export const DiffView = forwardRef<HTMLDivElement, DiffViewProps>(function DiffV
           <Gutter n={op.oldLine} type={op.type} />
           <Gutter n={op.newLine} type={op.type} className="static" />
           <Sign type={op.type} />
-          <span className={lineClass}>{op.text}</span>
+          <span role="cell" className={lineClass}>
+            {srPrefix(op.type) ? <span className="sr-only">{srPrefix(op.type)}</span> : null}
+            {op.text}
+          </span>
         </div>
       ));
     }
@@ -206,18 +216,20 @@ export const DiffView = forwardRef<HTMLDivElement, DiffViewProps>(function DiffV
           : null;
       const cell = (op: DiffOp | null, side: "old" | "new") => {
         if (!op) {
-          return <div className="min-h-[20px] min-w-0 bg-surface-3/40" aria-hidden="true" />;
+          return <div role="cell" className="min-h-[20px] min-w-0 bg-surface-3/40" />;
         }
         const n = side === "old" ? op.oldLine : op.newLine;
         const tokenSpans = spans ? (side === "old" ? spans.old : spans.new) : null;
         return (
           <div
+            role="cell"
             data-op={op.type}
             className={cn("flex min-h-[20px] min-w-0 items-start leading-5", OP_ROW[op.type])}
           >
             <Gutter n={n} type={op.type} />
             <Sign type={op.type} />
             <span className={lineClass}>
+              {srPrefix(op.type) ? <span className="sr-only">{srPrefix(op.type)}</span> : null}
               {tokenSpans ? <Spans spans={tokenSpans} type={op.type} /> : op.text}
             </span>
           </div>
@@ -295,6 +307,8 @@ export const DiffView = forwardRef<HTMLDivElement, DiffViewProps>(function DiffV
       <div
         role="table"
         aria-label="Differences"
+        // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a scrollable region must be reachable by keyboard
+        tabIndex={0}
         className="flex min-w-0 flex-col overflow-auto py-1 font-mono text-xs"
         style={{ maxHeight: maxH }}
       >

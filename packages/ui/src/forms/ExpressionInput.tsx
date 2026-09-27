@@ -11,7 +11,7 @@ import { EditorView, keymap, placeholder as cmPlaceholder } from "@codemirror/vi
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { cn } from "@/lib/cn";
 import type { ExpressionScope } from "@/types";
-import { FieldError, useControllableState, useFieldControl } from "@/primitives";
+import { FieldError, useControllableState, useFieldContext, useFieldControl } from "@/primitives";
 import { formsEditorTheme } from "./codemirror";
 import { referenceTemplate, type ExpressionValidation } from "./expression";
 import {
@@ -60,10 +60,19 @@ const baseExtensions: Extension = [
   formsEditorTheme,
 ];
 
-function editorControlAttributes(field: ReturnType<typeof useFieldControl>, ariaLabel?: string) {
+function editorControlAttributes(
+  field: ReturnType<typeof useFieldControl>,
+  ariaLabel?: string,
+  labelledBy?: string,
+) {
   const attrs: Record<string, string> = { role: "textbox", "aria-multiline": "false" };
   if (field.id) attrs.id = field.id;
+  // a <label for> cannot name a contenteditable div: reference the field's label instead
   if (ariaLabel) attrs["aria-label"] = ariaLabel;
+  else if (labelledBy) attrs["aria-labelledby"] = labelledBy;
+  else attrs["aria-label"] = "Expression";
+  // reachable by keyboard even when read-only (axe does not count contenteditable as focusable)
+  attrs.tabindex = "0";
   if (field["aria-describedby"]) attrs["aria-describedby"] = field["aria-describedby"];
   if (field["aria-invalid"]) attrs["aria-invalid"] = "true";
   if (field["aria-required"]) attrs["aria-required"] = "true";
@@ -107,6 +116,7 @@ export const ExpressionInput = forwardRef<ExpressionEditorHandle, ExpressionInpu
       "aria-describedby": ariaDescribedBy,
     });
     const isDisabled = Boolean(field.disabled);
+    const labelId = useFieldContext()?.labelId;
 
     const handleValidate = useCallback(
       (result: ExpressionValidation) => {
@@ -122,7 +132,7 @@ export const ExpressionInput = forwardRef<ExpressionEditorHandle, ExpressionInpu
         onExpressionValidate.of(handleValidate),
         EditorView.editable.of(!isDisabled && !readOnly),
         EditorState.readOnly.of(isDisabled || readOnly),
-        EditorView.contentAttributes.of(editorControlAttributes(field, ariaLabel)),
+        EditorView.contentAttributes.of(editorControlAttributes(field, ariaLabel, labelId)),
         cmPlaceholder(placeholder),
       ],
       // field is a fresh object each render; depend on its members.
@@ -136,6 +146,7 @@ export const ExpressionInput = forwardRef<ExpressionEditorHandle, ExpressionInpu
         field["aria-invalid"],
         field["aria-required"],
         ariaLabel,
+        labelId,
         placeholder,
       ],
     );
@@ -272,6 +283,7 @@ export const ExpressionTextarea = forwardRef<ExpressionEditorHandle, ExpressionT
       "aria-describedby": ariaDescribedBy,
     });
     const isDisabled = Boolean(field.disabled);
+    const labelId = useFieldContext()?.labelId;
 
     const handleValidate = useCallback(
       (result: ExpressionValidation) => {
@@ -288,7 +300,7 @@ export const ExpressionTextarea = forwardRef<ExpressionEditorHandle, ExpressionT
         EditorView.editable.of(!isDisabled && !readOnly),
         EditorState.readOnly.of(isDisabled || readOnly),
         EditorView.contentAttributes.of({
-          ...editorControlAttributes(field, ariaLabel),
+          ...editorControlAttributes(field, ariaLabel, labelId),
           "aria-multiline": "true",
         }),
         cmPlaceholder(placeholder),
@@ -305,6 +317,7 @@ export const ExpressionTextarea = forwardRef<ExpressionEditorHandle, ExpressionT
         field["aria-invalid"],
         field["aria-required"],
         ariaLabel,
+        labelId,
         placeholder,
       ],
     );

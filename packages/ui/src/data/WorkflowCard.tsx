@@ -72,7 +72,11 @@ export function EnvironmentDots({
   className?: string;
 }) {
   return (
-    <span className={cn("inline-flex items-center gap-1", className)} aria-label="Deployments">
+    <span
+      role="group"
+      className={cn("inline-flex items-center gap-1", className)}
+      aria-label="Deployments"
+    >
       {environments.map((env) => {
         const d = deployments.find((x) => x.environment === env.id);
         return (
@@ -81,6 +85,7 @@ export function EnvironmentDots({
             content={d ? `${env.name} · v${d.version}` : `${env.name} · not deployed`}
           >
             <span
+              role="img"
               tabIndex={-1}
               aria-label={d ? `${env.name} v${d.version}` : `${env.name} not deployed`}
               className={cn(

@@ -34,7 +34,13 @@ import { javascript } from "@codemirror/lang-javascript";
 import { json } from "@codemirror/lang-json";
 import { Braces, WrapText } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { Button, IconButton, useControllableState, useFieldControl } from "@/primitives";
+import {
+  Button,
+  IconButton,
+  useControllableState,
+  useFieldContext,
+  useFieldControl,
+} from "@/primitives";
 import { yamlLanguage } from "@/inspector";
 import { formsEditorExtensions } from "./codemirror";
 import { useEditorView } from "./useEditorView";
@@ -152,11 +158,17 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
   });
   const isDisabled = Boolean(field.disabled);
   const editable = !isDisabled && !readOnly;
+  const labelId = useFieldContext()?.labelId;
 
   const extensions = useMemo<Extension>(() => {
     const attrs: Record<string, string> = { "aria-multiline": "true" };
     if (field.id) attrs.id = field.id;
+    // the content is a div, so <label for> cannot name it: default to the language
     if (ariaLabel) attrs["aria-label"] = ariaLabel;
+    else if (labelId) attrs["aria-labelledby"] = labelId;
+    else attrs["aria-label"] = `${language ?? "code"} editor`;
+    // reachable by keyboard, also when disabled or read-only (to scroll and read)
+    attrs.tabindex = "0";
     if (field["aria-describedby"]) attrs["aria-describedby"] = field["aria-describedby"];
     if (field["aria-invalid"]) attrs["aria-invalid"] = "true";
     return [
@@ -186,6 +198,7 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
     field["aria-describedby"],
     field["aria-invalid"],
     ariaLabel,
+    labelId,
   ]);
 
   const staticExtensions = useMemo<Extension>(

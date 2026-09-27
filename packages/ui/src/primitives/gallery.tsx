@@ -1005,6 +1005,11 @@ function NavigationSection() {
               </TabsTrigger>
               <TabsTrigger value="c">Variant</TabsTrigger>
             </TabsList>
+            {["a", "b", "c"].map((v) => (
+              <TabsContent key={v} value={v} className="pt-2 text-xs text-ink-2">
+                Panel {v.toUpperCase()}
+              </TabsContent>
+            ))}
           </Tabs>
           <div className="flex flex-col gap-3">
             <Separator />

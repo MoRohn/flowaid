@@ -18,6 +18,7 @@ export {
   GATE_TONE,
   GATE_ORDER,
   gateColorVar,
+  gateTextVar,
   gateSoftVar,
   gateDescription,
   clampThresholds,

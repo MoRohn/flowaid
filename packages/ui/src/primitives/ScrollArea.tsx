@@ -38,6 +38,8 @@ export const ScrollArea = forwardRef<
     >
       <ScrollAreaPrimitive.Viewport
         ref={viewportRef}
+        // scrollable regions must be reachable by keyboard
+        tabIndex={0}
         className={cn("size-full rounded-[inherit] [&>div]:!block", viewportClassName)}
       >
         {children}

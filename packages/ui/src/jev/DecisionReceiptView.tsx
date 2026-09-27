@@ -94,7 +94,7 @@ function ThresholdStrip({ t }: { t: JevThresholdApplied }) {
           />
         ) : null}
       </div>
-      <div className="flex justify-between font-mono text-2xs text-ink-4 tabular">
+      <div className="flex justify-between font-mono text-2xs text-ink-3 tabular">
         <span>0</span>
         <span>
           {improve !== null ? `improve ${formatProbability(improve)}` : ""}
@@ -115,7 +115,7 @@ function RoutingDetail({ r }: { r: JevRoutingRecord }) {
         <RouteChip route={r.route} disposition={r.disposition} />
         <ConsequenceBadge value={r.consequenceClass} verbose />
         {t.illustrative ? <Badge tone="warn">illustrative thresholds</Badge> : null}
-        <span className="ml-auto font-mono text-2xs text-ink-4">{r.routedBy.nodeId}</span>
+        <span className="ml-auto font-mono text-2xs text-ink-3">{r.routedBy.nodeId}</span>
       </div>
       <ThresholdStrip t={t} />
       <dl className="m-0 flex flex-col gap-1">
@@ -157,7 +157,7 @@ function RoutingDetail({ r }: { r: JevRoutingRecord }) {
             {r.policy.verdict}
           </Badge>
           {r.policy.proofId ? (
-            <span className="ml-auto font-mono text-2xs text-ink-4">
+            <span className="ml-auto font-mono text-2xs text-ink-3">
               proof #{shortHash(r.policy.proofId)}
             </span>
           ) : null}
@@ -166,9 +166,9 @@ function RoutingDetail({ r }: { r: JevRoutingRecord }) {
           {r.policy.checks.map((c) => (
             <li key={c.name} className="flex items-start gap-1.5 text-xs">
               {c.ok ? (
-                <Check className="mt-0.5 size-3 shrink-0 text-ok" aria-label="passed" />
+                <Check className="mt-0.5 size-3 shrink-0 text-ok-text" aria-label="passed" />
               ) : (
-                <X className="mt-0.5 size-3 shrink-0 text-danger" aria-label="failed" />
+                <X className="mt-0.5 size-3 shrink-0 text-danger-text" aria-label="failed" />
               )}
               <span className="font-mono text-ink-2">{c.name}</span>
               {c.detail ? <span className="text-ink-3">{c.detail}</span> : null}
@@ -249,7 +249,7 @@ export const DecisionReceiptView = forwardRef<HTMLDivElement, DecisionReceiptVie
               ) : null}
               {receipt.staleness.staleEvidence.length > 0 || receipt.staleness.raceRecorded ? (
                 <Row label="Staleness">
-                  <span className="text-warn">
+                  <span className="text-warn-text">
                     {receipt.staleness.staleEvidence.length > 0
                       ? `stale ${receipt.staleness.staleEvidence.join(", ")}`
                       : ""}
@@ -278,7 +278,7 @@ export const DecisionReceiptView = forwardRef<HTMLDivElement, DecisionReceiptVie
                     margin {formatProbability(distributionMargin(receipt.distribution))}
                   </span>
                 ) : null}
-                <span className="ml-auto text-2xs text-ink-4">
+                <span className="ml-auto text-2xs text-ink-3">
                   {formatMs(receipt.latencyMs)} · {formatCost(receipt.costUsd)}
                 </span>
               </div>
@@ -318,7 +318,7 @@ export const DecisionReceiptView = forwardRef<HTMLDivElement, DecisionReceiptVie
                 </p>
               ) : null}
               {receipt.reused ? (
-                <p className="m-0 text-xs text-warn">
+                <p className="m-0 text-xs text-warn-text">
                   Reused an earlier distribution: the blind-retry guard made no provider call.
                 </p>
               ) : null}
@@ -347,9 +347,9 @@ export const DecisionReceiptView = forwardRef<HTMLDivElement, DecisionReceiptVie
                 <span
                   className={
                     a.status === "completed"
-                      ? "text-ok"
+                      ? "text-ok-text"
                       : a.status === "failed"
-                        ? "text-danger"
+                        ? "text-danger-text"
                         : "text-ink-3"
                   }
                 >
@@ -366,7 +366,7 @@ export const DecisionReceiptView = forwardRef<HTMLDivElement, DecisionReceiptVie
           return (
             <dl className="m-0 flex flex-col gap-1">
               <Row label="Changed">
-                {o.from ?? "—"} → <span className="text-warn">{o.to}</span>
+                {o.from ?? "—"} → <span className="text-warn-text">{o.to}</span>
                 {o.route ? ` · route ${o.route}` : ""}
               </Row>
               <Row label="By">
@@ -390,7 +390,7 @@ export const DecisionReceiptView = forwardRef<HTMLDivElement, DecisionReceiptVie
               <RouteChip route={first.route} disposition={first.disposition} className="ml-auto" />
             ) : null}
           </div>
-          <p className="m-0 font-mono text-2xs text-ink-4 tabular">
+          <p className="m-0 font-mono text-2xs text-ink-3 tabular">
             receipt {receipt.receiptId.slice(0, 8)} · run {receipt.runId.slice(0, 8)} ·{" "}
             {receipt.nodeId} · {receipt.at}
           </p>
@@ -401,7 +401,7 @@ export const DecisionReceiptView = forwardRef<HTMLDivElement, DecisionReceiptVie
             const prevStage = i > 0 ? steps[i - 1]?.stage : undefined;
             return (
               <li key={s.id} data-step={s.kind} className="grid grid-cols-[64px_16px_1fr] gap-x-2">
-                <span className="pt-0.5 text-right text-eyebrow text-ink-4">
+                <span className="pt-0.5 text-right text-eyebrow text-ink-3">
                   {s.stage !== prevStage ? RECEIPT_STAGE_LABEL[s.stage] : ""}
                 </span>
                 <span className="relative flex justify-center" aria-hidden="true">

@@ -26,6 +26,14 @@ export interface TokenBudgetMeterProps extends Omit<HTMLAttributes<HTMLDivElemen
   maxTokens: number;
 }
 
+/** The same tones as text (AA): the bar keeps the strong hue. */
+const BUDGET_TEXT = {
+  ok: "var(--ok-text)",
+  near: "var(--warn-text)",
+  over: "var(--danger-text)",
+  limit: "var(--danger-text)",
+} as const;
+
 const BUDGET_TONE = {
   ok: "var(--ok)",
   near: "var(--warn)",
@@ -62,7 +70,7 @@ export const TokenBudgetMeter = forwardRef<HTMLDivElement, TokenBudgetMeterProps
             {b.tokens.toLocaleString("en")} / {b.maxTokens.toLocaleString("en")} tok
             <span className="text-ink-3"> · {formatPercent(b.fraction)}</span>
           </span>
-          <span style={{ color: BUDGET_TONE[b.status] }}>{label}</span>
+          <span style={{ color: BUDGET_TEXT[b.status] }}>{label}</span>
         </div>
         <div
           role="meter"
@@ -140,7 +148,7 @@ function isRedacted(v: unknown): boolean {
 function ProvenanceChips({ refs }: { refs: readonly string[] | undefined }) {
   if (!refs || refs.length === 0) return null;
   return (
-    <span className="flex flex-wrap items-center gap-1" aria-label="Provenance">
+    <span role="group" className="flex flex-wrap items-center gap-1" aria-label="Provenance">
       {refs.map((r) => (
         <span
           key={r}
@@ -249,7 +257,7 @@ export const EvidencePacketView = forwardRef<HTMLDivElement, EvidencePacketViewP
                   </Badge>
                   {a.ref ? <span className="font-mono text-ink-3">{a.ref}</span> : null}
                   {a.hash ? (
-                    <span className="font-mono text-2xs text-ink-4">#{shortHash(a.hash)}</span>
+                    <span className="font-mono text-2xs text-ink-3">#{shortHash(a.hash)}</span>
                   ) : null}
                   {a.summary ? <span className="basis-full text-ink-2">{a.summary}</span> : null}
                 </li>
@@ -286,7 +294,7 @@ export const EvidencePacketView = forwardRef<HTMLDivElement, EvidencePacketViewP
                           stale
                         </Badge>
                       ) : null}
-                      <span className="ml-auto font-mono text-2xs text-ink-4 tabular">
+                      <span className="ml-auto font-mono text-2xs text-ink-3 tabular">
                         {e.version ? `v ${e.version}` : "unversioned"}
                         {age !== null ? ` · ${formatMs(age)} old` : ""}
                       </span>
@@ -294,7 +302,7 @@ export const EvidencePacketView = forwardRef<HTMLDivElement, EvidencePacketViewP
                     {e.summary ? <p className="m-0 text-xs text-ink-2">{e.summary}</p> : null}
                     {e.supports.length > 0 ? (
                       <div className="flex flex-wrap items-center gap-1">
-                        <span className="text-2xs text-ink-4">supports</span>
+                        <span className="text-2xs text-ink-3">supports</span>
                         {e.supports.map((s) => (
                           <Badge key={s} size="sm" tone="accent" mono>
                             {s}
@@ -321,7 +329,7 @@ export const EvidencePacketView = forwardRef<HTMLDivElement, EvidencePacketViewP
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <span className="font-mono text-xs text-ink">{packet.stateVersion}</span>
             {packetHash ? (
-              <span className="font-mono text-2xs text-ink-4">packet #{shortHash(packetHash)}</span>
+              <span className="font-mono text-2xs text-ink-3">packet #{shortHash(packetHash)}</span>
             ) : null}
             {effective ? (
               <Badge tone={overPrivacy ? "danger" : DATA_CLASS_TONE[effective]}>
@@ -348,7 +356,7 @@ export const EvidencePacketView = forwardRef<HTMLDivElement, EvidencePacketViewP
               <BlockTitle meta={`${s.size} · ~${s.tokens} tok`}>
                 {PACKET_SECTION_LABEL[s.key]}
               </BlockTitle>
-              <p className="m-0 text-2xs text-ink-4">
+              <p className="m-0 text-2xs text-ink-3">
                 {PACKET_SECTION_PURPOSE[s.key]}
                 {(s.key === "evidence" || s.key === "artifacts") && declared.length > 0
                   ? ` · from ${declared.map(([n]) => n).join(", ")}`

@@ -1,8 +1,11 @@
 name: E2E
 
-# The release gate (docs/UPGRADE_PLAN.md P5-03): the acceptance journey in a browser against the
-# production builds that `pnpm start --prod` runs (the web app's standalone server, the compiled
-# API and worker) over Postgres with pgvector. No provider keys are needed.
+# The release gate (docs/UPGRADE_PLAN.md P5-03, P0-20): the acceptance specs in a browser against
+# the production builds that `pnpm start --prod` runs (the web app's standalone server, the compiled
+# API and worker) over Postgres with pgvector: the journey, a TypeSafe decision replayed from
+# fixtures/providers (FLOWAID_PROVIDER_FIXTURES=replay), secret canaries that must never reach the
+# logs, and axe on every main route. No provider keys are needed. A second job runs the
+# @flowaid/ui gallery suite (axe and console errors in light and dark).
 
 on:
   push:
@@ -54,7 +57,10 @@ jobs:
       - name: Install Chromium
         run: pnpm exec playwright install --with-deps chromium
 
-      - name: Start the stack (production builds)
+      - name: Start the stack (production builds, providers replayed from fixtures)
+        env:
+          FLOWAID_PROVIDER_FIXTURES: replay
+          LOG_LEVEL: info
         run: |
           nohup node scripts/start.ts --prod --skip-install \
             --database-url postgres://postgres:postgres@localhost:5432/postgres > stack.log 2>&1 &
@@ -70,6 +76,16 @@ jobs:
         run: pnpm test:acceptance
         env:
           E2E_BASE_URL: http://127.0.0.1:3001
+          E2E_STACK_LOG: stack.log
+
+      - name: No secret canary reached the logs
+        if: always()
+        run: |
+          test -s test-results/secret-canaries.txt || { echo "the secrets spec wrote no canaries"; exit 1; }
+          if grep -F -f test-results/secret-canaries.txt stack.log; then
+            echo "a secret canary appears in stack.log"
+            exit 1
+          fi
 
       - name: Keep the logs and the report
         if: failure()
@@ -80,4 +96,39 @@ jobs:
             stack.log
             playwright-report
             test-results
+          retention-days: 7
+
+  ui-gallery:
+    name: ui gallery (axe, console)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium
+        run: pnpm --filter @flowaid/ui exec playwright install --with-deps chromium
+
+      - name: Build the packages the gallery imports
+        run: pnpm turbo run build --filter=@flowaid/ui^... --output-logs=errors-only
+
+      - name: Gallery suite
+        run: pnpm --filter @flowaid/ui test:e2e
+
+      - name: Keep the report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-gallery-${{ github.run_id }}
+          path: |
+            packages/ui/playwright-report
+            packages/ui/test-results
           retention-days: 7

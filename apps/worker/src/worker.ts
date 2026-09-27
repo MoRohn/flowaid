@@ -20,7 +20,13 @@ import {
 import { McpSessionPool, connectSession, type StdioPolicy } from "@flowaid/mcp";
 import type { NodePackage } from "@flowaid/node-sdk";
 import { coreNodes } from "@flowaid/nodes-core";
-import { DefaultModelCatalog, ProviderRegistry } from "@flowaid/providers";
+import {
+  DefaultModelCatalog,
+  ProviderRegistry,
+  recordingFactory,
+  type FixtureMode,
+  type FixtureStore,
+} from "@flowaid/providers";
 import { anthropicFactory } from "@flowaid/provider-anthropic";
 import { ollamaEmbeddingFactory, ollamaFactory } from "@flowaid/provider-ollama";
 import { openaiFactories } from "@flowaid/provider-openai";
@@ -93,13 +99,24 @@ const silent: WorkerLogger = {
   error: () => undefined,
 };
 
-export function defaultProviderRegistry(): ProviderRegistry {
+/**
+ * The built-in providers. With `fixtures` (FLOWAID_PROVIDER_FIXTURES=record|replay) every call is
+ * recorded to, or replayed from, the fixture store instead of only reaching the vendor.
+ */
+export function defaultProviderRegistry(
+  options: { fixtures?: { mode: FixtureMode; store: FixtureStore } } = {},
+): ProviderRegistry {
   const registry = new ProviderRegistry({ catalog: new DefaultModelCatalog() });
-  registry.register(typesafeFactory());
-  for (const f of openaiFactories()) registry.register(f);
-  registry.register(anthropicFactory());
-  registry.register(ollamaFactory());
-  registry.register(ollamaEmbeddingFactory());
+  const { fixtures } = options;
+  const register: ProviderRegistry["register"] = (factory) =>
+    registry.register(
+      fixtures ? recordingFactory(factory, fixtures.mode, fixtures.store) : factory,
+    );
+  register(typesafeFactory());
+  for (const f of openaiFactories()) register(f);
+  register(anthropicFactory());
+  register(ollamaFactory());
+  register(ollamaEmbeddingFactory());
   return registry;
 }
 

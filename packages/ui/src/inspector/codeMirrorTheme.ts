@@ -12,7 +12,7 @@ import { tags as t } from "@lezer/highlight";
  * CodeMirror 6 theme built from the FlowAId CSS variables, so one extension
  * follows light and dark without re-configuring the editor. Background is
  * surface-2, text is ink, the selection is accent-soft-2 and the gutter is
- * ink-4. Syntax colours mirror JsonView: strings in the data hue, numbers in
+ * ink-3 (line numbers are read, so they meet AA). Syntax colours mirror JsonView: strings in the data hue, numbers in
  * the accent, booleans/null in the human hue, keys in ink-2.
  */
 export const flowaidCodeMirrorTheme: Extension = [
@@ -38,7 +38,7 @@ export const flowaidCodeMirrorTheme: Extension = [
     ".cm-line": { padding: "0 12px 0 6px" },
     ".cm-gutters": {
       backgroundColor: "var(--surface-2)",
-      color: "var(--ink-4)",
+      color: "var(--ink-3)",
       border: "none",
       borderRight: "1px solid var(--border)",
       minWidth: "36px",
@@ -48,7 +48,7 @@ export const flowaidCodeMirrorTheme: Extension = [
       minWidth: "36px",
     },
     ".cm-activeLine": { backgroundColor: "transparent" },
-    ".cm-activeLineGutter": { backgroundColor: "transparent", color: "var(--ink-3)" },
+    ".cm-activeLineGutter": { backgroundColor: "transparent", color: "var(--ink-2)" },
     "&.cm-focused .cm-activeLine": { backgroundColor: "var(--surface-3)" },
     "&.cm-focused .cm-activeLineGutter": { backgroundColor: "var(--surface-3)" },
     ".cm-selectionBackground, &.cm-focused .cm-selectionBackground, ::selection": {
@@ -94,9 +94,9 @@ export const flowaidCodeMirrorTheme: Extension = [
         color: "var(--ink-3)",
         fontStyle: "italic",
       },
-      { tag: [t.string, t.special(t.string), t.regexp], color: "var(--cat-data)" },
+      { tag: [t.string, t.special(t.string), t.regexp], color: "var(--cat-data-text)" },
       { tag: [t.number, t.integer, t.float], color: "var(--accent-text)" },
-      { tag: [t.bool, t.null, t.atom], color: "var(--cat-human)" },
+      { tag: [t.bool, t.null, t.atom], color: "var(--cat-human-text)" },
       { tag: [t.propertyName, t.attributeName], color: "var(--ink-2)" },
       {
         tag: [t.keyword, t.controlKeyword, t.operatorKeyword, t.definitionKeyword, t.moduleKeyword],
@@ -105,7 +105,7 @@ export const flowaidCodeMirrorTheme: Extension = [
       },
       { tag: [t.function(t.variableName), t.function(t.propertyName)], color: "var(--ink)" },
       { tag: [t.definition(t.variableName), t.variableName], color: "var(--ink)" },
-      { tag: [t.typeName, t.className, t.namespace], color: "var(--cat-tool)" },
+      { tag: [t.typeName, t.className, t.namespace], color: "var(--cat-tool-text)" },
       { tag: [t.operator, t.punctuation, t.separator, t.bracket], color: "var(--ink-3)" },
       { tag: [t.meta, t.processingInstruction, t.docComment], color: "var(--ink-3)" },
       { tag: t.invalid, color: "var(--danger)" },

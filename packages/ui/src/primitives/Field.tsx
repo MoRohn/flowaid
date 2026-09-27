@@ -13,6 +13,11 @@ import { Label } from "./Label";
 export interface FieldContextValue {
   /** Id the control should use so the label points at it. */
   id: string;
+  /**
+   * Id of the visible label, for controls a `<label for>` cannot name (contenteditable
+   * editors, custom widgets): they reference it with `aria-labelledby`.
+   */
+  labelId?: string;
   /** Space-separated ids of the hint/error nodes to reference via aria-describedby. */
   describedBy?: string;
   invalid: boolean;
@@ -133,6 +138,7 @@ export const FieldRow = forwardRef<HTMLDivElement, FieldRowProps>(function Field
   const hintId = hint ? `${id}-hint` : undefined;
   const errorId = error ? `${id}-error` : undefined;
   const describedBy = [errorId, hintId].filter(Boolean).join(" ") || undefined;
+  const labelId = label ? `${id}-label` : undefined;
   const invalid = Boolean(error);
 
   const labelNode = label ? (
@@ -142,7 +148,7 @@ export const FieldRow = forwardRef<HTMLDivElement, FieldRowProps>(function Field
         layout === "row" && (align === "center" ? "h-7" : "min-h-7"),
       )}
     >
-      <Label htmlFor={id} required={required} optional={optional} disabled={disabled}>
+      <Label id={labelId} htmlFor={id} required={required} optional={optional} disabled={disabled}>
         {label}
       </Label>
       {labelAddon}
@@ -158,7 +164,7 @@ export const FieldRow = forwardRef<HTMLDivElement, FieldRowProps>(function Field
   );
 
   return (
-    <FieldContext.Provider value={{ id, describedBy, invalid, disabled, required }}>
+    <FieldContext.Provider value={{ id, labelId, describedBy, invalid, disabled, required }}>
       <div
         ref={ref}
         data-layout={layout}

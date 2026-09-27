@@ -27,6 +27,11 @@ export function gateColorVar(outcome: GateOutcome): string {
   return outcome === "review" ? "var(--accent)" : `var(--${GATE_TONE[outcome]})`;
 }
 
+/** Text colour token for an outcome: the AA text variant of its tone. */
+export function gateTextVar(outcome: GateOutcome): string {
+  return outcome === "review" ? "var(--accent-text)" : `var(--${GATE_TONE[outcome]}-text)`;
+}
+
 /** Soft (background) colour token for an outcome. */
 export function gateSoftVar(outcome: GateOutcome): string {
   return outcome === "review" ? "var(--accent-soft)" : `var(--${GATE_TONE[outcome]}-soft)`;

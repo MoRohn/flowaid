@@ -132,6 +132,11 @@ export const CodeBlock = forwardRef<HTMLDivElement, CodeBlockProps>(function Cod
         extensions: [
           EditorState.readOnly.of(true),
           EditorView.editable.of(false),
+          // read-only content is still reachable by keyboard (to scroll and select) and named
+          EditorView.contentAttributes.of({
+            tabindex: "0",
+            "aria-label": `${typeof title === "string" ? title : language} code`,
+          }),
           highlightSpecialChars(),
           bracketMatching(),
           flowaidCodeMirrorTheme,

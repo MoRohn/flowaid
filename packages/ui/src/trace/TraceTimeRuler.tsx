@@ -48,12 +48,9 @@ export const TraceTimeRuler = forwardRef<HTMLDivElement, TraceTimeRulerProps>(
           );
         })}
         {live ? (
-          <span
-            aria-label="Live"
-            className="absolute inset-y-0 right-0 flex items-center gap-1 bg-surface pl-1 font-mono text-2xs leading-none text-info-text"
-          >
+          <span className="absolute inset-y-0 right-0 flex items-center gap-1 bg-surface pl-1 font-mono text-2xs leading-none text-info-text">
             <span aria-hidden="true" className="fa-pulse size-1.5 rounded-full bg-current" />
-            now
+            <span className="sr-only">live, </span>now
           </span>
         ) : null}
       </div>

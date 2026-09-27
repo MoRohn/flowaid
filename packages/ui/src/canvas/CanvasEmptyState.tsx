@@ -48,7 +48,7 @@ export const CanvasEmptyState = forwardRef<HTMLDivElement, CanvasEmptyStateProps
             <Shortcut
               shortcut="mod+k"
               size="sm"
-              className="ml-auto border-transparent bg-transparent text-accent-ink/70"
+              className="ml-auto border-transparent bg-transparent text-accent-ink"
             />
           </Button>
           {onStartFromTemplate ? (

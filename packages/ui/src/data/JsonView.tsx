@@ -257,7 +257,7 @@ function Highlight({ text, query }: { text: string; query: string }): ReactNode 
   while (idx !== -1) {
     if (idx > from) parts.push(text.slice(from, idx));
     parts.push(
-      <mark key={k++} className="rounded-xs bg-accent-soft-2 text-inherit">
+      <mark key={k++} className="rounded-xs bg-accent-soft-2 text-ink">
         {text.slice(idx, idx + q.length)}
       </mark>,
     );
@@ -269,9 +269,9 @@ function Highlight({ text, query }: { text: string; query: string }): ReactNode 
 }
 
 const KIND_CLASS: Record<JsonKind, string> = {
-  string: "text-cat-data",
+  string: "text-cat-data-text",
   number: "text-accent-text",
-  boolean: "text-cat-human",
+  boolean: "text-cat-human-text",
   null: "text-ink-3",
   undefined: "text-ink-3",
   object: "text-ink-3",

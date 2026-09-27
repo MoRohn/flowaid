@@ -78,6 +78,7 @@ export const CalibrationMini = forwardRef<HTMLDivElement, CalibrationMiniProps>(
             return (
               <circle
                 key={i}
+                role="img"
                 cx={s(p.predicted)}
                 cy={yS(p.observed)}
                 r={r}

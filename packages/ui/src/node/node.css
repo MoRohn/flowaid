@@ -215,7 +215,7 @@
 }
 .fa-handle-label small {
   font-size: var(--text-2xs);
-  color: var(--ink-4);
+  color: var(--ink-3);
 }
 .react-flow__handle-left .fa-handle-label {
   right: calc(100% + 7px);

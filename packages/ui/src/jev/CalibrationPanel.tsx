@@ -95,10 +95,10 @@ export const CalibrationPanel = forwardRef<HTMLDivElement, CalibrationPanelProps
           {contract ? <ContractRefChip contract={contract} /> : null}
           {segmentChips.map(([k, v]) => (
             <Badge key={k} tone="outline">
-              <span className="text-ink-4">{k}</span> {v}
+              <span className="text-ink-3">{k}</span> {v}
             </Badge>
           ))}
-          {window ? <span className="ml-auto font-mono text-2xs text-ink-4">{window}</span> : null}
+          {window ? <span className="ml-auto font-mono text-2xs text-ink-3">{window}</span> : null}
         </header>
 
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
@@ -204,7 +204,7 @@ export const CalibrationPanel = forwardRef<HTMLDivElement, CalibrationPanelProps
                       <td
                         className={cn(
                           "py-1 pr-2 text-right",
-                          c.support < 30 ? "text-warn" : "text-ink-2",
+                          c.support < 30 ? "text-warn-text" : "text-ink-2",
                         )}
                       >
                         {c.support}
@@ -218,7 +218,7 @@ export const CalibrationPanel = forwardRef<HTMLDivElement, CalibrationPanelProps
                       <td
                         className={cn(
                           "py-1 text-right",
-                          c.ece !== null && c.ece > ECE_TARGET ? "text-warn" : "text-ink-2",
+                          c.ece !== null && c.ece > ECE_TARGET ? "text-warn-text" : "text-ink-2",
                         )}
                       >
                         {nullable(c.ece)}
@@ -235,7 +235,7 @@ export const CalibrationPanel = forwardRef<HTMLDivElement, CalibrationPanelProps
           <section className="flex min-w-0 flex-col gap-2" aria-label="Drift alarms">
             <BlockTitle meta={`${sorted.length} open`}>Drift alarms</BlockTitle>
             {sorted.length === 0 ? (
-              <p className="m-0 text-xs text-ok">No drift alarms against the baseline.</p>
+              <p className="m-0 text-xs text-ok-text">No drift alarms against the baseline.</p>
             ) : (
               <ul className="m-0 flex list-none flex-col gap-2 p-0">
                 {sorted.map((a, i) => (
@@ -271,7 +271,7 @@ export const CalibrationPanel = forwardRef<HTMLDivElement, CalibrationPanelProps
                     <p className="m-0 text-xs text-ink-2">{a.message}</p>
                     {a.inspectFirst.length > 0 ? (
                       <div className="flex flex-wrap items-center gap-1">
-                        <span className="text-2xs text-ink-4">inspect first</span>
+                        <span className="text-2xs text-ink-3">inspect first</span>
                         {a.inspectFirst.map((x) => (
                           <Badge key={x} tone="outline" size="sm">
                             {INSPECT_FIRST_LABEL[x]}
@@ -299,7 +299,9 @@ export const CalibrationPanel = forwardRef<HTMLDivElement, CalibrationPanelProps
                   <span className="text-ink-3">{zonesText(recommendation.current)}</span>
                   <ArrowRight className="size-3.5 text-ink-4" aria-hidden="true" />
                   <span
-                    className={recommendation.recommended ? "font-semibold text-ink" : "text-warn"}
+                    className={
+                      recommendation.recommended ? "font-semibold text-ink" : "text-warn-text"
+                    }
                   >
                     {zonesText(recommendation.recommended)}
                   </span>
@@ -321,7 +323,7 @@ export const CalibrationPanel = forwardRef<HTMLDivElement, CalibrationPanelProps
                   <dd
                     className={cn(
                       "m-0 font-mono tabular",
-                      recommendation.nearThresholdMass > 0.15 ? "text-warn" : "text-ink",
+                      recommendation.nearThresholdMass > 0.15 ? "text-warn-text" : "text-ink",
                     )}
                   >
                     {formatPercent(recommendation.nearThresholdMass, 1)}
@@ -333,12 +335,12 @@ export const CalibrationPanel = forwardRef<HTMLDivElement, CalibrationPanelProps
                   </dd>
                 </dl>
                 {recommendation.warnings.map((w) => (
-                  <p key={w} className="m-0 flex items-start gap-1 text-xs text-warn">
+                  <p key={w} className="m-0 flex items-start gap-1 text-xs text-warn-text">
                     <AlertTriangle className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
                     {w}
                   </p>
                 ))}
-                <p className="m-0 text-2xs text-ink-4">
+                <p className="m-0 text-2xs text-ink-3">
                   Never applied automatically: accepting creates a contract draft with governance
                   prefilled, which goes through review and rollout.
                 </p>
