@@ -62,6 +62,7 @@ import {
   withDefaults,
   type FieldHints,
   type SchemaValues,
+  jsonEqual,
 } from "./schema";
 import {
   createSchemaValidator,
@@ -883,14 +884,23 @@ function ChangeBridge({
   const { isValid } = useFormState({ control });
   const unclaimed = useUnclaimedIssues(values);
   const onChangeRef = useLatestRef(onChange);
-  const first = useRef(true);
   const valid = isValid && unclaimed.length === 0;
+  // Report changes, not mounts: compare with the last values seen rather than skipping the first
+  // effect run, which StrictMode's double effect invocation would turn into a spurious report.
+  // Values are compared by content (react-hook-form hands out fresh objects), and a validity change
+  // is reported only once the person has changed something.
+  const last = useRef<{ values: SchemaValues; valid: boolean; edited: boolean } | null>(null);
   useEffect(() => {
-    if (first.current) {
-      first.current = false;
+    const prev = last.current;
+    // a snapshot: react-hook-form may hand back the same object, mutated in place
+    const snapshot = structuredClone(values);
+    if (prev === null) {
+      last.current = { values: snapshot, valid, edited: false };
       return;
     }
-    onChangeRef.current?.(values, valid);
+    const changed = !jsonEqual(prev.values, snapshot);
+    last.current = { values: snapshot, valid, edited: prev.edited || changed };
+    if (changed || (prev.edited && prev.valid !== valid)) onChangeRef.current?.(values, valid);
   }, [values, valid, onChangeRef]);
   return null;
 }
@@ -967,14 +977,15 @@ export const SchemaForm = forwardRef<SchemaFormHandle, SchemaFormProps>(function
   const validator = useMemo(() => createSchemaValidator(schema), [schema]);
   const [registry] = useState(createFieldRegistry);
 
-  const firstValues = useRef(true);
+  // Re-seed only when the caller passes new `values` or a new schema. Tracking the previous props
+  // (not a first-run flag) keeps StrictMode's second effect run from resetting an uncontrolled
+  // form (`defaultValues` only) to the bare schema defaults.
+  const seeded = useRef({ values, schema });
   useEffect(() => {
-    if (firstValues.current) {
-      firstValues.current = false;
-      return;
-    }
-    reset(withDefaults(schema, values));
-  }, [values, schema, reset]);
+    if (seeded.current.values === values && seeded.current.schema === schema) return;
+    seeded.current = { values, schema };
+    reset(withDefaults(schema, values ?? defaultValues));
+  }, [values, schema, defaultValues, reset]);
 
   const onSubmitRef = useLatestRef(onSubmit);
   const runSubmit = useCallback(

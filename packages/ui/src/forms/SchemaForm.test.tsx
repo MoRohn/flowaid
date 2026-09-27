@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { StrictMode, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { JsonSchema } from "@/types";
 import { installDomStubs } from "@/primitives/testStubs";
@@ -255,5 +255,84 @@ describe("SchemaForm", () => {
     const group = screen.getByRole("radiogroup", { name: "Backoff" });
     expect(within(group).getAllByRole("radio")).toHaveLength(2);
     expect(within(group).getByRole("radio", { name: "Fixed" })).toBeChecked();
+  });
+});
+
+describe("SchemaForm under StrictMode (double effect invocation)", () => {
+  const schema: JsonSchema = {
+    type: "object",
+    properties: {
+      title: { type: "string", title: "Title", default: "" },
+      labels: {
+        type: "object",
+        title: "Labels",
+        additionalProperties: { type: "string" },
+        default: {},
+      },
+    },
+  };
+  const seeded = { title: "Refund request", labels: { team: "billing" } };
+
+  it("keeps an uncontrolled form's defaultValues and reports nothing on mount", async () => {
+    const onChange = vi.fn();
+    render(
+      <StrictMode>
+        <SchemaForm schema={schema} defaultValues={seeded} onChange={onChange} />
+      </StrictMode>,
+    );
+    expect(await screen.findByDisplayValue("Refund request")).toBeInTheDocument();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("reports the edit a person makes, with the untouched values intact", async () => {
+    const onChange = vi.fn();
+    render(
+      <StrictMode>
+        <SchemaForm schema={schema} defaultValues={seeded} onChange={onChange} />
+      </StrictMode>,
+    );
+    const input = await screen.findByDisplayValue("Refund request");
+    await userEvent.type(input, "!");
+    await waitFor(() => expect(onChange).toHaveBeenCalled());
+    expect(onChange.mock.lastCall?.[0]).toMatchObject({
+      title: "Refund request!",
+      labels: { team: "billing" },
+    });
+  });
+
+  it("reports a value set in one input event (fill), not only keystrokes", async () => {
+    const onChange = vi.fn();
+    render(
+      <StrictMode>
+        <SchemaForm schema={schema} defaultValues={seeded} onChange={onChange} />
+      </StrictMode>,
+    );
+    const input = await screen.findByDisplayValue("Refund request");
+    fireEvent.change(input, { target: { value: "Chargeback" } });
+    await waitFor(() => expect(onChange).toHaveBeenCalled());
+    expect(onChange.mock.lastCall?.[0]).toMatchObject({ title: "Chargeback" });
+  });
+
+  it("still re-seeds a controlled form when the caller passes new values", async () => {
+    function Controlled() {
+      const [values, setValues] = useState<Record<string, unknown>>(seeded);
+      return (
+        <>
+          <button type="button" onClick={() => setValues({ title: "Replaced", labels: {} })}>
+            replace
+          </button>
+          <SchemaForm schema={schema} values={values} />
+        </>
+      );
+    }
+    render(
+      <StrictMode>
+        <Controlled />
+      </StrictMode>,
+    );
+    expect(await screen.findByDisplayValue("Refund request")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "replace" }));
+    expect(await screen.findByDisplayValue("Replaced")).toBeInTheDocument();
   });
 });

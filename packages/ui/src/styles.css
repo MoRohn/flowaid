@@ -5,6 +5,15 @@
  */
 @import "tailwindcss";
 @import "./tokens.css";
+/*
+ * The component groups' own stylesheets. Each group's index also imports its file, but bundlers
+ * that honour `sideEffects` may skip a barrel whose named exports resolve to the component
+ * modules, dropping that import; listing them here makes this file sufficient on its own.
+ */
+@import "./primitives/primitives.css";
+@import "./node/node.css";
+@import "./canvas/canvas.css";
+@import "./builder/builder.css";
 
 /* The playground's Vite root is ./playground, so tell Tailwind to scan the library sources too. */
 @source "../src";

@@ -4,7 +4,7 @@
  * a `TopBar` (breadcrumbs plus page actions), the command menu and the user menu. Pages pass
  * their own inspector and bottom panel (the builder does).
  */
-import { useRouter, useSelectedLayoutSegments } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { Plus } from "lucide-react";
 import {
@@ -46,12 +46,12 @@ export function AppFrame({
 }: AppFrameProps) {
   const s = useSession();
   const router = useRouter();
-  const segments = useSelectedLayoutSegments();
+  // "/<ws>/<section>/…": the section picks the active nav entry
+  const section = usePathname().split("/")[2] ?? "";
   const go = (path: string) => router.push(`/${s.ws}/${path}`);
   const items = visibleNav(NAV, s.features);
   const secondary = visibleNav(NAV_SECONDARY, s.features);
-  const active =
-    [...items, ...secondary].find((e) => segments[0] === e.path)?.id ?? segments[0] ?? "workflows";
+  const active = [...items, ...secondary].find((e) => section === e.path)?.id ?? section;
   const toItem = (e: (typeof items)[number]) => ({
     id: e.id,
     label: e.label,

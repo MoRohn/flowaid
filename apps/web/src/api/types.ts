@@ -166,7 +166,8 @@ export interface Member {
 
 /** `GET /v1/workflows?include=activity` */
 export interface WorkflowWithActivity extends WorkflowSummary {
-  deployments: { environmentId: string; version: number | null }[];
-  runs24h: number[];
-  lastRun: { id: string; status: RunStatus; createdAt: string } | null;
+  /** absent from servers that predate `include=activity` */
+  deployments?: { environmentId: string; version: number | null }[];
+  runs24h?: number[];
+  lastRun?: { id: string; status: RunStatus; createdAt: string } | null;
 }

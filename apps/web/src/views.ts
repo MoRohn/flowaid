@@ -12,7 +12,7 @@ export function toWorkflowListItem(
   envs: readonly Environment[],
 ): WorkflowListItemView {
   const protectedIds = new Set(envs.filter((e) => e.protected).map((e) => e.id));
-  const deployments = w.deployments
+  const deployments = (w.deployments ?? [])
     .filter((d): d is { environmentId: string; version: number } => d.version !== null)
     .map((d) => ({ environment: d.environmentId, version: d.version }));
   return {
@@ -27,7 +27,7 @@ export function toWorkflowListItem(
           ? "production"
           : "published",
     ...(w.lastRun ? { lastRunStatus: w.lastRun.status, lastRunAt: w.lastRun.createdAt } : {}),
-    runs24h: w.runs24h,
+    runs24h: w.runs24h ?? Array.from({ length: 24 }, () => 0),
     updatedAt: w.updatedAt,
     deployments,
     tags: w.tags,

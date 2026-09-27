@@ -6,7 +6,10 @@
     "baseUrl": ".",
     "paths": {
       "~/*": ["src/*"],
-      "@/*": ["../../packages/ui/src/*"]
+      "@/*": ["../../packages/ui/src/*"],
+      "@flowaid/workflow-core": ["../../packages/workflow-core/dist/index.d.ts"],
+      "@flowaid/workflow-compiler": ["../../packages/workflow-compiler/dist/index.d.ts"],
+      "@flowaid/shared": ["../../packages/shared/dist/index.d.ts"]
     }
   },
   "include": [
