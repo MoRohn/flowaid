@@ -73,6 +73,11 @@ export interface OrchestratorOptions {
   onCancelChild?: (childRunId: string) => Promise<void>;
   /** Ephemeral GENERATION_DELTA fan-out. */
   onDelta?: (runId: string, nodeRunId: string, channel: string, delta: string) => void;
+  /**
+   * Durable events this orchestrator appended (after the fenced write succeeded), in order. Runs in
+   * the one process that wrote them, so side effects (metrics, alerts) happen once per event.
+   */
+  onEvents?: (run: Run, events: readonly DurableRunEvent[]) => void;
   onError?: (error: unknown, context: { runId?: string; phase: string }) => void;
   now?: () => Date;
   ids?: IdSource;
@@ -284,6 +289,13 @@ export class Orchestrator {
     }
     held.state = result.state;
     const lastSeq = held.state.run.lastSeq;
+    if (result.events.length > 0 && this.o.onEvents) {
+      try {
+        this.o.onEvents(held.run, result.events);
+      } catch (e) {
+        this.error(e, "onEvents", runId);
+      }
+    }
     if (result.events.length > 0) {
       await this.o.bus
         ?.publish(`run:${runId}`, { runId, fromSeq: before + 1, toSeq: lastSeq })

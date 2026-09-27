@@ -3,6 +3,20 @@ import type { CliOperation } from "../operation.js";
 
 export const OPERATIONS: readonly CliOperation[] = [
   {
+    noun: "alerts",
+    verb: "deliveries",
+    method: "GET",
+    path: "/v1/alerts/deliveries",
+    summary: "Observability alerts sent (or attempted) to notification channels, newest first",
+    auth: "session_or_api_key",
+    positional: [],
+    query: [
+      { name: "limit", type: "integer", required: false },
+      { name: "before", type: "string", required: false },
+    ],
+    body: null,
+  },
+  {
     noun: "api-key",
     verb: "create",
     method: "POST",
@@ -871,6 +885,41 @@ export const OPERATIONS: readonly CliOperation[] = [
     auth: "session",
     positional: [],
     query: [],
+    body: null,
+  },
+  {
+    noun: "metrics",
+    verb: "overview",
+    method: "GET",
+    path: "/v1/metrics/overview",
+    summary: "Runs, success, latency, cost, confidence and review rates for a time range",
+    auth: "session_or_api_key",
+    positional: [],
+    query: [
+      { name: "workflowId", type: "string", required: false },
+      { name: "environmentId", type: "string", required: false },
+      { name: "versionId", type: "string", required: false },
+      { name: "from", type: "string", required: false },
+      { name: "to", type: "string", required: false },
+    ],
+    body: null,
+  },
+  {
+    noun: "metrics",
+    verb: "timeseries",
+    method: "GET",
+    path: "/v1/metrics/timeseries",
+    summary: "Runs, failures, cost, p95 latency and human reviews per time bucket",
+    auth: "session_or_api_key",
+    positional: [],
+    query: [
+      { name: "workflowId", type: "string", required: false },
+      { name: "environmentId", type: "string", required: false },
+      { name: "versionId", type: "string", required: false },
+      { name: "from", type: "string", required: false },
+      { name: "to", type: "string", required: false },
+      { name: "bucket", type: "string", required: false, enum: ["1m", "1h", "1d"] },
+    ],
     body: null,
   },
   {

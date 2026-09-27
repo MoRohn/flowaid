@@ -148,6 +148,16 @@ export function ingressRoutes(app: FastifyInstance, ctx: ApiContext): void {
             }),
           );
           req.log.warn({ webhookId: w.id, reason }, "webhook rejected");
+          // one alert per webhook per hour: a flood of bad requests pages once
+          const hour = new Date(ctx.clock.now()).toISOString().slice(0, 13);
+          void ctx.alerts?.dispatch(w.workspaceId, `webhook.rejected:${w.id}:${hour}`, {
+            event: "webhook.rejected",
+            severity: "warning",
+            title: `Webhook rejected: ${w.path}`,
+            text: `A request to the webhook ${slug}/${w.path} was rejected: ${reason}.`,
+            url: `${ctx.config.webUrl.replace(/\/$/, "")}/${slug}/workflows/${w.workflowId}/settings`,
+            data: { webhookId: w.id, workflowId: w.workflowId, reason, httpStatus: status },
+          });
           return reply
             .code(status)
             .send(

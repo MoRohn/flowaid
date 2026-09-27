@@ -447,6 +447,9 @@ importers:
       '@flowaid/nodes-langchain':
         specifier: workspace:*
         version: link:../../packages/nodes-langchain
+      '@flowaid/observability':
+        specifier: workspace:*
+        version: link:../../packages/observability
       '@flowaid/openapi-tools':
         specifier: workspace:*
         version: link:../../packages/openapi-tools

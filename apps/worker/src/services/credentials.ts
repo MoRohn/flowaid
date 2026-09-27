@@ -64,6 +64,14 @@ const FALLBACK: Record<string, (k: ServerKeys) => Record<string, string> | undef
   "ollama.host": (k) => (k.ollamaHost ? { host: k.ollamaHost } : undefined),
 };
 
+/** The server's own key for a credential type (TYPESAFE_API_KEY, …), when configured. */
+export function serverKeyCredential(
+  credentialType: string,
+  keys: ServerKeys,
+): Record<string, string> | undefined {
+  return FALLBACK[credentialType]?.(keys);
+}
+
 /** `ResolveContext.credential` for provider factories. */
 export function providerCredential(
   call: ExecutionCall,

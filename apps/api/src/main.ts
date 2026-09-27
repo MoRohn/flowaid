@@ -13,9 +13,26 @@ import { JwtKeys } from "./auth/jwt.js";
 import { firstBoot } from "./bootstrap/firstBoot.js";
 import { configFromEnv, type ApiContext } from "./context.js";
 import { buildServer } from "./server.js";
+import { setupTelemetry, startMetricsListener } from "@flowaid/observability";
+import { createAlertDispatcher, smtpFromEnv } from "./services/alerts.js";
 
 async function main(): Promise<void> {
   const env = loadEnv();
+  // OpenTelemetry export when OTEL_EXPORTER_OTLP_ENDPOINT is set; Prometheus on PROMETHEUS_PORT.
+  const telemetry = setupTelemetry({
+    serviceName: "flowaid-api",
+    ...(env.OTEL_EXPORTER_OTLP_ENDPOINT
+      ? { otlpEndpoint: String(env.OTEL_EXPORTER_OTLP_ENDPOINT) }
+      : {}),
+    prometheus: env.PROMETHEUS_PORT !== undefined,
+  });
+  const metricsListener =
+    env.PROMETHEUS_PORT !== undefined && telemetry.prometheusHandler
+      ? await startMetricsListener({
+          port: Number(env.PROMETHEUS_PORT),
+          handler: telemetry.prometheusHandler,
+        })
+      : null;
   await migrate({
     adminUrl: String(env.DATABASE_ADMIN_URL ?? env.DATABASE_URL),
     partitionRunEvents: Boolean(env.RUN_EVENTS_PARTITIONED),
@@ -59,6 +76,16 @@ async function main(): Promise<void> {
     credentials,
     http,
     env,
+    alerts: createAlertDispatcher({
+      db,
+      credentials,
+      fetch: http,
+      smtp: smtpFromEnv(env),
+      onError: (error, context) =>
+        process.stderr.write(
+          `${JSON.stringify({ level: 50, msg: "alert delivery failed", err: String(error), ...context })}\n`,
+        ),
+    }),
   };
   const boot = await firstBoot(db, {
     ...(env.FLOWAID_ADMIN_EMAIL ? { adminEmail: String(env.FLOWAID_ADMIN_EMAIL) } : {}),
@@ -88,6 +115,8 @@ async function main(): Promise<void> {
     await hub.close();
     await queue.close();
     await db.close();
+    await metricsListener?.close();
+    await telemetry.shutdown().catch(() => undefined);
     process.exit(0);
   };
   process.once("SIGTERM", () => void stop("SIGTERM"));

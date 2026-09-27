@@ -57,6 +57,7 @@ export const FEATURE_KEYS = [
   "oidc",
   "schedules",
   "mcp_exposures",
+  "dashboard",
 ] as const;
 
 /** A feature key (API.md §7). */
@@ -657,6 +658,22 @@ const docs = {
       "Port of the internal Prometheus `/metrics` listener in the api and worker. Unset disables it.",
     required: false,
     example: "9464",
+    secret: false,
+  },
+  SMTP_URL: {
+    group: "observability",
+    description:
+      "SMTP server for email alert channels: `smtp://user:password@host:587` (STARTTLS when the server offers it) or `smtps://…:465`. Unset disables email channels; Slack and webhook channels still work.",
+    required: false,
+    example: "smtp://alerts:<password>@smtp.example.com:587",
+    secret: true,
+  },
+  SMTP_FROM: {
+    group: "observability",
+    description:
+      "Sender address of email alerts. Email channels need both `SMTP_URL` and `SMTP_FROM`.",
+    required: false,
+    example: "flowaid@example.com",
     secret: false,
   },
 

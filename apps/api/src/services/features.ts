@@ -21,6 +21,7 @@ export const FEATURES_SHIPPED: ReadonlySet<FeatureKey> = new Set<FeatureKey>([
   "schedules",
   "mcp_exposures",
   "advisor",
+  "dashboard",
 ]);
 
 export function featuresFor(

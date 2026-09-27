@@ -13,6 +13,7 @@ import {
   RUN_EVENTS_CHANNEL,
   environments,
   runs,
+  workspaces,
   workflowDeployments,
   workflowVersions,
   type Database,
@@ -32,6 +33,7 @@ import type {
   ExecutionPlan,
   Job,
   QueueDriver,
+  DurableRunEvent,
   Run,
   RunEventOf,
   SafeFetch,
@@ -56,6 +58,8 @@ import { stateAccessFor } from "./services/state.js";
 import { toolAccessFor } from "./services/tools.js";
 import { runEvaluationJob } from "./jobs/evaluation.js";
 import { runExportJob } from "./jobs/export.js";
+import { runTraceReviewJob, wantsReview } from "./jobs/traceReview.js";
+import { recordRunMetrics, type AlertDispatcher, type Instruments } from "@flowaid/observability";
 
 export interface WorkerLogger {
   info(data: Record<string, unknown>, msg: string): void;
@@ -85,6 +89,12 @@ export interface WorkerDeps {
   maintenance?: { timerPollMs?: number; heartbeatMs?: number; reapMs?: number };
   /** code export (`export.package` on the `jobs` queue): FLOWAID_VENDOR_DIR for vendored mode */
   exports?: { vendorDir?: string | null };
+  /** observability (P6-04): metric instruments, alerts to notification channels, the review judge */
+  instruments?: Instruments;
+  alerts?: AlertDispatcher;
+  /** public web URL for links in alerts */
+  webUrl?: string;
+  traceReview?: { judge?: DecisionProvider };
 }
 
 const TERMINAL = new Set(["RUN_COMPLETED", "RUN_FAILED", "RUN_CANCELLED", "RUN_TIMED_OUT"]);
@@ -180,6 +190,90 @@ export function createWorker(deps: WorkerDeps): Worker {
     ...(deps.sandbox ? { sandbox: deps.sandbox } : {}),
   };
 
+  // ── observability: metrics, alerts and trace reviews of finished runs ──
+  const labels = new Map<string, { env: string; slug: string }>();
+  const labelsOf = async (run: Run) => {
+    const key = `${run.workspaceId}|${run.environmentId}`;
+    const cached = labels.get(key);
+    if (cached) return cached;
+    const [row] = await deps.db.system((tx) =>
+      tx
+        .select({ env: environments.name, slug: workspaces.slug })
+        .from(environments)
+        .innerJoin(workspaces, eq(workspaces.id, environments.workspaceId))
+        .where(eq(environments.id, run.environmentId)),
+    );
+    const value = { env: row?.env ?? "unknown", slug: row?.slug ?? "" };
+    if (labels.size > 1000) labels.clear();
+    labels.set(key, value);
+    return value;
+  };
+  const link = (slug: string, path: string) =>
+    deps.webUrl ? `${deps.webUrl.replace(/\/$/, "")}/${slug}/${path}` : undefined;
+  const finalize = async (runId: string) => {
+    const run = await store.getRun(runId);
+    if (!run) return;
+    const { env, slug } = await labelsOf(run);
+    if (deps.instruments) {
+      const [events, nodeRuns] = await Promise.all([
+        store.listEvents(runId, 0, 100_000),
+        store.listNodeRuns(runId),
+      ]);
+      recordRunMetrics(
+        deps.instruments,
+        { run, events, nodeRuns },
+        { workflow: run.workflowId, env },
+      );
+    }
+    if (deps.alerts && (run.status === "failed" || run.status === "timed_out")) {
+      const url = link(slug, `runs/${runId}`);
+      await deps.alerts.dispatch(run.workspaceId, `run.failed:${runId}`, {
+        event: "run.failed",
+        severity: env === "prod" || env === "production" ? "critical" : "warning",
+        title: `Run ${run.status === "timed_out" ? "timed out" : "failed"} in ${env}`,
+        text: run.error ? `${run.error.code}: ${run.error.message}` : `The run ${run.status}.`,
+        ...(url ? { url } : {}),
+        data: {
+          runId,
+          workflowId: run.workflowId,
+          environment: env,
+          code: run.error?.code ?? null,
+          nodeId: run.error?.nodeId ?? null,
+        },
+      });
+    }
+    if (await wantsReview(deps.db, run))
+      await deps.queue.enqueue(
+        "trace_review",
+        { type: "trace_review.run", runId },
+        { jobId: `trace_review:${runId}` },
+      );
+  };
+  const onEvents = (run: Run, events: readonly DurableRunEvent[]) => {
+    for (const e of events) {
+      if (e.type === "HUMAN_APPROVAL_REQUESTED" && deps.alerts) {
+        const alerts = deps.alerts;
+        void labelsOf(run)
+          .then(({ slug, env }) => {
+            const url = link(slug, `human-tasks/${e.humanTaskId}`);
+            return alerts.dispatch(run.workspaceId, `human_task.created:${e.humanTaskId}`, {
+              event: "human_task.created",
+              severity: "info",
+              title: `Review needed: ${e.request.title.slice(0, 120)}`,
+              text: `A run in ${env} is waiting for a person (${e.request.mode.type}).`,
+              ...(url ? { url } : {}),
+              data: { runId: run.id, humanTaskId: e.humanTaskId, nodeId: e.nodeId },
+            });
+          })
+          .catch((error: unknown) => log.error({ err: String(error) }, "alert failed"));
+      }
+      if (TERMINAL.has(e.type))
+        void finalize(run.id).catch((error: unknown) =>
+          log.error({ err: String(error), runId: run.id }, "finalizing a run failed"),
+        );
+    }
+  };
+
   const orchestrator = new Orchestrator({
     store,
     queue: deps.queue,
@@ -189,6 +283,7 @@ export function createWorker(deps: WorkerDeps): Worker {
     workerId,
     pool: "general",
     loadPlan: planOf,
+    onEvents,
     redact: createEventRedactor(deps.credentials.redactor),
     context: async (run) => {
       const { env, deployments, variables, source } = await deps.db.system(async (tx) => {
@@ -419,11 +514,36 @@ export function createWorker(deps: WorkerDeps): Worker {
         },
         { concurrency: 1 },
       );
+      const reviews = await deps.queue.consume(
+        "trace_review",
+        async (job) => {
+          if (job.type === "trace_review.run") {
+            const out = await runTraceReviewJob(
+              {
+                db: deps.db,
+                store,
+                registry: providers,
+                credentials: deps.credentials,
+                http: deps.http,
+                serverKeys,
+                alerts: deps.alerts,
+                webUrl: deps.webUrl,
+                judge: deps.traceReview?.judge,
+              },
+              job.runId,
+            );
+            if (out.status === "skipped")
+              log.info({ runId: job.runId, reason: out.reason }, "trace review skipped");
+          }
+        },
+        { concurrency: 2 },
+      );
       stops.push(
         () => general.stop(),
         () => control.stop(),
         () => evaluation.stop(),
         () => background.stop(),
+        () => reviews.stop(),
       );
       // Terminal runs: release their credentials and complete subflows into their parents.
       const unsub = await deps.bus.subscribe(RUN_EVENTS_CHANNEL, (m) => {

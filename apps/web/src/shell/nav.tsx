@@ -7,6 +7,7 @@ import {
   CheckSquare,
   FlaskConical,
   KeyRound,
+  LayoutDashboard,
   LayoutTemplate,
   Play,
   Plug,
@@ -28,6 +29,14 @@ export interface NavEntry {
 const ICON = { strokeWidth: 1.75 } as const;
 
 export const NAV: NavEntry[] = [
+  {
+    id: "dashboard",
+    label: "Overview",
+    feature: "dashboard",
+    icon: <LayoutDashboard {...ICON} />,
+    path: "",
+    shortcut: "g o",
+  },
   {
     id: "workflows",
     label: "Workflows",
