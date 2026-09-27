@@ -75,14 +75,17 @@ export function normalizePackage(
     };
   }
   const prefix = idPrefixFor(nodePackage.name);
+  // A @flowaid package may also use its own scoped prefix, exactly like a third-party plugin
+  // (`@flowaid/nodes-langchain.chat`), which proves the plugin path with a first-party package.
+  const ownPrefix = `${nodePackage.name}.`;
   const diagnostics: Diagnostic[] = [];
   const seen = new Set<string>();
   for (const node of nodePackage.nodes) {
-    if (!node.id.startsWith(prefix)) {
+    if (!node.id.startsWith(prefix) && !node.id.startsWith(ownPrefix)) {
       diagnostics.push({
         code: "E_PLUGIN_ID_PREFIX",
         severity: "error",
-        message: `Node type '${node.id}' in ${nodePackage.name} must start with '${prefix}'`,
+        message: `Node type '${node.id}' in ${nodePackage.name} must start with '${prefix}'${prefix === ownPrefix ? "" : ` or '${ownPrefix}'`}`,
         location: {},
       });
     }

@@ -55,3 +55,28 @@ describe.each(templates)("template %s", (name) => {
     expect(result.ok).toBe(true);
   });
 });
+
+/**
+ * The LangChain template (`packages/nodes-langchain/templates`) compiles against the core and the
+ * `@flowaid/nodes-langchain` manifests (both read as data), like a workspace with the bundled plugin.
+ */
+describe("template knowledge-assistant-langchain-rag", () => {
+  const NODES_LANGCHAIN = join(NODES_CORE, "../nodes-langchain");
+  const readLc = (...p: string[]): unknown =>
+    JSON.parse(readFileSync(join(NODES_LANGCHAIN, ...p), "utf8"));
+  const lcManifests = (readLc("manifest.json") as { nodes: unknown[] }).nodes.map((m) =>
+    NodeManifestSchema.parse(m),
+  );
+  const definition = readLc("templates", "knowledge-assistant-langchain-rag.json");
+
+  it("compiles with zero errors against the core and LangChain manifests", () => {
+    const result = compile(definition, { catalog: catalogOf([...manifests, ...lcManifests]) });
+    expect(result.diagnostics.filter((d) => d.severity === "error")).toEqual([]);
+    expect(result.ok).toBe(true);
+  });
+
+  it("does not compile without the LangChain manifests", () => {
+    const result = compile(definition, { catalog });
+    expect(result.diagnostics.map((d) => d.code)).toContain("E_UNKNOWN_NODE_TYPE");
+  });
+});

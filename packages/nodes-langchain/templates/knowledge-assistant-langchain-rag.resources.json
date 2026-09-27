@@ -1,0 +1,9 @@
+{
+  "$comment": "Resources this template needs bound on instantiate (none: it uses the durable workspace vector store). `requires: [\"langchain\"]` marks templates that need the @flowaid/nodes-langchain bundled plugin (features.langchain).",
+  "id": "knowledge-assistant-langchain-rag",
+  "name": "Knowledge assistant (LangChain RAG)",
+  "description": "Answers questions from your own documents: LangChain loads, splits, embeds and retrieves (hybrid vector + BM25); TypeSafe judges relevance, safety and groundedness; low-confidence answers go to a reviewer.",
+  "category": "knowledge",
+  "requires": ["langchain"],
+  "requiredResources": []
+}

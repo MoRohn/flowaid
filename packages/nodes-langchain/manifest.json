@@ -1,0 +1,1945 @@
+{
+  "nodes": [
+    {
+      "capabilities": [
+        "generation",
+        "credentials",
+        "tools",
+        "suspend"
+      ],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "maxCostUsd": {
+            "minimum": 0,
+            "type": "number"
+          },
+          "maxOutputTokens": {
+            "default": 2048,
+            "maximum": 65536,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "maxSteps": {
+            "default": 8,
+            "maximum": 50,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "maxTokens": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "maxToolCalls": {
+            "default": 16,
+            "maximum": 200,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "model": {
+            "properties": {
+              "model": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "provider": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "provider",
+              "model"
+            ],
+            "type": "object",
+            "x-ui": {
+              "widget": "model"
+            }
+          },
+          "system": {
+            "default": "You are a careful assistant. Use the tools when they help; answer concisely.",
+            "maxLength": 32000,
+            "type": "string",
+            "x-ui": {
+              "widget": "textarea"
+            }
+          },
+          "temperature": {
+            "default": 0.2,
+            "maximum": 2,
+            "minimum": 0,
+            "type": "number"
+          },
+          "tools": {
+            "default": [],
+            "items": {
+              "properties": {
+                "approval": {
+                  "default": "tool_default",
+                  "enum": [
+                    "never",
+                    "always",
+                    "tool_default"
+                  ],
+                  "type": "string"
+                },
+                "name": {
+                  "pattern": "^[A-Za-z0-9_-]{1,64}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "type": "object"
+            },
+            "maxItems": 32,
+            "type": "array",
+            "x-ui": {
+              "help": "Workflow tools the agent may call, with their approval policy.",
+              "widget": "list"
+            }
+          }
+        },
+        "required": [
+          "model"
+        ],
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [
+        {
+          "description": "Credential of the chat or embedding model (native or langchain:<vendor>).",
+          "name": "llm",
+          "required": true,
+          "types": [
+            "openai.api_key",
+            "anthropic.api_key",
+            "ollama.host",
+            "ollama.none"
+          ]
+        }
+      ],
+      "defaultPolicy": {
+        "timeoutMs": 600000
+      },
+      "generation": true,
+      "id": "@flowaid/nodes-langchain.agent",
+      "idempotency": "none",
+      "inputs": [
+        {
+          "name": "task",
+          "required": true,
+          "schema": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        {
+          "name": "context",
+          "required": false,
+          "schema": {}
+        }
+      ],
+      "metadata": {
+        "category": "agent",
+        "description": "A LangGraph ReAct agent over the workflow's tools, bounded by steps, tool calls, tokens, cost and time; tool calls that need approval pause the run for a person.",
+        "icon": "bot",
+        "name": "LangChain agent",
+        "summary": "{{ config.model.model }} · {{ config.maxSteps }} steps",
+        "tags": [
+          "langchain",
+          "langgraph",
+          "agent",
+          "react",
+          "tools"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "answer",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "steps",
+          "required": true,
+          "schema": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        {
+          "name": "tool_calls",
+          "required": true,
+          "schema": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "args": {},
+                "name": {
+                  "type": "string"
+                },
+                "ok": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "name",
+                "args",
+                "ok"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "name": "usage",
+          "required": true,
+          "schema": {
+            "additionalProperties": false,
+            "properties": {
+              "inputTokens": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "outputTokens": {
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "inputTokens",
+              "outputTokens"
+            ],
+            "type": "object"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [
+        "generation",
+        "credentials",
+        "streaming",
+        "tools"
+      ],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "includeHistory": {
+            "default": false,
+            "type": "boolean",
+            "x-ui": {
+              "help": "Insert the `history` input before the last message.",
+              "widget": "switch"
+            }
+          },
+          "maxOutputTokens": {
+            "default": 1024,
+            "maximum": 65536,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "messages": {
+            "default": [
+              {
+                "content": "{input}",
+                "role": "human"
+              }
+            ],
+            "items": {
+              "properties": {
+                "content": {
+                  "maxLength": 32000,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "role": {
+                  "enum": [
+                    "system",
+                    "human",
+                    "ai"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "role",
+                "content"
+              ],
+              "type": "object"
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "type": "array",
+            "x-ui": {
+              "help": "Prompt template messages; {name} placeholders are filled from the `variables` input ({{ and }} escape braces).",
+              "widget": "list"
+            }
+          },
+          "model": {
+            "properties": {
+              "model": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "provider": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "provider",
+              "model"
+            ],
+            "type": "object",
+            "x-ui": {
+              "widget": "model"
+            }
+          },
+          "outputSchema": {
+            "type": "object",
+            "x-ui": {
+              "help": "JSON Schema for structured output (types `structured`).",
+              "widget": "schema"
+            }
+          },
+          "stream": {
+            "default": true,
+            "type": "boolean"
+          },
+          "temperature": {
+            "default": 0.7,
+            "maximum": 2,
+            "minimum": 0,
+            "type": "number"
+          },
+          "tools": {
+            "default": [],
+            "items": {
+              "pattern": "^[A-Za-z0-9_-]{1,64}$",
+              "type": "string"
+            },
+            "maxItems": 64,
+            "type": "array",
+            "x-ui": {
+              "help": "Workflow tools the model may request (returned as tool_calls).",
+              "widget": "list"
+            }
+          }
+        },
+        "required": [
+          "model"
+        ],
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [
+        {
+          "description": "Credential of the chat or embedding model (native or langchain:<vendor>).",
+          "name": "llm",
+          "required": true,
+          "types": [
+            "openai.api_key",
+            "anthropic.api_key",
+            "ollama.host",
+            "ollama.none"
+          ]
+        }
+      ],
+      "defaultPolicy": {
+        "timeoutMs": 120000
+      },
+      "generation": true,
+      "id": "@flowaid/nodes-langchain.chat",
+      "idempotency": "safe",
+      "inputs": [
+        {
+          "name": "variables",
+          "required": false,
+          "schema": {
+            "default": {},
+            "type": "object"
+          }
+        },
+        {
+          "name": "history",
+          "required": false,
+          "schema": {
+            "items": {
+              "properties": {
+                "content": {
+                  "type": "string"
+                },
+                "role": {
+                  "enum": [
+                    "system",
+                    "user",
+                    "assistant",
+                    "tool"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "role",
+                "content"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        }
+      ],
+      "metadata": {
+        "category": "generation",
+        "description": "Runs a chat model with a LangChain prompt template ({variable} placeholders from `variables`, optional chat history). Streams text, returns structured output with an output schema, and returns tool calls when tools are offered.",
+        "icon": "messages-square",
+        "name": "LangChain chat",
+        "summary": "{{ config.model.provider }}/{{ config.model.model }}",
+        "tags": [
+          "langchain",
+          "llm",
+          "prompt",
+          "chat"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "text",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "structured",
+          "required": true,
+          "schema": {}
+        },
+        {
+          "name": "tool_calls",
+          "required": true,
+          "schema": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "args": {},
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "args"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "name": "finish_reason",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "usage",
+          "required": true,
+          "schema": {
+            "properties": {
+              "inputTokens": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "outputTokens": {
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "inputTokens",
+              "outputTokens"
+            ],
+            "type": "object"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [
+        {
+          "kind": "outputSchemaFromConfig",
+          "path": "/outputSchema",
+          "port": "structured"
+        }
+      ],
+      "streams": true,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [
+        "network",
+        "credentials"
+      ],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "csvDelimiter": {
+            "default": ",",
+            "maxLength": 1,
+            "minLength": 1,
+            "type": "string"
+          },
+          "extensions": {
+            "default": [
+              ".md",
+              ".mdx",
+              ".txt"
+            ],
+            "items": {
+              "maxLength": 20,
+              "type": "string"
+            },
+            "maxItems": 50,
+            "type": "array"
+          },
+          "include": {
+            "maxLength": 2000,
+            "type": "string",
+            "x-ui": {
+              "help": "Only pages whose URL starts with this.",
+              "showWhen": {
+                "equals": "sitemap",
+                "path": "/source"
+              }
+            }
+          },
+          "jsonPointer": {
+            "default": "",
+            "pattern": "^(\\/.*)?$",
+            "type": "string",
+            "x-ui": {
+              "help": "Pointer to the array (or value) to load.",
+              "showWhen": {
+                "equals": "json",
+                "path": "/source"
+              }
+            }
+          },
+          "maxBytes": {
+            "default": 2097152,
+            "maximum": 20971520,
+            "minimum": 1024,
+            "type": "integer"
+          },
+          "maxPages": {
+            "default": 50,
+            "maximum": 500,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "path": {
+            "default": "",
+            "maxLength": 1000,
+            "type": "string"
+          },
+          "ref": {
+            "default": "main",
+            "maxLength": 200,
+            "type": "string"
+          },
+          "repo": {
+            "pattern": "^[\\w.-]+\\/[\\w.-]+$",
+            "type": "string",
+            "x-ui": {
+              "placeholder": "owner/name",
+              "showWhen": {
+                "equals": "github",
+                "path": "/source"
+              }
+            }
+          },
+          "source": {
+            "default": "text",
+            "enum": [
+              "text",
+              "markdown",
+              "json",
+              "jsonl",
+              "csv",
+              "html",
+              "url",
+              "sitemap",
+              "github"
+            ],
+            "type": "string",
+            "x-ui": {
+              "widget": "select"
+            }
+          },
+          "sourceName": {
+            "default": "input",
+            "maxLength": 500,
+            "type": "string",
+            "x-ui": {
+              "help": "`metadata.source` for inline content."
+            }
+          },
+          "textField": {
+            "maxLength": 200,
+            "type": "string",
+            "x-ui": {
+              "help": "JSON pointer (json/jsonl) or column (csv) holding the text; default the whole item."
+            }
+          }
+        },
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [
+        {
+          "description": "Token for private repositories and higher GitHub rate limits.",
+          "name": "github",
+          "required": false,
+          "types": [
+            "github.token"
+          ]
+        }
+      ],
+      "defaultPolicy": {
+        "timeoutMs": 120000
+      },
+      "generation": false,
+      "id": "@flowaid/nodes-langchain.document_loader",
+      "idempotency": "safe",
+      "inputs": [
+        {
+          "name": "content",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "urls",
+          "required": false,
+          "schema": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ]
+          }
+        },
+        {
+          "name": "metadata",
+          "required": false,
+          "schema": {
+            "default": {},
+            "type": "object"
+          }
+        }
+      ],
+      "metadata": {
+        "category": "retrieval",
+        "description": "Loads documents from text, Markdown, JSON, JSON Lines, CSV or HTML content, or from web pages, a sitemap or a GitHub repository.",
+        "icon": "file-text",
+        "name": "Document loader",
+        "summary": "{{ config.source }}",
+        "tags": [
+          "langchain",
+          "rag",
+          "loader",
+          "documents"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "documents",
+          "required": true,
+          "schema": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "metadata": {
+                  "type": "object"
+                },
+                "pageContent": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "pageContent",
+                "metadata"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "name": "count",
+          "required": true,
+          "schema": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [
+        "generation",
+        "credentials"
+      ],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "batchSize": {
+            "default": 96,
+            "maximum": 2048,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "model": {
+            "properties": {
+              "model": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "provider": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "provider",
+              "model"
+            ],
+            "type": "object",
+            "x-ui": {
+              "widget": "model"
+            }
+          }
+        },
+        "required": [
+          "model"
+        ],
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [
+        {
+          "description": "Credential of the chat or embedding model (native or langchain:<vendor>).",
+          "name": "llm",
+          "required": true,
+          "types": [
+            "openai.api_key",
+            "anthropic.api_key",
+            "ollama.host",
+            "ollama.none"
+          ]
+        }
+      ],
+      "defaultPolicy": {
+        "timeoutMs": 120000
+      },
+      "generation": true,
+      "id": "@flowaid/nodes-langchain.embed",
+      "idempotency": "safe",
+      "inputs": [
+        {
+          "name": "texts",
+          "required": false,
+          "schema": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ]
+          }
+        },
+        {
+          "name": "documents",
+          "required": false,
+          "schema": {
+            "items": {
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "metadata": {
+                  "type": "object"
+                },
+                "pageContent": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "pageContent",
+                "metadata"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        }
+      ],
+      "metadata": {
+        "category": "retrieval",
+        "description": "Embeds texts or documents with an embedding model; one vector per item, in order.",
+        "icon": "binary",
+        "name": "LangChain embed",
+        "summary": "{{ config.model.provider }}/{{ config.model.model }}",
+        "tags": [
+          "langchain",
+          "rag",
+          "embeddings"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "vectors",
+          "required": true,
+          "schema": {
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "name": "dimensions",
+          "required": true,
+          "schema": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        {
+          "name": "usage",
+          "required": true,
+          "schema": {
+            "additionalProperties": false,
+            "properties": {
+              "inputTokens": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "outputTokens": {
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "inputTokens",
+              "outputTokens"
+            ],
+            "type": "object"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [
+        "generation",
+        "credentials"
+      ],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "maxRepairs": {
+            "default": 1,
+            "maximum": 3,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "model": {
+            "properties": {
+              "model": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "provider": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "provider",
+              "model"
+            ],
+            "type": "object",
+            "x-ui": {
+              "showWhen": {
+                "path": "/repair",
+                "truthy": true
+              },
+              "widget": "model"
+            }
+          },
+          "parser": {
+            "default": "json",
+            "enum": [
+              "json",
+              "comma_list",
+              "line_list",
+              "number",
+              "boolean"
+            ],
+            "type": "string",
+            "x-ui": {
+              "widget": "select"
+            }
+          },
+          "repair": {
+            "default": false,
+            "type": "boolean",
+            "x-ui": {
+              "widget": "switch"
+            }
+          },
+          "schema": {
+            "type": "object",
+            "x-ui": {
+              "help": "JSON Schema the parsed value must match; types `output`.",
+              "widget": "schema"
+            }
+          }
+        },
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [
+        {
+          "description": "Chat model credential for the repair loop.",
+          "name": "llm",
+          "required": false,
+          "types": [
+            "openai.api_key",
+            "anthropic.api_key",
+            "ollama.host",
+            "ollama.none"
+          ]
+        }
+      ],
+      "defaultPolicy": {},
+      "generation": true,
+      "id": "@flowaid/nodes-langchain.output_parser",
+      "idempotency": "safe",
+      "inputs": [
+        {
+          "name": "text",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "metadata": {
+        "category": "data",
+        "description": "Parses model text into JSON (validated against a schema), a list, a number or a boolean; optionally repairs unparseable text with a chat model.",
+        "icon": "braces",
+        "name": "Output parser",
+        "summary": "{{ config.parser }}",
+        "tags": [
+          "langchain",
+          "parser",
+          "json",
+          "structured"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "output",
+          "required": true,
+          "schema": {}
+        },
+        {
+          "name": "repaired",
+          "required": true,
+          "schema": {
+            "type": "boolean"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [
+        {
+          "kind": "outputSchemaFromConfig",
+          "path": "/schema",
+          "port": "output"
+        }
+      ],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [
+        "generation",
+        "credentials",
+        "network",
+        "state"
+      ],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "collection": {
+            "default": "knowledge",
+            "pattern": "^[A-Za-z0-9_.-]{1,128}$",
+            "type": "string",
+            "x-ui": {
+              "help": "Collection (Qdrant), namespace (Pinecone) or workspace collection."
+            }
+          },
+          "embeddingModel": {
+            "properties": {
+              "model": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "provider": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "provider",
+              "model"
+            ],
+            "type": "object",
+            "x-ui": {
+              "widget": "model"
+            }
+          },
+          "fetchK": {
+            "default": 20,
+            "maximum": 200,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "k": {
+            "default": 4,
+            "maximum": 50,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "lambda": {
+            "default": 0.5,
+            "maximum": 1,
+            "minimum": 0,
+            "type": "number",
+            "x-ui": {
+              "help": "1 = relevance only, 0 = diversity only.",
+              "showWhen": {
+                "equals": "mmr",
+                "path": "/strategy"
+              }
+            }
+          },
+          "model": {
+            "properties": {
+              "model": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "provider": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "provider",
+              "model"
+            ],
+            "type": "object",
+            "x-ui": {
+              "showWhen": {
+                "equals": "multi_query",
+                "path": "/strategy"
+              },
+              "widget": "model"
+            }
+          },
+          "queries": {
+            "default": 3,
+            "maximum": 8,
+            "minimum": 1,
+            "type": "integer",
+            "x-ui": {
+              "showWhen": {
+                "equals": "multi_query",
+                "path": "/strategy"
+              }
+            }
+          },
+          "scoreThreshold": {
+            "maximum": 1,
+            "minimum": -1,
+            "type": "number"
+          },
+          "store": {
+            "default": "workspace",
+            "enum": [
+              "workspace",
+              "qdrant",
+              "pinecone"
+            ],
+            "type": "string",
+            "x-ui": {
+              "help": "workspace: durable workspace state (small corpora); qdrant / pinecone: external vector databases.",
+              "widget": "select"
+            }
+          },
+          "strategy": {
+            "default": "hybrid",
+            "enum": [
+              "similarity",
+              "mmr",
+              "multi_query",
+              "hybrid"
+            ],
+            "type": "string",
+            "x-ui": {
+              "widget": "select"
+            }
+          },
+          "url": {
+            "maxLength": 2000,
+            "type": "string",
+            "x-ui": {
+              "help": "Qdrant base URL or Pinecone index host.",
+              "placeholder": "https://…",
+              "showWhen": {
+                "oneOf": [
+                  "qdrant",
+                  "pinecone"
+                ],
+                "path": "/store"
+              }
+            }
+          }
+        },
+        "required": [
+          "embeddingModel"
+        ],
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [
+        {
+          "description": "Credential of the chat or embedding model (native or langchain:<vendor>).",
+          "name": "llm",
+          "required": false,
+          "types": [
+            "openai.api_key",
+            "anthropic.api_key",
+            "ollama.host",
+            "ollama.none"
+          ]
+        },
+        {
+          "description": "API key of the external vector database (Qdrant api-key, Pinecone Api-Key).",
+          "name": "store",
+          "required": false,
+          "types": [
+            "http.api_key"
+          ]
+        }
+      ],
+      "defaultPolicy": {
+        "timeoutMs": 60000
+      },
+      "generation": true,
+      "id": "@flowaid/nodes-langchain.retriever",
+      "idempotency": "safe",
+      "inputs": [
+        {
+          "name": "query",
+          "required": true,
+          "schema": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        {
+          "name": "filter",
+          "required": false,
+          "schema": {
+            "additionalProperties": {
+              "type": [
+                "string",
+                "number",
+                "boolean"
+              ]
+            },
+            "type": "object"
+          }
+        }
+      ],
+      "metadata": {
+        "category": "retrieval",
+        "description": "Retrieves the documents most relevant to a query from a vector store: similarity, MMR (diverse), multi-query (LLM query variants, fused) or hybrid (vector + BM25).",
+        "icon": "search",
+        "name": "Retriever",
+        "summary": "{{ config.strategy }} · k={{ config.k }}",
+        "tags": [
+          "langchain",
+          "rag",
+          "retrieval",
+          "bm25",
+          "mmr"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "documents",
+          "required": true,
+          "schema": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "metadata": {
+                  "type": "object"
+                },
+                "pageContent": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "pageContent",
+                "metadata"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "name": "context",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "count",
+          "required": true,
+          "schema": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [
+        "generation",
+        "credentials",
+        "streaming",
+        "tools"
+      ],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "embeddingModel": {
+            "properties": {
+              "model": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "provider": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "provider",
+              "model"
+            ],
+            "type": "object",
+            "x-ui": {
+              "widget": "model"
+            }
+          },
+          "idempotent": {
+            "default": false,
+            "type": "boolean",
+            "x-ui": {
+              "help": "Declare the runnable free of side effects.",
+              "widget": "switch"
+            }
+          },
+          "inputSchema": {
+            "type": "object",
+            "x-ui": {
+              "help": "JSON Schema of `input`; types the input port.",
+              "widget": "schema"
+            }
+          },
+          "maxCostUsd": {
+            "minimum": 0,
+            "type": "number"
+          },
+          "maxTokens": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "model": {
+            "properties": {
+              "model": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "provider": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "provider",
+              "model"
+            ],
+            "type": "object",
+            "x-ui": {
+              "widget": "model"
+            }
+          },
+          "outputSchema": {
+            "type": "object",
+            "x-ui": {
+              "help": "JSON Schema of `output`; checked at run time.",
+              "widget": "schema"
+            }
+          },
+          "params": {
+            "default": {},
+            "type": "object",
+            "x-ui": {
+              "help": "Passed to the runnable's factory.",
+              "widget": "keyvalue"
+            }
+          },
+          "runnable": {
+            "pattern": "^[a-z0-9][a-z0-9_.-]{0,127}$",
+            "type": "string",
+            "x-ui": {
+              "optionsProvider": "runnables",
+              "widget": "select"
+            }
+          },
+          "tools": {
+            "default": [],
+            "items": {
+              "pattern": "^[A-Za-z0-9_-]{1,64}$",
+              "type": "string"
+            },
+            "maxItems": 32,
+            "type": "array",
+            "x-ui": {
+              "help": "Workflow tools handed to the runnable.",
+              "widget": "list"
+            }
+          }
+        },
+        "required": [
+          "runnable"
+        ],
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [
+        {
+          "description": "Credential of the configured chat/embedding model.",
+          "name": "llm",
+          "required": false,
+          "types": [
+            "openai.api_key",
+            "anthropic.api_key",
+            "ollama.host",
+            "ollama.none"
+          ]
+        }
+      ],
+      "defaultPolicy": {
+        "timeoutMs": 300000
+      },
+      "generation": true,
+      "id": "@flowaid/nodes-langchain.runnable",
+      "idempotency": {
+        "byConfig": "/idempotent",
+        "cases": {
+          "false": "none",
+          "true": "safe"
+        },
+        "default": "none"
+      },
+      "inputs": [
+        {
+          "name": "input",
+          "required": true,
+          "schema": {}
+        }
+      ],
+      "metadata": {
+        "category": "generation",
+        "description": "Runs a registered LangChain (LCEL) runnable by name with a typed input and output. Inner model, tool and retriever calls appear in the trace and count against the node's bounds.",
+        "icon": "workflow",
+        "name": "LangChain runnable",
+        "summary": "{{ config.runnable }}",
+        "tags": [
+          "langchain",
+          "lcel",
+          "chain"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [
+        "runnables"
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "required": true,
+          "schema": {}
+        }
+      ],
+      "pool": "general",
+      "portRules": [
+        {
+          "kind": "inputSchemaFromConfig",
+          "path": "/inputSchema",
+          "port": "input"
+        },
+        {
+          "kind": "outputSchemaFromConfig",
+          "path": "/outputSchema",
+          "port": "output"
+        }
+      ],
+      "streams": true,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "chunkOverlap": {
+            "default": 150,
+            "maximum": 8000,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "chunkSize": {
+            "default": 1000,
+            "maximum": 32000,
+            "minimum": 50,
+            "type": "integer"
+          },
+          "language": {
+            "default": "js",
+            "enum": [
+              "cpp",
+              "go",
+              "java",
+              "js",
+              "php",
+              "proto",
+              "python",
+              "rst",
+              "ruby",
+              "rust",
+              "scala",
+              "swift",
+              "markdown",
+              "latex",
+              "html",
+              "sol"
+            ],
+            "type": "string",
+            "x-ui": {
+              "showWhen": {
+                "equals": "code",
+                "path": "/splitter"
+              },
+              "widget": "select"
+            }
+          },
+          "separator": {
+            "default": "\n\n",
+            "maxLength": 20,
+            "type": "string",
+            "x-ui": {
+              "showWhen": {
+                "equals": "character",
+                "path": "/splitter"
+              }
+            }
+          },
+          "splitter": {
+            "default": "recursive",
+            "enum": [
+              "recursive",
+              "character",
+              "markdown",
+              "code"
+            ],
+            "type": "string",
+            "x-ui": {
+              "widget": "select"
+            }
+          }
+        },
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [],
+      "defaultPolicy": {},
+      "generation": false,
+      "id": "@flowaid/nodes-langchain.text_splitter",
+      "idempotency": "safe",
+      "inputs": [
+        {
+          "name": "documents",
+          "required": false,
+          "schema": {
+            "items": {
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "metadata": {
+                  "type": "object"
+                },
+                "pageContent": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "pageContent",
+                "metadata"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "name": "text",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "metadata": {
+        "category": "retrieval",
+        "description": "Splits documents or text into overlapping chunks (recursive character, character, Markdown or code-aware) for embedding and retrieval.",
+        "icon": "scissors",
+        "name": "Text splitter",
+        "summary": "{{ config.splitter }} · {{ config.chunkSize }}/{{ config.chunkOverlap }}",
+        "tags": [
+          "langchain",
+          "rag",
+          "chunking"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "chunks",
+          "required": true,
+          "schema": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "metadata": {
+                  "type": "object"
+                },
+                "pageContent": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "pageContent",
+                "metadata"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "name": "count",
+          "required": true,
+          "schema": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [
+        "generation",
+        "credentials",
+        "network",
+        "state"
+      ],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "collection": {
+            "default": "knowledge",
+            "pattern": "^[A-Za-z0-9_.-]{1,128}$",
+            "type": "string",
+            "x-ui": {
+              "help": "Collection (Qdrant), namespace (Pinecone) or workspace collection."
+            }
+          },
+          "embeddingModel": {
+            "properties": {
+              "model": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "provider": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "provider",
+              "model"
+            ],
+            "type": "object",
+            "x-ui": {
+              "widget": "model"
+            }
+          },
+          "k": {
+            "default": 4,
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "operation": {
+            "default": "upsert",
+            "enum": [
+              "upsert",
+              "query",
+              "delete"
+            ],
+            "type": "string",
+            "x-ui": {
+              "widget": "select"
+            }
+          },
+          "scoreThreshold": {
+            "maximum": 1,
+            "minimum": -1,
+            "type": "number"
+          },
+          "store": {
+            "default": "workspace",
+            "enum": [
+              "workspace",
+              "qdrant",
+              "pinecone"
+            ],
+            "type": "string",
+            "x-ui": {
+              "help": "workspace: durable workspace state (small corpora); qdrant / pinecone: external vector databases.",
+              "widget": "select"
+            }
+          },
+          "url": {
+            "maxLength": 2000,
+            "type": "string",
+            "x-ui": {
+              "help": "Qdrant base URL or Pinecone index host.",
+              "placeholder": "https://…",
+              "showWhen": {
+                "oneOf": [
+                  "qdrant",
+                  "pinecone"
+                ],
+                "path": "/store"
+              }
+            }
+          }
+        },
+        "required": [
+          "embeddingModel"
+        ],
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [
+        {
+          "description": "Credential of the chat or embedding model (native or langchain:<vendor>).",
+          "name": "llm",
+          "required": false,
+          "types": [
+            "openai.api_key",
+            "anthropic.api_key",
+            "ollama.host",
+            "ollama.none"
+          ]
+        },
+        {
+          "description": "API key of the external vector database (Qdrant api-key, Pinecone Api-Key).",
+          "name": "store",
+          "required": false,
+          "types": [
+            "http.api_key"
+          ]
+        }
+      ],
+      "defaultPolicy": {
+        "timeoutMs": 120000
+      },
+      "generation": true,
+      "id": "@flowaid/nodes-langchain.vector_store",
+      "idempotency": "safe",
+      "inputs": [
+        {
+          "name": "documents",
+          "required": false,
+          "schema": {
+            "items": {
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "metadata": {
+                  "type": "object"
+                },
+                "pageContent": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "pageContent",
+                "metadata"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "name": "vectors",
+          "required": false,
+          "schema": {
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "name": "query",
+          "required": false,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "ids",
+          "required": false,
+          "schema": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "name": "filter",
+          "required": false,
+          "schema": {
+            "additionalProperties": {
+              "type": [
+                "string",
+                "number",
+                "boolean"
+              ]
+            },
+            "type": "object"
+          }
+        }
+      ],
+      "metadata": {
+        "category": "retrieval",
+        "description": "Upserts, queries or deletes documents in a vector store: the durable workspace store, Qdrant or Pinecone.",
+        "icon": "database",
+        "name": "Vector store",
+        "summary": "{{ config.operation }} · {{ config.store }}/{{ config.collection }}",
+        "tags": [
+          "langchain",
+          "rag",
+          "vector",
+          "qdrant",
+          "pinecone"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "ids",
+          "required": true,
+          "schema": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "name": "hits",
+          "required": true,
+          "schema": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "metadata": {
+                  "type": "object"
+                },
+                "pageContent": {
+                  "type": "string"
+                },
+                "score": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "pageContent",
+                "metadata",
+                "score"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "name": "count",
+          "required": true,
+          "schema": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    }
+  ],
+  "package": "@flowaid/nodes-langchain",
+  "providers": [
+    {
+      "credentialType": null,
+      "id": "langchain:ollama",
+      "kind": "embedding"
+    },
+    {
+      "credentialType": "openai.api_key",
+      "id": "langchain:openai",
+      "kind": "embedding"
+    },
+    {
+      "credentialType": "anthropic.api_key",
+      "id": "langchain:anthropic",
+      "kind": "generation"
+    },
+    {
+      "credentialType": null,
+      "id": "langchain:ollama",
+      "kind": "generation"
+    },
+    {
+      "credentialType": "openai.api_key",
+      "id": "langchain:openai",
+      "kind": "generation"
+    }
+  ],
+  "version": "0.1.0"
+}

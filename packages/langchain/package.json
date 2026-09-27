@@ -1,0 +1,42 @@
+{
+  "name": "@flowaid/langchain",
+  "version": "0.1.0",
+  "private": true,
+  "description": "LangChain adapters for FlowAId, in both directions: LangChain chat models, embeddings and decisions as FlowAId providers; FlowAId providers, tools and workflows as LangChain models and tools; a callback handler that puts LangChain work into run traces and budgets; the LCEL runnable registry and schema/message bridges (docs/design/LANGCHAIN.md §2).",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src",
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src",
+    "test": "vitest run",
+    "clean": "rm -rf dist .turbo *.tsbuildinfo"
+  },
+  "peerDependencies": {
+    "@langchain/core": "^1.2.12"
+  },
+  "dependencies": {
+    "@flowaid/node-sdk": "workspace:*",
+    "@flowaid/providers": "workspace:*",
+    "@flowaid/shared": "workspace:*",
+    "@flowaid/workflow-core": "workspace:*",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@flowaid/config": "workspace:*",
+    "@langchain/core": "1.2.12",
+    "@types/node": "24.13.6",
+    "eslint": "9.39.5",
+    "typescript": "5.9.3",
+    "vitest": "4.1.11"
+  }
+}

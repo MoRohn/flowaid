@@ -1,0 +1,754 @@
+{
+  "$schema": "https://flowaid.dev/schemas/workflow/v1",
+  "id": "5a8c1e3f-7b2d-4c6e-9f1a-3d5b7e9c2a4f",
+  "name": "Knowledge Assistant (LangChain RAG)",
+  "description": "Retrieval-augmented answers with LangChain: ingest any new knowledge (load, split, embed, upsert; a no-op without it), retrieve with hybrid vector + BM25 search, let TypeSafe judge whether the passages answer the question, answer with a LangChain chat prompt that cites its sources, then check safety and groundedness and gate on confidence with a human review fallback.",
+  "inputs": {
+    "type": "object",
+    "required": ["question"],
+    "properties": {
+      "question": {
+        "type": "string",
+        "minLength": 1
+      },
+      "knowledge": {
+        "type": "string",
+        "description": "Optional Markdown to add to the knowledge base before answering."
+      },
+      "source": {
+        "type": "string",
+        "description": "Name of the knowledge source (used for citations)."
+      }
+    }
+  },
+  "outputs": {
+    "type": "object",
+    "required": ["answer", "sources", "disposition"],
+    "properties": {
+      "answer": {
+        "type": "string"
+      },
+      "sources": {
+        "type": "array",
+        "items": {
+          "type": "object"
+        }
+      },
+      "disposition": {
+        "type": "string",
+        "enum": ["answered", "reviewed", "insufficient_context"]
+      }
+    }
+  },
+  "secrets": [
+    {
+      "name": "TYPESAFE_API_KEY",
+      "credentialType": "typesafe.api_key"
+    },
+    {
+      "name": "OPENAI_API_KEY",
+      "credentialType": "openai.api_key"
+    }
+  ],
+  "variables": [
+    {
+      "name": "answerThreshold",
+      "schema": {
+        "type": "number"
+      },
+      "default": 0.85
+    }
+  ],
+  "execution": {
+    "timeoutMs": 180000,
+    "maxCostUsd": 0.25,
+    "decisions": {
+      "primary": {
+        "provider": "typesafe",
+        "model": "jev-latest"
+      },
+      "failover": [
+        {
+          "provider": "llm",
+          "model": {
+            "provider": "openai",
+            "model": "gpt-4.1-mini"
+          }
+        }
+      ]
+    }
+  },
+  "nodes": [
+    {
+      "id": "start",
+      "kind": "input",
+      "name": "Question"
+    },
+    {
+      "id": "load",
+      "kind": "task",
+      "type": "@flowaid/nodes-langchain.document_loader",
+      "typeVersion": "1.0.0",
+      "name": "Load knowledge",
+      "config": {
+        "source": "markdown",
+        "sourceName": "knowledge"
+      },
+      "inputs": {
+        "content": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "start",
+            "port": "knowledge"
+          },
+          "default": ""
+        },
+        "metadata": {
+          "kind": "object",
+          "fields": {
+            "source": {
+              "kind": "ref",
+              "ref": {
+                "kind": "port",
+                "node": "start",
+                "port": "source"
+              },
+              "default": "knowledge"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "chunk",
+      "kind": "task",
+      "type": "@flowaid/nodes-langchain.text_splitter",
+      "typeVersion": "1.0.0",
+      "name": "Split into chunks",
+      "config": {
+        "splitter": "markdown",
+        "chunkSize": 800,
+        "chunkOverlap": 120
+      },
+      "inputs": {
+        "documents": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "load",
+            "port": "documents"
+          }
+        }
+      }
+    },
+    {
+      "id": "embed",
+      "kind": "task",
+      "type": "@flowaid/nodes-langchain.embed",
+      "typeVersion": "1.0.0",
+      "name": "Embed chunks",
+      "config": {
+        "model": {
+          "provider": "openai",
+          "model": "text-embedding-3-small"
+        },
+        "batchSize": 96
+      },
+      "inputs": {
+        "documents": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "chunk",
+            "port": "chunks"
+          }
+        }
+      },
+      "credentials": {
+        "llm": "OPENAI_API_KEY"
+      }
+    },
+    {
+      "id": "upsert",
+      "kind": "task",
+      "type": "@flowaid/nodes-langchain.vector_store",
+      "typeVersion": "1.0.0",
+      "name": "Upsert chunks",
+      "config": {
+        "operation": "upsert",
+        "embeddingModel": {
+          "provider": "openai",
+          "model": "text-embedding-3-small"
+        },
+        "store": "workspace",
+        "collection": "knowledge"
+      },
+      "inputs": {
+        "documents": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "chunk",
+            "port": "chunks"
+          }
+        },
+        "vectors": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "embed",
+            "port": "vectors"
+          }
+        }
+      },
+      "credentials": {
+        "llm": "OPENAI_API_KEY"
+      }
+    },
+    {
+      "id": "retrieve",
+      "kind": "task",
+      "type": "@flowaid/nodes-langchain.retriever",
+      "typeVersion": "1.0.0",
+      "name": "Retrieve passages",
+      "config": {
+        "embeddingModel": {
+          "provider": "openai",
+          "model": "text-embedding-3-small"
+        },
+        "strategy": "hybrid",
+        "k": 4,
+        "fetchK": 20,
+        "store": "workspace",
+        "collection": "knowledge"
+      },
+      "inputs": {
+        "query": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "start",
+            "port": "question"
+          }
+        }
+      },
+      "credentials": {
+        "llm": "OPENAI_API_KEY"
+      }
+    },
+    {
+      "id": "relevance",
+      "kind": "task",
+      "type": "flowaid.decision.batch",
+      "typeVersion": "1.0.0",
+      "name": "Relevance judgments",
+      "config": {
+        "questions": {
+          "answerable": {
+            "kind": "boolean",
+            "instructions": "Do the retrieved passages contain the information needed to answer the question?",
+            "criteria": {
+              "true": "The passages answer the question",
+              "false": "The passages are missing or off-topic"
+            }
+          },
+          "coverage": {
+            "kind": "score",
+            "instructions": "How completely do the passages cover the question?",
+            "levels": ["Not at all", "Partially", "Mostly", "Completely"]
+          }
+        }
+      },
+      "inputs": {
+        "state": {
+          "kind": "object",
+          "fields": {
+            "question": {
+              "kind": "ref",
+              "ref": {
+                "kind": "port",
+                "node": "start",
+                "port": "question"
+              }
+            },
+            "passages": {
+              "kind": "ref",
+              "ref": {
+                "kind": "port",
+                "node": "retrieve",
+                "port": "context"
+              }
+            }
+          }
+        }
+      },
+      "credentials": {
+        "typesafe": "TYPESAFE_API_KEY",
+        "llm": "OPENAI_API_KEY"
+      }
+    },
+    {
+      "id": "grounded",
+      "kind": "branch",
+      "name": "Answerable?",
+      "cases": [
+        {
+          "port": "answer",
+          "when": "relevance.answers.answerable.value && relevance.answers.coverage.value >= 1"
+        }
+      ],
+      "defaultPort": "no_context"
+    },
+    {
+      "id": "answer",
+      "kind": "task",
+      "type": "@flowaid/nodes-langchain.chat",
+      "typeVersion": "1.0.0",
+      "name": "Answer with citations",
+      "config": {
+        "model": {
+          "provider": "openai",
+          "model": "gpt-4.1-mini"
+        },
+        "temperature": 0.1,
+        "maxOutputTokens": 700,
+        "stream": true,
+        "messages": [
+          {
+            "role": "system",
+            "content": "You answer questions using only the numbered context passages. Cite every claim with its passage number, like [1]. If the context does not contain the answer, say so plainly. Never invent facts."
+          },
+          {
+            "role": "human",
+            "content": "Question: {question}\n\nContext:\n{context}"
+          }
+        ]
+      },
+      "inputs": {
+        "variables": {
+          "kind": "object",
+          "fields": {
+            "question": {
+              "kind": "ref",
+              "ref": {
+                "kind": "port",
+                "node": "start",
+                "port": "question"
+              }
+            },
+            "context": {
+              "kind": "ref",
+              "ref": {
+                "kind": "port",
+                "node": "retrieve",
+                "port": "context"
+              }
+            }
+          }
+        }
+      },
+      "credentials": {
+        "llm": "OPENAI_API_KEY"
+      }
+    },
+    {
+      "id": "safety",
+      "kind": "task",
+      "type": "flowaid.decision.batch",
+      "typeVersion": "1.0.0",
+      "name": "Safety and groundedness",
+      "config": {
+        "questions": {
+          "grounded": {
+            "kind": "boolean",
+            "instructions": "Is every claim in the answer supported by the context passages, with citations?",
+            "criteria": {
+              "true": "Fully grounded",
+              "false": "Contains unsupported claims"
+            }
+          },
+          "safe": {
+            "kind": "boolean",
+            "instructions": "Is the answer safe to send (no harmful advice, no personal data, no policy violations)?",
+            "criteria": {
+              "true": "Safe",
+              "false": "Unsafe"
+            }
+          }
+        }
+      },
+      "inputs": {
+        "state": {
+          "kind": "object",
+          "fields": {
+            "question": {
+              "kind": "ref",
+              "ref": {
+                "kind": "port",
+                "node": "start",
+                "port": "question"
+              }
+            },
+            "context": {
+              "kind": "ref",
+              "ref": {
+                "kind": "port",
+                "node": "retrieve",
+                "port": "context"
+              }
+            },
+            "answer": {
+              "kind": "ref",
+              "ref": {
+                "kind": "port",
+                "node": "answer",
+                "port": "text"
+              }
+            }
+          }
+        }
+      },
+      "credentials": {
+        "typesafe": "TYPESAFE_API_KEY",
+        "llm": "OPENAI_API_KEY"
+      }
+    },
+    {
+      "id": "gate",
+      "kind": "task",
+      "type": "flowaid.decision.confidence_gate",
+      "typeVersion": "1.0.0",
+      "name": "Confidence gate",
+      "config": {
+        "threshold": {
+          "kind": "ref",
+          "ref": {
+            "kind": "var",
+            "name": "answerThreshold"
+          }
+        },
+        "requireValue": true
+      },
+      "inputs": {
+        "decision": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "safety",
+            "port": "answers",
+            "path": "/grounded"
+          }
+        }
+      }
+    },
+    {
+      "id": "review",
+      "kind": "human",
+      "name": "Review answer",
+      "mode": {
+        "type": "review",
+        "value": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "answer",
+            "port": "text"
+          }
+        },
+        "schema": {
+          "type": "string"
+        }
+      },
+      "title": {
+        "kind": "template",
+        "source": "Review a knowledge answer (grounded p={{ round(safety.answers.grounded.pYes, 2) }})"
+      },
+      "context": {
+        "question": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "start",
+            "port": "question"
+          }
+        },
+        "passages": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "retrieve",
+            "port": "documents"
+          }
+        },
+        "judgments": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "safety",
+            "port": "answers"
+          }
+        }
+      },
+      "assignees": ["role:editor"],
+      "expiresInMs": 86400000,
+      "onExpire": "route",
+      "externalReview": true
+    },
+    {
+      "id": "out_answer",
+      "kind": "output",
+      "name": "Answered",
+      "outcome": "answered",
+      "value": {
+        "kind": "object",
+        "fields": {
+          "answer": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "answer",
+              "port": "text"
+            }
+          },
+          "sources": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "retrieve",
+              "port": "documents"
+            }
+          },
+          "disposition": {
+            "kind": "literal",
+            "value": "answered"
+          }
+        }
+      }
+    },
+    {
+      "id": "out_reviewed",
+      "kind": "output",
+      "name": "Reviewed",
+      "outcome": "reviewed",
+      "value": {
+        "kind": "object",
+        "fields": {
+          "answer": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "review",
+              "port": "value"
+            }
+          },
+          "sources": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "retrieve",
+              "port": "documents"
+            }
+          },
+          "disposition": {
+            "kind": "literal",
+            "value": "reviewed"
+          }
+        }
+      }
+    },
+    {
+      "id": "out_no_context",
+      "kind": "output",
+      "name": "Insufficient context",
+      "outcome": "insufficient_context",
+      "value": {
+        "kind": "object",
+        "fields": {
+          "answer": {
+            "kind": "literal",
+            "value": "I could not find this in the knowledge base."
+          },
+          "sources": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "retrieve",
+              "port": "documents"
+            }
+          },
+          "disposition": {
+            "kind": "literal",
+            "value": "insufficient_context"
+          }
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e3",
+      "from": {
+        "node": "upsert",
+        "port": "done"
+      },
+      "to": {
+        "node": "retrieve"
+      }
+    },
+    {
+      "id": "e4",
+      "from": {
+        "node": "grounded",
+        "port": "answer"
+      },
+      "to": {
+        "node": "answer"
+      }
+    },
+    {
+      "id": "e4b",
+      "from": {
+        "node": "answer",
+        "port": "done"
+      },
+      "to": {
+        "node": "safety"
+      }
+    },
+    {
+      "id": "e5",
+      "from": {
+        "node": "grounded",
+        "port": "no_context"
+      },
+      "to": {
+        "node": "out_no_context"
+      }
+    },
+    {
+      "id": "e6",
+      "from": {
+        "node": "gate",
+        "port": "pass"
+      },
+      "to": {
+        "node": "out_answer"
+      }
+    },
+    {
+      "id": "e7",
+      "from": {
+        "node": "gate",
+        "port": "review"
+      },
+      "to": {
+        "node": "review"
+      }
+    },
+    {
+      "id": "e8",
+      "from": {
+        "node": "gate",
+        "port": "fail"
+      },
+      "to": {
+        "node": "review"
+      }
+    },
+    {
+      "id": "e9",
+      "from": {
+        "node": "review",
+        "port": "approved"
+      },
+      "to": {
+        "node": "out_reviewed"
+      }
+    },
+    {
+      "id": "e10",
+      "from": {
+        "node": "review",
+        "port": "rejected"
+      },
+      "to": {
+        "node": "out_no_context"
+      }
+    },
+    {
+      "id": "e11",
+      "from": {
+        "node": "review",
+        "port": "expired"
+      },
+      "to": {
+        "node": "out_no_context"
+      }
+    }
+  ],
+  "layout": {
+    "nodes": {
+      "start": {
+        "x": 0,
+        "y": 220
+      },
+      "load": {
+        "x": 260,
+        "y": 220
+      },
+      "chunk": {
+        "x": 520,
+        "y": 220
+      },
+      "embed": {
+        "x": 780,
+        "y": 220
+      },
+      "upsert": {
+        "x": 1040,
+        "y": 220
+      },
+      "retrieve": {
+        "x": 1300,
+        "y": 220
+      },
+      "relevance": {
+        "x": 1560,
+        "y": 220
+      },
+      "grounded": {
+        "x": 1820,
+        "y": 220
+      },
+      "answer": {
+        "x": 2080,
+        "y": 220
+      },
+      "safety": {
+        "x": 2340,
+        "y": 220
+      },
+      "gate": {
+        "x": 2600,
+        "y": 220
+      },
+      "review": {
+        "x": 2860,
+        "y": 220
+      },
+      "out_answer": {
+        "x": 3120,
+        "y": 220
+      },
+      "out_reviewed": {
+        "x": 3380,
+        "y": 220
+      },
+      "out_no_context": {
+        "x": 3640,
+        "y": 220
+      }
+    }
+  }
+}
