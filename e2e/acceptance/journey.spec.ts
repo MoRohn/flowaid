@@ -49,7 +49,7 @@ test("import → run → external review → publish → API run", async ({ page
   await page.goto(`/${ws}/workflows/new`);
   await page.getByLabel("Definition").click();
   await page.keyboard.insertText(JSON.stringify(DEFINITION, null, 2));
-  await page.getByRole("button", { name: "Import" }).click();
+  await page.getByRole("button", { name: "Import", exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/${ws}/workflows/[0-9a-f-]{36}$`));
   const workflowId = new URL(page.url()).pathname.split("/").at(-1) as string;
   await expect(page.getByText("Saved", { exact: true })).toBeVisible();

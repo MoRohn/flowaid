@@ -80,7 +80,8 @@ test("every side navigation item resolves without a 404", async ({ page }) => {
   }
   expect(hrefs.length).toBeGreaterThanOrEqual(5);
   for (const href of hrefs) {
-    expect(href.startsWith(`/${ws}/`), href).toBe(true);
+    // Overview is the workspace root; every other item is below it
+    expect(href === `/${ws}` || href.startsWith(`/${ws}/`), href).toBe(true);
     const response = await page.goto(href);
     expect(response?.status(), href).toBeLessThan(400);
     await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
