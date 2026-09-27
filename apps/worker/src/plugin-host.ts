@@ -6,7 +6,12 @@
  */
 import { pathToFileURL } from "node:url";
 import { normalizePackage, type AnyNodeDefinition, type ExecutionContext } from "@flowaid/node-sdk";
-import type { JsonObject, JsonValue, ModelRef } from "@flowaid/workflow-core";
+import {
+  SchemaValidationError,
+  type JsonObject,
+  type JsonValue,
+  type ModelRef,
+} from "@flowaid/workflow-core";
 import { errorInfo, fromErrorInfo } from "./plugins/host.js";
 import { BUNDLED_LOADERS } from "./plugins/loaders.js";
 import {
@@ -267,7 +272,22 @@ async function execute(m: Extract<ToHost, { type: "execute" }>): Promise<void> {
   let result: JsonValue;
   try {
     if (!def) throw new Error(`${m.nodeType}@${m.version} is not in this plugin host`);
-    const r = await def.execute(contextFor(m.id, m.ctx, controller.signal), m.input);
+    // The worker validated against the recorded manifest's JSON Schemas; the package's own
+    // schemas apply its defaults and transforms (installed packages are registered from data).
+    const config = def.configSchema.safeParse(m.ctx.config);
+    const input = def.inputSchema.safeParse(m.input);
+    if (!config.success || !input.success)
+      throw new SchemaValidationError(
+        `${m.nodeType}: ${config.success ? "input" : "config"} does not match the package's schema`,
+        (config.success ? input.error : config.error)?.issues.map((i) => ({
+          path: `/${i.path.join("/")}`,
+          message: i.message,
+        })) ?? [],
+      );
+    const r = await def.execute(
+      contextFor(m.id, { ...m.ctx, config: config.data as JsonObject }, controller.signal),
+      input.data,
+    );
     result =
       r.kind === "error"
         ? { kind: "error", error: errorInfo(r.error) as unknown as JsonObject }

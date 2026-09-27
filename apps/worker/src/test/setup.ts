@@ -21,6 +21,8 @@ import {
 } from "@flowaid/database";
 import { createTestDatabase, type TestDatabase } from "@flowaid/database/testing";
 import { coreManifests } from "@flowaid/nodes-core/manifest";
+import { coreNodes } from "@flowaid/nodes-core";
+import type { NodePackage } from "@flowaid/node-sdk";
 import { DefaultModelCatalog, ProviderRegistry, booleanDecision } from "@flowaid/providers";
 import { uuidv7 } from "@flowaid/shared";
 import type { ArtifactStorage } from "@flowaid/storage";
@@ -31,6 +33,7 @@ import {
   type DecisionProvider,
   type JsonValue,
   type NodeCatalog,
+  type NodeManifest,
   type Run,
   type SandboxExecutor,
   type WorkerPool,
@@ -110,6 +113,14 @@ export async function createHarness(
       db: TestDatabase["app"];
       credentials: CredentialService;
     }) => Partial<WorkerDeps>;
+    /** node packages besides the core nodes, and the manifests the test compiler sees for them */
+    nodes?: readonly NodePackage[];
+    manifests?: readonly NodeManifest[];
+    /** runs after the workspace exists and before the worker starts (e.g. to install plugins) */
+    prepare?: (
+      db: TestDatabase,
+      workspaceId: string,
+    ) => Promise<{ nodes?: readonly NodePackage[]; manifests?: readonly NodeManifest[] }>;
   } = {},
 ): Promise<Harness> {
   const db = await createTestDatabase();
@@ -136,6 +147,9 @@ export async function createHarness(
       .where(and(eq(environments.workspaceId, workspace.id), eq(environments.name, "dev")));
     return { workspaceId: workspace.id, environmentId: dev?.id as string };
   });
+  const prepared = (await o.prepare?.(db, workspaceId)) ?? {};
+  const extraNodes = [...(o.nodes ?? []), ...(prepared.nodes ?? [])];
+  const extra = [...(o.manifests ?? []), ...(prepared.manifests ?? [])];
   const artifactsDir = mkdtempSync(join(tmpdir(), "flowaid-artifacts-"));
   const worker = createWorker({
     db: db.app,
@@ -150,6 +164,7 @@ export async function createHarness(
     ...(o.sandbox ? { sandbox: o.sandbox } : {}),
     ...(o.storage ? { storage: o.storage } : {}),
     ...(o.extra?.({ db: db.app, credentials }) ?? {}),
+    ...(extraNodes.length ? { nodes: [coreNodes, ...extraNodes] } : {}),
   });
   await worker.start();
   const store = new PgRunStore(db.app);
@@ -166,7 +181,13 @@ export async function createHarness(
     async deploy(name, body) {
       const workflowId = uuidv7();
       const definition = { $schema: WORKFLOW_SCHEMA_URI, id: workflowId, name, ...body };
-      const result = compile(definition, { catalog, level: "publish" });
+      const result = compile(definition, {
+        catalog: {
+          get: (id) => extra.find((m) => m.id === id) ?? catalog.get(id),
+          list: () => [...catalog.list(), ...extra],
+        },
+        level: "publish",
+      });
       if (!result.ok)
         throw new Error(
           `does not compile: ${JSON.stringify(result.diagnostics.filter((d) => d.severity === "error"))}`,

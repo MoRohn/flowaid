@@ -992,6 +992,7 @@ export const plugins = pgTable(
       .default("disabled"),
     pool: text("pool").$type<WorkerPool>().notNull().default("general"),
     error: text("error"),
+    location: text("location"), // local: the absolute package directory the worker loads from; npm/bundled: null
     installedAt: ts("installed_at").notNull().defaultNow(),
   },
   (t) => [

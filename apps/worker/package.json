@@ -40,6 +40,7 @@
     "@flowaid/provider-typesafe": "workspace:*",
     "@flowaid/providers": "workspace:*",
     "@flowaid/sandbox": "workspace:*",
+    "@flowaid/plugins": "workspace:*",
     "@flowaid/shared": "workspace:*",
     "@flowaid/storage": "workspace:*",
     "@flowaid/workflow-compiler": "workspace:*",

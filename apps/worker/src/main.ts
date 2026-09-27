@@ -19,6 +19,7 @@ import {
 } from "@flowaid/database";
 import { loadEnv, pickEnv } from "@flowaid/env";
 import { createSafeFetch } from "@flowaid/providers";
+import { RegistryClient } from "@flowaid/plugins";
 import { FileFixtureStore } from "@flowaid/providers/recording-fs";
 import { createSandbox } from "@flowaid/sandbox";
 import { artifactStorageFrom } from "@flowaid/storage";
@@ -29,6 +30,7 @@ import { createPoolWorker } from "./poolWorker.js";
 import { startScheduler } from "./jobs/scheduler.js";
 import { loadBundledPlugins, registerPluginProviders } from "./plugins/bundled.js";
 import { PluginHost, hostedPackage } from "./plugins/host.js";
+import { loadInstalledPlugins } from "./plugins/installed.js";
 import { createWorker, defaultProviderRegistry, type WorkerLogger } from "./worker.js";
 import { eq } from "drizzle-orm";
 import { schedules, workspaces } from "@flowaid/database";
@@ -156,6 +158,23 @@ async function main(): Promise<void> {
       .catch((error: unknown) =>
         log.error({ err: String(error) }, "plugin host failed to start; it retries on first use"),
       );
+  // Installed (npm/local) plugins: verified, extracted and run in their own host processes.
+  const installed = env.FLOWAID_FEATURES_DISABLED?.includes("integrations_plugins")
+    ? { packages: [], hosts: [] }
+    : await loadInstalledPlugins({
+        db,
+        registry: new RegistryClient({
+          registry: String(env.FLOWAID_PLUGIN_REGISTRY),
+          fetch: http,
+        }),
+        pluginDir: String(env.FLOWAID_PLUGIN_DIR),
+        log,
+        env: {
+          NODE_ENV: env.flags.isProduction ? "production" : "development",
+          LOG_LEVEL: String(env.LOG_LEVEL ?? "info"),
+        },
+      });
+  hosts.push(...installed.hosts);
 
   const alerts = createAlertDispatcher({
     db,
@@ -179,6 +198,7 @@ async function main(): Promise<void> {
     nodes: [
       coreNodes,
       ...bundled.packages.map((pkg, i) => hostedPackage(pkg, hosts[i] as PluginHost)),
+      ...installed.packages,
     ],
     artifactsDir: join(dataDir, "artifacts"),
     storage: artifactStorageFrom(env, join(dataDir, "artifacts")),

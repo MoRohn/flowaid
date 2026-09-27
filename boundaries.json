@@ -207,7 +207,8 @@
         "codegen",
         "langchain",
         "nodes-langchain",
-        "knowledge"
+        "knowledge",
+        "plugins"
       ]
     },
     "web": {

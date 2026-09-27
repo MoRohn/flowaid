@@ -350,6 +350,8 @@ export function pluginRoutes(app: FastifyInstance, ctx: ApiContext): void {
           source: b.source,
           integrity: resolved.integrity,
           manifests: resolved.manifests,
+          // local packages load from where they were verified; npm ones from the registry tarball
+          location: b.source === "local" ? resolved.tarball : null,
           error: null,
         };
         if (current) {
