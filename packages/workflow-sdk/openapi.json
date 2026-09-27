@@ -2607,7 +2607,7 @@
     },
     "/v1/workflows/import": {
       "post": {
-        "summary": "Import a definition (JSON or YAML) as a new workflow",
+        "summary": "Import a definition (JSON or YAML), or an external flow export translated by the FlowAId importer, as a new workflow",
         "tags": ["workflows"],
         "requestBody": {
           "required": true,
@@ -2618,6 +2618,7 @@
                 "properties": {
                   "definition": {},
                   "yaml": { "type": "string", "maxLength": 2097152 },
+                  "external": {},
                   "name": { "type": "string", "minLength": 1, "maxLength": 200 }
                 }
               }
@@ -2714,9 +2715,177 @@
                       ],
                       "additionalProperties": false
                     },
-                    "diagnostics": { "type": "array", "items": {} }
+                    "diagnostics": { "type": "array", "items": {} },
+                    "report": {
+                      "type": "object",
+                      "properties": {
+                        "format": { "type": "string", "enum": ["agentflow", "chatflow"] },
+                        "workflowName": { "type": "string" },
+                        "counts": {
+                          "type": "object",
+                          "properties": {
+                            "imported": { "type": "number" },
+                            "converted": { "type": "number" },
+                            "needsConfig": { "type": "number" },
+                            "unsupported": { "type": "number" }
+                          },
+                          "required": ["imported", "converted", "needsConfig", "unsupported"],
+                          "additionalProperties": false
+                        },
+                        "nodes": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "sourceId": { "type": "string" },
+                              "sourceType": { "type": "string" },
+                              "name": { "type": "string" },
+                              "nodeId": { "type": "string" },
+                              "targetType": { "type": "string" },
+                              "status": {
+                                "type": "string",
+                                "enum": ["imported", "converted", "needs_config", "unsupported"]
+                              },
+                              "message": { "type": "string" }
+                            },
+                            "required": ["sourceId", "sourceType", "name", "status"],
+                            "additionalProperties": false
+                          }
+                        },
+                        "issues": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "code": { "type": "string" },
+                              "severity": { "type": "string", "enum": ["error", "warning"] },
+                              "message": { "type": "string" },
+                              "nodeId": { "type": "string" },
+                              "sourceId": { "type": "string" }
+                            },
+                            "required": ["code", "severity", "message"],
+                            "additionalProperties": false
+                          }
+                        },
+                        "secrets": { "type": "array", "items": { "type": "string" } }
+                      },
+                      "required": [
+                        "format",
+                        "workflowName",
+                        "counts",
+                        "nodes",
+                        "issues",
+                        "secrets"
+                      ],
+                      "additionalProperties": false
+                    }
                   },
                   "required": ["workflow", "diagnostics"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/workflows/import/preview": {
+      "post": {
+        "summary": "Translate an external flow export without saving it: the migration report and the compiler's diagnostics",
+        "tags": ["workflows"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "external": {},
+                  "name": { "type": "string", "minLength": 1, "maxLength": 200 }
+                },
+                "required": ["external"]
+              }
+            }
+          }
+        },
+        "x-cli": { "noun": "workflow", "verb": "import-preview" },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["workflows:read"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "report": {
+                      "type": "object",
+                      "properties": {
+                        "format": { "type": "string", "enum": ["agentflow", "chatflow"] },
+                        "workflowName": { "type": "string" },
+                        "counts": {
+                          "type": "object",
+                          "properties": {
+                            "imported": { "type": "number" },
+                            "converted": { "type": "number" },
+                            "needsConfig": { "type": "number" },
+                            "unsupported": { "type": "number" }
+                          },
+                          "required": ["imported", "converted", "needsConfig", "unsupported"],
+                          "additionalProperties": false
+                        },
+                        "nodes": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "sourceId": { "type": "string" },
+                              "sourceType": { "type": "string" },
+                              "name": { "type": "string" },
+                              "nodeId": { "type": "string" },
+                              "targetType": { "type": "string" },
+                              "status": {
+                                "type": "string",
+                                "enum": ["imported", "converted", "needs_config", "unsupported"]
+                              },
+                              "message": { "type": "string" }
+                            },
+                            "required": ["sourceId", "sourceType", "name", "status"],
+                            "additionalProperties": false
+                          }
+                        },
+                        "issues": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "code": { "type": "string" },
+                              "severity": { "type": "string", "enum": ["error", "warning"] },
+                              "message": { "type": "string" },
+                              "nodeId": { "type": "string" },
+                              "sourceId": { "type": "string" }
+                            },
+                            "required": ["code", "severity", "message"],
+                            "additionalProperties": false
+                          }
+                        },
+                        "secrets": { "type": "array", "items": { "type": "string" } }
+                      },
+                      "required": [
+                        "format",
+                        "workflowName",
+                        "counts",
+                        "nodes",
+                        "issues",
+                        "secrets"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "definition": {},
+                    "diagnostics": { "type": "array", "items": {} }
+                  },
+                  "required": ["report", "definition", "diagnostics"],
                   "additionalProperties": false
                 }
               }

@@ -1,0 +1,29 @@
+{
+  "name": "@flowaid/docs",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The FlowAId documentation site: a static site generated from the guides, the design documents, the node manifests and the OpenAPI document.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "build": "tsx --conditions=development src/build.ts",
+    "check": "tsx --conditions=development src/build.ts --check",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src",
+    "test": "vitest run",
+    "clean": "rm -rf dist .turbo"
+  },
+  "dependencies": {
+    "@flowaid/nodes-core": "workspace:*",
+    "@flowaid/workflow-core": "workspace:*",
+    "marked": "18.0.12"
+  },
+  "devDependencies": {
+    "@flowaid/config": "workspace:*",
+    "@types/node": "24.13.6",
+    "eslint": "9.39.5",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "vitest": "4.1.11"
+  }
+}

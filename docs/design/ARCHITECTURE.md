@@ -107,7 +107,7 @@ workflow-runtime  → workflow-core, workflow-compiler, node-sdk, providers, cre
 database          → workflow-core, shared, env                 (implements RunStore/QueueDriver/EventBus/ArtifactStore/CredentialRepository)
 evaluation        → workflow-core, providers, shared            (RunLauncher injected)
 workflow-sdk      → workflow-core (types), shared
-cli               → workflow-sdk, workflow-compiler, workflow-runtime, nodes-core, providers, provider-typesafe, provider-openai, provider-anthropic, provider-ollama, credentials, sandbox, workflow-core, shared   (runtime, nodes and providers only for `workflow run --local`)
+cli               → workflow-sdk, workflow-compiler, workflow-runtime, nodes-core, providers, provider-typesafe, provider-openai, provider-anthropic, provider-ollama, credentials, sandbox, importer, workflow-core, shared   (runtime, nodes and providers only for `workflow run --local`; importer for `import external --local`)
 importer          → workflow-core, shared
 codegen           → workflow-core, workflow-compiler, workflow-sdk (builders subpath only: round-trip evaluation of the generated module), shared
 langchain         → providers, node-sdk, workflow-core, shared, @langchain/core (peer)

@@ -6154,7 +6154,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Import a definition (JSON or YAML) as a new workflow */
+    /** Import a definition (JSON or YAML), or an external flow export translated by the FlowAId importer, as a new workflow */
     post: {
       parameters: {
         query?: never;
@@ -6166,6 +6166,7 @@ export interface paths {
         content: {
           "application/json": {
             definition?: unknown;
+            external?: unknown;
             name?: string;
             yaml?: string;
           };
@@ -6180,6 +6181,36 @@ export interface paths {
           content: {
             "application/json": {
               diagnostics: unknown[];
+              report?: {
+                counts: {
+                  converted: number;
+                  imported: number;
+                  needsConfig: number;
+                  unsupported: number;
+                };
+                /** @enum {string} */
+                format: "agentflow" | "chatflow";
+                issues: {
+                  code: string;
+                  message: string;
+                  nodeId?: string;
+                  /** @enum {string} */
+                  severity: "error" | "warning";
+                  sourceId?: string;
+                }[];
+                nodes: {
+                  message?: string;
+                  name: string;
+                  nodeId?: string;
+                  sourceId: string;
+                  sourceType: string;
+                  /** @enum {string} */
+                  status: "imported" | "converted" | "needs_config" | "unsupported";
+                  targetType?: string;
+                }[];
+                secrets: string[];
+                workflowName: string;
+              };
               workflow: {
                 archived: boolean;
                 deployments?: {
@@ -6206,6 +6237,82 @@ export interface paths {
                 tags: string[];
                 updatedAt: string;
                 warnings: number;
+              };
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/workflows/import/preview": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Translate an external flow export without saving it: the migration report and the compiler's diagnostics */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            external: unknown;
+            name?: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              definition: unknown;
+              diagnostics: unknown[];
+              report: {
+                counts: {
+                  converted: number;
+                  imported: number;
+                  needsConfig: number;
+                  unsupported: number;
+                };
+                /** @enum {string} */
+                format: "agentflow" | "chatflow";
+                issues: {
+                  code: string;
+                  message: string;
+                  nodeId?: string;
+                  /** @enum {string} */
+                  severity: "error" | "warning";
+                  sourceId?: string;
+                }[];
+                nodes: {
+                  message?: string;
+                  name: string;
+                  nodeId?: string;
+                  sourceId: string;
+                  sourceType: string;
+                  /** @enum {string} */
+                  status: "imported" | "converted" | "needs_config" | "unsupported";
+                  targetType?: string;
+                }[];
+                secrets: string[];
+                workflowName: string;
               };
             };
           };

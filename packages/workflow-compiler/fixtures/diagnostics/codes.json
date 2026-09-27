@@ -336,6 +336,17 @@
       "severity": "error"
     }
   ],
+  "E_IMPORT_UNSUPPORTED": [
+    {
+      "code": "E_IMPORT_UNSUPPORTED",
+      "location": {
+        "nodeId": "intent",
+        "path": "/nodes/1/type"
+      },
+      "message": "'Intent' (agentAgentflow) was not imported: no FlowAId equivalent. Replace it with FlowAId nodes.",
+      "severity": "error"
+    }
+  ],
   "E_INPUT_LITERAL_INVALID": [
     {
       "code": "E_INPUT_LITERAL_INVALID",

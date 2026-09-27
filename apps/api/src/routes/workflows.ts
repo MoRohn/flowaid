@@ -5,6 +5,7 @@ import { z } from "zod";
 import { generateWorkflowTs } from "@flowaid/codegen";
 import { and, desc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { parse as parseYaml, stringify as toYaml } from "yaml";
+import { ExternalFlowError, importExternalFlow, type ImportReport } from "@flowaid/importer";
 import {
   createWorkflow,
   deploy,
@@ -182,6 +183,87 @@ async function workflowActivity(ctx: ApiContext, workspaceId: string, ids: strin
       };
   }
   return out;
+}
+
+const ImportBody = z.object({
+  definition: z.unknown().optional(),
+  yaml: z
+    .string()
+    .max(2 * 1024 * 1024)
+    .optional(),
+  /** an external flow export (agent flow or LangChain chat flow), translated by the FlowAId importer */
+  external: z.unknown().optional(),
+  name: z.string().min(1).max(200).optional(),
+});
+
+const ImportReportSchema = z.object({
+  format: z.enum(["agentflow", "chatflow"]),
+  workflowName: z.string(),
+  counts: z.object({
+    imported: z.number(),
+    converted: z.number(),
+    needsConfig: z.number(),
+    unsupported: z.number(),
+  }),
+  nodes: z.array(
+    z.object({
+      sourceId: z.string(),
+      sourceType: z.string(),
+      name: z.string(),
+      nodeId: z.string().optional(),
+      targetType: z.string().optional(),
+      status: z.enum(["imported", "converted", "needs_config", "unsupported"]),
+      message: z.string().optional(),
+    }),
+  ),
+  issues: z.array(
+    z.object({
+      code: z.string(),
+      severity: z.enum(["error", "warning"]),
+      message: z.string(),
+      nodeId: z.string().optional(),
+      sourceId: z.string().optional(),
+    }),
+  ),
+  secrets: z.array(z.string()),
+});
+
+/** The definition an import request carries (and the importer's report for external exports). */
+function readImport(
+  body: { definition?: unknown; yaml?: string; external?: unknown; name?: string },
+  id: string,
+): { definition: unknown; report?: ImportReport } {
+  if (body.external !== undefined) {
+    try {
+      const out = importExternalFlow(body.external, {
+        id,
+        ...(body.name ? { name: body.name } : {}),
+      });
+      return { definition: out.definition, report: out.report };
+    } catch (error) {
+      if (error instanceof ExternalFlowError || error instanceof SyntaxError)
+        throw new BadRequestError(`the flow export could not be read: ${error.message}`);
+      throw error;
+    }
+  }
+  if (body.yaml !== undefined) {
+    try {
+      return {
+        definition: parseYaml(body.yaml, {
+          schema: "core",
+          merge: false,
+          maxAliasCount: 100,
+        }) as unknown,
+      };
+    } catch (error) {
+      throw new BadRequestError(
+        `the YAML does not parse: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+  if (body.definition === undefined)
+    throw new BadRequestError("send `definition`, `yaml` or `external`");
+  return { definition: body.definition };
 }
 
 export function workflowRoutes(app: FastifyInstance, ctx: ApiContext): void {
@@ -720,44 +802,28 @@ export function workflowRoutes(app: FastifyInstance, ctx: ApiContext): void {
       },
       schema: {
         tags: ["workflows"],
-        summary: "Import a definition (JSON or YAML) as a new workflow",
-        body: z.object({
-          definition: z.unknown().optional(),
-          yaml: z
-            .string()
-            .max(2 * 1024 * 1024)
-            .optional(),
-          name: z.string().min(1).max(200).optional(),
-        }),
+        summary:
+          "Import a definition (JSON or YAML), or an external flow export translated by the FlowAId importer, as a new workflow",
+        body: ImportBody,
         response: {
-          201: z.object({ workflow: WorkflowSummarySchema, diagnostics: z.array(z.unknown()) }),
+          201: z.object({
+            workflow: WorkflowSummarySchema,
+            diagnostics: z.array(z.unknown()),
+            report: ImportReportSchema.optional(),
+          }),
         },
       },
     },
     async (req, reply) => {
       const p = req.principal;
       if (!p) throw new ForbiddenError("no principal");
-      let definition: unknown = req.body.definition;
-      if (req.body.yaml !== undefined) {
-        try {
-          definition = parseYaml(req.body.yaml, {
-            schema: "core",
-            merge: false,
-            maxAliasCount: 100,
-          }) as unknown;
-        } catch (error) {
-          throw new BadRequestError(
-            `the YAML does not parse: ${error instanceof Error ? error.message : String(error)}`,
-          );
-        }
-      }
-      if (definition === undefined) throw new BadRequestError("send `definition` or `yaml`");
+      const id = uuidv7();
+      const { definition, report } = readImport(req.body, id);
       const docName =
         typeof definition === "object" && definition !== null
           ? (definition as JsonObject).name
           : undefined;
       const name = req.body.name ?? (typeof docName === "string" ? docName : "Imported workflow");
-      const id = uuidv7();
       const out = await ctx.db.tenant(p.workspaceId, async (tx) => {
         const def = withId(definition, id, name);
         const compiled = await compileIn(tx, def, { workspaceId: p.workspaceId, level: "draft" });
@@ -777,9 +843,51 @@ export function workflowRoutes(app: FastifyInstance, ctx: ApiContext): void {
         return { row: u as WorkflowRow, diagnostics: compiled.diagnostics };
       });
       req.audit.resourceId = out.row.id;
-      return reply
-        .code(201)
-        .send({ workflow: summaryDto(out.row, null), diagnostics: out.diagnostics });
+      if (report)
+        req.audit.details = {
+          source: `external ${report.format}`,
+          counts: report.counts,
+        };
+      return reply.code(201).send({
+        workflow: summaryDto(out.row, null),
+        diagnostics: out.diagnostics,
+        ...(report ? { report } : {}),
+      });
+    },
+  );
+
+  r.post(
+    "/v1/workflows/import/preview",
+    {
+      config: {
+        auth: "session_or_api_key",
+        scope: "workflows:read",
+        // a dry run: nothing is written
+        audit: false,
+        cli: { noun: "workflow", verb: "import-preview" },
+      },
+      schema: {
+        tags: ["workflows"],
+        summary:
+          "Translate an external flow export without saving it: the migration report and the compiler's diagnostics",
+        body: z.object({ external: z.unknown(), name: z.string().min(1).max(200).optional() }),
+        response: {
+          200: z.object({
+            report: ImportReportSchema,
+            definition: z.unknown(),
+            diagnostics: z.array(z.unknown()),
+          }),
+        },
+      },
+    },
+    async (req) => {
+      const p = req.principal;
+      if (!p) throw new ForbiddenError("no principal");
+      const { definition, report } = readImport(req.body, uuidv7());
+      const compiled = await ctx.db.tenant(p.workspaceId, (tx) =>
+        compileIn(tx, definition, { workspaceId: p.workspaceId, level: "draft" }),
+      );
+      return { report: report as ImportReport, definition, diagnostics: compiled.diagnostics };
     },
   );
 

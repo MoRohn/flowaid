@@ -222,9 +222,30 @@ function setupInput(ctx: CompileContext, info: NodeInfo): void {
   }
 }
 
+/** The placeholder node type the FlowAId importer writes for untranslatable source nodes. */
+export const IMPORT_PLACEHOLDER_TYPE = "flowaid.dev.todo";
+
 function resolveTask(ctx: CompileContext, info: NodeInfo, node: TaskNode): void {
   const { diagnostics, options } = ctx;
   const path = nodePath(info.index);
+  if (node.type === IMPORT_PLACEHOLDER_TYPE) {
+    // A node the FlowAId importer could not translate (ARCHITECTURE.md §10.9): it keeps the
+    // source node's edges and fails compilation until it is replaced, so nothing degrades silently.
+    info.unresolved = true;
+    const ports = node.config.controlPorts;
+    info.controlOut =
+      Array.isArray(ports) && ports.length > 0 && ports.every((p) => typeof p === "string")
+        ? uniqueInOrder(ports)
+        : ["done"];
+    const source = typeof node.config.sourceType === "string" ? node.config.sourceType : "node";
+    const reason = typeof node.config.reason === "string" ? `: ${node.config.reason}` : "";
+    diagnostics.add(
+      "E_IMPORT_UNSUPPORTED",
+      `'${node.name}' (${source}) was not imported${reason}. Replace it with FlowAId nodes.`,
+      { nodeId: node.id, path: `${path}/type` },
+    );
+    return;
+  }
   const manifest = options.catalog.get(node.type, node.typeVersion);
   if (!manifest) {
     info.unresolved = true;

@@ -52,6 +52,9 @@ jobs:
       - name: UI inventory is current
         run: pnpm ui:inventory:check
 
+      - name: Docs site builds with no broken links
+        run: pnpm docs:check
+
       - name: Formatting
         run: pnpm format:check
 

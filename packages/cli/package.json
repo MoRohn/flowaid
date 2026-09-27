@@ -2,7 +2,7 @@
   "name": "@flowaid/cli",
   "version": "0.1.0",
   "private": true,
-  "description": "The flowaid command line: every API operation as a generated noun/verb command (from the OpenAPI x-cli extension), plus login, dev, workflow run (remote with --watch, or embedded with --local), workflow export/package and runs events --follow (API.md §8.3).",
+  "description": "The flowaid command line: every API operation as a generated noun/verb command (from the OpenAPI x-cli extension), plus login, dev, workflow run (remote with --watch, or embedded with --local), workflow export/package and runs events --follow (API.md \u00a78.3).",
   "license": "Apache-2.0",
   "type": "module",
   "bin": {
@@ -29,6 +29,7 @@
     "clean": "rm -rf dist .turbo *.tsbuildinfo"
   },
   "dependencies": {
+    "@flowaid/importer": "workspace:*",
     "@flowaid/nodes-core": "workspace:*",
     "@flowaid/provider-anthropic": "workspace:*",
     "@flowaid/provider-ollama": "workspace:*",

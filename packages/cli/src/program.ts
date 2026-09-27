@@ -6,6 +6,7 @@
 import { Command } from "commander";
 import { FlowaidApiError } from "@flowaid/workflow-sdk";
 import { registerDev } from "./commands/dev.js";
+import { registerImport } from "./commands/import.js";
 import { registerLogin } from "./commands/login.js";
 import { registerRunCommands } from "./commands/runs.js";
 import { registerValidate } from "./commands/validate.js";
@@ -46,6 +47,7 @@ export function createProgram(io: CliIO): Command {
   registerLogin(program, io);
   registerDev(program, io);
   registerValidate(program, io);
+  registerImport(program, io);
   registerOperations(program, io, HAND_WRITTEN);
   const noun = (name: string) => program.commands.find((c) => c.name() === name) as Command;
   registerWorkflowCommands(noun("workflow"), io);
