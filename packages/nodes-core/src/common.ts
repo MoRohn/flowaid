@@ -3,6 +3,7 @@ import { z } from "zod";
 import { HumanFallbackSignal } from "@flowaid/providers";
 import {
   CredentialError,
+  GenerationPolicySchema,
   type DecisionCallContext,
   type DecisionQuestion,
   type DecisionResult,
@@ -25,8 +26,17 @@ export const instructions = (help?: string) =>
     .max(4000)
     .meta({ "x-ui": help ? { widget: "textarea", help } : { widget: "textarea" } });
 
-export const modelRef = z
-  .looseObject({ provider: z.string().min(1), model: z.string().min(1) })
+const modelRefObject = z.looseObject({ provider: z.string().min(1), model: z.string().min(1) });
+
+/** One model (embeddings, and anything that cannot fail over). */
+export const modelRef = modelRefObject.meta({ "x-ui": { widget: "model" } });
+
+/**
+ * A generation model: one `{ provider, model }` or a GenerationPolicy of 1–5 candidates with a
+ * routing strategy (RFC-0005). The ModelPicker edits both.
+ */
+export const generationModel = z
+  .union([modelRefObject, GenerationPolicySchema])
   .meta({ "x-ui": { widget: "model" } });
 
 export const usageSchema = z.object({ inputTokens: z.int().min(0), outputTokens: z.int().min(0) });

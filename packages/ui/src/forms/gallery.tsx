@@ -24,6 +24,7 @@ import {
   ExpressionTextarea,
   KeyValueEditor,
   ModelPicker,
+  ModelFallbacks,
   ReorderableList,
   RetryPolicyEditor,
   SchemaForm,
@@ -1146,6 +1147,13 @@ function PickersDemo() {
   const [openaiCred, setOpenaiCred] = useState<string | null>(null);
   const [decisionModel, setDecisionModel] = useState<string | null>("jev-latest");
   const [genModel, setGenModel] = useState<string | null>(null);
+  const [routed, setRouted] = useState<unknown>({
+    candidates: [
+      { provider: "OpenAI", model: "gpt-5-mini" },
+      { provider: "Anthropic", model: "claude-haiku-4-5" },
+    ],
+    strategy: "cheapest",
+  });
   const [lastCreate, setLastCreate] = useState<string | null>(null);
   const typeIcon = (c: CredentialView) =>
     c.type === "openai" || c.type === "typesafe" ? (
@@ -1231,6 +1239,17 @@ function PickersDemo() {
             <ModelPicker models={MODELS.filter((m) => m.kind !== "embedding")} kind="embedding" />
           </FieldRow>
         </div>
+      </Swatch>
+      <Swatch label="ModelFallbacks · a generation policy: primary, fallbacks, routing (RFC-0005)">
+        <FieldRow label="Model">
+          <ModelFallbacks
+            models={MODELS}
+            kind="generation"
+            value={routed}
+            onValueChange={setRouted}
+          />
+        </FieldRow>
+        <p className="mt-2 font-mono text-2xs text-ink-3">{JSON.stringify(routed)}</p>
       </Swatch>
     </div>
   );

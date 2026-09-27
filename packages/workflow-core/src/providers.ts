@@ -12,6 +12,7 @@ import type {
   DecisionKind,
   DecisionResult,
   PriceSnapshot,
+  ProviderAttempt,
   ScoreDecision,
   TokenUsage,
 } from "./decision.js";
@@ -164,6 +165,8 @@ export interface GenerationResult {
   provider: string;
   model: string;
   raw?: JsonValue;
+  /** Every candidate tried when the call went through a generation policy (RFC-0005). */
+  attempts?: ProviderAttempt[];
 }
 /** One streamed chunk of a generation. */
 export type GenerationChunk =

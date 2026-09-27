@@ -13,11 +13,13 @@
 import { sha256Json } from "@flowaid/shared";
 import {
   CredentialError,
+  GenerationPolicySchema,
   ProviderError,
   toFlowaidError,
   type DecisionProvider,
   type EmbeddingProvider,
   type GenerationChunk,
+  type GenerationPolicy,
   type GenerationProvider,
   type JsonObject,
   type JsonValue,
@@ -28,6 +30,7 @@ import {
 } from "@flowaid/workflow-core";
 import type { DefaultModelCatalog } from "./catalog/index.js";
 import { FailoverChain, type ChainHop, type FailoverOptions } from "./failover.js";
+import { GenerationFailoverChain, type GenerationCandidate } from "./generation-failover.js";
 import { HealthTracker } from "./health.js";
 import { LLMDecisionProvider } from "./llm-decision.js";
 import { RateLimiter, type TokenBucket } from "./rateLimit.js";
@@ -192,19 +195,68 @@ export class ProviderRegistry {
     });
   }
 
-  async generation(ref: ModelRef, ctx: ResolveContext): Promise<GenerationProvider> {
+  private async resolveGeneration(
+    ref: ModelRef,
+    ctx: ResolveContext,
+  ): Promise<{ provider: GenerationProvider; healthKey: string; model: string }> {
     const model = this.catalog.resolveAlias(ref.provider, ref.model);
     const { provider, credentialId } = await this.create("generation", ref.provider, model, ctx, {
       kind: "generation",
       provider: ref.provider,
       model,
     });
-    return guardedGeneration(provider as GenerationProvider, {
+    const healthKey = `${ref.provider}/${model}/${credentialId}`;
+    return {
+      provider: guardedGeneration(provider as GenerationProvider, {
+        catalog: this.catalog,
+        health: this.health,
+        healthKey,
+        bucket: this.bucketFor(ref.provider, model, credentialId),
+        clock: this.clock,
+      }),
+      healthKey,
+      model,
+    };
+  }
+
+  /**
+   * A generation provider for one model, or for a GenerationPolicy (RFC-0005) the failover chain
+   * over its candidates. Candidates that cannot be resolved are skipped with a reason; when none
+   * resolves, the first candidate's error surfaces.
+   */
+  async generation(
+    selection: ModelRef | GenerationPolicy,
+    ctx: ResolveContext,
+    opts: Omit<FailoverOptions, "health" | "clock"> = {},
+  ): Promise<GenerationProvider> {
+    if (!("candidates" in selection))
+      return (await this.resolveGeneration(selection, ctx)).provider;
+    const candidates: GenerationCandidate[] = [];
+    let firstError: unknown;
+    for (const ref of selection.candidates) {
+      try {
+        const r = await this.resolveGeneration(ref, ctx);
+        candidates.push({
+          ref: { provider: ref.provider, model: r.model },
+          provider: r.provider,
+          healthKey: r.healthKey,
+        });
+      } catch (error) {
+        firstError ??= error;
+        candidates.push({
+          ref,
+          skipReason: toFlowaidError(error).message,
+          healthKey: `${ref.provider}/${ref.model}`,
+        });
+      }
+    }
+    if (!candidates.some((c) => c.provider)) throw toFlowaidError(firstError);
+    return new GenerationFailoverChain(candidates, GenerationPolicySchema.parse(selection), {
       catalog: this.catalog,
       health: this.health,
-      healthKey: `${ref.provider}/${model}/${credentialId}`,
-      bucket: this.bucketFor(ref.provider, model, credentialId),
       clock: this.clock,
+      ...(opts.onFailover ? { onFailover: opts.onFailover } : {}),
+      ...(opts.warn ? { warn: opts.warn } : {}),
     });
   }
 

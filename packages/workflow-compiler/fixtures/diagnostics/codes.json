@@ -524,7 +524,7 @@
     {
       "code": "E_PLAN_HASH_MISMATCH",
       "location": {},
-      "message": "Plan content hashes to 6435e8e0837d0457f012348f860755f022a5dbcd5d36c9e9cd9e2e76d8ecbdd8, not its planHash 52c9de2de3ea974af9bafcc62490856a9f9e9c650d850f9ba90db23ed456faf5",
+      "message": "Plan content hashes to dafb37922e94e8c55f1eea985ab42f090ed53d5723b74aebc37015ace432a4ea, not its planHash 23bf3fcd344d7cbed100b8e204607f5c405b319d1eed6b2edc4aa5a9f0abc819",
       "severity": "error"
     }
   ],

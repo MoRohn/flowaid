@@ -497,6 +497,21 @@ export type NodePolicy = z.infer<typeof NodePolicySchema>;
 export const ModelRefSchema = z.object({ provider: z.string().min(1), model: z.string().min(1) });
 export type ModelRef = z.infer<typeof ModelRefSchema>;
 
+/** Generation failover and routing (RFC-0005): 1–5 candidates ordered by strategy; retryable failures move on. */
+export const GenerationStrategySchema = z.enum(['ordered', 'cheapest', 'fastest', 'healthiest']);
+export type GenerationStrategy = z.infer<typeof GenerationStrategySchema>;
+export const GenerationPolicySchema = z.object({
+  candidates: z.array(ModelRefSchema).min(1).max(5),
+  strategy: GenerationStrategySchema.default('ordered'),
+  requirements: z.object({ tools: z.boolean().optional(), jsonSchema: z.boolean().optional(), vision: z.boolean().optional(), minContext: z.int().min(1).optional() }).optional(),
+  maxCostUsdPerCall: z.number().positive().optional(),
+});
+export type GenerationPolicy = z.infer<typeof GenerationPolicySchema>;
+/** Accepted wherever a generation model is configured (`x-ui.widget: 'model'`). */
+export const ModelSelectionSchema = z.union([ModelRefSchema, GenerationPolicySchema]);
+export type ModelSelection = z.infer<typeof ModelSelectionSchema>;
+export declare function modelCandidates(selection: ModelSelection): ModelRef[];
+
 /** One hop of a decision failover chain. `human` suspends the node for a reviewer and is always last. */
 export const ProviderHopSchema = z.discriminatedUnion('provider', [
   z.object({ provider: z.literal('typesafe'), model: z.string().default('jev-latest') }),
@@ -1785,6 +1800,8 @@ export interface GenerationResult {
   provider: string;
   model: string;
   raw?: JsonValue;
+  /** every candidate tried when the call went through a GenerationPolicy (RFC-0005) */
+  attempts?: ProviderAttempt[];
 }
 export type GenerationChunk =
   | { type: 'text'; delta: string }
@@ -1887,7 +1904,8 @@ export interface CredentialAccess {
 export interface ProviderAccess {
   /** Failover chain [primary, ...failover]; every hop visible in DecisionResult.attempts. `human` suspends (see NodeResult). */
   decision(chain: readonly ProviderHop[], opts?: { credentialSlot?: string }): DecisionProvider;
-  generation(ref: ModelRef, opts?: { credentialSlot?: string }): GenerationProvider;
+  /** One model, or a GenerationPolicy resolved to a failover chain (RFC-0005): attempts[] and PROVIDER_FAILOVER as for decisions. */
+  generation(selection: ModelRef | GenerationPolicy, opts?: { credentialSlot?: string }): GenerationProvider;
   embedding(ref: ModelRef, opts?: { credentialSlot?: string }): EmbeddingProvider;
 }
 export interface ToolAccess {

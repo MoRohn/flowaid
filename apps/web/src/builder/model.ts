@@ -362,9 +362,20 @@ export function project(
 
 function taskMeta(config: Record<string, unknown>): { label: string; value: string }[] {
   const out: { label: string; value: string }[] = [];
-  const model = config.model as { provider?: string; model?: string } | string | undefined;
+  const model = config.model as
+    | { provider?: string; model?: string; candidates?: { model?: string }[]; strategy?: string }
+    | string
+    | undefined;
   if (typeof model === "string") out.push({ label: "model", value: model });
   else if (model?.model) out.push({ label: "model", value: model.model });
+  else if (Array.isArray(model?.candidates) && model.candidates[0]?.model) {
+    // a generation policy (RFC-0005): the first candidate, how many fall back, and the routing
+    const extra = model.candidates.length - 1;
+    out.push({
+      label: model.strategy && model.strategy !== "ordered" ? model.strategy : "model",
+      value: `${model.candidates[0].model}${extra > 0 ? ` +${extra}` : ""}`,
+    });
+  }
   if (typeof config.method === "string" && typeof config.url === "string")
     out.push({ label: String(config.method), value: String(config.url).slice(0, 48) });
   return out.slice(0, 2);

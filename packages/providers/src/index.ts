@@ -2,6 +2,7 @@ export * from "./signals.js";
 export * from "./health.js";
 export * from "./rateLimit.js";
 export * from "./failover.js";
+export * from "./generation-failover.js";
 export * from "./decisionMath.js";
 export * from "./llm-decision.js";
 export * from "./rule-decision.js";

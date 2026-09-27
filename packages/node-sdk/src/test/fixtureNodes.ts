@@ -4,7 +4,11 @@
  * `execute` here reports that plainly instead of pretending to work.
  */
 import { z } from "zod";
-import { DecisionResultJsonSchema, NodeExecutionError } from "@flowaid/workflow-core";
+import {
+  DecisionResultJsonSchema,
+  GenerationPolicySchema,
+  NodeExecutionError,
+} from "@flowaid/workflow-core";
 import { defineNode } from "../define.js";
 import type { AnyNodeDefinition } from "../types.js";
 
@@ -221,7 +225,10 @@ export const generateNode = defineNode({
   },
   configSchema: z.strictObject({
     model: z
-      .looseObject({ provider: z.string().min(1), model: z.string().min(1) })
+      .union([
+        z.looseObject({ provider: z.string().min(1), model: z.string().min(1) }),
+        GenerationPolicySchema,
+      ])
       .meta({ "x-ui": { widget: "model" } }),
     system: z
       .string()

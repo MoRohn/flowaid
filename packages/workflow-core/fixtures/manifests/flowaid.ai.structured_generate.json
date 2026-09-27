@@ -13,18 +13,74 @@
     "type": "object",
     "properties": {
       "model": {
-        "type": "object",
-        "properties": {
-          "provider": {
-            "type": "string",
-            "minLength": 1
+        "anyOf": [
+          {
+            "properties": {
+              "model": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "provider": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": ["provider", "model"],
+            "type": "object"
           },
-          "model": {
-            "type": "string",
-            "minLength": 1
+          {
+            "properties": {
+              "candidates": {
+                "items": {
+                  "properties": {
+                    "model": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "provider": {
+                      "minLength": 1,
+                      "type": "string"
+                    }
+                  },
+                  "required": ["provider", "model"],
+                  "type": "object"
+                },
+                "maxItems": 5,
+                "minItems": 1,
+                "type": "array"
+              },
+              "maxCostUsdPerCall": {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              "requirements": {
+                "properties": {
+                  "jsonSchema": {
+                    "type": "boolean"
+                  },
+                  "minContext": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "tools": {
+                    "type": "boolean"
+                  },
+                  "vision": {
+                    "type": "boolean"
+                  }
+                },
+                "type": "object"
+              },
+              "strategy": {
+                "default": "ordered",
+                "enum": ["ordered", "cheapest", "fastest", "healthiest"],
+                "type": "string"
+              }
+            },
+            "required": ["candidates"],
+            "type": "object"
           }
-        },
-        "required": ["provider", "model"],
+        ],
         "x-ui": {
           "widget": "model"
         }

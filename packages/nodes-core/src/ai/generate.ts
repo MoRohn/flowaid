@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { defineNode, ok } from "@flowaid/node-sdk";
 import type { ChatMessage, GenerationResult, TokenUsage } from "@flowaid/workflow-core";
-import { callCtx, modelRef } from "../common.js";
+import { callCtx, generationModel } from "../common.js";
 
 const usage = z.object({ inputTokens: z.int().min(0), outputTokens: z.int().min(0) });
 
@@ -25,7 +25,7 @@ export const generateNode = defineNode({
     summary: "{{ config.model.provider }}/{{ config.model.model }}",
   },
   configSchema: z.strictObject({
-    model: modelRef,
+    model: generationModel,
     system: z
       .string()
       .max(32000)

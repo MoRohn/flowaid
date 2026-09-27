@@ -37,6 +37,25 @@ function hopLabel(hop: ProviderHop): string {
   }
 }
 
+/**
+ * The models a generation node's `config.model` names: the ref itself, or each candidate of a
+ * GenerationPolicy (RFC-0005), with the JSON pointer of each. Shapes that are neither yield none
+ * (the schema pass reports them).
+ */
+function generationCandidates(
+  model: unknown,
+  path: string,
+): { provider: string; model: string; path: string }[] {
+  if (!isPlainObject(model)) return [];
+  const isRef = (v: unknown): v is { provider: string; model: string } =>
+    isPlainObject(v) && typeof v.provider === "string" && typeof v.model === "string";
+  if (Array.isArray(model.candidates))
+    return model.candidates.flatMap((c, i) =>
+      isRef(c) ? [{ provider: c.provider, model: c.model, path: `${path}/candidates/${i}` }] : [],
+    );
+  return isRef(model) ? [{ provider: model.provider, model: model.model, path }] : [];
+}
+
 /** The decision chain in effect: the definition's, or the workspace default when it is untouched. */
 export function decisionChain(ctx: CompileContext): {
   primary: ProviderHop;
@@ -86,31 +105,39 @@ export function environmentPass(ctx: CompileContext): void {
     }
     for (const info of ctx.active()) {
       if (info.node.kind !== "task" || !info.manifest?.generation) continue;
-      const model = info.node.config.model;
-      if (
-        !isPlainObject(model) ||
-        typeof model.provider !== "string" ||
-        typeof model.model !== "string"
-      )
-        continue;
       const path = nodePath(info.index, "config", "model");
-      if (!available.providers.has(model.provider)) {
+      const candidates = generationCandidates(info.node.config.model, path);
+      if (candidates.length === 0) continue;
+      const configured = candidates.filter((c) => available.providers.has(c.provider));
+      if (configured.length === 0) {
+        const names = [...new Set(candidates.map((c) => c.provider))].join(", ");
         unavailable(
-          `'${info.node.id}' uses ${model.provider}, which is not configured in this workspace`,
+          `'${info.node.id}' uses ${names}, which ${candidates.length > 1 ? "are" : "is"} not configured in this workspace`,
           info,
           path,
         );
         continue;
       }
-      const entry = available.models.find(
-        (m) => m.provider === model.provider && m.model === model.model,
-      );
-      if (entry?.deprecated) {
+      // A generation policy (RFC-0005) skips unconfigured candidates: warn, like decision hops.
+      candidates.forEach((c, i) => {
+        if (available.providers.has(c.provider)) return;
         diagnostics.add(
-          "W_MODEL_DEPRECATED",
-          `${model.provider}/${model.model} is deprecated: ${entry.deprecated}`,
-          { nodeId: info.node.id, path },
+          "W_FAILOVER_UNCONFIGURED",
+          `Candidate ${i + 1} of '${info.node.id}' (${c.provider}/${c.model}) is not configured and will be skipped`,
+          { nodeId: info.node.id, path: c.path },
         );
+      });
+      for (const c of configured) {
+        const entry = available.models.find(
+          (m) => m.provider === c.provider && m.model === c.model,
+        );
+        if (entry?.deprecated) {
+          diagnostics.add(
+            "W_MODEL_DEPRECATED",
+            `${c.provider}/${c.model} is deprecated: ${entry.deprecated}`,
+            { nodeId: info.node.id, path: c.path },
+          );
+        }
       }
     }
   }

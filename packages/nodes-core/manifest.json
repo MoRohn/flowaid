@@ -158,21 +158,87 @@
             "type": "integer"
           },
           "model": {
-            "properties": {
-              "model": {
-                "minLength": 1,
-                "type": "string"
+            "anyOf": [
+              {
+                "properties": {
+                  "model": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "provider": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "provider",
+                  "model"
+                ],
+                "type": "object"
               },
-              "provider": {
-                "minLength": 1,
-                "type": "string"
+              {
+                "properties": {
+                  "candidates": {
+                    "items": {
+                      "properties": {
+                        "model": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "provider": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "provider",
+                        "model"
+                      ],
+                      "type": "object"
+                    },
+                    "maxItems": 5,
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "maxCostUsdPerCall": {
+                    "exclusiveMinimum": 0,
+                    "type": "number"
+                  },
+                  "requirements": {
+                    "properties": {
+                      "jsonSchema": {
+                        "type": "boolean"
+                      },
+                      "minContext": {
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "tools": {
+                        "type": "boolean"
+                      },
+                      "vision": {
+                        "type": "boolean"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "strategy": {
+                    "default": "ordered",
+                    "enum": [
+                      "ordered",
+                      "cheapest",
+                      "fastest",
+                      "healthiest"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "candidates"
+                ],
+                "type": "object"
               }
-            },
-            "required": [
-              "provider",
-              "model"
             ],
-            "type": "object",
             "x-ui": {
               "widget": "model"
             }
@@ -299,21 +365,87 @@
             "type": "integer"
           },
           "model": {
-            "properties": {
-              "model": {
-                "minLength": 1,
-                "type": "string"
+            "anyOf": [
+              {
+                "properties": {
+                  "model": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "provider": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "provider",
+                  "model"
+                ],
+                "type": "object"
               },
-              "provider": {
-                "minLength": 1,
-                "type": "string"
+              {
+                "properties": {
+                  "candidates": {
+                    "items": {
+                      "properties": {
+                        "model": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "provider": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "provider",
+                        "model"
+                      ],
+                      "type": "object"
+                    },
+                    "maxItems": 5,
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "maxCostUsdPerCall": {
+                    "exclusiveMinimum": 0,
+                    "type": "number"
+                  },
+                  "requirements": {
+                    "properties": {
+                      "jsonSchema": {
+                        "type": "boolean"
+                      },
+                      "minContext": {
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "tools": {
+                        "type": "boolean"
+                      },
+                      "vision": {
+                        "type": "boolean"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "strategy": {
+                    "default": "ordered",
+                    "enum": [
+                      "ordered",
+                      "cheapest",
+                      "fastest",
+                      "healthiest"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "candidates"
+                ],
+                "type": "object"
               }
-            },
-            "required": [
-              "provider",
-              "model"
             ],
-            "type": "object",
             "x-ui": {
               "widget": "model"
             }

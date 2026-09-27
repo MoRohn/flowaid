@@ -20,6 +20,7 @@ import type {
   IdempotencySpec,
   JsonObject,
   JsonValue,
+  GenerationPolicy,
   ModelRef,
   NodeCapability,
   NodeId,
@@ -62,7 +63,11 @@ export interface CredentialAccess {
 export interface ProviderAccess {
   /** Failover chain [primary, ...failover]; every hop visible in DecisionResult.attempts. `human` suspends (see NodeResult). */
   decision(chain: readonly ProviderHop[], opts?: { credentialSlot?: string }): DecisionProvider;
-  generation(ref: ModelRef, opts?: { credentialSlot?: string }): GenerationProvider;
+  /** One model, or a GenerationPolicy resolved to a failover chain (RFC-0005). */
+  generation(
+    selection: ModelRef | GenerationPolicy,
+    opts?: { credentialSlot?: string },
+  ): GenerationProvider;
   embedding(ref: ModelRef, opts?: { credentialSlot?: string }): EmbeddingProvider;
 }
 export interface ToolAccess {
