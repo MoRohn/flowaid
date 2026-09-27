@@ -2871,6 +2871,266 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/plugins": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Installed and bundled node packages */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              error: string | null;
+              /** Format: uuid */
+              id: string;
+              installedAt: string;
+              integrity: string | null;
+              nodes: {
+                category: string;
+                id: string;
+                name: string;
+                version: string;
+              }[];
+              packageName: string;
+              pool: string;
+              /** @enum {string} */
+              scope: "global" | "workspace";
+              /** @enum {string} */
+              source: "npm" | "local" | "bundled";
+              /** @enum {string} */
+              status: "enabled" | "disabled" | "error";
+              version: string;
+            }[];
+          };
+        };
+      };
+    };
+    put?: never;
+    /** Install (or upgrade) a node package for this workspace */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            integrity?: string;
+            packageName: string;
+            path?: string;
+            /**
+             * @default npm
+             * @enum {string}
+             */
+            source?: "npm" | "local";
+            /** @default latest */
+            version?: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Default Response */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              plugin: {
+                error: string | null;
+                /** Format: uuid */
+                id: string;
+                installedAt: string;
+                integrity: string | null;
+                nodes: {
+                  category: string;
+                  id: string;
+                  name: string;
+                  version: string;
+                }[];
+                packageName: string;
+                pool: string;
+                /** @enum {string} */
+                scope: "global" | "workspace";
+                /** @enum {string} */
+                source: "npm" | "local" | "bundled";
+                /** @enum {string} */
+                status: "enabled" | "disabled" | "error";
+                version: string;
+              };
+              workerRestartRequired: boolean;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/plugins/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description No content */
+        204: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    /** Enable or disable a plugin, or move it to another worker pool */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            /** @enum {string} */
+            pool?: "general" | "code" | "browser" | "gpu" | "retrieval" | "high_memory";
+            /** @enum {string} */
+            status?: "enabled" | "disabled";
+          };
+        };
+      };
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              plugin: {
+                error: string | null;
+                /** Format: uuid */
+                id: string;
+                installedAt: string;
+                integrity: string | null;
+                nodes: {
+                  category: string;
+                  id: string;
+                  name: string;
+                  version: string;
+                }[];
+                packageName: string;
+                pool: string;
+                /** @enum {string} */
+                scope: "global" | "workspace";
+                /** @enum {string} */
+                source: "npm" | "local" | "bundled";
+                /** @enum {string} */
+                status: "enabled" | "disabled" | "error";
+                version: string;
+              };
+              workerRestartRequired: boolean;
+            };
+          };
+        };
+      };
+    };
+    trace?: never;
+  };
+  "/v1/plugins/search": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Search the registry for node packages (keyword flowaid-node) */
+    get: {
+      parameters: {
+        query?: {
+          q?: string;
+          size?: number;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              allowed: boolean;
+              date: string | null;
+              description: string;
+              installed: string | null;
+              keywords: string[];
+              links: {
+                homepage?: string;
+                npm?: string;
+                repository?: string;
+              };
+              name: string;
+              publisher: string | null;
+              score: number;
+              version: string;
+            }[];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/providers": {
     parameters: {
       query?: never;

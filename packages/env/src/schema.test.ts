@@ -94,6 +94,8 @@ describe("EnvSchema", () => {
     expect(env.FLOWAID_PLUGIN_DIR).toBe(".flowaid/plugins");
     expect(env.FLOWAID_BUNDLED_PLUGINS).toEqual(["@flowaid/nodes-langchain"]);
     expect(env.FLOWAID_PLUGIN_ALLOW_LOCAL).toBe(false);
+    expect(env.FLOWAID_PLUGIN_ALLOWED_SCOPES).toEqual(["@flowaid"]);
+    expect(env.FLOWAID_PLUGIN_REGISTRY).toBe("https://registry.npmjs.org");
     expect(env.FLOWAID_MCP_STDIO_ALLOWED_COMMANDS).toEqual([]);
     expect(env.FLOWAID_MCP_STDIO_ENV_ALLOWLIST).toEqual([]);
     expect(env.FLOWAID_EXPORT_MODE).toBe("vendored");
@@ -175,6 +177,8 @@ describe("EnvSchema", () => {
       PROMETHEUS_PORT: "9464",
       FLOWAID_FEATURES_DISABLED: "agents, ai_builder",
       FLOWAID_BUNDLED_PLUGINS: "@flowaid/nodes-langchain,@acme/nodes-crm",
+      FLOWAID_PLUGIN_ALLOWED_SCOPES: "@acme, flowaid-node-weather ,*",
+      FLOWAID_PLUGIN_REGISTRY: "https://npm.internal.example.com",
       FLOWAID_MCP_STDIO_ENV_ALLOWLIST: "PATH, HOME",
     });
     expect(env.PORT).toBe(8080);
@@ -187,6 +191,8 @@ describe("EnvSchema", () => {
     expect(env.PROMETHEUS_PORT).toBe(9464);
     expect(env.FLOWAID_FEATURES_DISABLED).toEqual(["agents", "ai_builder"]);
     expect(env.FLOWAID_BUNDLED_PLUGINS).toEqual(["@flowaid/nodes-langchain", "@acme/nodes-crm"]);
+    expect(env.FLOWAID_PLUGIN_ALLOWED_SCOPES).toEqual(["@acme", "flowaid-node-weather", "*"]);
+    expect(env.FLOWAID_PLUGIN_REGISTRY).toBe("https://npm.internal.example.com");
     expect(env.FLOWAID_MCP_STDIO_ENV_ALLOWLIST).toEqual(["PATH", "HOME"]);
   });
 
@@ -209,6 +215,8 @@ describe("EnvSchema", () => {
       FLOWAID_PROVIDER_FIXTURES: "cache",
       RETENTION_SWEEP_CRON: "every night",
       FLOWAID_BUNDLED_PLUGINS: "Not A Package",
+      FLOWAID_PLUGIN_ALLOWED_SCOPES: "@acme,Not Allowed",
+      FLOWAID_PLUGIN_REGISTRY: "file:///etc",
       FLOWAID_MCP_STDIO_ENV_ALLOWLIST: "PATH,9LIVES",
     });
     expect(issues.get("PORT")?.[0]).toContain("integer between 1 and 65535");
@@ -227,6 +235,8 @@ describe("EnvSchema", () => {
     expect(issues.get("FLOWAID_PROVIDER_FIXTURES")?.[0]).toContain("off, record, replay");
     expect(issues.get("RETENTION_SWEEP_CRON")?.[0]).toContain("five-field cron");
     expect(issues.get("FLOWAID_BUNDLED_PLUGINS")?.[0]).toContain("npm package name");
+    expect(issues.get("FLOWAID_PLUGIN_ALLOWED_SCOPES")?.[0]).toContain("npm scope");
+    expect(issues.get("FLOWAID_PLUGIN_REGISTRY")?.[0]).toContain("http:// or https://");
     expect(issues.get("FLOWAID_MCP_STDIO_ENV_ALLOWLIST")?.[0]).toContain("variable name");
   });
 

@@ -1,17 +1,34 @@
 {
   "$schema": "./scripts/boundaries.schema.json",
-  "$comment": "Dependency DAG from docs/design/ARCHITECTURE.md §1.1. Keys are workspace package short names (@flowaid/<name>); `allow` lists the @flowaid packages a package may import. An `allow` entry with a slash (e.g. \"nodes-core/manifest\") permits only that subpath. `browserSafe` packages may not import Node built-ins. @flowaid/config (tooling only) is allowed everywhere as a devDependency. `thirdParty` maps a `|`-separated list of external specifier globs to the only packages (`packages`) and files (`files`, repo-relative globs) that may import them; every other package gets a matching no-restricted-imports pattern and may not declare them in package.json. Enforced by eslint.boundaries.js (ESLint no-restricted-imports) and scripts/check-boundaries.test.ts (package.json dependencies).",
+  "$comment": "Dependency DAG from docs/design/ARCHITECTURE.md \u00a71.1. Keys are workspace package short names (@flowaid/<name>); `allow` lists the @flowaid packages a package may import. An `allow` entry with a slash (e.g. \"nodes-core/manifest\") permits only that subpath. `browserSafe` packages may not import Node built-ins. @flowaid/config (tooling only) is allowed everywhere as a devDependency. `thirdParty` maps a `|`-separated list of external specifier globs to the only packages (`packages`) and files (`files`, repo-relative globs) that may import them; every other package gets a matching no-restricted-imports pattern and may not declare them in package.json. Enforced by eslint.boundaries.js (ESLint no-restricted-imports) and scripts/check-boundaries.test.ts (package.json dependencies).",
   "packages": {
-    "shared": { "dir": "packages/shared", "allow": [], "browserSafe": true },
-    "env": { "dir": "packages/env", "allow": ["shared"] },
-    "workflow-core": { "dir": "packages/workflow-core", "allow": ["shared"], "browserSafe": true },
-    "node-sdk": { "dir": "packages/node-sdk", "allow": ["workflow-core", "shared"] },
+    "shared": {
+      "dir": "packages/shared",
+      "allow": [],
+      "browserSafe": true
+    },
+    "env": {
+      "dir": "packages/env",
+      "allow": ["shared"]
+    },
+    "workflow-core": {
+      "dir": "packages/workflow-core",
+      "allow": ["shared"],
+      "browserSafe": true
+    },
+    "node-sdk": {
+      "dir": "packages/node-sdk",
+      "allow": ["workflow-core", "shared"]
+    },
     "workflow-compiler": {
       "dir": "packages/workflow-compiler",
       "allow": ["workflow-core", "shared"],
       "browserSafe": true
     },
-    "providers": { "dir": "packages/providers", "allow": ["workflow-core", "shared"] },
+    "providers": {
+      "dir": "packages/providers",
+      "allow": ["workflow-core", "shared"]
+    },
     "provider-typesafe": {
       "dir": "packages/provider-typesafe",
       "allow": ["providers", "workflow-core", "shared"]
@@ -28,7 +45,10 @@
       "dir": "packages/provider-ollama",
       "allow": ["providers", "workflow-core", "shared"]
     },
-    "credentials": { "dir": "packages/credentials", "allow": ["workflow-core", "shared", "env"] },
+    "credentials": {
+      "dir": "packages/credentials",
+      "allow": ["workflow-core", "shared", "env"]
+    },
     "observability": {
       "dir": "packages/observability",
       "allow": ["workflow-core", "credentials", "shared", "env"]
@@ -40,7 +60,10 @@
       "dir": "packages/nodes-core",
       "allow": ["node-sdk", "providers", "mcp", "openapi-tools", "workflow-core", "shared"]
     },
-    "sandbox": { "dir": "packages/sandbox", "allow": ["workflow-core", "shared"] },
+    "sandbox": {
+      "dir": "packages/sandbox",
+      "allow": ["workflow-core", "shared"]
+    },
     "workflow-runtime": {
       "dir": "packages/workflow-runtime",
       "allow": [
@@ -54,7 +77,10 @@
         "env"
       ]
     },
-    "database": { "dir": "packages/database", "allow": ["workflow-core", "shared", "env"] },
+    "database": {
+      "dir": "packages/database",
+      "allow": ["workflow-core", "shared", "env"]
+    },
     "evaluation": {
       "dir": "packages/evaluation",
       "allow": ["workflow-core", "providers", "shared"]
@@ -63,7 +89,10 @@
       "dir": "packages/advisor",
       "allow": ["workflow-core", "workflow-compiler", "providers", "shared"]
     },
-    "workflow-sdk": { "dir": "packages/workflow-sdk", "allow": ["workflow-core", "shared"] },
+    "workflow-sdk": {
+      "dir": "packages/workflow-sdk",
+      "allow": ["workflow-core", "shared"]
+    },
     "cli": {
       "dir": "packages/cli",
       "allow": [
@@ -79,10 +108,14 @@
         "credentials",
         "sandbox",
         "workflow-core",
-        "shared"
+        "shared",
+        "plugins"
       ]
     },
-    "importer": { "dir": "packages/importer", "allow": ["workflow-core", "shared"] },
+    "importer": {
+      "dir": "packages/importer",
+      "allow": ["workflow-core", "shared"]
+    },
     "codegen": {
       "dir": "packages/codegen",
       "allow": ["workflow-core", "workflow-compiler", "workflow-sdk/builders", "shared"]
@@ -95,8 +128,16 @@
       "dir": "packages/nodes-langchain",
       "allow": ["langchain", "node-sdk", "providers", "workflow-core", "shared"]
     },
-    "ui": { "dir": "packages/ui", "allow": ["workflow-core"], "browserSafe": true },
-    "jev": { "dir": "packages/jev", "allow": ["workflow-core", "shared"], "browserSafe": true },
+    "ui": {
+      "dir": "packages/ui",
+      "allow": ["workflow-core"],
+      "browserSafe": true
+    },
+    "jev": {
+      "dir": "packages/jev",
+      "allow": ["workflow-core", "shared"],
+      "browserSafe": true
+    },
     "api": {
       "dir": "apps/api",
       "allow": [
@@ -122,7 +163,8 @@
         "importer",
         "codegen",
         "advisor",
-        "nodes-core/manifest"
+        "nodes-core/manifest",
+        "plugins"
       ]
     },
     "worker": {
@@ -157,7 +199,18 @@
       "dir": "apps/web",
       "allow": ["ui", "workflow-core", "workflow-compiler", "workflow-sdk", "shared"]
     },
-    "docs": { "dir": "apps/docs", "allow": ["workflow-core", "nodes-core/manifest"] }
+    "docs": {
+      "dir": "apps/docs",
+      "allow": ["workflow-core", "nodes-core/manifest"]
+    },
+    "plugins": {
+      "dir": "packages/plugins",
+      "allow": ["workflow-core", "shared"]
+    },
+    "create-flowaid-node": {
+      "dir": "packages/create-flowaid-node",
+      "allow": ["node-sdk", "plugins"]
+    }
   },
   "thirdParty": {
     "langchain|langchain/*|@langchain/*": {

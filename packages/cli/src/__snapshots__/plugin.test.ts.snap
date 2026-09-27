@@ -1,0 +1,7 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`flowaid plugin > search lists only flowaid-node packages from the registry (recorded response) 1`] = `
+"NAME                  VERSION    DESCRIPTION
+@acme/nodes-crm       1.2.0      CRM lookups and updates as FlowAId nodes
+flowaid-node-weather  0.4.1      Weather forecasts for FlowAId workflows"
+`;

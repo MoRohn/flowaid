@@ -32,6 +32,7 @@ import { aiRoutes } from "./routes/ai.js";
 import { optimizeRoutes } from "./routes/optimize.js";
 import { exportRoutes } from "./routes/export.js";
 import { reviewRoutes } from "./routes/review.js";
+import { pluginRoutes } from "./routes/plugins.js";
 import { mcpServerRoutes } from "./routes/mcpServer.js";
 import { workflowRoutes } from "./routes/workflows.js";
 import "./types.js";
@@ -112,6 +113,7 @@ export async function buildServer(ctx: ApiContext, o: BuildOptions = {}): Promis
   aiRoutes(app, ctx);
   exportRoutes(app, ctx);
   reviewRoutes(app, ctx);
+  pluginRoutes(app, ctx);
   mcpServerRoutes(app, ctx);
   for (const register of o.routes ?? []) register(app, ctx);
   return app;

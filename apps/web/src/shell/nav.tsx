@@ -62,7 +62,12 @@ export const NAV: NavEntry[] = [
   {
     id: "integrations",
     label: "Integrations",
-    anyOf: ["integrations_mcp", "integrations_openapi", "integrations_providers"],
+    anyOf: [
+      "integrations_mcp",
+      "integrations_openapi",
+      "integrations_providers",
+      "integrations_plugins",
+    ],
     icon: <Plug {...ICON} />,
     path: "integrations",
   },

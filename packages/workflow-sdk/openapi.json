@@ -7962,6 +7962,360 @@
           }
         }
       }
+    },
+    "/v1/plugins": {
+      "get": {
+        "summary": "Installed and bundled node packages",
+        "tags": ["plugins"],
+        "x-cli": { "noun": "plugin", "verb": "list" },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["tools:read"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "packageName": { "type": "string" },
+                      "version": { "type": "string" },
+                      "source": { "type": "string", "enum": ["npm", "local", "bundled"] },
+                      "integrity": { "type": ["string", "null"] },
+                      "status": { "type": "string", "enum": ["enabled", "disabled", "error"] },
+                      "pool": { "type": "string" },
+                      "error": { "type": ["string", "null"] },
+                      "scope": { "type": "string", "enum": ["global", "workspace"] },
+                      "nodes": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": { "type": "string" },
+                            "name": { "type": "string" },
+                            "category": { "type": "string" },
+                            "version": { "type": "string" }
+                          },
+                          "required": ["id", "name", "category", "version"],
+                          "additionalProperties": false
+                        }
+                      },
+                      "installedAt": { "type": "string" }
+                    },
+                    "required": [
+                      "id",
+                      "packageName",
+                      "version",
+                      "source",
+                      "integrity",
+                      "status",
+                      "pool",
+                      "error",
+                      "scope",
+                      "nodes",
+                      "installedAt"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Install (or upgrade) a node package for this workspace",
+        "tags": ["plugins"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "packageName": { "type": "string", "minLength": 1, "maxLength": 214 },
+                  "version": {
+                    "default": "latest",
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "source": { "default": "npm", "type": "string", "enum": ["npm", "local"] },
+                  "integrity": { "type": "string", "maxLength": 200 },
+                  "path": { "type": "string", "maxLength": 1000 }
+                },
+                "required": ["packageName"]
+              }
+            }
+          }
+        },
+        "x-cli": { "noun": "plugin", "verb": "install" },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["admin"],
+        "responses": {
+          "201": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "plugin": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "packageName": { "type": "string" },
+                        "version": { "type": "string" },
+                        "source": { "type": "string", "enum": ["npm", "local", "bundled"] },
+                        "integrity": { "type": ["string", "null"] },
+                        "status": { "type": "string", "enum": ["enabled", "disabled", "error"] },
+                        "pool": { "type": "string" },
+                        "error": { "type": ["string", "null"] },
+                        "scope": { "type": "string", "enum": ["global", "workspace"] },
+                        "nodes": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": { "type": "string" },
+                              "name": { "type": "string" },
+                              "category": { "type": "string" },
+                              "version": { "type": "string" }
+                            },
+                            "required": ["id", "name", "category", "version"],
+                            "additionalProperties": false
+                          }
+                        },
+                        "installedAt": { "type": "string" }
+                      },
+                      "required": [
+                        "id",
+                        "packageName",
+                        "version",
+                        "source",
+                        "integrity",
+                        "status",
+                        "pool",
+                        "error",
+                        "scope",
+                        "nodes",
+                        "installedAt"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "workerRestartRequired": { "type": "boolean" }
+                  },
+                  "required": ["plugin", "workerRestartRequired"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/plugins/search": {
+      "get": {
+        "summary": "Search the registry for node packages (keyword flowaid-node)",
+        "tags": ["plugins"],
+        "parameters": [
+          {
+            "schema": { "default": "", "type": "string", "maxLength": 200 },
+            "in": "query",
+            "name": "q",
+            "required": false
+          },
+          {
+            "schema": { "default": 20, "type": "integer", "minimum": 1, "maximum": 100 },
+            "in": "query",
+            "name": "size",
+            "required": false
+          }
+        ],
+        "x-cli": { "noun": "plugin", "verb": "discover" },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["tools:read"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": { "type": "string" },
+                      "version": { "type": "string" },
+                      "description": { "type": "string" },
+                      "keywords": { "type": "array", "items": { "type": "string" } },
+                      "publisher": { "type": ["string", "null"] },
+                      "date": { "type": ["string", "null"] },
+                      "links": {
+                        "type": "object",
+                        "properties": {
+                          "npm": { "type": "string" },
+                          "repository": { "type": "string" },
+                          "homepage": { "type": "string" }
+                        },
+                        "additionalProperties": false
+                      },
+                      "score": { "type": "number" },
+                      "allowed": { "type": "boolean" },
+                      "installed": { "type": ["string", "null"] }
+                    },
+                    "required": [
+                      "name",
+                      "version",
+                      "description",
+                      "keywords",
+                      "publisher",
+                      "date",
+                      "links",
+                      "score",
+                      "allowed",
+                      "installed"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/plugins/{id}": {
+      "patch": {
+        "summary": "Enable or disable a plugin, or move it to another worker pool",
+        "tags": ["plugins"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": { "type": "string", "enum": ["enabled", "disabled"] },
+                  "pool": {
+                    "type": "string",
+                    "enum": ["general", "code", "browser", "gpu", "retrieval", "high_memory"]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "x-cli": { "noun": "plugin", "verb": "update", "positional": ["id"] },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["admin"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "plugin": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "packageName": { "type": "string" },
+                        "version": { "type": "string" },
+                        "source": { "type": "string", "enum": ["npm", "local", "bundled"] },
+                        "integrity": { "type": ["string", "null"] },
+                        "status": { "type": "string", "enum": ["enabled", "disabled", "error"] },
+                        "pool": { "type": "string" },
+                        "error": { "type": ["string", "null"] },
+                        "scope": { "type": "string", "enum": ["global", "workspace"] },
+                        "nodes": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": { "type": "string" },
+                              "name": { "type": "string" },
+                              "category": { "type": "string" },
+                              "version": { "type": "string" }
+                            },
+                            "required": ["id", "name", "category", "version"],
+                            "additionalProperties": false
+                          }
+                        },
+                        "installedAt": { "type": "string" }
+                      },
+                      "required": [
+                        "id",
+                        "packageName",
+                        "version",
+                        "source",
+                        "integrity",
+                        "status",
+                        "pool",
+                        "error",
+                        "scope",
+                        "nodes",
+                        "installedAt"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "workerRestartRequired": { "type": "boolean" }
+                  },
+                  "required": ["plugin", "workerRestartRequired"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["plugins"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "x-cli": { "noun": "plugin", "verb": "remove", "positional": ["id"] },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["admin"],
+        "responses": { "204": { "description": "No content" } }
+      }
     }
   },
   "security": [{ "apiKey": [] }, { "session": [] }]

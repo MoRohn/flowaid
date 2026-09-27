@@ -1,0 +1,64 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`create-flowaid-node > scaffolds a package whose node runs, whose manifest is current, and whose own tests pass 1`] = `
+{
+  "nodes": [
+    {
+      "capabilities": [],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "greeting": {
+            "default": "Hello",
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string",
+          },
+        },
+        "type": "object",
+      },
+      "controlPorts": [],
+      "credentials": [],
+      "defaultPolicy": {},
+      "generation": false,
+      "id": "@acme/nodes-crm.greet",
+      "idempotency": "safe",
+      "inputs": [
+        {
+          "name": "name",
+          "required": true,
+          "schema": {
+            "minLength": 1,
+            "type": "string",
+          },
+        },
+      ],
+      "metadata": {
+        "category": "data",
+        "description": "Greets someone by name. Replace it with your own node.",
+        "icon": "hand",
+        "name": "Greet",
+        "summary": "{{ config.greeting }}",
+        "tags": [
+          "example",
+        ],
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "text",
+          "required": true,
+          "schema": {
+            "type": "string",
+          },
+        },
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0",
+    },
+  ],
+}
+`;

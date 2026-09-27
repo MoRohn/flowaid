@@ -34,6 +34,8 @@ export interface ApiConfig {
   exportMode: "npm" | "vendored";
   /** The packed runtime packages exist (FLOWAID_VENDOR_DIR/SHA256SUMS), so vendored exports work. */
   vendorAvailable: boolean;
+  /** Plugins (ARCHITECTURE.md §3.5): the allow-list, the npm registry, and whether local installs are accepted. */
+  plugins: { allowList: readonly string[]; registry: string; allowLocal: boolean };
 }
 
 export interface Clock {
@@ -93,6 +95,11 @@ export function configFromEnv(env: Env): ApiConfig {
     vendorAvailable: existsSync(
       join(String(env.FLOWAID_VENDOR_DIR ?? "/opt/flowaid/vendor"), "SHA256SUMS"),
     ),
+    plugins: {
+      allowList: env.FLOWAID_PLUGIN_ALLOWED_SCOPES,
+      registry: String(env.FLOWAID_PLUGIN_REGISTRY),
+      allowLocal: env.FLOWAID_PLUGIN_ALLOW_LOCAL,
+    },
   };
 }
 
@@ -115,6 +122,7 @@ export function defaultConfig(over: Partial<ApiConfig> = {}): ApiConfig {
     s3: null,
     exportMode: "npm",
     vendorAvailable: false,
+    plugins: { allowList: ["@flowaid"], registry: "https://registry.npmjs.org", allowLocal: false },
     ...over,
   };
 }

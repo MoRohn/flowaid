@@ -91,6 +91,16 @@ model list {--provider --kind --out}
 node
 node get <typeId> {--version --out}
 node list {--out}
+plugin
+plugin add <spec> {--frozen --local}
+plugin disable <plugin>
+plugin discover {--q --size --out}
+plugin enable <plugin>
+plugin install {--package-name --version --source --integrity --path --body --out}
+plugin list {--out}
+plugin remove <id> {--out}
+plugin search [query] {--registry --size}
+plugin update <id> {--status --pool --body --out}
 provider
 provider list {--out}
 review
@@ -222,6 +232,7 @@ Commands:
   member|members                    member operations
   model|models                      model operations
   node|nodes                        node operations
+  plugin|plugins                    plugin operations
   provider|providers                provider operations
   review|reviews                    review operations
   run|runs                          run operations
