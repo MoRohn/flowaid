@@ -1,0 +1,252 @@
+/** `scoreCase`: every expectation of a case checked against its run. */
+import {
+  getPointer,
+  type DecisionCallContext,
+  type DecisionProvider,
+  type DecisionResult,
+  type JsonValue,
+} from "@flowaid/workflow-core";
+import type { EvaluationCase } from "./expectation.js";
+import { judge } from "./scorers/judge.js";
+import { jsonEquals, matchValue } from "./scorers/matchers.js";
+import type { CaseMetrics, CaseResult, CheckResult, NodeRecord, RunRecord } from "./types.js";
+
+export interface ScoreOptions {
+  /** decision provider for `judge` matchers; without it they fail with a clear message */
+  judge?: DecisionProvider;
+  judgeContext?: Omit<DecisionCallContext, "signal"> & { signal?: AbortSignal };
+}
+
+/** The value a decision expectation compares against (score decisions also match their level/label). */
+function decisionMatches(d: DecisionResult, v: JsonValue): boolean {
+  if (jsonEquals(d.value, v)) return true;
+  if (d.kind === "score") return v === d.level || v === d.levelLabel;
+  if (d.kind === "boolean") return (v === "yes" && d.value) || (v === "no" && !d.value);
+  return false;
+}
+
+function numericOf(d: DecisionResult): number {
+  if (d.kind === "score") return d.value;
+  if (d.kind === "boolean") return d.pYes;
+  return d.confidence;
+}
+
+const EXECUTED = new Set(["completed", "failed", "reused"]);
+
+export function metricsOf(run: RunRecord): CaseMetrics {
+  const branches: CaseMetrics["branches"] = {};
+  const decisions: CaseMetrics["decisions"] = {};
+  for (const n of run.nodes) {
+    if (n.firedPort !== undefined) branches[n.nodeId] = n.firedPort;
+    if (n.decision)
+      decisions[n.nodeId] = {
+        value: n.decision.value,
+        confidence: n.decision.confidence,
+      };
+  }
+  return {
+    latencyMs: run.latencyMs,
+    costUsd: run.costUsd,
+    tokens: run.tokens ?? 0,
+    branches,
+    decisions,
+    humanRequested: run.humanRequested,
+    toolCalls: { total: run.tools.length, ok: run.tools.filter((t) => t.ok).length },
+    schemaErrors: run.nodes.filter((n) => n.schemaError === true).length,
+  };
+}
+
+export async function scoreCase(
+  c: EvaluationCase,
+  run: RunRecord,
+  o: ScoreOptions = {},
+): Promise<CaseResult> {
+  const e = c.expected;
+  const checks: CheckResult[] = [];
+  const add = (check: CheckResult) => checks.push(check);
+  const byNode = new Map<string, NodeRecord>(run.nodes.map((n) => [n.nodeId, n]));
+
+  // A run that did not reach a terminal success still gets every check, so failures are specific.
+  for (const { path, matcher } of e.output) {
+    const actual = getPointer(run.output, path);
+    const id = `output:${path || "/"}:${matcher.type}`;
+    if (matcher.type === "judge") {
+      if (!o.judge) {
+        add({ kind: "output", id, passed: false, message: "no judge provider is configured" });
+        continue;
+      }
+      try {
+        const v = await judge(
+          o.judge,
+          matcher,
+          { input: c.input, actual },
+          {
+            runId: run.runId,
+            nodeRunId: `eval:${c.id}`,
+            idempotencyKey: null,
+            signal: o.judgeContext?.signal ?? new AbortController().signal,
+          },
+        );
+        add({
+          kind: "output",
+          id,
+          passed: v.passed,
+          actual: { pYes: v.pYes },
+          ...(v.message ? { message: v.message } : {}),
+        });
+      } catch (error) {
+        add({
+          kind: "output",
+          id,
+          passed: false,
+          message: `judge failed: ${error instanceof Error ? error.message : String(error)}`,
+        });
+      }
+      continue;
+    }
+    const m = matchValue(matcher, actual);
+    add({
+      kind: "output",
+      id,
+      passed: m.passed,
+      ...(actual !== undefined ? { actual } : {}),
+      ...(m.message ? { message: m.message } : {}),
+    });
+  }
+
+  for (const [nodeId, exp] of Object.entries(e.decisions)) {
+    const d = byNode.get(nodeId)?.decision;
+    const id = `decision:${nodeId}`;
+    if (!d) {
+      add({ kind: "decision", id, passed: false, message: `${nodeId} made no decision` });
+      continue;
+    }
+    const problems: string[] = [];
+    if (exp.value !== undefined && !decisionMatches(d, exp.value))
+      problems.push(`value ${JSON.stringify(d.value)} ≠ ${JSON.stringify(exp.value)}`);
+    if (exp.valueIn && !exp.valueIn.some((v) => decisionMatches(d, v)))
+      problems.push(`value ${JSON.stringify(d.value)} not in ${JSON.stringify(exp.valueIn)}`);
+    if (exp.range) {
+      const x = numericOf(d);
+      if (x < exp.range[0] || x > exp.range[1])
+        problems.push(`${x} outside [${exp.range[0]}, ${exp.range[1]}]`);
+    }
+    if (exp.minConfidence !== undefined && d.confidence < exp.minConfidence)
+      problems.push(`confidence ${d.confidence.toFixed(3)} < ${exp.minConfidence}`);
+    add({
+      kind: "decision",
+      id,
+      passed: problems.length === 0,
+      actual: { value: d.value as JsonValue, confidence: d.confidence },
+      ...(problems.length ? { message: problems.join("; ") } : {}),
+    });
+  }
+
+  for (const [nodeId, port] of Object.entries(e.branches)) {
+    const fired = byNode.get(nodeId)?.firedPort ?? null;
+    add({
+      kind: "branch",
+      id: `branch:${nodeId}`,
+      passed: fired === port,
+      expected: port,
+      actual: fired,
+      ...(fired === port
+        ? {}
+        : { message: `${nodeId} fired ${fired ?? "nothing"}, expected ${port}` }),
+    });
+  }
+
+  for (const nodeId of e.requiredNodes) {
+    const ran = EXECUTED.has(byNode.get(nodeId)?.status ?? "");
+    add({
+      kind: "node",
+      id: `node:${nodeId}:required`,
+      passed: ran,
+      ...(ran ? {} : { message: `${nodeId} did not run` }),
+    });
+  }
+  for (const nodeId of e.forbiddenNodes) {
+    const ran = EXECUTED.has(byNode.get(nodeId)?.status ?? "");
+    add({
+      kind: "node",
+      id: `node:${nodeId}:forbidden`,
+      passed: !ran,
+      ...(ran ? { message: `${nodeId} ran` } : {}),
+    });
+  }
+  const tools = new Set(run.tools.map((t) => t.name));
+  for (const t of e.requiredTools)
+    add({
+      kind: "tool",
+      id: `tool:${t}:required`,
+      passed: tools.has(t),
+      ...(tools.has(t) ? {} : { message: `${t} was not called` }),
+    });
+  for (const t of e.forbiddenTools)
+    add({
+      kind: "tool",
+      id: `tool:${t}:forbidden`,
+      passed: !tools.has(t),
+      ...(tools.has(t) ? { message: `${t} was called` } : {}),
+    });
+
+  const expectedStatus = e.status ?? (e.outcome !== undefined ? undefined : "completed");
+  if (expectedStatus !== undefined)
+    add({
+      kind: "status",
+      id: "status",
+      passed: run.status === expectedStatus,
+      expected: expectedStatus,
+      actual: run.status,
+      ...(run.status === expectedStatus
+        ? {}
+        : {
+            message: `run ${run.status}${run.error ? ` (${run.error.code}: ${run.error.message})` : ""}`,
+          }),
+    });
+  if (e.outcome !== undefined)
+    add({
+      kind: "outcome",
+      id: "outcome",
+      passed: run.outcome === e.outcome,
+      expected: e.outcome,
+      actual: run.outcome,
+    });
+  if (e.maxLatencyMs !== undefined)
+    add({
+      kind: "latency",
+      id: "latency",
+      passed: run.latencyMs <= e.maxLatencyMs,
+      expected: e.maxLatencyMs,
+      actual: run.latencyMs,
+    });
+  if (e.maxCostUsd !== undefined)
+    add({
+      kind: "cost",
+      id: "cost",
+      passed: run.costUsd <= e.maxCostUsd,
+      expected: e.maxCostUsd,
+      actual: run.costUsd,
+    });
+  if (e.humanExpected !== undefined)
+    add({
+      kind: "human",
+      id: "human",
+      passed: run.humanRequested === e.humanExpected,
+      expected: e.humanExpected,
+      actual: run.humanRequested,
+    });
+
+  const failures = checks
+    .filter((k) => !k.passed)
+    .map((k) => `${k.id}${k.message ? `: ${k.message}` : ""}`);
+  return {
+    caseId: c.id,
+    runId: run.runId,
+    passed: failures.length === 0,
+    checks,
+    failures,
+    metrics: metricsOf(run),
+    status: run.status,
+  };
+}
