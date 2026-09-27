@@ -51,6 +51,7 @@
   },
   "devDependencies": {
     "@flowaid/config": "workspace:*",
+    "@flowaid/workflow-sdk": "workspace:*",
     "@types/node": "24.13.6",
     "eslint": "9.39.5",
     "tsx": "4.23.15",

@@ -12,7 +12,7 @@
   "scripts": {
     "start": "node --disable-warning=ExperimentalWarning scripts/start.ts",
     "preflight": "node --disable-warning=ExperimentalWarning scripts/preflight-cli.ts",
-    "check": "pnpm audit --prod --audit-level=high && pnpm boundaries && pnpm env:check && pnpm ui:inventory:check && pnpm format:check && pnpm lint:root && pnpm typecheck:root && turbo run typecheck lint build test",
+    "check": "pnpm audit --prod --audit-level=high && pnpm boundaries && pnpm env:check && pnpm sdk:check && pnpm ui:inventory:check && pnpm format:check && pnpm lint:root && pnpm typecheck:root && turbo run typecheck lint build test",
     "build": "turbo run build",
     "dev": "turbo run dev --parallel",
     "lint": "turbo run lint",
@@ -30,7 +30,9 @@
     "ui:inventory": "tsx scripts/ui-inventory.ts",
     "ui:inventory:check": "tsx scripts/ui-inventory.ts --check",
     "lint:root": "eslint scripts docker eslint.boundaries.js packages/config",
-    "typecheck:root": "tsc -p tsconfig.json --noEmit"
+    "typecheck:root": "tsc -p tsconfig.json --noEmit",
+    "sdk:types": "tsx scripts/gen-sdk-types.ts",
+    "sdk:check": "tsx scripts/gen-sdk-types.ts --check"
   },
   "devDependencies": {
     "@flowaid/config": "workspace:*",
@@ -38,6 +40,7 @@
     "esbuild": "0.28.2",
     "eslint": "9.39.5",
     "happy-dom": "20.14.5",
+    "openapi-typescript": "7.13.0",
     "prettier": "3.9.8",
     "tsx": "4.23.15",
     "turbo": "2.11.2",
