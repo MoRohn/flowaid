@@ -1,6 +1,8 @@
 /** Test harness: a migrated disposable database, first boot, and a server over it. */
 import type { FastifyInstance, LightMyRequestResponse } from "fastify";
+import { PgEventBus, PgQueueDriver } from "@flowaid/database";
 import { createTestDatabase, type TestDatabase } from "@flowaid/database/testing";
+import { RunEventHub } from "../services/hub.js";
 import { AuthService } from "../auth/service.js";
 import { JwtKeys } from "../auth/jwt.js";
 import { firstBoot } from "../bootstrap/firstBoot.js";
@@ -29,17 +31,27 @@ export async function createTestApp(
       return this.t;
     },
   };
+  const queue = new PgQueueDriver(db.app.sql, { pollMs: 50 });
+  const hub = new RunEventHub(new PgEventBus(db.app.sql));
   const ctx: ApiContext = {
     config: defaultConfig(config),
     db: db.app,
     keys,
     auth: new AuthService(db.app, keys, () => clock.now()),
     clock,
+    queue,
+    hub,
   };
   await firstBoot(db.app, { adminEmail: OWNER.email, adminPassword: OWNER.password });
   const app = await buildServer(ctx, o);
   await app.ready();
-  return { app, ctx, db, clock, close: async () => (await app.close(), await db.drop()) };
+  return {
+    app,
+    ctx,
+    db,
+    clock,
+    close: async () => (await app.close(), await hub.close(), await queue.close(), await db.drop()),
+  };
 }
 
 /** A cookie jar that follows Set-Cookie across injected requests (Path-aware for the refresh cookie). */

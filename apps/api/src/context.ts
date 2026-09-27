@@ -1,5 +1,7 @@
 /** Everything a route needs, built once in `buildServer` (tests build it over a test database). */
 import type { Database } from "@flowaid/database";
+import type { QueueDriver } from "@flowaid/workflow-core";
+import type { RunEventHub } from "./services/hub.js";
 import type { Env } from "@flowaid/env";
 import type { AuthService } from "./auth/service.js";
 import type { JwtKeys } from "./auth/jwt.js";
@@ -29,6 +31,10 @@ export interface ApiContext {
   keys: JwtKeys;
   auth: AuthService;
   clock: Clock;
+  /** where `run.start`, `run.resume` and `run.control` go (Postgres or BullMQ) */
+  queue: QueueDriver;
+  /** run notifications for SSE and sync waits */
+  hub: RunEventHub;
   env?: Env;
 }
 

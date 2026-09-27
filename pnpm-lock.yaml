@@ -256,6 +256,9 @@ importers:
       '@scalar/fastify-api-reference':
         specifier: 1.72.1
         version: 1.72.1
+      ajv:
+        specifier: 8.20.0
+        version: 8.20.0
       argon2:
         specifier: 0.45.1
         version: 0.45.1

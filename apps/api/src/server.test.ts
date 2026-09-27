@@ -19,6 +19,8 @@ describe("route registration guard", () => {
       keys,
       auth: new AuthService(db, keys),
       clock: { now: () => Date.now() },
+      queue: {} as never,
+      hub: {} as never,
     };
   };
 

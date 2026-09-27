@@ -2,7 +2,9 @@
  * The api entrypoint: environment → migrations (as the owner role) → first boot → server. Prints the
  * generated owner password once, and shuts down gracefully on SIGTERM/SIGINT.
  */
-import { createDatabaseFromEnv, migrate } from "@flowaid/database";
+import { PgEventBus, PgQueueDriver, createDatabaseFromEnv, migrate } from "@flowaid/database";
+import { BullMqQueueDriver, RedisEventBus } from "@flowaid/workflow-runtime";
+import { RunEventHub } from "./services/hub.js";
 import { loadEnv } from "@flowaid/env";
 import { AuthService } from "./auth/service.js";
 import { JwtKeys } from "./auth/jwt.js";
@@ -24,12 +26,21 @@ async function main(): Promise<void> {
     production: env.flags.isProduction,
   });
   const clock = { now: () => Date.now() };
+  // Redis when configured (BullMQ + pub/sub), else Postgres (queue_jobs + LISTEN/NOTIFY).
+  const redisUrl = env.REDIS_URL ? String(env.REDIS_URL) : null;
+  const queue = redisUrl
+    ? new BullMqQueueDriver({ connection: { url: redisUrl } })
+    : new PgQueueDriver(db.sql);
+  const bus = redisUrl ? new RedisEventBus(redisUrl) : new PgEventBus(db.sql);
+  const hub = new RunEventHub(bus);
   const ctx: ApiContext = {
     config: configFromEnv(env),
     db,
     keys,
     auth: new AuthService(db, keys, clock.now),
     clock,
+    queue,
+    hub,
     env,
   };
   const boot = await firstBoot(db, {
@@ -57,6 +68,8 @@ async function main(): Promise<void> {
   const stop = async (signal: string) => {
     app.log.info({ signal }, "shutting down");
     await app.close();
+    await hub.close();
+    await queue.close();
     await db.close();
     process.exit(0);
   };
