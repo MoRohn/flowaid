@@ -3,6 +3,70 @@ import type { CliOperation } from "../operation.js";
 
 export const OPERATIONS: readonly CliOperation[] = [
   {
+    noun: "agent",
+    verb: "create",
+    method: "POST",
+    path: "/v1/agents",
+    auth: "session_or_api_key",
+    positional: [],
+    query: [],
+    body: {
+      required: true,
+      properties: [
+        { name: "name", type: "string", required: true },
+        { name: "description", type: "string", required: false },
+        { name: "config", type: "object", required: true },
+      ],
+    },
+  },
+  {
+    noun: "agent",
+    verb: "delete",
+    method: "DELETE",
+    path: "/v1/agents/{id}",
+    auth: "session_or_api_key",
+    positional: ["id"],
+    query: [],
+    body: null,
+  },
+  {
+    noun: "agent",
+    verb: "get",
+    method: "GET",
+    path: "/v1/agents/{id}",
+    auth: "session_or_api_key",
+    positional: ["id"],
+    query: [],
+    body: null,
+  },
+  {
+    noun: "agent",
+    verb: "list",
+    method: "GET",
+    path: "/v1/agents",
+    auth: "session_or_api_key",
+    positional: [],
+    query: [],
+    body: null,
+  },
+  {
+    noun: "agent",
+    verb: "update",
+    method: "PATCH",
+    path: "/v1/agents/{id}",
+    auth: "session_or_api_key",
+    positional: ["id"],
+    query: [],
+    body: {
+      required: true,
+      properties: [
+        { name: "name", type: "string", required: false },
+        { name: "description", type: "string", required: false },
+        { name: "config", type: "object", required: false },
+      ],
+    },
+  },
+  {
     noun: "api-key",
     verb: "create",
     method: "POST",
@@ -1371,6 +1435,26 @@ export const OPERATIONS: readonly CliOperation[] = [
     positional: [],
     query: [{ name: "include", type: "string", required: false, enum: ["graph"] }],
     body: null,
+  },
+  {
+    noun: "tool",
+    verb: "add-workflow",
+    method: "POST",
+    path: "/v1/tools/workflow",
+    summary:
+      "Register a workflow as a tool (agent-as-tool): calls run its version deployed to the caller's environment",
+    auth: "session_or_api_key",
+    positional: [],
+    query: [],
+    body: {
+      required: true,
+      properties: [
+        { name: "workflowId", type: "string", required: true },
+        { name: "toolName", type: "string", required: true },
+        { name: "description", type: "string", required: true },
+        { name: "approvalRequired", type: "boolean", required: false },
+      ],
+    },
   },
   {
     noun: "tool",

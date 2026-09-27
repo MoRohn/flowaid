@@ -7222,6 +7222,424 @@
         "responses": { "200": { "description": "Default Response" } }
       }
     },
+    "/v1/agents": {
+      "get": {
+        "tags": ["agents"],
+        "x-cli": { "noun": "agent", "verb": "list" },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["tools:read"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "name": { "type": "string" },
+                      "description": { "type": "string" },
+                      "config": {
+                        "type": "object",
+                        "propertyNames": { "type": "string" },
+                        "additionalProperties": {}
+                      },
+                      "createdAt": { "type": "string" },
+                      "updatedAt": { "type": "string" }
+                    },
+                    "required": ["id", "name", "description", "config", "createdAt", "updatedAt"],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["agents"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string", "minLength": 1, "maxLength": 100 },
+                  "description": { "default": "", "type": "string", "maxLength": 2000 },
+                  "config": {
+                    "type": "object",
+                    "properties": {
+                      "model": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "provider": { "type": "string", "minLength": 1 },
+                              "model": { "type": "string", "minLength": 1 }
+                            },
+                            "required": ["provider", "model"]
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "candidates": {
+                                "minItems": 1,
+                                "maxItems": 5,
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "provider": { "type": "string", "minLength": 1 },
+                                    "model": { "type": "string", "minLength": 1 }
+                                  },
+                                  "required": ["provider", "model"]
+                                }
+                              },
+                              "strategy": {
+                                "default": "ordered",
+                                "type": "string",
+                                "enum": ["ordered", "cheapest", "fastest", "healthiest"]
+                              },
+                              "requirements": {
+                                "type": "object",
+                                "properties": {
+                                  "tools": { "type": "boolean" },
+                                  "jsonSchema": { "type": "boolean" },
+                                  "vision": { "type": "boolean" },
+                                  "minContext": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 9007199254740991
+                                  }
+                                }
+                              },
+                              "maxCostUsdPerCall": { "type": "number", "exclusiveMinimum": 0 }
+                            },
+                            "required": ["candidates"]
+                          }
+                        ]
+                      },
+                      "system": { "type": "string", "maxLength": 32000 },
+                      "tools": {
+                        "default": [],
+                        "maxItems": 32,
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "name": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
+                            "approval": {
+                              "default": "irreversible",
+                              "type": "string",
+                              "enum": ["always", "irreversible", "never"]
+                            }
+                          },
+                          "required": ["name"]
+                        }
+                      },
+                      "temperature": { "type": "number", "minimum": 0, "maximum": 2 },
+                      "maxOutputTokens": { "type": "integer", "minimum": 1, "maximum": 65536 },
+                      "maxSteps": { "type": "integer", "minimum": 1, "maximum": 50 },
+                      "maxToolCalls": { "type": "integer", "minimum": 0, "maximum": 200 },
+                      "maxTokens": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+                      "maxCostUsd": { "type": "number", "minimum": 0 },
+                      "stream": { "type": "boolean" }
+                    },
+                    "required": ["model"],
+                    "additionalProperties": false
+                  }
+                },
+                "required": ["name", "config"]
+              }
+            }
+          }
+        },
+        "x-cli": { "noun": "agent", "verb": "create" },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["tools:write"],
+        "responses": {
+          "201": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "name": { "type": "string" },
+                    "description": { "type": "string" },
+                    "config": {
+                      "type": "object",
+                      "propertyNames": { "type": "string" },
+                      "additionalProperties": {}
+                    },
+                    "createdAt": { "type": "string" },
+                    "updatedAt": { "type": "string" }
+                  },
+                  "required": ["id", "name", "description", "config", "createdAt", "updatedAt"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/agents/{id}": {
+      "get": {
+        "tags": ["agents"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "x-cli": { "noun": "agent", "verb": "get", "positional": ["id"] },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["tools:read"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "name": { "type": "string" },
+                    "description": { "type": "string" },
+                    "config": {
+                      "type": "object",
+                      "propertyNames": { "type": "string" },
+                      "additionalProperties": {}
+                    },
+                    "createdAt": { "type": "string" },
+                    "updatedAt": { "type": "string" }
+                  },
+                  "required": ["id", "name", "description", "config", "createdAt", "updatedAt"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": ["agents"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string", "minLength": 1, "maxLength": 100 },
+                  "description": { "type": "string", "maxLength": 2000 },
+                  "config": {
+                    "type": "object",
+                    "properties": {
+                      "model": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "provider": { "type": "string", "minLength": 1 },
+                              "model": { "type": "string", "minLength": 1 }
+                            },
+                            "required": ["provider", "model"]
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "candidates": {
+                                "minItems": 1,
+                                "maxItems": 5,
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "provider": { "type": "string", "minLength": 1 },
+                                    "model": { "type": "string", "minLength": 1 }
+                                  },
+                                  "required": ["provider", "model"]
+                                }
+                              },
+                              "strategy": {
+                                "default": "ordered",
+                                "type": "string",
+                                "enum": ["ordered", "cheapest", "fastest", "healthiest"]
+                              },
+                              "requirements": {
+                                "type": "object",
+                                "properties": {
+                                  "tools": { "type": "boolean" },
+                                  "jsonSchema": { "type": "boolean" },
+                                  "vision": { "type": "boolean" },
+                                  "minContext": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 9007199254740991
+                                  }
+                                }
+                              },
+                              "maxCostUsdPerCall": { "type": "number", "exclusiveMinimum": 0 }
+                            },
+                            "required": ["candidates"]
+                          }
+                        ]
+                      },
+                      "system": { "type": "string", "maxLength": 32000 },
+                      "tools": {
+                        "default": [],
+                        "maxItems": 32,
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "name": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
+                            "approval": {
+                              "default": "irreversible",
+                              "type": "string",
+                              "enum": ["always", "irreversible", "never"]
+                            }
+                          },
+                          "required": ["name"]
+                        }
+                      },
+                      "temperature": { "type": "number", "minimum": 0, "maximum": 2 },
+                      "maxOutputTokens": { "type": "integer", "minimum": 1, "maximum": 65536 },
+                      "maxSteps": { "type": "integer", "minimum": 1, "maximum": 50 },
+                      "maxToolCalls": { "type": "integer", "minimum": 0, "maximum": 200 },
+                      "maxTokens": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+                      "maxCostUsd": { "type": "number", "minimum": 0 },
+                      "stream": { "type": "boolean" }
+                    },
+                    "required": ["model"],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "x-cli": { "noun": "agent", "verb": "update", "positional": ["id"] },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["tools:write"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "name": { "type": "string" },
+                    "description": { "type": "string" },
+                    "config": {
+                      "type": "object",
+                      "propertyNames": { "type": "string" },
+                      "additionalProperties": {}
+                    },
+                    "createdAt": { "type": "string" },
+                    "updatedAt": { "type": "string" }
+                  },
+                  "required": ["id", "name", "description", "config", "createdAt", "updatedAt"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["agents"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "x-cli": { "noun": "agent", "verb": "delete", "positional": ["id"] },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["tools:write"],
+        "responses": { "204": { "description": "No content" } }
+      }
+    },
+    "/v1/tools/workflow": {
+      "post": {
+        "summary": "Register a workflow as a tool (agent-as-tool): calls run its version deployed to the caller's environment",
+        "tags": ["tools"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "workflowId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "toolName": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
+                  "description": { "type": "string", "minLength": 1, "maxLength": 4000 },
+                  "approvalRequired": { "default": false, "type": "boolean" }
+                },
+                "required": ["workflowId", "toolName", "description"]
+              }
+            }
+          }
+        },
+        "x-cli": { "noun": "tool", "verb": "add-workflow" },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["tools:write"],
+        "responses": { "200": { "description": "Default Response" } }
+      }
+    },
     "/v1/workflows/{id}/optimize": {
       "post": {
         "summary": "Cost suggestions from 30 days of the workflow's runs",

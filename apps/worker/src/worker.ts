@@ -170,6 +170,7 @@ export function createWorker(deps: WorkerDeps): Worker {
           http: deps.http,
           repo,
           cache,
+          workflows: { queue: deps.queue },
           ...(deps.allowPrivateNetwork ? { allowPrivateNetwork: true } : {}),
         },
         call,

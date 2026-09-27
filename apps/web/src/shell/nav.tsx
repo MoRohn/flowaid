@@ -4,6 +4,7 @@
  */
 import type { ReactNode } from "react";
 import {
+  Bot,
   CheckSquare,
   FlaskConical,
   KeyRound,
@@ -35,6 +36,14 @@ export const NAV: NavEntry[] = [
     icon: <Workflow {...ICON} />,
     path: "workflows",
     shortcut: "g w",
+  },
+  {
+    id: "agents",
+    label: "Agents",
+    feature: "agents",
+    icon: <Bot {...ICON} />,
+    path: "agents",
+    shortcut: "g a",
   },
   {
     id: "runs",

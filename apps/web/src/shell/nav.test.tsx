@@ -8,6 +8,9 @@ describe("feature-keyed navigation", () => {
     expect(ids({ workflows: true, runs: true })).toEqual(["workflows", "runs"]);
     expect(ids({ integrations_openapi: true })).toEqual(["integrations"]);
     expect(ids({ evaluations: false, credentials: true })).toEqual(["credentials"]);
+    // Agents stays hidden until the API reports the feature (P6-10)
+    expect(ids({ workflows: true })).not.toContain("agents");
+    expect(ids({ workflows: true, agents: true })).toEqual(["workflows", "agents"]);
   });
   it("keeps settings reachable for every signed-in user", () => {
     expect(visibleNav(NAV_SECONDARY, {}).map((e) => e.id)).toEqual(["settings"]);
