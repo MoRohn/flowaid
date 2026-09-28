@@ -10,6 +10,14 @@
 | [design/SPEC.md](design/SPEC.md)                 | The product specification                                                                                                             |
 | [design/ARCHITECTURE.md](design/ARCHITECTURE.md) | The authoritative architecture                                                                                                        |
 
+## Operations (`operations/`)
+
+| Document                                                  | What it covers                                                                                          |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| [BACKUP_AND_RESTORE.md](operations/BACKUP_AND_RESTORE.md) | Backing up the database and the master key together, restoring them, and checking the key after restore |
+| [UPGRADES.md](operations/UPGRADES.md)                     | Pinning image tags, upgrading, how migrations run, and rolling back by restoring                        |
+| [RUNBOOK.md](operations/RUNBOOK.md)                       | Health checks, logs, metrics, stuck runs, the queue, scaling workers and key rotation                   |
+
 ## Design (`design/`)
 
 The design is authoritative. Where documents disagree, `CONTRACTS.ts` wins, then ARCHITECTURE.
