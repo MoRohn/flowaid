@@ -187,6 +187,7 @@
         "advisor",
         "insights",
         "knowledge",
+        "pageindex",
         "nodes-core/manifest",
         "plugins"
       ]

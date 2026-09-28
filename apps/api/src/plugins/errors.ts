@@ -37,6 +37,22 @@ export function envelope(
   };
 }
 
+/**
+ * An API failure whose code is not a platform `ErrorCode` (e.g. `PAGEINDEX_DISABLED`,
+ * `UNSUPPORTED_MEDIA_TYPE`): the handler sends its status and code as they are.
+ */
+export class ApiError extends Error {
+  constructor(
+    readonly httpStatus: number,
+    readonly code: string,
+    message: string,
+    readonly retryable = false,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
 export function registerErrorHandling(app: FastifyInstance): void {
   app.setNotFoundHandler((req, reply) => {
     void reply
@@ -67,6 +83,12 @@ export function registerErrorHandling(app: FastifyInstance): void {
       return reply
         .code(500)
         .send(envelope("INTERNAL_ERROR", "the response did not match its declared schema", req.id));
+    }
+    if (error instanceof ApiError) {
+      if (error.httpStatus >= 500) req.log.warn({ err: error }, "request failed");
+      return reply
+        .code(error.httpStatus)
+        .send(envelope(error.code, error.message, req.id, error.retryable));
     }
     if (error.statusCode === 429)
       return reply
