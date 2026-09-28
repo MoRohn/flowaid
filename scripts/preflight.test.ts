@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  authModeForBind,
   checkDependencies,
   checkDocker,
   checkNode,
@@ -156,5 +157,19 @@ describe("report", () => {
     );
     expect(hasFailures(results)).toBe(true);
     expect(hasFailures(results.slice(0, 1))).toBe(false);
+  });
+});
+
+describe("authModeForBind", () => {
+  it("keeps the configured mode on loopback binds", () => {
+    expect(authModeForBind("127.0.0.1", undefined)).toEqual({ mode: undefined, forced: false });
+    expect(authModeForBind("::1", "local")).toEqual({ mode: "local", forced: false });
+  });
+
+  it("forces password mode when other computers can connect, and refuses explicit local", () => {
+    expect(authModeForBind("0.0.0.0", undefined)).toEqual({ mode: "password", forced: true });
+    expect(authModeForBind("192.168.1.5", "auto")).toEqual({ mode: "password", forced: true });
+    expect(authModeForBind("0.0.0.0", "password")).toEqual({ mode: "password", forced: false });
+    expect(authModeForBind("0.0.0.0", "local")).toHaveProperty("error");
   });
 });

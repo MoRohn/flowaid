@@ -14,6 +14,7 @@ import {
   workflowVersions,
 } from "@flowaid/database";
 import { ForbiddenError, NotFoundError, type ToolDefinition } from "@flowaid/workflow-core";
+import { assertEnvironmentAllowed } from "../auth/principal.js";
 import type { ApiContext } from "../context.js";
 import { visibleWorkflow } from "../services/workflows.js";
 import { loadEnabledPlugins } from "../services/plugins.js";
@@ -131,9 +132,11 @@ export function catalogRoutes(app: FastifyInstance, ctx: ApiContext): void {
       return ctx.db.tenant(p.workspaceId, async (tx) => {
         await visibleWorkflow(tx, p, req.params.id);
         let versionId = req.query.versionId ?? null;
+        if (req.query.environmentId) assertEnvironmentAllowed(p, req.query.environmentId);
         if (!versionId) {
           const envId =
             req.query.environmentId ??
+            p.environmentId ??
             (
               await tx
                 .select()

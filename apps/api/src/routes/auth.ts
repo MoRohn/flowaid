@@ -139,13 +139,22 @@ export function localSignInRefusal(req: {
   };
   if (header("x-requested-with") !== "flowaid") return "missing X-Requested-With: flowaid";
   if (!isLoopbackAddress(req.socketAddress)) return "not a loopback connection";
+  // the web app's proxy listens beyond this computer, so its forwarded chain may be the client's
+  if (header("x-flowaid-client-unverified") !== undefined)
+    return "the web app is reachable from other computers";
   const forwarded = header("x-forwarded-for");
   if (forwarded && !forwarded.split(",").every((a) => isLoopbackAddress(a))) {
     return "forwarded from another computer";
   }
-  const host = header("x-forwarded-host") ?? header("host") ?? "";
-  if (!isLocalHostname(hostnameOf(host.split(",")[0]?.trim() ?? "")))
-    return "not a local host name";
+  const realIp = header("x-real-ip");
+  if (realIp && !isLoopbackAddress(realIp)) return "forwarded from another computer";
+  if (/for=/i.test(header("forwarded") ?? "")) return "forwarded from another computer";
+  // both the Host the request arrived with and any forwarded one must be local names
+  for (const host of [header("host") ?? "", header("x-forwarded-host")]) {
+    if (host === undefined) continue;
+    if (!isLocalHostname(hostnameOf(host.split(",")[0]?.trim() ?? "")))
+      return "not a local host name";
+  }
   const origin = header("origin");
   if (origin && origin !== "null") {
     let name = "";

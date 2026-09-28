@@ -1,5 +1,6 @@
 /** The authenticated caller of a request (API.md §1). */
 import type { WorkspaceRole } from "@flowaid/database";
+import { ForbiddenError } from "@flowaid/workflow-core";
 import type { Scope } from "./scopes.js";
 
 export type PrincipalType =
@@ -39,4 +40,19 @@ export function hasScope(p: Principal, scope: Scope): boolean {
 
 export function canSeeWorkflow(p: Principal, workflowId: string): boolean {
   return p.workflowIds === null || p.workflowIds.has(workflowId);
+}
+
+/** Whether `p` may see or act in `environmentId` (`null`: every environment, e.g. a shared credential). */
+export function canUseEnvironment(p: Principal, environmentId: string | null): boolean {
+  return p.environmentId === null || environmentId === p.environmentId;
+}
+
+/**
+ * An API key pinned to an environment acts only in that environment: deploying, rolling back,
+ * binding secrets, creating credentials or reading them anywhere else is refused. `null` is every
+ * environment at once (a workspace-wide credential), which a pinned key may not create either.
+ */
+export function assertEnvironmentAllowed(p: Principal, environmentId: string | null): void {
+  if (!canUseEnvironment(p, environmentId))
+    throw new ForbiddenError("this API key is pinned to another environment");
 }

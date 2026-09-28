@@ -17,6 +17,28 @@ export const DEFAULT_HOST = "127.0.0.1";
 export const DEFAULT_DOMAIN = "flowaid.localhost";
 export const DEFAULT_PORT = 5178;
 
+/** 127.x, ::1 and localhost: a bind address only this computer can connect to. */
+export function isLoopbackBind(host: string): boolean {
+  return host === "localhost" || host === "::1" || /^127\./.test(host);
+}
+
+/**
+ * The auth mode `pnpm start` runs with on this bind address. Local mode (no sign-in) is only
+ * safe while nothing but this computer can connect: bound to another interface it is forced to
+ * `password`, and asking for `local` explicitly is refused.
+ */
+export function authModeForBind(
+  host: string,
+  requested: string | undefined,
+): { mode: string | undefined; forced: boolean } | { error: string } {
+  if (isLoopbackBind(host)) return { mode: requested, forced: false };
+  if (requested === "local")
+    return {
+      error: `FLOWAID_AUTH_MODE=local opens the app without signing in, so it only runs bound to this computer; --host ${host} exposes it to your network. Drop FLOWAID_AUTH_MODE (or set it to password), or bind to 127.0.0.1.`,
+    };
+  return { mode: "password", forced: requested !== "password" };
+}
+
 /** `info` never blocks; `warn` is fixable later or automatically; `fail` stops `pnpm start`. */
 export type CheckStatus = "ok" | "info" | "warn" | "fail";
 

@@ -29,7 +29,12 @@ import {
   WorkflowValidationError,
   type SecretDecl,
 } from "@flowaid/workflow-core";
-import { hasScope, type Principal } from "../auth/principal.js";
+import {
+  assertEnvironmentAllowed,
+  canUseEnvironment,
+  hasScope,
+  type Principal,
+} from "../auth/principal.js";
 import type { ApiContext } from "../context.js";
 import { IdParams } from "../dto/common.js";
 import {
@@ -241,7 +246,9 @@ export function versionRoutes(app: FastifyInstance, ctx: ApiContext): void {
       const p = need(req.principal);
       return ctx.db.tenant(p.workspaceId, async (tx) => {
         await visibleWorkflow(tx, p, req.params.id);
-        return (await deploymentsOf(tx, req.params.id)).map(deploymentDto);
+        return (await deploymentsOf(tx, req.params.id))
+          .filter((d) => canUseEnvironment(p, d.environmentId))
+          .map(deploymentDto);
       });
     },
   );
@@ -255,6 +262,7 @@ export function versionRoutes(app: FastifyInstance, ctx: ApiContext): void {
     versionId: string,
     overrides?: Record<string, unknown>,
   ) => {
+    assertEnvironmentAllowed(p, environmentId);
     const w = await visibleWorkflow(tx, p, workflowId);
     const [env] = await tx
       .select()
@@ -350,6 +358,7 @@ export function versionRoutes(app: FastifyInstance, ctx: ApiContext): void {
     },
     async (req) => {
       const p = need(req.principal);
+      assertEnvironmentAllowed(p, req.params.environmentId);
       return ctx.db.tenant(p.workspaceId, async (tx) => {
         if (req.body.toVersionId)
           return doDeploy(tx, p, req.params.id, req.params.environmentId, req.body.toVersionId);
@@ -382,6 +391,7 @@ export function versionRoutes(app: FastifyInstance, ctx: ApiContext): void {
     },
     async (req) => {
       const p = need(req.principal);
+      assertEnvironmentAllowed(p, req.params.environmentId);
       return ctx.db.tenant(p.workspaceId, async (tx) => {
         await visibleWorkflow(tx, p, req.params.id);
         const rows = (await listSecretBindings(tx, req.params.id)).filter(
@@ -411,6 +421,7 @@ export function versionRoutes(app: FastifyInstance, ctx: ApiContext): void {
     },
     async (req) => {
       const p = need(req.principal);
+      assertEnvironmentAllowed(p, req.params.environmentId);
       await ctx.db.tenant(p.workspaceId, async (tx) => {
         const w = await visibleWorkflow(tx, p, req.params.id);
         const [env] = await tx
@@ -489,7 +500,7 @@ export function versionRoutes(app: FastifyInstance, ctx: ApiContext): void {
         credentialUsage(tx, req.query.credentialId),
       );
       return rows
-        .filter((r) => r.workspaceId === p.workspaceId)
+        .filter((r) => r.workspaceId === p.workspaceId && canUseEnvironment(p, r.environmentId))
         .map((r) => ({
           workflowId: r.workflowId,
           environmentId: r.environmentId,

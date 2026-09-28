@@ -54,4 +54,32 @@ describe("local sign-in checks", () => {
       /X-Requested-With/,
     );
   });
+
+  it("refuses a LAN client posing as this computer through an exposed web app", () => {
+    // POST /v1/auth/local with Host: localhost and X-Forwarded-For: 127.0.0.1 sent from the LAN;
+    // the proxy (on this computer, so the socket is loopback) marks the chain unverified
+    const attack = {
+      socketAddress: "127.0.0.1",
+      headers: {
+        "x-requested-with": "flowaid",
+        host: "127.0.0.1:3000",
+        "x-forwarded-for": "127.0.0.1",
+        "x-forwarded-host": "localhost",
+        "x-flowaid-client-unverified": "1",
+      },
+    };
+    expect(localSignInRefusal(attack)).toMatch(/other computers/);
+    const { "x-flowaid-client-unverified": _, ...unmarked } = attack.headers;
+    expect(localSignInRefusal({ ...attack, headers: unmarked })).toBeNull();
+    expect(
+      localSignInRefusal({ ...attack, headers: { ...unmarked, "x-real-ip": "192.168.1.20" } }),
+    ).toMatch(/another computer/);
+    expect(
+      localSignInRefusal({ ...attack, headers: { ...unmarked, forwarded: "for=192.168.1.20" } }),
+    ).toMatch(/another computer/);
+    // a rebinding Host is refused even when a forwarded host claims localhost
+    expect(
+      localSignInRefusal({ ...attack, headers: { ...unmarked, host: "rebind.evil.example" } }),
+    ).toMatch(/host/);
+  });
 });

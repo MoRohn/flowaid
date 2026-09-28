@@ -1,9 +1,10 @@
-import { describe, expect, inject, it } from "vitest";
+import { describe, expect, inject, it, onTestFinished } from "vitest";
 import { runNode } from "@flowaid/node-sdk/testing";
 import type { JsonValue } from "@flowaid/workflow-core";
 import { graphqlNode, operationKind } from "./graphql.js";
 import {
   assertSingleStatement,
+  connectPostgres,
   dbQueryConnector,
   dbQueryNode,
   toJsonValue,
@@ -159,8 +160,55 @@ describe("flowaid.tools.db_query", () => {
     }
   });
 
+  it("refuses database hosts at loopback, private or metadata addresses before connecting", async () => {
+    const signal = new AbortController().signal;
+    for (const dsn of [
+      "postgres://u:p@127.0.0.1:5432/app",
+      "postgres://u:p@localhost/app",
+      "postgres://u:p@169.254.169.254/app",
+      // every host of a multi-host DSN is checked
+      "postgres://u:p@8.8.8.8,10.0.0.1/app",
+    ])
+      await expect(connectPostgres(dsn, signal)).rejects.toMatchObject({ code: "FORBIDDEN" });
+    // a public name that resolves to a private address
+    await expect(
+      connectPostgres("postgres://u:p@db.example.com/app", signal, {
+        lookup: (_h, _o, cb) => cb(null, [{ address: "10.0.0.5", family: 4 }]),
+      }),
+    ).rejects.toThrow(/private or reserved/);
+    const r = await runNode(dbQueryNode, {
+      config: { sql: "select 1" },
+      credentials: { database: { dsn: "postgres://u:p@127.0.0.1/app" } },
+    });
+    expect(r.result).toMatchObject({ kind: "error", error: { code: "FORBIDDEN" } });
+  });
+
+  it("re-checks the address at connect time (DNS rebinding)", async () => {
+    let calls = 0;
+    const client = await connectPostgres(
+      "postgres://u:p@rebind.example.com/app",
+      new AbortController().signal,
+      {
+        lookup: (_h, _o, cb) =>
+          cb(null, [{ address: calls++ === 0 ? "93.184.216.34" : "127.0.0.1", family: 4 }]),
+      },
+    );
+    try {
+      await expect(
+        client.transaction({ readOnly: true, timeoutMs: 1000 }, (q) => q("select 1", [], 1)),
+      ).rejects.toThrow(/private or reserved/);
+    } finally {
+      await client.close();
+    }
+  });
+
   const pg = inject("testDatabaseUrl");
   it.skipIf(!pg)("against PostgreSQL: caps rows, and read-only refuses writes", async () => {
+    // the test database is on this computer: a development-only allowance
+    dbQueryConnector.network = { allowPrivate: true };
+    onTestFinished(() => {
+      dbQueryConnector.network = {};
+    });
     const run = (sql: string, params: JsonValue[] = [], extra: object = {}) =>
       runNode(dbQueryNode, {
         config: { sql, maxRows: 3, ...extra },

@@ -68,6 +68,8 @@ export interface ApiContext {
   alerts?: AlertDispatcher;
   /** SMTP for `email` channels (SMTP_URL, SMTP_FROM); test sends explain its absence */
   smtp?: SmtpSettings;
+  /** readiness probe of Redis (REDIS_URL): resolves once it answers; absent without Redis */
+  pingRedis?: () => Promise<void>;
 }
 
 export function configFromEnv(env: Env): ApiConfig {

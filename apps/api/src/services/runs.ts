@@ -38,7 +38,7 @@ import {
   type RunEventOf,
   type RunOrigin,
 } from "@flowaid/workflow-core";
-import type { Principal } from "../auth/principal.js";
+import { assertEnvironmentAllowed, type Principal } from "../auth/principal.js";
 import type { ApiContext } from "../context.js";
 import { catalogSnapshot, compileIn } from "./compile.js";
 import { visibleWorkflow } from "./workflows.js";
@@ -72,8 +72,7 @@ async function resolveEnvironment(
   requested: string | undefined,
 ): Promise<string> {
   if (p.environmentId) {
-    if (requested && requested !== p.environmentId)
-      throw new ForbiddenError("this API key is pinned to another environment");
+    if (requested) assertEnvironmentAllowed(p, requested);
     return p.environmentId;
   }
   if (requested) {

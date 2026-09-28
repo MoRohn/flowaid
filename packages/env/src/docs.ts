@@ -216,7 +216,7 @@ const docs = {
   CORS_ORIGINS: {
     group: "core",
     description:
-      "Comma-separated list of browser origins allowed to call the api with credentials. `*` reflects every request origin and is rejected in production, as is an origin cross-site with `FLOWAID_BASE_URL` unless `FLOWAID_ALLOW_CROSS_SITE=true`.",
+      "Comma-separated list of browser origins allowed to call the api with credentials. `*` is always rejected (the api allows credentialed requests); in production so is an origin cross-site with `FLOWAID_BASE_URL` unless `FLOWAID_ALLOW_CROSS_SITE=true`.",
     default: "http://localhost:3001",
     required: false,
     example: "http://localhost:3001,https://flowaid.example.com",

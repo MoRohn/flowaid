@@ -2,7 +2,7 @@
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, isNull, or } from "drizzle-orm";
 import { assertExternalRef, secretFields } from "@flowaid/credentials";
 import { credentials, environments, secretReferences, type Tx } from "@flowaid/database";
 import { uuidv7 } from "@flowaid/shared";
@@ -12,7 +12,12 @@ import {
   ForbiddenError,
   NotFoundError,
 } from "@flowaid/workflow-core";
-import { hasScope, type Principal } from "../auth/principal.js";
+import {
+  assertEnvironmentAllowed,
+  canUseEnvironment,
+  hasScope,
+  type Principal,
+} from "../auth/principal.js";
 import type { ApiContext } from "../context.js";
 import { IdParams, NoContent } from "../dto/common.js";
 
@@ -94,7 +99,15 @@ export function credentialRoutes(app: FastifyInstance, ctx: ApiContext): void {
       .select()
       .from(credentials)
       .where(and(eq(credentials.id, id), eq(credentials.workspaceId, p.workspaceId)));
-    if (!row) throw new NotFoundError("credential not found");
+    // an API key pinned to an environment sees that environment's and the shared credentials
+    if (!row || (row.environmentId !== null && !canUseEnvironment(p, row.environmentId)))
+      throw new NotFoundError("credential not found");
+    return row;
+  };
+  /** Changing a shared credential changes it for every environment: not for pinned keys. */
+  const loadForWrite = async (tx: Tx, p: Principal, id: string): Promise<CredentialRow> => {
+    const row = await load(tx, p, id);
+    assertEnvironmentAllowed(p, row.environmentId);
     return row;
   };
   const hintsOf = (type: string, values: Record<string, string>) => {
@@ -162,6 +175,7 @@ export function credentialRoutes(app: FastifyInstance, ctx: ApiContext): void {
     },
     async (req) => {
       const p = need(req.principal);
+      if (req.query.environmentId) assertEnvironmentAllowed(p, req.query.environmentId);
       const rows = await ctx.db.tenant(p.workspaceId, (tx) =>
         tx
           .select()
@@ -172,6 +186,12 @@ export function credentialRoutes(app: FastifyInstance, ctx: ApiContext): void {
               req.query.type ? eq(credentials.type, req.query.type) : undefined,
               req.query.environmentId
                 ? eq(credentials.environmentId, req.query.environmentId)
+                : undefined,
+              p.environmentId
+                ? or(
+                    isNull(credentials.environmentId),
+                    eq(credentials.environmentId, p.environmentId),
+                  )
                 : undefined,
             ),
           )
@@ -199,6 +219,9 @@ export function credentialRoutes(app: FastifyInstance, ctx: ApiContext): void {
     async (req, reply) => {
       const p = need(req.principal);
       const b = req.body;
+      // a pinned API key creates credentials in its own environment
+      const environmentId = b.environmentId ?? p.environmentId ?? null;
+      assertEnvironmentAllowed(p, environmentId);
       if (!ctx.credentials.types.get(b.type))
         throw new BadRequestError(`unknown credential type ${b.type}`);
       const id = uuidv7();
@@ -223,7 +246,7 @@ export function credentialRoutes(app: FastifyInstance, ctx: ApiContext): void {
         hints = hintsOf(b.type, b.values);
       }
       const row = await ctx.db.tenant(p.workspaceId, async (tx) => {
-        await checkEnvironment(tx, p, b.environmentId);
+        await checkEnvironment(tx, p, environmentId);
         const [dup] = await tx
           .select({ id: credentials.id })
           .from(credentials)
@@ -243,7 +266,7 @@ export function credentialRoutes(app: FastifyInstance, ctx: ApiContext): void {
             externalRef: b.storage === "external" ? (b.externalRef ?? null) : null,
             publicFields: sealed.publicFields,
             scopes: b.scopes,
-            environmentId: b.environmentId ?? null,
+            environmentId,
             allowedWorkflowIds: b.allowedWorkflowIds ?? null,
             createdBy: p.userId,
           })
@@ -300,7 +323,10 @@ export function credentialRoutes(app: FastifyInstance, ctx: ApiContext): void {
     },
     async (req) => {
       const p = need(req.principal);
-      const current = await ctx.db.tenant(p.workspaceId, (tx) => load(tx, p, req.params.id));
+      const current = await ctx.db.tenant(p.workspaceId, (tx) =>
+        loadForWrite(tx, p, req.params.id),
+      );
+      if (req.body.environmentId !== undefined) assertEnvironmentAllowed(p, req.body.environmentId);
       let sealedPatch = {};
       let hints: Record<string, string> = {};
       if (req.body.values) {
@@ -363,7 +389,9 @@ export function credentialRoutes(app: FastifyInstance, ctx: ApiContext): void {
     },
     async (req) => {
       const p = need(req.principal);
-      const current = await ctx.db.tenant(p.workspaceId, (tx) => load(tx, p, req.params.id));
+      const current = await ctx.db.tenant(p.workspaceId, (tx) =>
+        loadForWrite(tx, p, req.params.id),
+      );
       if (current.storage === "external")
         throw new BadRequestError("rotate external credentials in their secret manager");
       const s = await ctx.credentials.seal(current.id, current.type, req.body.values);
@@ -455,7 +483,7 @@ export function credentialRoutes(app: FastifyInstance, ctx: ApiContext): void {
     async (req, reply) => {
       const p = need(req.principal);
       await ctx.db.tenant(p.workspaceId, async (tx) => {
-        const row = await load(tx, p, req.params.id);
+        const row = await loadForWrite(tx, p, req.params.id);
         const bound = await tx
           .select()
           .from(secretReferences)

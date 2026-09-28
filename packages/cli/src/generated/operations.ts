@@ -1763,7 +1763,7 @@ export const OPERATIONS: readonly CliOperation[] = [
     verb: "ready",
     method: "GET",
     path: "/v1/ready",
-    summary: "Readiness: the database answers",
+    summary: "Readiness: the database (and Redis, when configured) answers",
     auth: "public",
     positional: [],
     query: [],
