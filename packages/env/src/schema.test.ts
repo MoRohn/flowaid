@@ -394,7 +394,6 @@ describe("production rules", () => {
       const issues = issuesFor({
         ...MINIMAL,
         NODE_ENV,
-        CORS_ORIGINS: "*",
         FLOWAID_BASE_URL: "http://api.example.com",
         FLOWAID_ADMIN_EMAIL: "owner@example.com",
         FLOWAID_ADMIN_PASSWORD: ENV_VAR_DOCS.FLOWAID_ADMIN_PASSWORD.example,
@@ -413,10 +412,14 @@ describe("production rules", () => {
     expect(issues.has("CORS_ORIGINS")).toBe(false);
   });
 
-  it("reject CORS_ORIGINS=* with no override", () => {
+  it("reject CORS_ORIGINS=* with no override, in every NODE_ENV (credentials are allowed)", () => {
     expect(firstIssue({ ...PRODUCTION, CORS_ORIGINS: "*" }, "CORS_ORIGINS")).toContain(
       "must not contain *",
     );
+    for (const NODE_ENV of ["development", "test"])
+      expect(
+        issuesFor({ ...MINIMAL, NODE_ENV, CORS_ORIGINS: "*" }).get("CORS_ORIGINS")?.[0],
+      ).toContain("must not contain *");
     expect(
       firstIssue({ ...PRODUCTION, CORS_ORIGINS: "https://app.example.com,*" }, "CORS_ORIGINS"),
     ).toContain("must not contain *");

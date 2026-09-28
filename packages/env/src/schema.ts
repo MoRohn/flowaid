@@ -585,7 +585,7 @@ export function siteOf(url: URL): string {
  * instead of only after those are fixed).
  *
  * The production rules (`NODE_ENV=production`) refuse configurations that are unsafe on a
- * public host: `CORS_ORIGINS=*`, `http:` public URLs, the documented admin password, generated
+ * public host: `http:` public URLs, the documented admin password, generated
  * JWT keys in an unnamed directory, an unnamed master key source and cross-site origins,
  * each with its documented override. A worker serving only the `code` pool is exempt from the
  * key requirements and must not hold a master key.
@@ -712,6 +712,14 @@ export function crossFieldIssues(vars: Partial<Record<EnvVarName, unknown>>): Cr
   if (has("PROMETHEUS_PORT") && has("PORT") && str("PROMETHEUS_PORT") === str("PORT")) {
     issues.push({ path: "PROMETHEUS_PORT", message: "must differ from PORT" });
   }
+  // the api answers CORS with credentials: `*` would let every site make signed-in calls
+  if (has("CORS_ORIGINS") && listOf(vars.CORS_ORIGINS).includes("*")) {
+    issues.push({
+      path: "CORS_ORIGINS",
+      message:
+        "must not contain * (the api allows credentialed requests, so any site could act as the signed-in user); list the web app's origin instead, e.g. http://localhost:3001",
+    });
+  }
 
   const nodeEnv = has("NODE_ENV") ? str("NODE_ENV") : ENV_VAR_DOCS.NODE_ENV.default;
   if (nodeEnv !== "production") {
@@ -734,12 +742,6 @@ export function crossFieldIssues(vars: Partial<Record<EnvVarName, unknown>>): Cr
   );
 
   const origins = has("CORS_ORIGINS") ? listOf(vars.CORS_ORIGINS) : [];
-  if (origins.includes("*")) {
-    issues.push({
-      path: "CORS_ORIGINS",
-      message: "must not contain * in production (list the web app's origin instead)",
-    });
-  }
 
   for (const name of ["FLOWAID_BASE_URL", "FLOWAID_WEB_URL", "OIDC_ISSUER"] as const) {
     if (name === "OIDC_ISSUER" && !has(name)) {

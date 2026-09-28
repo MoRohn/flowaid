@@ -74,10 +74,9 @@ export async function buildServer(ctx: ApiContext, o: BuildOptions = {}): Promis
   await app.register(cors, {
     origin: (origin, cb) => {
       if (!origin) return cb(null, true);
-      const allowed = ctx.config.corsOrigins.includes("*")
-        ? !ctx.config.production
-        : ctx.config.corsOrigins.includes(origin);
-      cb(null, allowed);
+      // exact origins only: with credentials, `*` would let any site act as the signed-in user
+      // (the env schema refuses it; a hand-built config gets no wildcard either)
+      cb(null, origin !== "*" && ctx.config.corsOrigins.includes(origin));
     },
     credentials: true,
     allowedHeaders: [
