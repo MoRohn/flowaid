@@ -34,6 +34,17 @@
 | [security/THREAT_MODEL.md](security/THREAT_MODEL.md)             | Assets, boundaries, threats and controls                                      |
 | [operations/](operations/RUNBOOK.md)                             | Backup and restore, upgrades, the runbook                                     |
 
+## PageIndex document intelligence (`pageindex/`)
+
+| Document                                               | What it is                                                                   |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------- |
+| [pageindex/SETUP.md](pageindex/SETUP.md)               | Install, configure, first document and answer, verification, troubleshooting |
+| [pageindex/ADR.md](pageindex/ADR.md)                   | The verified upstream contract and the architecture decisions                |
+| [pageindex/CAPABILITIES.md](pageindex/CAPABILITIES.md) | Local and cloud capability matrix for the pinned release                     |
+| [pageindex/API.md](pageindex/API.md)                   | The HTTP routes                                                              |
+| [pageindex/EVALUATION.md](pageindex/EVALUATION.md)     | The evaluation set, thresholds and measured results                          |
+| [pageindex/EXTENDING.md](pageindex/EXTENDING.md)       | Where each part lives and the rules for changing it                          |
+
 ## Design (`design/`)
 
 The design is authoritative. Where documents disagree, `CONTRACTS.ts` wins, then ARCHITECTURE.
