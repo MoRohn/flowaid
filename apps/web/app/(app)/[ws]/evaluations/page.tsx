@@ -32,6 +32,8 @@ import type { EvaluationRun, EvaluationSet } from "~/admin/types";
 import { QueryView, useMutate } from "~/admin/ui";
 import { useSession } from "~/session";
 import { AppFrame, PageBody } from "~/shell/AppFrame";
+import { HELP } from "~/shell/help";
+import { LearnMore } from "~/shell/LearnMore";
 
 const ANY = "__any";
 
@@ -174,7 +176,12 @@ export default function EvaluationsPage() {
       <PageBody>
         <PageHeader
           title="Evaluations"
-          description="Regression sets that score runs on outputs, decisions and calibration, and gate publishing."
+          description={
+            <>
+              Regression sets that score runs on outputs, decisions and calibration, and gate
+              publishing. <LearnMore href={HELP.evaluations} />
+            </>
+          }
           actions={newButton}
         />
         <div className="mt-4">

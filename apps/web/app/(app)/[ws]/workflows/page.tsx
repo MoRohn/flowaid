@@ -58,8 +58,13 @@ export default function WorkflowsPage() {
             <EmptyState
               icon={<Workflow strokeWidth={1.5} />}
               title="No workflows yet"
-              description="Start from a template, import a flow export, or build one from a blank canvas."
+              description="A workflow is a typed graph of decisions, model calls, tools and human steps. Start from a tested template, import a definition, or build one on a blank canvas."
               primaryAction={newButton}
+              secondaryAction={
+                <Button variant="secondary" onClick={() => router.push(`/${s.ws}/templates`)}>
+                  Browse templates
+                </Button>
+              }
             />
           ) : (
             <WorkflowsBrowser

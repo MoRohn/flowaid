@@ -45,6 +45,8 @@ import {
 } from "~/knowledge/model";
 import { useSession } from "~/session";
 import { AppFrame, PageBody } from "~/shell/AppFrame";
+import { HELP } from "~/shell/help";
+import { LearnMore } from "~/shell/LearnMore";
 
 const NONE = "__none";
 const KINDS = Object.keys(KIND_LABEL) as SourceKind[];
@@ -377,7 +379,12 @@ export default function KnowledgePage() {
       <PageBody>
         <PageHeader
           title="Knowledge"
-          description="Document collections that retrieval nodes search: uploads, web pages, sitemaps and repositories."
+          description={
+            <>
+              Document collections that retrieval nodes search: uploads, web pages, sitemaps and
+              repositories. <LearnMore href={HELP.knowledge} />
+            </>
+          }
           actions={newButton}
         />
         <div className="mt-4">

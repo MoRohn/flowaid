@@ -14,6 +14,8 @@ import { WebhookList } from "~/admin/triggers/Webhooks";
 import { Section, useQueryTab } from "~/admin/ui";
 import { useSession, type Session } from "~/session";
 import { AppFrame, PageBody } from "~/shell/AppFrame";
+import { HELP } from "~/shell/help";
+import { LearnMore } from "~/shell/LearnMore";
 
 const TABS = [
   { id: "webhooks", label: "Webhooks", visible: (s: Session) => s.features.schedules === true },
@@ -33,7 +35,12 @@ function Triggers() {
     <PageBody>
       <PageHeader
         title="Triggers"
-        description="How workflows start without you: webhooks, schedules and MCP clients. Declared in each workflow, materialised per environment on deploy."
+        description={
+          <>
+            How workflows start without you: webhooks, schedules and MCP clients. Declared in each
+            workflow, materialised per environment on deploy. <LearnMore href={HELP.triggers} />
+          </>
+        }
         tabs={tabs.map((t) => ({ id: t.id, label: t.label }))}
         tab={tab}
         onTabChange={(t) => setTab(t as TabId)}

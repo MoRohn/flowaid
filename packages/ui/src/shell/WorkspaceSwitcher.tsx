@@ -35,7 +35,9 @@ export interface WorkspaceSwitcherProps extends Omit<
 
 /**
  * Workspace avatar + name with a menu of workspaces. In the collapsed rail
- * only the avatar shows and the name moves into a tooltip.
+ * only the avatar shows and the name moves into a tooltip. With one workspace
+ * and nothing to create there is nothing to switch to: the button opens the
+ * workspace settings directly.
  */
 export const WorkspaceSwitcher = forwardRef<HTMLButtonElement, WorkspaceSwitcherProps>(
   function WorkspaceSwitcher(
@@ -53,11 +55,15 @@ export const WorkspaceSwitcher = forwardRef<HTMLButtonElement, WorkspaceSwitcher
   ) {
     const current = workspaces.find((w) => w.id === currentId) ?? workspaces[0];
     const name = current?.name ?? "Workspace";
+    const direct = workspaces.length <= 1 && !onCreate && onSettings !== undefined;
     const trigger = (
       <button
         ref={ref}
         type="button"
-        aria-label={collapsed ? `Workspace: ${name}` : undefined}
+        aria-label={
+          direct ? `Workspace settings: ${name}` : collapsed ? `Workspace: ${name}` : undefined
+        }
+        {...(direct ? { onClick: onSettings } : {})}
         className={cn(
           "flex h-9 w-full min-w-0 cursor-pointer items-center gap-2 rounded-sm border border-transparent text-left text-xs transition-colors duration-(--dur-fast) hover:bg-surface-3 data-[state=open]:bg-surface-3",
           collapsed ? "justify-center px-0" : "px-1.5",
@@ -74,15 +80,31 @@ export const WorkspaceSwitcher = forwardRef<HTMLButtonElement, WorkspaceSwitcher
                 <span className="truncate text-2xs text-ink-3">{current.plan}</span>
               ) : null}
             </span>
-            <ChevronsUpDown
-              className="size-3.5 shrink-0 text-ink-3"
-              strokeWidth={1.75}
-              aria-hidden="true"
-            />
+            {direct ? (
+              <Settings
+                className="size-3.5 shrink-0 text-ink-3"
+                strokeWidth={1.75}
+                aria-hidden="true"
+              />
+            ) : (
+              <ChevronsUpDown
+                className="size-3.5 shrink-0 text-ink-3"
+                strokeWidth={1.75}
+                aria-hidden="true"
+              />
+            )}
           </>
         )}
       </button>
     );
+    if (direct)
+      return collapsed ? (
+        <Tooltip content={`${name} settings`} side="right">
+          {trigger}
+        </Tooltip>
+      ) : (
+        trigger
+      );
     return (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>

@@ -5,7 +5,7 @@
  * for a time range, workflow and environment.
  */
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Layers, Workflow } from "lucide-react";
 import {
   ChartFrame,
@@ -46,9 +46,11 @@ export interface DashboardProps {
   ws: string;
   environments: readonly Environment[];
   now?: () => number;
+  /** Shown under the header, above the metrics (the getting-started checklist). */
+  intro?: ReactNode;
 }
 
-export function Dashboard({ ws, environments, now = Date.now }: DashboardProps) {
+export function Dashboard({ ws, environments, now = Date.now, intro }: DashboardProps) {
   const [preset, setPreset] = useState<TimeRangePreset>("24h");
   const [workflowId, setWorkflowId] = useState<string | undefined>();
   const [environmentId, setEnvironmentId] = useState<string | undefined>();
@@ -79,6 +81,7 @@ export function Dashboard({ ws, environments, now = Date.now }: DashboardProps) 
   return (
     <div className="flex flex-col gap-5">
       <PageHeader title="Overview" description="How this workspace's workflows are running." />
+      {intro}
       <div
         role="group"
         aria-label="Dashboard filters"

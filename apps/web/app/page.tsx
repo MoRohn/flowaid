@@ -6,7 +6,7 @@ import { ApiError, get, setWorkspace } from "~/api/client";
 import type { Me } from "~/api/types";
 import { FullPageError, FullPageSpinner } from "~/session";
 
-/** `/`: signed in → the first workspace; otherwise the login page. */
+/** `/`: signed in → the first workspace's home; otherwise the login page. */
 export default function Root() {
   setWorkspace(null);
   const router = useRouter();
@@ -14,7 +14,7 @@ export default function Root() {
   useEffect(() => {
     if (me.error instanceof ApiError && me.error.status === 401) router.replace("/login");
     const first = me.data?.workspaces[0];
-    if (first) router.replace(`/${first.slug}/workflows`);
+    if (first) router.replace(`/${first.slug}`);
   }, [me.data, me.error, router]);
   if (me.data && me.data.workspaces.length === 0)
     return (

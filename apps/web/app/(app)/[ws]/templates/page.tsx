@@ -1,7 +1,7 @@
 "use client";
 import { useQuery } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useMemo, useState } from "react";
 import { LayoutTemplate } from "lucide-react";
 import type { NodeCategory } from "@flowaid/ui";
 import {
@@ -30,6 +30,8 @@ import type { McpServer, TemplateRow } from "~/admin/types";
 import { Notice, QueryView, useMutate } from "~/admin/ui";
 import { useSession } from "~/session";
 import { AppFrame, PageBody } from "~/shell/AppFrame";
+import { HELP } from "~/shell/help";
+import { LearnMore } from "~/shell/LearnMore";
 
 function UseTemplateDialog({
   template,
@@ -179,13 +181,35 @@ function UseTemplateDialog({
 }
 
 export default function TemplatesPage() {
+  return (
+    <Suspense>
+      <Templates />
+    </Suspense>
+  );
+}
+
+function Templates() {
   const s = useSession();
+  const router = useRouter();
+  const pathname = usePathname();
+  const params = useSearchParams();
   const [using, setUsing] = useState<TemplateRow | null>(null);
   const templates = useQuery({
     queryKey: ["templates", s.ws, "graph"],
     queryFn: () => get<TemplateRow[]>("/v1/templates?include=graph"),
     staleTime: 5 * 60_000,
   });
+  // `?use=<id>` (the command menu) opens that template's dialog once the list is in
+  const useId = params.get("use");
+  const canWrite = s.can("workflows:write");
+  const linked =
+    useId && canWrite
+      ? (templates.data?.find((x) => x.id === useId || x.slug === useId) ?? null)
+      : null;
+  const closeDialog = () => {
+    setUsing(null);
+    if (useId) router.replace(pathname, { scroll: false });
+  };
   const nodes = useQuery({
     queryKey: ["node-catalog", s.ws],
     queryFn: () => get<NodeManifest[]>("/v1/nodes"),
@@ -201,14 +225,19 @@ export default function TemplatesPage() {
     () => (templates.data ?? []).map((t) => templateToView(t, categoryOf)),
     [templates.data, categoryOf],
   );
-  const canWrite = s.can("workflows:write");
 
   return (
     <AppFrame crumbs={[{ label: s.workspaceName }, { label: "Templates" }]}>
       <PageBody>
         <PageHeader
           title="Templates"
-          description="Production-shaped starting points. Every template compiles and runs as shipped."
+          description={
+            <>
+              Production-shaped starting points. Every template compiles and runs as shipped;
+              credentials and servers it needs are listed before you create the workflow.{" "}
+              <LearnMore href={HELP.gettingStarted} label="Getting started" />
+            </>
+          }
         />
         <div className="mt-4">
           <QueryView query={templates}>
@@ -231,7 +260,7 @@ export default function TemplatesPage() {
           </QueryView>
         </div>
       </PageBody>
-      <UseTemplateDialog template={using} onClose={() => setUsing(null)} />
+      <UseTemplateDialog template={using ?? linked} onClose={closeDialog} />
     </AppFrame>
   );
 }
