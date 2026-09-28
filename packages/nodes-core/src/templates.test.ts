@@ -1,29 +1,45 @@
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { ToolDefinitionSchema } from "@flowaid/workflow-core";
+import { ANSWER_INSTRUCTIONS } from "@flowaid/pageindex";
 import { buildManifest } from "./manifest.js";
 import { coreManifests } from "./manifestFile.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const TEMPLATES = join(ROOT, "templates");
 const FIXTURES = join(ROOT, "../workflow-core/fixtures");
-/** variants of a demo live under fixtures/variants */
+/** the §11 demos live in fixtures/, variants and the retrieval templates under fixtures/variants */
 const fixtureOf = (name: string) =>
-  join(FIXTURES, name.includes(".") ? "variants" : "", `${name}.json`);
+  existsSync(join(FIXTURES, `${name}.json`))
+    ? join(FIXTURES, `${name}.json`)
+    : join(FIXTURES, "variants", `${name}.json`);
 const names = readdirSync(TEMPLATES)
   .filter((f) => f.endsWith(".json") && !f.endsWith(".resources.json"))
   .map((f) => f.slice(0, -5));
 
 describe("templates", () => {
-  it("ships the three demos and the retrieval variant of the GitHub triage", () => {
+  it("ships the three demos, the retrieval variant of the GitHub triage and the PageIndex templates", () => {
     expect(names.sort()).toEqual([
       "github-issue-triage",
       "github-issue-triage.retrieval",
+      "pageindex-agent",
+      "pageindex-compare",
+      "pageindex-document-qa",
       "research-agent",
       "support-triage",
     ]);
+  });
+
+  it("the PageIndex answer templates carry the answer instructions checkCitations reads", () => {
+    for (const name of ["pageindex-document-qa", "pageindex-compare"]) {
+      const def = JSON.parse(readFileSync(join(TEMPLATES, `${name}.json`), "utf8")) as {
+        nodes: { id: string; config?: { system?: string } }[];
+      };
+      const system = def.nodes.find((n) => n.id === "answer")?.config?.system ?? "";
+      expect(system, name).toContain(ANSWER_INSTRUCTIONS);
+    }
   });
 
   it.each(names)("%s stays in sync with the workflow-core fixture", (name) => {

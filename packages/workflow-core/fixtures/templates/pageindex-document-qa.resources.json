@@ -1,0 +1,9 @@
+{
+  "mcpServers": [],
+  "knowledgeSources": [
+    {
+      "key": "documents",
+      "description": "Knowledge source whose PDFs have PageIndex indexes; retrieval navigates their sections and reads the chosen pages (at most five documents)."
+    }
+  ]
+}

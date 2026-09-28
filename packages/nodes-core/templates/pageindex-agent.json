@@ -1,0 +1,148 @@
+{
+  "$schema": "https://flowaid.dev/schemas/workflow/v1",
+  "id": "7fe5108f-300a-478d-8a3f-7f2bd8d458fd",
+  "description": "A bounded agent that reads indexed documents with read-only tools (outline, pages, section search) confined to one knowledge source, and cites the document and page for what it states.",
+  "name": "Document agent (PageIndex)",
+  "inputs": {
+    "type": "object",
+    "required": ["task"],
+    "properties": {
+      "task": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 20000
+      }
+    }
+  },
+  "outputs": {
+    "type": "object",
+    "required": ["answer"],
+    "properties": {
+      "answer": {
+        "type": "string"
+      },
+      "steps": {
+        "type": "integer"
+      },
+      "tool_calls": {
+        "type": "array",
+        "items": {
+          "type": "object"
+        }
+      }
+    }
+  },
+  "secrets": [
+    {
+      "name": "TYPESAFE_API_KEY",
+      "credentialType": "typesafe.api_key"
+    },
+    {
+      "name": "OPENAI_API_KEY",
+      "credentialType": "openai.api_key"
+    }
+  ],
+  "execution": {
+    "timeoutMs": 600000,
+    "maxCostUsd": 0.75,
+    "decisions": {
+      "primary": {
+        "provider": "typesafe",
+        "model": "jev-latest"
+      }
+    }
+  },
+  "nodes": [
+    {
+      "id": "start",
+      "kind": "input",
+      "name": "Task"
+    },
+    {
+      "id": "agent",
+      "kind": "task",
+      "type": "flowaid.ai.agent",
+      "typeVersion": "1.0.0",
+      "name": "Document agent",
+      "config": {
+        "model": {
+          "provider": "openai",
+          "model": "gpt-4.1-mini"
+        },
+        "system": "You answer questions about the documents you can read. Look at the outline first, then read or search the relevant pages. Base every factual statement on page text you read and cite it as (document name, p. N). If the documents do not answer the question, say so and say what is missing.",
+        "temperature": 0.1,
+        "maxSteps": 8,
+        "maxToolCalls": 16,
+        "maxCostUsd": 0.5,
+        "documents": {
+          "sourceIds": ["$template.knowledge.documents"]
+        }
+      },
+      "inputs": {
+        "task": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "start",
+            "port": "task"
+          }
+        }
+      },
+      "credentials": {
+        "llm": "OPENAI_API_KEY",
+        "typesafe": "TYPESAFE_API_KEY"
+      }
+    },
+    {
+      "id": "out",
+      "kind": "output",
+      "name": "Answer",
+      "value": {
+        "kind": "object",
+        "fields": {
+          "answer": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "agent",
+              "port": "answer"
+            }
+          },
+          "steps": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "agent",
+              "port": "steps"
+            }
+          },
+          "tool_calls": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "agent",
+              "port": "tool_calls"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "edges": [],
+  "layout": {
+    "nodes": {
+      "start": {
+        "x": 0,
+        "y": 200
+      },
+      "agent": {
+        "x": 260,
+        "y": 200
+      },
+      "out": {
+        "x": 520,
+        "y": 200
+      }
+    }
+  }
+}

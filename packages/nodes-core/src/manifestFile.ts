@@ -8,6 +8,12 @@ import githubIssueTriage from "../templates/github-issue-triage.json" with { typ
 import githubIssueTriageResources from "../templates/github-issue-triage.resources.json" with { type: "json" };
 import githubIssueTriageRetrieval from "../templates/github-issue-triage.retrieval.json" with { type: "json" };
 import githubIssueTriageRetrievalResources from "../templates/github-issue-triage.retrieval.resources.json" with { type: "json" };
+import pageindexAgent from "../templates/pageindex-agent.json" with { type: "json" };
+import pageindexAgentResources from "../templates/pageindex-agent.resources.json" with { type: "json" };
+import pageindexCompare from "../templates/pageindex-compare.json" with { type: "json" };
+import pageindexCompareResources from "../templates/pageindex-compare.resources.json" with { type: "json" };
+import pageindexDocumentQa from "../templates/pageindex-document-qa.json" with { type: "json" };
+import pageindexDocumentQaResources from "../templates/pageindex-document-qa.resources.json" with { type: "json" };
 import researchAgent from "../templates/research-agent.json" with { type: "json" };
 import researchAgentResources from "../templates/research-agent.resources.json" with { type: "json" };
 import supportTriage from "../templates/support-triage.json" with { type: "json" };
@@ -38,6 +44,9 @@ export const coreTemplates: readonly CoreTemplate[] = [
   [githubIssueTriage, githubIssueTriageResources],
   [githubIssueTriageRetrieval, githubIssueTriageRetrievalResources],
   [researchAgent, researchAgentResources],
+  [pageindexDocumentQa, pageindexDocumentQaResources],
+  [pageindexCompare, pageindexCompareResources],
+  [pageindexAgent, pageindexAgentResources],
 ].map(([definition, r]) => {
   const res = r as unknown as Omit<CoreTemplate, "definition">;
   return {
