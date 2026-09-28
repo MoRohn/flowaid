@@ -28,6 +28,8 @@ import { useSession } from "~/session";
 import type { Webhook as WebhookRow, WebhookDelivery } from "../types";
 import { Notice, OneTimeSecretDialog, QueryView, useMutate } from "../ui";
 import { DELIVERY_LABEL, deliveryTone } from "./logic";
+import { exampleWebhookRequest } from "./add";
+import { NoTriggers } from "./AddTriggerDialog";
 
 export function WebhookList({
   workflowId,
@@ -65,9 +67,7 @@ export function WebhookList({
       <QueryView query={hooks} rows={2}>
         {(rows) =>
           rows.length === 0 ? (
-            <p className="text-xs text-ink-3">
-              No webhook is live. Add a webhook trigger in the builder, publish and deploy.
-            </p>
+            <NoTriggers kind="webhook" {...(workflowId ? { workflowId } : {})} />
           ) : (
             <ul
               className="flex flex-col divide-y divide-border rounded-md border border-border"
@@ -184,6 +184,35 @@ export function WebhookList({
                       )}
                     </span>
                   </div>
+                  <details className="group text-xs">
+                    <summary className="cursor-pointer select-none text-ink-3 hover:text-ink">
+                      Example request
+                    </summary>
+                    <div className="mt-2 flex items-start gap-2">
+                      <pre className="min-w-0 flex-1 overflow-x-auto rounded-md border border-border bg-surface-2 p-2 font-mono text-2xs text-ink">
+                        {exampleWebhookRequest(
+                          h.url,
+                          h.signature as "hmac_sha256" | "token" | "none",
+                        )}
+                      </pre>
+                      <CopyButton
+                        value={exampleWebhookRequest(
+                          h.url,
+                          h.signature as "hmac_sha256" | "token" | "none",
+                        )}
+                        label="Copy example request"
+                        size="sm"
+                      />
+                    </div>
+                    <p className="mt-1.5 text-ink-3">
+                      {h.signature === "hmac_sha256"
+                        ? "Replace <signing secret> with the secret you generated; the signature covers the timestamp and the raw body, and each one is accepted once."
+                        : h.signature === "token"
+                          ? "Replace <signing secret> with the secret you generated."
+                          : "Unsigned: anyone who knows this URL can start runs."}{" "}
+                      The JSON body becomes the run&apos;s input.
+                    </p>
+                  </details>
                 </li>
               ))}
             </ul>

@@ -10,14 +10,8 @@ import { get } from "~/api/client";
 import { useSession } from "~/session";
 import type { Credential, ModelInfo, Provider } from "../types";
 import { QueryView, Section } from "../ui";
+import { PROVIDER_NAME } from "../providerNames";
 
-const PROVIDER_NAME: Record<string, string> = {
-  typesafe: "TypeSafe",
-  openai: "OpenAI",
-  anthropic: "Anthropic",
-  google: "Google Gemini",
-  ollama: "Ollama",
-};
 const KIND_LABEL: Record<ModelInfo["kind"], string> = {
   decision: "Decision",
   chat: "Chat",

@@ -5,10 +5,11 @@
  */
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState, type FormEvent } from "react";
-import { CheckCircle2, Plug, XCircle } from "lucide-react";
+import { CheckCircle2, ExternalLink, Plug, XCircle } from "lucide-react";
 import {
   Badge,
   Button,
+  Checkbox,
   Dialog,
   DialogBody,
   DialogContent,
@@ -37,6 +38,7 @@ import type { Environment } from "~/api/types";
 import { useSession } from "~/session";
 import type { Credential, CredentialField, CredentialType, SecretUse } from "../types";
 import { Notice, useMutate } from "../ui";
+import { credentialGuide } from "./guide";
 
 const ALL_ENVIRONMENTS = "__all";
 
@@ -88,11 +90,12 @@ function FieldInputs({
           hint={
             hints?.[f.name]
               ? `Current: ${hints[f.name]}`
-              : typeof f.schema.description === "string"
-                ? f.schema.description
-                : f.schema.format === "uri"
-                  ? "A URL"
-                  : undefined
+              : (credentialGuide(type.id).fields?.[f.name] ??
+                (typeof f.schema.description === "string"
+                  ? f.schema.description
+                  : f.schema.format === "uri"
+                    ? "A full URL, starting with https://"
+                    : undefined))
           }
         >
           {f.schema.enum ? (
@@ -144,18 +147,43 @@ export function CreateCredentialDialog({
   const [externalRef, setExternalRef] = useState("");
   const [env, setEnv] = useState(ALL_ENVIRONMENTS);
   const [values, setValues] = useState<Record<string, string>>({});
+  const [testAfter, setTestAfter] = useState(true);
+  // after saving: the credential, and the connection test when one ran
+  const [saved, setSaved] = useState<{
+    credential: Credential;
+    test: { ok: boolean; message?: string } | null;
+  } | null>(null);
   const type = types.find((t) => t.id === typeId);
+  const guide = credentialGuide(typeId);
+  const canTest = Boolean(type?.testSupported) && storage === "db";
+  const reset = () => {
+    setName("");
+    setValues({});
+    setExternalRef("");
+    setSaved(null);
+  };
+  const close = (o: boolean) => {
+    onOpenChange(o);
+    if (!o) reset();
+  };
   const create = useMutate(
-    (body: Record<string, unknown>) => post<Credential>("/v1/credentials", body),
+    async (body: Record<string, unknown>) => {
+      const credential = await post<Credential>("/v1/credentials", body);
+      const test =
+        canTest && testAfter
+          ? await post<{ ok: boolean; message?: string }>(
+              `/v1/credentials/${credential.id}/test`,
+            ).catch((e: unknown) => ({
+              ok: false,
+              message: e instanceof Error ? e.message : "The test could not run.",
+            }))
+          : null;
+      return { credential, test };
+    },
     {
-      success: (c) => `Created ${c.name}`,
+      // the dialog's result step says it; no toast on top
       invalidate: [["credentials", s.ws]],
-      onSuccess: () => {
-        onOpenChange(false);
-        setName("");
-        setValues({});
-        setExternalRef("");
-      },
+      onSuccess: (r) => setSaved(r),
     },
   );
   const missing =
@@ -176,8 +204,59 @@ export function CreateCredentialDialog({
     });
   }
 
+  if (saved)
+    return (
+      <Dialog open={open} onOpenChange={close}>
+        <DialogContent size="md">
+          <DialogHeader>
+            <DialogTitle>{saved.credential.name} is saved</DialogTitle>
+            <DialogDescription>
+              The secret is encrypted; FlowAId shows only a masked hint from now on.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogBody className="flex flex-col gap-4">
+            {saved.test ? (
+              <p
+                role="status"
+                className={
+                  "flex items-center gap-1.5 text-sm " +
+                  (saved.test.ok ? "text-ok-text" : "text-danger-text")
+                }
+              >
+                {saved.test.ok ? (
+                  <CheckCircle2 strokeWidth={1.75} className="size-4" aria-hidden="true" />
+                ) : (
+                  <XCircle strokeWidth={1.75} className="size-4" aria-hidden="true" />
+                )}
+                {saved.test.ok
+                  ? "Connection test passed: the provider accepted it."
+                  : `Connection test failed: ${saved.test.message ?? "the provider refused it"}. Check the value and rotate it from the credential's details.`}
+              </p>
+            ) : null}
+            <div className="flex flex-col gap-1.5 text-sm text-ink-2">
+              <p className="font-medium text-ink">Next: use it in a workflow</p>
+              <p>
+                Nodes read credentials through named secrets (for example{" "}
+                <code className="font-mono text-xs">TYPESAFE_API_KEY</code>). Open a workflow&apos;s{" "}
+                <span className="font-medium text-ink">Settings → Secrets</span> and bind the secret
+                to this credential for each environment.
+              </p>
+            </div>
+          </DialogBody>
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={reset}>
+              Add another
+            </Button>
+            <Button type="button" variant="primary" onClick={() => close(false)}>
+              Done
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={close}>
       <DialogContent size="md">
         <form onSubmit={submit}>
           <DialogHeader>
@@ -203,6 +282,22 @@ export function CreateCredentialDialog({
                 ))}
               </Select>
             </FieldRow>
+            {guide.use || guide.where ? (
+              <p className="-mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-3">
+                {guide.use ? <span>{guide.use}</span> : null}
+                {guide.where ? (
+                  <a
+                    className="inline-flex items-center gap-1 text-accent-text hover:underline"
+                    href={guide.where.url}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Get a key: {guide.where.label}
+                    <ExternalLink strokeWidth={1.75} className="size-3" aria-hidden="true" />
+                  </a>
+                ) : null}
+              </p>
+            ) : null}
             <FieldRow
               label="Name"
               htmlFor="cred-name"
@@ -259,9 +354,15 @@ export function CreateCredentialDialog({
                 ))}
               </Select>
             </FieldRow>
+            {canTest ? (
+              <label className="flex items-center gap-2 text-sm text-ink">
+                <Checkbox checked={testAfter} onCheckedChange={(v) => setTestAfter(v === true)} />
+                Test the connection after saving
+              </label>
+            ) : null}
           </DialogBody>
           <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="ghost" onClick={() => close(false)}>
               Cancel
             </Button>
             <Button
@@ -472,7 +573,14 @@ export function CredentialSheet({
         }
       }}
     >
-      <SheetContent width={440}>
+      <SheetContent
+        width={440}
+        // opening the details is not editing them: focus the panel, not the Name field
+        onOpenAutoFocus={(e) => {
+          e.preventDefault();
+          (e.currentTarget as HTMLElement | null)?.focus();
+        }}
+      >
         <SheetHeader>
           <SheetTitle>{credential?.name}</SheetTitle>
           <SheetDescription>{type?.name ?? credential?.type}</SheetDescription>
@@ -540,7 +648,9 @@ export function CredentialSheet({
             {used.isPending ? (
               <p className="text-xs text-ink-3">Loading…</p>
             ) : (used.data ?? []).length === 0 ? (
-              <p className="text-xs text-ink-3">No workflow binds this credential.</p>
+              <p className="text-xs text-ink-3">
+                No workflow uses it yet. Bind it in a workflow&apos;s Settings → Secrets.
+              </p>
             ) : (
               <ul className="flex flex-col gap-1" role="list">
                 {(used.data ?? []).map((u) => (

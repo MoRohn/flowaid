@@ -196,3 +196,44 @@ export function countsLine(s: Pick<KnowledgeSource, "documents" | "chunks">): st
   const p = (n: number, one: string) => `${n.toLocaleString("en-US")} ${one}${n === 1 ? "" : "s"}`;
   return `${p(s.documents, "document")} · ${p(s.chunks, "chunk")}`;
 }
+
+/** An embedding model a source can use, and whether this workspace can call it yet. */
+export interface EmbeddingOption {
+  provider: string;
+  model: string;
+  /** a server key, a workspace credential, or (Ollama) a configured server */
+  ready: boolean;
+}
+
+/**
+ * The embedding models of the registry, ready ones first. A provider is ready with a server key
+ * (`configuredOnServer`) or a workspace credential of its type.
+ */
+export function embeddingOptions(
+  models: readonly { provider: string; model: string; kind: string; deprecated?: boolean }[],
+  providers: readonly { id: string; configuredOnServer: boolean }[],
+  credentialTypes: ReadonlySet<string>,
+): EmbeddingOption[] {
+  const server = new Set(providers.filter((p) => p.configuredOnServer).map((p) => p.id));
+  const keyType = (id: string) => (id === "ollama" ? "ollama.host" : `${id}.api_key`);
+  return models
+    .filter((m) => m.kind === "embedding" && !m.deprecated)
+    .map((m) => ({
+      provider: m.provider,
+      model: m.model,
+      ready: server.has(m.provider) || credentialTypes.has(keyType(m.provider)),
+    }))
+    .sort(
+      (a, b) =>
+        Number(b.ready) - Number(a.ready) ||
+        a.provider.localeCompare(b.provider) ||
+        a.model.localeCompare(b.model),
+    );
+}
+
+/** What to do about an indexing error: fix a key (Credentials), or retry once the cause is gone. */
+export function indexingErrorFix(message: string): "credentials" | "retry" {
+  return /credential|api[ _-]?key|unauthori[sz]ed|\b401\b|\b403\b|forbidden/i.test(message)
+    ? "credentials"
+    : "retry";
+}

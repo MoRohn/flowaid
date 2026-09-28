@@ -5,6 +5,7 @@ import { use, useMemo, useState } from "react";
 import { FileText, Layers, RefreshCw, Search, Trash2, Upload } from "lucide-react";
 import {
   Badge,
+  Hint,
   Button,
   ConfirmDialog,
   Dialog,
@@ -37,6 +38,7 @@ import {
   KIND_LABEL,
   countsLine,
   documentTone,
+  indexingErrorFix,
   isUploadKind,
   mimeOf,
   sourceTone,
@@ -385,16 +387,15 @@ export default function KnowledgeSourcePage({ params }: { params: Promise<{ sour
         col.accessor("status", {
           header: "Status",
           size: 110,
-          cell: ({ row }) => (
-            <Badge
-              tone={documentTone(row.original.status)}
-              dot
-              className="capitalize"
-              {...(row.original.error ? { title: row.original.error } : {})}
-            >
-              {row.original.status}
-            </Badge>
-          ),
+          cell: ({ row }) => {
+            const badge = (
+              <Badge tone={documentTone(row.original.status)} dot className="capitalize">
+                {row.original.status}
+              </Badge>
+            );
+            // the reason a document failed is reachable by keyboard and screen reader, not a title
+            return row.original.error ? <Hint hint={row.original.error}>{badge}</Hint> : badge;
+          },
         }),
         col.accessor("chunkCount", {
           header: "Chunks",
@@ -509,7 +510,26 @@ export default function KnowledgeSourcePage({ params }: { params: Promise<{ sour
               </div>
               {src.lastError ? (
                 <div className="mt-3">
-                  <Notice tone={src.status === "error" ? "danger" : "warn"}>{src.lastError}</Notice>
+                  <Notice tone={src.status === "error" ? "danger" : "warn"}>
+                    <p>{src.lastError}</p>
+                    <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+                      {indexingErrorFix(src.lastError) === "credentials" ? (
+                        <a className="font-medium underline" href={`/${s.ws}/credentials`}>
+                          Add or fix the provider&apos;s key under Credentials
+                        </a>
+                      ) : null}
+                      {canWrite ? (
+                        <button
+                          type="button"
+                          className="font-medium underline disabled:opacity-60"
+                          disabled={sync.isPending}
+                          onClick={() => sync.mutate(undefined)}
+                        >
+                          {sync.isPending ? "Retrying…" : "Retry indexing"}
+                        </button>
+                      ) : null}
+                    </p>
+                  </Notice>
                 </div>
               ) : null}
               <div className="mt-5 flex flex-col gap-5">
