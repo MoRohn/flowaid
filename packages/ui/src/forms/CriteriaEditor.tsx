@@ -487,7 +487,7 @@ export const CriteriaEditor = forwardRef<HTMLDivElement, CriteriaEditorProps>(
                 autoGrow
                 minRows={2}
                 maxRows={6}
-                placeholder="The message threatens to cancel or mentions legal action"
+                placeholder="e.g. The message threatens to cancel or mentions legal action"
                 value={criteria.trueCriteria ?? ""}
                 disabled={isDisabled}
                 onChange={(e) => set({ ...criteria, trueCriteria: e.target.value })}
@@ -502,7 +502,7 @@ export const CriteriaEditor = forwardRef<HTMLDivElement, CriteriaEditorProps>(
                 autoGrow
                 minRows={2}
                 maxRows={6}
-                placeholder="A routine question with no urgency signals"
+                placeholder="e.g. A routine question with no urgency signals"
                 value={criteria.falseCriteria ?? ""}
                 disabled={isDisabled}
                 onChange={(e) => set({ ...criteria, falseCriteria: e.target.value })}

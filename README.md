@@ -94,66 +94,137 @@ expensive, hard to audit, and impossible to calibrate. FlowAId separates the job
 
 ## Product tour
 
-Screenshots of the running application, following your GitHub theme. The workflow is a small
-refund triage: a TypeSafe decision asks whether a support message wants money back, and refunds
-wait for a person.
+Screenshots of the running application at 2× resolution, following your GitHub theme. The
+workflow is a small refund triage: a TypeSafe decision asks whether a support message wants its
+money back, refunds wait for a person, and a signed webhook lets the help desk start runs.
 
-**Start here.** The Overview guides a new install step by step, then shows how the workspace's
-workflows are running: runs, success rate, latency, AI cost, human review rate and retries.
+### Start here
+
+The Overview guides a new install step by step, then shows how the workspace's workflows are
+running: runs, success rate, latency, AI cost, human review rate and retries.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/overview-dark.webp">
-  <img alt="The Overview with the Get started with FlowAId checklist at 5 of 6 steps done, the optional step to connect a text model, the Call it from your code step with Create an API key, and the run metrics below" src="docs/assets/screenshots/overview-light.webp">
+  <img alt="The Overview with the Get started with FlowAId checklist at 5 of 6 steps done and the run metrics below" src="docs/assets/screenshots/overview-light.webp">
 </picture>
 
-**The builder.** Nodes, typed ports and control edges on the canvas; the inspector edits a
-node from its schema; the draft compiles as you type and runs from the Run tab, with each
-node's status, the decision's probability and a live trace.
+### The builder
+
+Nodes, typed ports and control edges on the canvas; the inspector edits a node from its schema;
+the draft compiles as you type and runs from the Run tab, with each node's status and a live
+trace.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/builder-dark.webp">
-  <img alt="The builder with the Refund triage workflow: the Refund request decision answered yes at 0.99 in under 300 ms, the run waits at Approve refund, the inspector shows the decision's criteria and instructions, and the trace lists every step" src="docs/assets/screenshots/builder-light.webp">
-</picture>
-
-**Every run, inspectable.** The trace viewer has a timeline, the graph, the event log, output,
-logs and cost. A decision expands into the full distribution TypeSafe returned, with the model,
-latency, confidence, tokens and cost; any run can be replayed, forked or restarted from a node.
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/run-trace-dark.webp">
-  <img alt="A completed refund triage run: the Refund request decision is expanded to show NO/YES at 0.99 yes from jev-1.13.0, the approval step, and the node panel with the decision, its input and Restart from here" src="docs/assets/screenshots/run-trace-light.webp">
+  <img alt="The builder with the Refund triage workflow: the Refund request decision answered yes, the run waits at Approve refund, the inspector shows the decision's criteria and instructions, and the trace lists every step" src="docs/assets/screenshots/builder-light.webp">
 </picture>
 
 <table>
   <tr>
-    <td width="50%" valign="top">
-      <strong>Human review.</strong> Runs pause durably for approvals, reviews, forms and
-      choices. Reviewers see why they were asked and the run so far, and can hand a single-use
-      link to someone outside the workspace.<br><br>
+    <td width="58%" valign="top">
+      <strong>Decisions you can read.</strong> Every decision node shows its answer, the
+      probability behind it, the model and the latency, right on the canvas.<br><br>
       <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/review-dark.webp">
-        <img alt="A human task for a refund request with Approve, Reject and Escalate, the run so far with the decision at yes 0.98, and the option to create an external review link" src="docs/assets/screenshots/review-light.webp">
+        <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/closeup-decision-node-dark.webp">
+        <img alt="A decision node on the canvas: Refund request?, a yes/no bar at 0.99 yes, completed by jev-1.13.0 in a few hundred milliseconds" src="docs/assets/screenshots/closeup-decision-node-light.webp">
+      </picture>
+      <br><br><strong>Everything one keystroke away.</strong> ⌘K searches workflows, runs and
+      templates, creates anything, and jumps to any page or setting.<br><br>
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/closeup-command-menu-dark.webp">
+        <img alt="The command menu with Create actions (knowledge source, evaluation set, workflow from a template, import, credential, API key) and the Refund triage workflow" src="docs/assets/screenshots/closeup-command-menu-light.webp">
       </picture>
     </td>
-    <td width="50%" valign="top">
-      <strong>Evaluations.</strong> Sets of cases with known answers, run against any version:
-      pass rate, branch correctness, accuracy and calibration per decision, latency, cost and
-      regressions against a baseline.<br><br>
+    <td width="42%" valign="top">
+      <strong>An inspector per node.</strong> Criteria for yes and no with a live preview of the
+      prior, instructions, and inputs bound by reference, template or expression.<br><br>
       <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/evaluation-dark.webp">
-        <img alt="An evaluation report for v1: 100% pass rate over 4 cases, p95 latency, cost per case, 50% human review rate, calibration ECE 0.013 and the list of cases with their branches" src="docs/assets/screenshots/evaluation-light.webp">
+        <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/closeup-inspector-dark.webp">
+        <img alt="The inspector for the Refund request decision: completed status, criteria for true and false with a preview, the instructions and the input bound to ticket.message" src="docs/assets/screenshots/closeup-inspector-light.webp">
       </picture>
     </td>
   </tr>
 </table>
 
-**Templates.** Tested starting points that compile and run as shipped: GitHub issue triage over
-MCP (with or without a knowledge base), support triage with safety checks and a confidence gate,
-a LangChain retrieval-augmented assistant, and a bounded research agent.
+### Every run, inspectable
+
+The trace viewer has a timeline, the graph, the event log, output, logs and cost. A decision
+expands into the full distribution TypeSafe returned; any run can be replayed, forked onto
+another version or restarted from a node.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/run-trace-dark.webp">
+  <img alt="A completed refund triage run with the Refund request decision expanded and the node panel showing the decision, its input and Restart from here" src="docs/assets/screenshots/run-trace-light.webp">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/closeup-distribution-dark.webp">
+  <img alt="The run timeline: the Refund request decision expanded to NO/YES at 0.99 yes from typesafe jev-1.13.0 with tokens and cost, then Route to refund and Approve refund approved" src="docs/assets/screenshots/closeup-distribution-light.webp">
+</picture>
+
+### People in the loop
+
+Runs pause durably for approvals, reviews, forms and choices. Reviewers see why they were asked
+and the run so far, answer with a keystroke, and can hand a single-use link to someone outside
+the workspace.
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/review-dark.webp">
+        <img alt="The human task page for a refund request with the approval card, the run so far and the external review link" src="docs/assets/screenshots/review-light.webp">
+      </picture>
+    </td>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/closeup-approval-dark.webp">
+        <img alt="The approval card: the request, why this step asks a person, an optional comment, and Escalate, Reject and Approve with keyboard shortcuts" src="docs/assets/screenshots/closeup-approval-light.webp">
+      </picture>
+    </td>
+  </tr>
+</table>
+
+### Quality you can measure
+
+Evaluation sets are built by hand or from real runs and run against any version: pass rate,
+branch correctness, latency, cost, human review rate, calibration per decision and regressions
+against a baseline, with a publish gate.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/evaluation-dark.webp">
+  <img alt="An evaluation report for v1 with pass rate, latency, cost per case, human review rate, calibration and the list of cases" src="docs/assets/screenshots/evaluation-light.webp">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/closeup-evaluation-dark.webp">
+  <img alt="Evaluation headline tiles: 100.0% pass rate, 3.17 s p95 latency, $0.000012 cost per case and 50.0% human review rate" src="docs/assets/screenshots/closeup-evaluation-light.webp">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/closeup-calibration-dark.webp">
+  <img alt="The calibration chart for the judge decision: predicted confidence against observed accuracy with ECE 0.013" src="docs/assets/screenshots/closeup-calibration-light.webp">
+</picture>
+
+### Triggers, ready to call
+
+Webhooks and schedules are added from the app and go live with a deployment. Each webhook shows
+its URL, its signature scheme and a request you can paste into a terminal.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/closeup-webhook-dark.webp">
+  <img alt="A live webhook for Refund triage in dev at http://flowaid.localhost:3100/hooks/default/dev/refund-triage, signed with HMAC SHA-256, with the example curl request expanded" src="docs/assets/screenshots/closeup-webhook-light.webp">
+</picture>
+
+### Templates
+
+Tested starting points that compile and run as shipped: GitHub issue triage over MCP (with or
+without a knowledge base), support triage with safety checks and a confidence gate, a LangChain
+retrieval-augmented assistant, and a bounded research agent.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/templates-dark.webp">
-  <img alt="The template gallery with GitHub Issue Triage, GitHub Issue Triage (knowledge base), Intelligent Support Triage, Knowledge Assistant (LangChain RAG) and Research Agent, each with a graph preview and node counts" src="docs/assets/screenshots/templates-light.webp">
+  <img alt="The template gallery with GitHub Issue Triage, GitHub Issue Triage (knowledge base), Intelligent Support Triage, Knowledge Assistant (LangChain RAG) and Research Agent" src="docs/assets/screenshots/templates-light.webp">
 </picture>
 
 ## Quick start
@@ -205,6 +276,11 @@ session, so other computers and web pages cannot use it). The API reference (Ope
 
 The **Get started** checklist on the Overview walks you through it, and ticks each step off as
 you go:
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/closeup-checklist-dark.webp">
+  <img alt="The Get started with FlowAId checklist: connect TypeSafe, connect a model (optional), create a workflow, run it, answer a human task, publish and deploy, and call it from your code with Create an API key" src="docs/assets/screenshots/closeup-checklist-light.webp">
+</picture>
 
 1. **Connect TypeSafe.** A `TYPESAFE_API_KEY` in `.env.local` is picked up as a server key, or
    add it under _Credentials → New credential_ (encrypted, and tested when saved).
