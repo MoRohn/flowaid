@@ -212,6 +212,65 @@ describe("flowaid.ai.agent", () => {
     expect(text).toContain("[truncated:");
   });
 
+  it("checks a turn's worst case against the token cap before calling the model", async () => {
+    const gen = scripted(["never"]);
+    const r = await runNode(agentNode, {
+      config: { model, maxTokens: 1000, maxOutputTokens: 2048 },
+      input: { task: "hi" },
+      providers: { generation: gen },
+    });
+    expect(r.result.kind === "error" && r.result.error.code).toBe("BOUNDS_EXCEEDED");
+    expect(gen.requests).toHaveLength(0);
+  });
+
+  it("checks a turn's worst-case price against the remaining cost budget", async () => {
+    // gpt-4.1-mini is priced in the built-in catalog: 1000 output tokens cost far more than $0.00001
+    const priced = { provider: "openai", model: "gpt-4.1-mini" };
+    const gen = scripted([[call("c1", "lookup_order", { id: "1" })], "done"]);
+    const r = await runNode(agentNode, {
+      config: {
+        model: priced,
+        maxOutputTokens: 1000,
+        tools: [{ name: "lookup_order", approval: "never" }],
+      },
+      input: { task: "Where is order 1?" },
+      providers: { generation: gen },
+      tools: [lookup],
+      budget: { remainingCostUsd: 0.00001 },
+    });
+    expect(r.result.kind === "error" && r.result.error).toMatchObject({
+      code: "BOUNDS_EXCEEDED",
+      message: expect.stringContaining("maxCostUsd"),
+    });
+    expect(gen.requests).toHaveLength(0);
+  });
+
+  it("counts streamed turns toward its cost cap at catalog prices", async () => {
+    const priced = { provider: "openai", model: "gpt-4.1-mini" };
+    // each streamed turn reports 100 in / 10 out and no price; three turns cannot fit the cap
+    const turnCost = (100 * 0.4 + 10 * 1.6) / 1e6;
+    const gen = scripted([
+      [call("c1", "lookup_order", { id: "1" })],
+      [call("c2", "lookup_order", { id: "2" })],
+      [call("c3", "lookup_order", { id: "3" })],
+      "done",
+    ]);
+    const r = await runNode(agentNode, {
+      config: {
+        model: priced,
+        stream: true,
+        maxOutputTokens: 1,
+        maxCostUsd: turnCost * 2.5,
+        tools: [{ name: "lookup_order", approval: "never" }],
+      },
+      input: { task: "x" },
+      providers: { generation: gen },
+      tools: [lookup],
+    });
+    expect(r.result.kind === "error" && r.result.error.code).toBe("BOUNDS_EXCEEDED");
+    expect(gen.requests.length).toBeLessThanOrEqual(3);
+  });
+
   it("reports tool errors to the model instead of failing", async () => {
     const broken = tool("lookup_order", () => new Error("upstream 503"));
     const gen = scripted([[call("c1", "lookup_order", { id: "1" })], "Sorry, the lookup failed."]);
