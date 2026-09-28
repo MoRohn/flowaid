@@ -583,7 +583,10 @@ if (opts.playground) {
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     ...fileEnv,
-    ...secrets.values,
+    // the generated PageIndex token only travels with --pageindex (which also sets its URL)
+    ...Object.fromEntries(
+      Object.entries(secrets.values).filter(([k]) => k !== "FLOWAID_PAGEINDEX_TOKEN"),
+    ),
     NODE_ENV: opts.prod ? "production" : "development",
     DATABASE_URL: dbUrl,
     FLOWAID_MASTER_KEY_FILE: join(data, "master.key"),
