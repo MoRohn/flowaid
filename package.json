@@ -36,6 +36,7 @@
     "sdk:check": "tsx --conditions=development scripts/gen-sdk-types.ts --check",
     "test:acceptance": "playwright test",
     "eval:assistant": "pnpm --filter @flowaid/api eval:assistant",
+    "eval:pageindex": "pnpm --filter @flowaid/api eval:pageindex",
     "pageindex:test": "node --disable-warning=ExperimentalWarning scripts/python-test.ts apps/pageindex",
     "flowaid": "tsx --conditions=development packages/cli/src/main.ts",
     "prepare": "node --disable-warning=ExperimentalWarning scripts/install-hooks.ts",

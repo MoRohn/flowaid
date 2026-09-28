@@ -48,7 +48,10 @@ const PROVIDERS: Record<
 };
 
 async function main(): Promise<number> {
+  const argv = process.argv.slice(2);
   const { values } = parseArgs({
+    // `pnpm eval:… -- --flag` passes the separator through
+    args: argv[0] === "--" ? argv.slice(1) : argv,
     options: {
       provider: { type: "string" },
       model: { type: "string" },

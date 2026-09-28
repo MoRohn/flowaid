@@ -75,7 +75,7 @@ export interface RetrieveInput {
 
 const NONE = "none";
 const MAX_OPTIONS = 60;
-const SUMMARY_CHARS = 280;
+const SUMMARY_CHARS = 400;
 
 interface Candidate {
   index: IndexReference;
@@ -133,10 +133,8 @@ export async function retrieveEvidence(input: RetrieveInput): Promise<RetrievalR
       );
     const options: Record<string, string> = {};
     shown.forEach((n, i) => {
-      const summary = n.summary
-        ? ` — ${n.summary.replace(/\s+/g, " ").slice(0, SUMMARY_CHARS)}`
-        : "";
-      options[`s${i}`] = `${n.title} (pages ${pageSpan(n)})${summary}`;
+      const snippet = sectionSnippet(n, shown[i + 1]);
+      options[`s${i}`] = `${n.title} (pages ${pageSpan(n)})${snippet ? ` — ${snippet}` : ""}`;
     });
     options[NONE] = "None of these sections is likely to contain the answer";
     const where = path.length ? ` within "${path.join(" › ")}"` : "";
@@ -210,7 +208,13 @@ export async function retrieveEvidence(input: RetrieveInput): Promise<RetrievalR
   // read the most confident sections first, within the page budget
   candidates.sort((x, y) => (y.confidence ?? 0.5) - (x.confidence ?? 0.5));
   const evidence: Evidence[] = [];
-  for (const c of candidates.slice(0, b.maxSections)) {
+  const read = new Set<string>();
+  for (const c of candidates) {
+    if (evidence.length >= b.maxSections) break;
+    // sibling sections often share a page: read it once, under the most confident section
+    const span = `${c.index.indexId}:${c.node.startPage}-${Math.min(c.node.endPage, c.node.startPage + b.maxPagesPerSection - 1)}`;
+    if (read.has(span)) continue;
+    read.add(span);
     const remaining = b.maxPages - pagesRead;
     if (remaining <= 0) {
       exhausted = true;
@@ -280,6 +284,25 @@ export async function retrieveEvidence(input: RetrieveInput): Promise<RetrievalR
     usage,
     costUsd: Number(costUsd.toFixed(6)),
   };
+}
+
+/**
+ * What a section is about, for the navigator. A short section's summary is the raw text of its
+ * page(s), shared by every section on them, so it is cut to this section: from its own title to
+ * the next section's title when both appear in it.
+ */
+export function sectionSnippet(node: OutlineNode, next: OutlineNode | undefined): string {
+  if (!node.summary) return "";
+  let text = node.summary.replace(/\s+/g, " ").trim();
+  const title = node.title.replace(/\s+/g, " ").trim();
+  const start = title ? text.indexOf(title) : -1;
+  if (start >= 0) text = text.slice(start + title.length).trim();
+  const nextTitle = next?.title.replace(/\s+/g, " ").trim();
+  if (nextTitle) {
+    const end = text.indexOf(nextTitle);
+    if (end > 0) text = text.slice(0, end).trim();
+  }
+  return text.slice(0, SUMMARY_CHARS);
 }
 
 function pageSpan(n: OutlineNode): string {

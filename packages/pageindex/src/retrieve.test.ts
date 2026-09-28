@@ -4,6 +4,7 @@ import { LOCAL_CAPABILITIES } from "./capabilities.js";
 import {
   evidenceForPrompt,
   retrieveEvidence,
+  sectionSnippet,
   type Navigator,
   type NavigatorChoice,
 } from "./retrieve.js";
@@ -230,6 +231,17 @@ describe("retrieveEvidence", () => {
       ]),
     ).toBe(
       '[E1] Handbook.pdf, section "Policies › Refunds", page 2:\nRefunds above $200 need a team lead.',
+    );
+  });
+  it("describes each section by its own text when siblings share a page's summary", () => {
+    const page =
+      "4. Service levels First responses are sent within 8 hours. 5. Tools The team uses tickets.";
+    const a = { nodeId: "a", title: "4. Service levels", startPage: 2, endPage: 2, summary: page };
+    const b = { nodeId: "b", title: "5. Tools", startPage: 2, endPage: 2, summary: page };
+    expect(sectionSnippet(a, b)).toBe("First responses are sent within 8 hours.");
+    expect(sectionSnippet(b, undefined)).toBe("The team uses tickets.");
+    expect(sectionSnippet({ ...a, summary: "A model-written summary." }, b)).toBe(
+      "A model-written summary.",
     );
   });
 });

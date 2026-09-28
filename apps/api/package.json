@@ -20,6 +20,7 @@
     "lint": "eslint src",
     "test": "vitest run",
     "eval:assistant": "tsx --conditions=development src/evals/assistant.ts",
+    "eval:pageindex": "tsx --conditions=development src/evals/pageindex.ts",
     "clean": "rm -rf dist .turbo *.tsbuildinfo"
   },
   "dependencies": {
