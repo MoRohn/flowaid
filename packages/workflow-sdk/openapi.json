@@ -9132,7 +9132,7 @@
                   "name": { "type": "string", "minLength": 1, "maxLength": 200 },
                   "kind": {
                     "type": "string",
-                    "enum": ["files", "text", "url", "sitemap", "github"]
+                    "enum": ["files", "text", "url", "sitemap", "github", "pageindex"]
                   },
                   "config": {
                     "default": {},
@@ -10052,6 +10052,3142 @@
                     "costUsd": { "type": "number" }
                   },
                   "required": ["hits", "mode", "costUsd"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/pageindex/status": {
+      "get": {
+        "summary": "Whether PageIndex is configured and its service answers, and what it can do",
+        "tags": ["pageindex"],
+        "x-cli": { "noun": "pageindex", "verb": "status" },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["knowledge:read"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": { "type": "boolean" },
+                    "reachable": { "type": "boolean" },
+                    "sdkVersion": { "type": ["string", "null"] },
+                    "protocol": { "type": "string" },
+                    "modes": {
+                      "type": "object",
+                      "properties": {
+                        "local": {
+                          "type": "object",
+                          "properties": {
+                            "available": { "type": "boolean" },
+                            "capabilities": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "formats": { "type": "array", "items": { "type": "string" } },
+                                    "pageLocators": { "type": "string", "enum": ["physical"] },
+                                    "pageLabels": { "type": "boolean" },
+                                    "blocks": { "type": "boolean" },
+                                    "ocr": { "type": "boolean" }
+                                  },
+                                  "required": [
+                                    "formats",
+                                    "pageLocators",
+                                    "pageLabels",
+                                    "blocks",
+                                    "ocr"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                { "type": "null" }
+                              ]
+                            },
+                            "processing": { "type": "string" }
+                          },
+                          "required": ["available", "capabilities", "processing"],
+                          "additionalProperties": false
+                        },
+                        "cloud": {
+                          "type": "object",
+                          "properties": {
+                            "available": { "type": "boolean" },
+                            "capabilities": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "formats": { "type": "array", "items": { "type": "string" } },
+                                    "pageLocators": { "type": "string", "enum": ["physical"] },
+                                    "pageLabels": { "type": "boolean" },
+                                    "blocks": { "type": "boolean" },
+                                    "ocr": { "type": "boolean" }
+                                  },
+                                  "required": [
+                                    "formats",
+                                    "pageLocators",
+                                    "pageLabels",
+                                    "blocks",
+                                    "ocr"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                { "type": "null" }
+                              ]
+                            },
+                            "processing": { "type": "string" }
+                          },
+                          "required": ["available", "capabilities", "processing"],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": ["local", "cloud"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["enabled", "reachable", "sdkVersion", "protocol", "modes"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/pageindex/sources/{sourceId}/documents": {
+      "get": {
+        "summary": "A pageindex source's documents, newest first",
+        "tags": ["pageindex"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "sourceId",
+            "required": true
+          }
+        ],
+        "x-cli": { "noun": "pageindex", "verb": "documents", "positional": ["sourceId"] },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["knowledge:read"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "documentId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "title": { "type": "string" },
+                          "status": {
+                            "type": "string",
+                            "enum": ["pending", "indexed", "error", "deleted"]
+                          },
+                          "versions": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "latestVersion": {
+                            "type": "object",
+                            "properties": {
+                              "documentId": {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                              },
+                              "sourceId": {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                              },
+                              "versionId": {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                              },
+                              "version": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              "contentSha256": { "type": "string" },
+                              "displayName": { "type": "string" },
+                              "mediaType": { "type": "string" },
+                              "bytes": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              "pageCount": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  { "type": "null" }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "documentId",
+                              "sourceId",
+                              "versionId",
+                              "version",
+                              "contentSha256",
+                              "displayName",
+                              "mediaType",
+                              "bytes",
+                              "pageCount"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "activeIndex": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "indexId": {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                  },
+                                  "documentId": {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                  },
+                                  "sourceId": {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                  },
+                                  "versionId": {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                  },
+                                  "documentVersion": {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "indexVersion": {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "displayName": { "type": "string" },
+                                  "state": {
+                                    "type": "string",
+                                    "enum": [
+                                      "queued",
+                                      "running",
+                                      "ready",
+                                      "failed",
+                                      "cancel_requested",
+                                      "canceled",
+                                      "superseded",
+                                      "deleted"
+                                    ]
+                                  },
+                                  "active": { "type": "boolean" },
+                                  "backend": { "type": "string", "enum": ["pageindex"] },
+                                  "mode": { "type": "string", "enum": ["local"] },
+                                  "backendVersion": { "type": ["string", "null"] },
+                                  "configHash": { "type": "string" },
+                                  "indexModel": { "type": ["string", "null"] },
+                                  "pageCount": {
+                                    "anyOf": [
+                                      {
+                                        "type": "integer",
+                                        "minimum": -9007199254740991,
+                                        "maximum": 9007199254740991
+                                      },
+                                      { "type": "null" }
+                                    ]
+                                  },
+                                  "stage": { "type": ["string", "null"] },
+                                  "error": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "code": { "type": "string" },
+                                          "message": { "type": "string" }
+                                        },
+                                        "required": ["code", "message"],
+                                        "additionalProperties": false
+                                      },
+                                      { "type": "null" }
+                                    ]
+                                  },
+                                  "createdAt": { "type": "string" },
+                                  "readyAt": { "type": ["string", "null"] },
+                                  "capabilities": {
+                                    "type": "object",
+                                    "properties": {
+                                      "formats": { "type": "array", "items": { "type": "string" } },
+                                      "pageLocators": { "type": "string", "enum": ["physical"] },
+                                      "pageLabels": { "type": "boolean" },
+                                      "blocks": { "type": "boolean" },
+                                      "ocr": { "type": "boolean" }
+                                    },
+                                    "required": [
+                                      "formats",
+                                      "pageLocators",
+                                      "pageLabels",
+                                      "blocks",
+                                      "ocr"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": [
+                                  "indexId",
+                                  "documentId",
+                                  "sourceId",
+                                  "versionId",
+                                  "documentVersion",
+                                  "indexVersion",
+                                  "displayName",
+                                  "state",
+                                  "active",
+                                  "backend",
+                                  "mode",
+                                  "backendVersion",
+                                  "configHash",
+                                  "indexModel",
+                                  "pageCount",
+                                  "stage",
+                                  "error",
+                                  "createdAt",
+                                  "readyAt",
+                                  "capabilities"
+                                ],
+                                "additionalProperties": false
+                              },
+                              { "type": "null" }
+                            ]
+                          },
+                          "latestIndex": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "indexId": {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                  },
+                                  "documentId": {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                  },
+                                  "sourceId": {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                  },
+                                  "versionId": {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                  },
+                                  "documentVersion": {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "indexVersion": {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "displayName": { "type": "string" },
+                                  "state": {
+                                    "type": "string",
+                                    "enum": [
+                                      "queued",
+                                      "running",
+                                      "ready",
+                                      "failed",
+                                      "cancel_requested",
+                                      "canceled",
+                                      "superseded",
+                                      "deleted"
+                                    ]
+                                  },
+                                  "active": { "type": "boolean" },
+                                  "backend": { "type": "string", "enum": ["pageindex"] },
+                                  "mode": { "type": "string", "enum": ["local"] },
+                                  "backendVersion": { "type": ["string", "null"] },
+                                  "configHash": { "type": "string" },
+                                  "indexModel": { "type": ["string", "null"] },
+                                  "pageCount": {
+                                    "anyOf": [
+                                      {
+                                        "type": "integer",
+                                        "minimum": -9007199254740991,
+                                        "maximum": 9007199254740991
+                                      },
+                                      { "type": "null" }
+                                    ]
+                                  },
+                                  "stage": { "type": ["string", "null"] },
+                                  "error": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "code": { "type": "string" },
+                                          "message": { "type": "string" }
+                                        },
+                                        "required": ["code", "message"],
+                                        "additionalProperties": false
+                                      },
+                                      { "type": "null" }
+                                    ]
+                                  },
+                                  "createdAt": { "type": "string" },
+                                  "readyAt": { "type": ["string", "null"] },
+                                  "capabilities": {
+                                    "type": "object",
+                                    "properties": {
+                                      "formats": { "type": "array", "items": { "type": "string" } },
+                                      "pageLocators": { "type": "string", "enum": ["physical"] },
+                                      "pageLabels": { "type": "boolean" },
+                                      "blocks": { "type": "boolean" },
+                                      "ocr": { "type": "boolean" }
+                                    },
+                                    "required": [
+                                      "formats",
+                                      "pageLocators",
+                                      "pageLabels",
+                                      "blocks",
+                                      "ocr"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": [
+                                  "indexId",
+                                  "documentId",
+                                  "sourceId",
+                                  "versionId",
+                                  "documentVersion",
+                                  "indexVersion",
+                                  "displayName",
+                                  "state",
+                                  "active",
+                                  "backend",
+                                  "mode",
+                                  "backendVersion",
+                                  "configHash",
+                                  "indexModel",
+                                  "pageCount",
+                                  "stage",
+                                  "error",
+                                  "createdAt",
+                                  "readyAt",
+                                  "capabilities"
+                                ],
+                                "additionalProperties": false
+                              },
+                              { "type": "null" }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "documentId",
+                          "title",
+                          "status",
+                          "versions",
+                          "latestVersion",
+                          "activeIndex",
+                          "latestIndex"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["items"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Upload a PDF (the body, at most 50 MiB; X-File-Name URL-encoded) and index it; ?documentId= adds a version",
+        "tags": ["pageindex"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "query",
+            "name": "documentId",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "sourceId",
+            "required": true
+          }
+        ],
+        "x-cli": { "noun": "pageindex", "verb": "upload", "positional": ["sourceId"] },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["knowledge:write"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "document": {
+                      "type": "object",
+                      "properties": {
+                        "documentId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "title": { "type": "string" },
+                        "status": {
+                          "type": "string",
+                          "enum": ["pending", "indexed", "error", "deleted"]
+                        },
+                        "versions": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "latestVersion": {
+                          "type": "object",
+                          "properties": {
+                            "documentId": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            "sourceId": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            "versionId": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            "version": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "contentSha256": { "type": "string" },
+                            "displayName": { "type": "string" },
+                            "mediaType": { "type": "string" },
+                            "bytes": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "pageCount": {
+                              "anyOf": [
+                                {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                { "type": "null" }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "documentId",
+                            "sourceId",
+                            "versionId",
+                            "version",
+                            "contentSha256",
+                            "displayName",
+                            "mediaType",
+                            "bytes",
+                            "pageCount"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "activeIndex": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "indexId": {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                },
+                                "documentId": {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                },
+                                "sourceId": {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                },
+                                "versionId": {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                },
+                                "documentVersion": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                "indexVersion": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                "displayName": { "type": "string" },
+                                "state": {
+                                  "type": "string",
+                                  "enum": [
+                                    "queued",
+                                    "running",
+                                    "ready",
+                                    "failed",
+                                    "cancel_requested",
+                                    "canceled",
+                                    "superseded",
+                                    "deleted"
+                                  ]
+                                },
+                                "active": { "type": "boolean" },
+                                "backend": { "type": "string", "enum": ["pageindex"] },
+                                "mode": { "type": "string", "enum": ["local"] },
+                                "backendVersion": { "type": ["string", "null"] },
+                                "configHash": { "type": "string" },
+                                "indexModel": { "type": ["string", "null"] },
+                                "pageCount": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    { "type": "null" }
+                                  ]
+                                },
+                                "stage": { "type": ["string", "null"] },
+                                "error": {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "code": { "type": "string" },
+                                        "message": { "type": "string" }
+                                      },
+                                      "required": ["code", "message"],
+                                      "additionalProperties": false
+                                    },
+                                    { "type": "null" }
+                                  ]
+                                },
+                                "createdAt": { "type": "string" },
+                                "readyAt": { "type": ["string", "null"] },
+                                "capabilities": {
+                                  "type": "object",
+                                  "properties": {
+                                    "formats": { "type": "array", "items": { "type": "string" } },
+                                    "pageLocators": { "type": "string", "enum": ["physical"] },
+                                    "pageLabels": { "type": "boolean" },
+                                    "blocks": { "type": "boolean" },
+                                    "ocr": { "type": "boolean" }
+                                  },
+                                  "required": [
+                                    "formats",
+                                    "pageLocators",
+                                    "pageLabels",
+                                    "blocks",
+                                    "ocr"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": [
+                                "indexId",
+                                "documentId",
+                                "sourceId",
+                                "versionId",
+                                "documentVersion",
+                                "indexVersion",
+                                "displayName",
+                                "state",
+                                "active",
+                                "backend",
+                                "mode",
+                                "backendVersion",
+                                "configHash",
+                                "indexModel",
+                                "pageCount",
+                                "stage",
+                                "error",
+                                "createdAt",
+                                "readyAt",
+                                "capabilities"
+                              ],
+                              "additionalProperties": false
+                            },
+                            { "type": "null" }
+                          ]
+                        },
+                        "latestIndex": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "indexId": {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                },
+                                "documentId": {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                },
+                                "sourceId": {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                },
+                                "versionId": {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                },
+                                "documentVersion": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                "indexVersion": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                "displayName": { "type": "string" },
+                                "state": {
+                                  "type": "string",
+                                  "enum": [
+                                    "queued",
+                                    "running",
+                                    "ready",
+                                    "failed",
+                                    "cancel_requested",
+                                    "canceled",
+                                    "superseded",
+                                    "deleted"
+                                  ]
+                                },
+                                "active": { "type": "boolean" },
+                                "backend": { "type": "string", "enum": ["pageindex"] },
+                                "mode": { "type": "string", "enum": ["local"] },
+                                "backendVersion": { "type": ["string", "null"] },
+                                "configHash": { "type": "string" },
+                                "indexModel": { "type": ["string", "null"] },
+                                "pageCount": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    { "type": "null" }
+                                  ]
+                                },
+                                "stage": { "type": ["string", "null"] },
+                                "error": {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "code": { "type": "string" },
+                                        "message": { "type": "string" }
+                                      },
+                                      "required": ["code", "message"],
+                                      "additionalProperties": false
+                                    },
+                                    { "type": "null" }
+                                  ]
+                                },
+                                "createdAt": { "type": "string" },
+                                "readyAt": { "type": ["string", "null"] },
+                                "capabilities": {
+                                  "type": "object",
+                                  "properties": {
+                                    "formats": { "type": "array", "items": { "type": "string" } },
+                                    "pageLocators": { "type": "string", "enum": ["physical"] },
+                                    "pageLabels": { "type": "boolean" },
+                                    "blocks": { "type": "boolean" },
+                                    "ocr": { "type": "boolean" }
+                                  },
+                                  "required": [
+                                    "formats",
+                                    "pageLocators",
+                                    "pageLabels",
+                                    "blocks",
+                                    "ocr"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": [
+                                "indexId",
+                                "documentId",
+                                "sourceId",
+                                "versionId",
+                                "documentVersion",
+                                "indexVersion",
+                                "displayName",
+                                "state",
+                                "active",
+                                "backend",
+                                "mode",
+                                "backendVersion",
+                                "configHash",
+                                "indexModel",
+                                "pageCount",
+                                "stage",
+                                "error",
+                                "createdAt",
+                                "readyAt",
+                                "capabilities"
+                              ],
+                              "additionalProperties": false
+                            },
+                            { "type": "null" }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "documentId",
+                        "title",
+                        "status",
+                        "versions",
+                        "latestVersion",
+                        "activeIndex",
+                        "latestIndex"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "version": {
+                      "type": "object",
+                      "properties": {
+                        "documentId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "sourceId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "versionId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "version": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "contentSha256": { "type": "string" },
+                        "displayName": { "type": "string" },
+                        "mediaType": { "type": "string" },
+                        "bytes": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "pageCount": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            { "type": "null" }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "documentId",
+                        "sourceId",
+                        "versionId",
+                        "version",
+                        "contentSha256",
+                        "displayName",
+                        "mediaType",
+                        "bytes",
+                        "pageCount"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "index": {
+                      "type": "object",
+                      "properties": {
+                        "indexId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "documentId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "sourceId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "versionId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "documentVersion": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "indexVersion": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "displayName": { "type": "string" },
+                        "state": {
+                          "type": "string",
+                          "enum": [
+                            "queued",
+                            "running",
+                            "ready",
+                            "failed",
+                            "cancel_requested",
+                            "canceled",
+                            "superseded",
+                            "deleted"
+                          ]
+                        },
+                        "active": { "type": "boolean" },
+                        "backend": { "type": "string", "enum": ["pageindex"] },
+                        "mode": { "type": "string", "enum": ["local"] },
+                        "backendVersion": { "type": ["string", "null"] },
+                        "configHash": { "type": "string" },
+                        "indexModel": { "type": ["string", "null"] },
+                        "pageCount": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            { "type": "null" }
+                          ]
+                        },
+                        "stage": { "type": ["string", "null"] },
+                        "error": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "code": { "type": "string" },
+                                "message": { "type": "string" }
+                              },
+                              "required": ["code", "message"],
+                              "additionalProperties": false
+                            },
+                            { "type": "null" }
+                          ]
+                        },
+                        "createdAt": { "type": "string" },
+                        "readyAt": { "type": ["string", "null"] },
+                        "capabilities": {
+                          "type": "object",
+                          "properties": {
+                            "formats": { "type": "array", "items": { "type": "string" } },
+                            "pageLocators": { "type": "string", "enum": ["physical"] },
+                            "pageLabels": { "type": "boolean" },
+                            "blocks": { "type": "boolean" },
+                            "ocr": { "type": "boolean" }
+                          },
+                          "required": ["formats", "pageLocators", "pageLabels", "blocks", "ocr"],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "indexId",
+                        "documentId",
+                        "sourceId",
+                        "versionId",
+                        "documentVersion",
+                        "indexVersion",
+                        "displayName",
+                        "state",
+                        "active",
+                        "backend",
+                        "mode",
+                        "backendVersion",
+                        "configHash",
+                        "indexModel",
+                        "pageCount",
+                        "stage",
+                        "error",
+                        "createdAt",
+                        "readyAt",
+                        "capabilities"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "created": { "type": "boolean" }
+                  },
+                  "required": ["document", "version", "index", "created"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "document": {
+                      "type": "object",
+                      "properties": {
+                        "documentId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "title": { "type": "string" },
+                        "status": {
+                          "type": "string",
+                          "enum": ["pending", "indexed", "error", "deleted"]
+                        },
+                        "versions": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "latestVersion": {
+                          "type": "object",
+                          "properties": {
+                            "documentId": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            "sourceId": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            "versionId": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            "version": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "contentSha256": { "type": "string" },
+                            "displayName": { "type": "string" },
+                            "mediaType": { "type": "string" },
+                            "bytes": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "pageCount": {
+                              "anyOf": [
+                                {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                { "type": "null" }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "documentId",
+                            "sourceId",
+                            "versionId",
+                            "version",
+                            "contentSha256",
+                            "displayName",
+                            "mediaType",
+                            "bytes",
+                            "pageCount"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "activeIndex": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "indexId": {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                },
+                                "documentId": {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                },
+                                "sourceId": {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                },
+                                "versionId": {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                },
+                                "documentVersion": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                "indexVersion": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                "displayName": { "type": "string" },
+                                "state": {
+                                  "type": "string",
+                                  "enum": [
+                                    "queued",
+                                    "running",
+                                    "ready",
+                                    "failed",
+                                    "cancel_requested",
+                                    "canceled",
+                                    "superseded",
+                                    "deleted"
+                                  ]
+                                },
+                                "active": { "type": "boolean" },
+                                "backend": { "type": "string", "enum": ["pageindex"] },
+                                "mode": { "type": "string", "enum": ["local"] },
+                                "backendVersion": { "type": ["string", "null"] },
+                                "configHash": { "type": "string" },
+                                "indexModel": { "type": ["string", "null"] },
+                                "pageCount": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    { "type": "null" }
+                                  ]
+                                },
+                                "stage": { "type": ["string", "null"] },
+                                "error": {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "code": { "type": "string" },
+                                        "message": { "type": "string" }
+                                      },
+                                      "required": ["code", "message"],
+                                      "additionalProperties": false
+                                    },
+                                    { "type": "null" }
+                                  ]
+                                },
+                                "createdAt": { "type": "string" },
+                                "readyAt": { "type": ["string", "null"] },
+                                "capabilities": {
+                                  "type": "object",
+                                  "properties": {
+                                    "formats": { "type": "array", "items": { "type": "string" } },
+                                    "pageLocators": { "type": "string", "enum": ["physical"] },
+                                    "pageLabels": { "type": "boolean" },
+                                    "blocks": { "type": "boolean" },
+                                    "ocr": { "type": "boolean" }
+                                  },
+                                  "required": [
+                                    "formats",
+                                    "pageLocators",
+                                    "pageLabels",
+                                    "blocks",
+                                    "ocr"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": [
+                                "indexId",
+                                "documentId",
+                                "sourceId",
+                                "versionId",
+                                "documentVersion",
+                                "indexVersion",
+                                "displayName",
+                                "state",
+                                "active",
+                                "backend",
+                                "mode",
+                                "backendVersion",
+                                "configHash",
+                                "indexModel",
+                                "pageCount",
+                                "stage",
+                                "error",
+                                "createdAt",
+                                "readyAt",
+                                "capabilities"
+                              ],
+                              "additionalProperties": false
+                            },
+                            { "type": "null" }
+                          ]
+                        },
+                        "latestIndex": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "indexId": {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                },
+                                "documentId": {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                },
+                                "sourceId": {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                },
+                                "versionId": {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                },
+                                "documentVersion": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                "indexVersion": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                "displayName": { "type": "string" },
+                                "state": {
+                                  "type": "string",
+                                  "enum": [
+                                    "queued",
+                                    "running",
+                                    "ready",
+                                    "failed",
+                                    "cancel_requested",
+                                    "canceled",
+                                    "superseded",
+                                    "deleted"
+                                  ]
+                                },
+                                "active": { "type": "boolean" },
+                                "backend": { "type": "string", "enum": ["pageindex"] },
+                                "mode": { "type": "string", "enum": ["local"] },
+                                "backendVersion": { "type": ["string", "null"] },
+                                "configHash": { "type": "string" },
+                                "indexModel": { "type": ["string", "null"] },
+                                "pageCount": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    { "type": "null" }
+                                  ]
+                                },
+                                "stage": { "type": ["string", "null"] },
+                                "error": {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "code": { "type": "string" },
+                                        "message": { "type": "string" }
+                                      },
+                                      "required": ["code", "message"],
+                                      "additionalProperties": false
+                                    },
+                                    { "type": "null" }
+                                  ]
+                                },
+                                "createdAt": { "type": "string" },
+                                "readyAt": { "type": ["string", "null"] },
+                                "capabilities": {
+                                  "type": "object",
+                                  "properties": {
+                                    "formats": { "type": "array", "items": { "type": "string" } },
+                                    "pageLocators": { "type": "string", "enum": ["physical"] },
+                                    "pageLabels": { "type": "boolean" },
+                                    "blocks": { "type": "boolean" },
+                                    "ocr": { "type": "boolean" }
+                                  },
+                                  "required": [
+                                    "formats",
+                                    "pageLocators",
+                                    "pageLabels",
+                                    "blocks",
+                                    "ocr"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": [
+                                "indexId",
+                                "documentId",
+                                "sourceId",
+                                "versionId",
+                                "documentVersion",
+                                "indexVersion",
+                                "displayName",
+                                "state",
+                                "active",
+                                "backend",
+                                "mode",
+                                "backendVersion",
+                                "configHash",
+                                "indexModel",
+                                "pageCount",
+                                "stage",
+                                "error",
+                                "createdAt",
+                                "readyAt",
+                                "capabilities"
+                              ],
+                              "additionalProperties": false
+                            },
+                            { "type": "null" }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "documentId",
+                        "title",
+                        "status",
+                        "versions",
+                        "latestVersion",
+                        "activeIndex",
+                        "latestIndex"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "version": {
+                      "type": "object",
+                      "properties": {
+                        "documentId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "sourceId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "versionId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "version": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "contentSha256": { "type": "string" },
+                        "displayName": { "type": "string" },
+                        "mediaType": { "type": "string" },
+                        "bytes": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "pageCount": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            { "type": "null" }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "documentId",
+                        "sourceId",
+                        "versionId",
+                        "version",
+                        "contentSha256",
+                        "displayName",
+                        "mediaType",
+                        "bytes",
+                        "pageCount"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "index": {
+                      "type": "object",
+                      "properties": {
+                        "indexId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "documentId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "sourceId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "versionId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "documentVersion": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "indexVersion": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "displayName": { "type": "string" },
+                        "state": {
+                          "type": "string",
+                          "enum": [
+                            "queued",
+                            "running",
+                            "ready",
+                            "failed",
+                            "cancel_requested",
+                            "canceled",
+                            "superseded",
+                            "deleted"
+                          ]
+                        },
+                        "active": { "type": "boolean" },
+                        "backend": { "type": "string", "enum": ["pageindex"] },
+                        "mode": { "type": "string", "enum": ["local"] },
+                        "backendVersion": { "type": ["string", "null"] },
+                        "configHash": { "type": "string" },
+                        "indexModel": { "type": ["string", "null"] },
+                        "pageCount": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            { "type": "null" }
+                          ]
+                        },
+                        "stage": { "type": ["string", "null"] },
+                        "error": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "code": { "type": "string" },
+                                "message": { "type": "string" }
+                              },
+                              "required": ["code", "message"],
+                              "additionalProperties": false
+                            },
+                            { "type": "null" }
+                          ]
+                        },
+                        "createdAt": { "type": "string" },
+                        "readyAt": { "type": ["string", "null"] },
+                        "capabilities": {
+                          "type": "object",
+                          "properties": {
+                            "formats": { "type": "array", "items": { "type": "string" } },
+                            "pageLocators": { "type": "string", "enum": ["physical"] },
+                            "pageLabels": { "type": "boolean" },
+                            "blocks": { "type": "boolean" },
+                            "ocr": { "type": "boolean" }
+                          },
+                          "required": ["formats", "pageLocators", "pageLabels", "blocks", "ocr"],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "indexId",
+                        "documentId",
+                        "sourceId",
+                        "versionId",
+                        "documentVersion",
+                        "indexVersion",
+                        "displayName",
+                        "state",
+                        "active",
+                        "backend",
+                        "mode",
+                        "backendVersion",
+                        "configHash",
+                        "indexModel",
+                        "pageCount",
+                        "stage",
+                        "error",
+                        "createdAt",
+                        "readyAt",
+                        "capabilities"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "created": { "type": "boolean" }
+                  },
+                  "required": ["document", "version", "index", "created"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/pageindex/documents/{documentId}": {
+      "get": {
+        "summary": "A document with its versions and indexes",
+        "tags": ["pageindex"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "documentId",
+            "required": true
+          }
+        ],
+        "x-cli": { "noun": "pageindex", "verb": "document", "positional": ["documentId"] },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["knowledge:read"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "document": {
+                      "type": "object",
+                      "properties": {
+                        "documentId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "title": { "type": "string" },
+                        "status": {
+                          "type": "string",
+                          "enum": ["pending", "indexed", "error", "deleted"]
+                        },
+                        "versions": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "latestVersion": {
+                          "type": "object",
+                          "properties": {
+                            "documentId": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            "sourceId": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            "versionId": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            "version": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "contentSha256": { "type": "string" },
+                            "displayName": { "type": "string" },
+                            "mediaType": { "type": "string" },
+                            "bytes": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "pageCount": {
+                              "anyOf": [
+                                {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                { "type": "null" }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "documentId",
+                            "sourceId",
+                            "versionId",
+                            "version",
+                            "contentSha256",
+                            "displayName",
+                            "mediaType",
+                            "bytes",
+                            "pageCount"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "activeIndex": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "indexId": {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                },
+                                "documentId": {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                },
+                                "sourceId": {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                },
+                                "versionId": {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                },
+                                "documentVersion": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                "indexVersion": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                "displayName": { "type": "string" },
+                                "state": {
+                                  "type": "string",
+                                  "enum": [
+                                    "queued",
+                                    "running",
+                                    "ready",
+                                    "failed",
+                                    "cancel_requested",
+                                    "canceled",
+                                    "superseded",
+                                    "deleted"
+                                  ]
+                                },
+                                "active": { "type": "boolean" },
+                                "backend": { "type": "string", "enum": ["pageindex"] },
+                                "mode": { "type": "string", "enum": ["local"] },
+                                "backendVersion": { "type": ["string", "null"] },
+                                "configHash": { "type": "string" },
+                                "indexModel": { "type": ["string", "null"] },
+                                "pageCount": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    { "type": "null" }
+                                  ]
+                                },
+                                "stage": { "type": ["string", "null"] },
+                                "error": {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "code": { "type": "string" },
+                                        "message": { "type": "string" }
+                                      },
+                                      "required": ["code", "message"],
+                                      "additionalProperties": false
+                                    },
+                                    { "type": "null" }
+                                  ]
+                                },
+                                "createdAt": { "type": "string" },
+                                "readyAt": { "type": ["string", "null"] },
+                                "capabilities": {
+                                  "type": "object",
+                                  "properties": {
+                                    "formats": { "type": "array", "items": { "type": "string" } },
+                                    "pageLocators": { "type": "string", "enum": ["physical"] },
+                                    "pageLabels": { "type": "boolean" },
+                                    "blocks": { "type": "boolean" },
+                                    "ocr": { "type": "boolean" }
+                                  },
+                                  "required": [
+                                    "formats",
+                                    "pageLocators",
+                                    "pageLabels",
+                                    "blocks",
+                                    "ocr"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": [
+                                "indexId",
+                                "documentId",
+                                "sourceId",
+                                "versionId",
+                                "documentVersion",
+                                "indexVersion",
+                                "displayName",
+                                "state",
+                                "active",
+                                "backend",
+                                "mode",
+                                "backendVersion",
+                                "configHash",
+                                "indexModel",
+                                "pageCount",
+                                "stage",
+                                "error",
+                                "createdAt",
+                                "readyAt",
+                                "capabilities"
+                              ],
+                              "additionalProperties": false
+                            },
+                            { "type": "null" }
+                          ]
+                        },
+                        "latestIndex": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "indexId": {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                },
+                                "documentId": {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                },
+                                "sourceId": {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                },
+                                "versionId": {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                },
+                                "documentVersion": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                "indexVersion": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                "displayName": { "type": "string" },
+                                "state": {
+                                  "type": "string",
+                                  "enum": [
+                                    "queued",
+                                    "running",
+                                    "ready",
+                                    "failed",
+                                    "cancel_requested",
+                                    "canceled",
+                                    "superseded",
+                                    "deleted"
+                                  ]
+                                },
+                                "active": { "type": "boolean" },
+                                "backend": { "type": "string", "enum": ["pageindex"] },
+                                "mode": { "type": "string", "enum": ["local"] },
+                                "backendVersion": { "type": ["string", "null"] },
+                                "configHash": { "type": "string" },
+                                "indexModel": { "type": ["string", "null"] },
+                                "pageCount": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    { "type": "null" }
+                                  ]
+                                },
+                                "stage": { "type": ["string", "null"] },
+                                "error": {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "code": { "type": "string" },
+                                        "message": { "type": "string" }
+                                      },
+                                      "required": ["code", "message"],
+                                      "additionalProperties": false
+                                    },
+                                    { "type": "null" }
+                                  ]
+                                },
+                                "createdAt": { "type": "string" },
+                                "readyAt": { "type": ["string", "null"] },
+                                "capabilities": {
+                                  "type": "object",
+                                  "properties": {
+                                    "formats": { "type": "array", "items": { "type": "string" } },
+                                    "pageLocators": { "type": "string", "enum": ["physical"] },
+                                    "pageLabels": { "type": "boolean" },
+                                    "blocks": { "type": "boolean" },
+                                    "ocr": { "type": "boolean" }
+                                  },
+                                  "required": [
+                                    "formats",
+                                    "pageLocators",
+                                    "pageLabels",
+                                    "blocks",
+                                    "ocr"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": [
+                                "indexId",
+                                "documentId",
+                                "sourceId",
+                                "versionId",
+                                "documentVersion",
+                                "indexVersion",
+                                "displayName",
+                                "state",
+                                "active",
+                                "backend",
+                                "mode",
+                                "backendVersion",
+                                "configHash",
+                                "indexModel",
+                                "pageCount",
+                                "stage",
+                                "error",
+                                "createdAt",
+                                "readyAt",
+                                "capabilities"
+                              ],
+                              "additionalProperties": false
+                            },
+                            { "type": "null" }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "documentId",
+                        "title",
+                        "status",
+                        "versions",
+                        "latestVersion",
+                        "activeIndex",
+                        "latestIndex"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "versions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "documentId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "sourceId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "versionId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "version": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "contentSha256": { "type": "string" },
+                          "displayName": { "type": "string" },
+                          "mediaType": { "type": "string" },
+                          "bytes": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "pageCount": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              { "type": "null" }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "documentId",
+                          "sourceId",
+                          "versionId",
+                          "version",
+                          "contentSha256",
+                          "displayName",
+                          "mediaType",
+                          "bytes",
+                          "pageCount"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "indexes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "indexId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "documentId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "sourceId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "versionId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "documentVersion": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "indexVersion": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "displayName": { "type": "string" },
+                          "state": {
+                            "type": "string",
+                            "enum": [
+                              "queued",
+                              "running",
+                              "ready",
+                              "failed",
+                              "cancel_requested",
+                              "canceled",
+                              "superseded",
+                              "deleted"
+                            ]
+                          },
+                          "active": { "type": "boolean" },
+                          "backend": { "type": "string", "enum": ["pageindex"] },
+                          "mode": { "type": "string", "enum": ["local"] },
+                          "backendVersion": { "type": ["string", "null"] },
+                          "configHash": { "type": "string" },
+                          "indexModel": { "type": ["string", "null"] },
+                          "pageCount": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              { "type": "null" }
+                            ]
+                          },
+                          "stage": { "type": ["string", "null"] },
+                          "error": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "code": { "type": "string" },
+                                  "message": { "type": "string" }
+                                },
+                                "required": ["code", "message"],
+                                "additionalProperties": false
+                              },
+                              { "type": "null" }
+                            ]
+                          },
+                          "createdAt": { "type": "string" },
+                          "readyAt": { "type": ["string", "null"] },
+                          "capabilities": {
+                            "type": "object",
+                            "properties": {
+                              "formats": { "type": "array", "items": { "type": "string" } },
+                              "pageLocators": { "type": "string", "enum": ["physical"] },
+                              "pageLabels": { "type": "boolean" },
+                              "blocks": { "type": "boolean" },
+                              "ocr": { "type": "boolean" }
+                            },
+                            "required": ["formats", "pageLocators", "pageLabels", "blocks", "ocr"],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "indexId",
+                          "documentId",
+                          "sourceId",
+                          "versionId",
+                          "documentVersion",
+                          "indexVersion",
+                          "displayName",
+                          "state",
+                          "active",
+                          "backend",
+                          "mode",
+                          "backendVersion",
+                          "configHash",
+                          "indexModel",
+                          "pageCount",
+                          "stage",
+                          "error",
+                          "createdAt",
+                          "readyAt",
+                          "capabilities"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["document", "versions", "indexes"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Revoke a document and its indexes now; upstream cleanup runs as a job",
+        "tags": ["pageindex"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "documentId",
+            "required": true
+          }
+        ],
+        "x-cli": { "noun": "pageindex", "verb": "delete", "positional": ["documentId"] },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["knowledge:write"],
+        "responses": {
+          "202": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "documentId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "status": { "type": "string", "enum": ["deleted"] }
+                  },
+                  "required": ["documentId", "status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/pageindex/documents/{documentId}/versions/{versionId}/file": {
+      "get": {
+        "summary": "The original PDF of one version, inline",
+        "tags": ["pageindex"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "documentId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "versionId",
+            "required": true
+          }
+        ],
+        "x-cli": { "noun": "pageindex", "verb": "file", "positional": ["documentId", "versionId"] },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["knowledge:read"],
+        "responses": { "200": { "description": "Default Response" } }
+      }
+    },
+    "/v1/pageindex/documents/{documentId}/index": {
+      "post": {
+        "summary": "Build (or join) the latest version's index with the source's settings; retries a failed build",
+        "tags": ["pageindex"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "documentId",
+            "required": true
+          }
+        ],
+        "x-cli": { "noun": "pageindex", "verb": "index", "positional": ["documentId"] },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["knowledge:write"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "index": {
+                      "type": "object",
+                      "properties": {
+                        "indexId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "documentId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "sourceId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "versionId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "documentVersion": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "indexVersion": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "displayName": { "type": "string" },
+                        "state": {
+                          "type": "string",
+                          "enum": [
+                            "queued",
+                            "running",
+                            "ready",
+                            "failed",
+                            "cancel_requested",
+                            "canceled",
+                            "superseded",
+                            "deleted"
+                          ]
+                        },
+                        "active": { "type": "boolean" },
+                        "backend": { "type": "string", "enum": ["pageindex"] },
+                        "mode": { "type": "string", "enum": ["local"] },
+                        "backendVersion": { "type": ["string", "null"] },
+                        "configHash": { "type": "string" },
+                        "indexModel": { "type": ["string", "null"] },
+                        "pageCount": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            { "type": "null" }
+                          ]
+                        },
+                        "stage": { "type": ["string", "null"] },
+                        "error": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "code": { "type": "string" },
+                                "message": { "type": "string" }
+                              },
+                              "required": ["code", "message"],
+                              "additionalProperties": false
+                            },
+                            { "type": "null" }
+                          ]
+                        },
+                        "createdAt": { "type": "string" },
+                        "readyAt": { "type": ["string", "null"] },
+                        "capabilities": {
+                          "type": "object",
+                          "properties": {
+                            "formats": { "type": "array", "items": { "type": "string" } },
+                            "pageLocators": { "type": "string", "enum": ["physical"] },
+                            "pageLabels": { "type": "boolean" },
+                            "blocks": { "type": "boolean" },
+                            "ocr": { "type": "boolean" }
+                          },
+                          "required": ["formats", "pageLocators", "pageLabels", "blocks", "ocr"],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "indexId",
+                        "documentId",
+                        "sourceId",
+                        "versionId",
+                        "documentVersion",
+                        "indexVersion",
+                        "displayName",
+                        "state",
+                        "active",
+                        "backend",
+                        "mode",
+                        "backendVersion",
+                        "configHash",
+                        "indexModel",
+                        "pageCount",
+                        "stage",
+                        "error",
+                        "createdAt",
+                        "readyAt",
+                        "capabilities"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "created": { "type": "boolean" }
+                  },
+                  "required": ["index", "created"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "index": {
+                      "type": "object",
+                      "properties": {
+                        "indexId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "documentId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "sourceId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "versionId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "documentVersion": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "indexVersion": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "displayName": { "type": "string" },
+                        "state": {
+                          "type": "string",
+                          "enum": [
+                            "queued",
+                            "running",
+                            "ready",
+                            "failed",
+                            "cancel_requested",
+                            "canceled",
+                            "superseded",
+                            "deleted"
+                          ]
+                        },
+                        "active": { "type": "boolean" },
+                        "backend": { "type": "string", "enum": ["pageindex"] },
+                        "mode": { "type": "string", "enum": ["local"] },
+                        "backendVersion": { "type": ["string", "null"] },
+                        "configHash": { "type": "string" },
+                        "indexModel": { "type": ["string", "null"] },
+                        "pageCount": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            { "type": "null" }
+                          ]
+                        },
+                        "stage": { "type": ["string", "null"] },
+                        "error": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "code": { "type": "string" },
+                                "message": { "type": "string" }
+                              },
+                              "required": ["code", "message"],
+                              "additionalProperties": false
+                            },
+                            { "type": "null" }
+                          ]
+                        },
+                        "createdAt": { "type": "string" },
+                        "readyAt": { "type": ["string", "null"] },
+                        "capabilities": {
+                          "type": "object",
+                          "properties": {
+                            "formats": { "type": "array", "items": { "type": "string" } },
+                            "pageLocators": { "type": "string", "enum": ["physical"] },
+                            "pageLabels": { "type": "boolean" },
+                            "blocks": { "type": "boolean" },
+                            "ocr": { "type": "boolean" }
+                          },
+                          "required": ["formats", "pageLocators", "pageLabels", "blocks", "ocr"],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "indexId",
+                        "documentId",
+                        "sourceId",
+                        "versionId",
+                        "documentVersion",
+                        "indexVersion",
+                        "displayName",
+                        "state",
+                        "active",
+                        "backend",
+                        "mode",
+                        "backendVersion",
+                        "configHash",
+                        "indexModel",
+                        "pageCount",
+                        "stage",
+                        "error",
+                        "createdAt",
+                        "readyAt",
+                        "capabilities"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "created": { "type": "boolean" }
+                  },
+                  "required": ["index", "created"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/pageindex/indexes/{indexId}": {
+      "get": {
+        "tags": ["pageindex"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "indexId",
+            "required": true
+          }
+        ],
+        "x-cli": { "noun": "pageindex", "verb": "get-index", "positional": ["indexId"] },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["knowledge:read"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "indexId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "documentId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "sourceId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "versionId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "documentVersion": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "indexVersion": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "displayName": { "type": "string" },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "queued",
+                        "running",
+                        "ready",
+                        "failed",
+                        "cancel_requested",
+                        "canceled",
+                        "superseded",
+                        "deleted"
+                      ]
+                    },
+                    "active": { "type": "boolean" },
+                    "backend": { "type": "string", "enum": ["pageindex"] },
+                    "mode": { "type": "string", "enum": ["local"] },
+                    "backendVersion": { "type": ["string", "null"] },
+                    "configHash": { "type": "string" },
+                    "indexModel": { "type": ["string", "null"] },
+                    "pageCount": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        { "type": "null" }
+                      ]
+                    },
+                    "stage": { "type": ["string", "null"] },
+                    "error": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "code": { "type": "string" },
+                            "message": { "type": "string" }
+                          },
+                          "required": ["code", "message"],
+                          "additionalProperties": false
+                        },
+                        { "type": "null" }
+                      ]
+                    },
+                    "createdAt": { "type": "string" },
+                    "readyAt": { "type": ["string", "null"] },
+                    "capabilities": {
+                      "type": "object",
+                      "properties": {
+                        "formats": { "type": "array", "items": { "type": "string" } },
+                        "pageLocators": { "type": "string", "enum": ["physical"] },
+                        "pageLabels": { "type": "boolean" },
+                        "blocks": { "type": "boolean" },
+                        "ocr": { "type": "boolean" }
+                      },
+                      "required": ["formats", "pageLocators", "pageLabels", "blocks", "ocr"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "indexId",
+                    "documentId",
+                    "sourceId",
+                    "versionId",
+                    "documentVersion",
+                    "indexVersion",
+                    "displayName",
+                    "state",
+                    "active",
+                    "backend",
+                    "mode",
+                    "backendVersion",
+                    "configHash",
+                    "indexModel",
+                    "pageCount",
+                    "stage",
+                    "error",
+                    "createdAt",
+                    "readyAt",
+                    "capabilities"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/pageindex/indexes/{indexId}/outline": {
+      "get": {
+        "summary": "The section tree of a ready (or superseded) index",
+        "tags": ["pageindex"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "indexId",
+            "required": true
+          }
+        ],
+        "x-cli": { "noun": "pageindex", "verb": "outline", "positional": ["indexId"] },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["knowledge:read"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "outline": { "type": "array", "items": {} } },
+                  "required": ["outline"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/pageindex/indexes/{indexId}/cancel": {
+      "post": {
+        "summary": "Cancel a build: a queued one at once, a running one when the worker next checks",
+        "tags": ["pageindex"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "indexId",
+            "required": true
+          }
+        ],
+        "x-cli": { "noun": "pageindex", "verb": "cancel", "positional": ["indexId"] },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["knowledge:write"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "indexId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "documentId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "sourceId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "versionId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "documentVersion": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "indexVersion": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "displayName": { "type": "string" },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "queued",
+                        "running",
+                        "ready",
+                        "failed",
+                        "cancel_requested",
+                        "canceled",
+                        "superseded",
+                        "deleted"
+                      ]
+                    },
+                    "active": { "type": "boolean" },
+                    "backend": { "type": "string", "enum": ["pageindex"] },
+                    "mode": { "type": "string", "enum": ["local"] },
+                    "backendVersion": { "type": ["string", "null"] },
+                    "configHash": { "type": "string" },
+                    "indexModel": { "type": ["string", "null"] },
+                    "pageCount": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        { "type": "null" }
+                      ]
+                    },
+                    "stage": { "type": ["string", "null"] },
+                    "error": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "code": { "type": "string" },
+                            "message": { "type": "string" }
+                          },
+                          "required": ["code", "message"],
+                          "additionalProperties": false
+                        },
+                        { "type": "null" }
+                      ]
+                    },
+                    "createdAt": { "type": "string" },
+                    "readyAt": { "type": ["string", "null"] },
+                    "capabilities": {
+                      "type": "object",
+                      "properties": {
+                        "formats": { "type": "array", "items": { "type": "string" } },
+                        "pageLocators": { "type": "string", "enum": ["physical"] },
+                        "pageLabels": { "type": "boolean" },
+                        "blocks": { "type": "boolean" },
+                        "ocr": { "type": "boolean" }
+                      },
+                      "required": ["formats", "pageLocators", "pageLabels", "blocks", "ocr"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "indexId",
+                    "documentId",
+                    "sourceId",
+                    "versionId",
+                    "documentVersion",
+                    "indexVersion",
+                    "displayName",
+                    "state",
+                    "active",
+                    "backend",
+                    "mode",
+                    "backendVersion",
+                    "configHash",
+                    "indexModel",
+                    "pageCount",
+                    "stage",
+                    "error",
+                    "createdAt",
+                    "readyAt",
+                    "capabilities"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/pageindex/query": {
+      "post": {
+        "summary": "Retrieve evidence by navigating the scope's indexes; optionally answer with checked citations",
+        "tags": ["pageindex"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "query": { "type": "string", "minLength": 1, "maxLength": 4000 },
+                  "scope": {
+                    "type": "object",
+                    "properties": {
+                      "sourceIds": {
+                        "maxItems": 20,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        }
+                      },
+                      "documentIds": {
+                        "maxItems": 50,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        }
+                      },
+                      "indexIds": {
+                        "maxItems": 50,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        }
+                      }
+                    }
+                  },
+                  "answer": { "default": false, "type": "boolean" },
+                  "budget": {
+                    "type": "object",
+                    "properties": {
+                      "maxSections": { "type": "integer", "minimum": 1, "maximum": 20 },
+                      "maxPages": { "type": "integer", "minimum": 1, "maximum": 60 },
+                      "maxDecisions": { "type": "integer", "minimum": 1, "maximum": 60 },
+                      "maxPagesPerSection": { "type": "integer", "minimum": 1, "maximum": 20 },
+                      "branching": { "type": "integer", "minimum": 1, "maximum": 5 },
+                      "minProbability": { "type": "number", "minimum": 0, "maximum": 1 },
+                      "excerptChars": { "type": "integer", "minimum": 200, "maximum": 20000 }
+                    }
+                  }
+                },
+                "required": ["query", "scope"]
+              }
+            }
+          }
+        },
+        "x-cli": { "noun": "pageindex", "verb": "query" },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["knowledge:read"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "retrieval": {
+                      "type": "object",
+                      "properties": {
+                        "evidence": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": { "type": "string" },
+                              "indexId": {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                              },
+                              "documentId": {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                              },
+                              "versionId": {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                              },
+                              "documentVersion": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              "indexVersion": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              "displayName": { "type": "string" },
+                              "nodeId": { "type": ["string", "null"] },
+                              "sectionPath": { "type": "array", "items": { "type": "string" } },
+                              "excerpt": { "type": "string" },
+                              "truncated": { "type": "boolean" },
+                              "locator": {
+                                "type": "object",
+                                "properties": {
+                                  "kind": { "type": "string", "enum": ["pdf_page"] },
+                                  "page": {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "endPage": {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "pageLabel": { "type": ["string", "null"] }
+                                },
+                                "required": ["kind", "page", "endPage", "pageLabel"],
+                                "additionalProperties": false
+                              },
+                              "provenance": {
+                                "type": "object",
+                                "properties": {
+                                  "method": { "type": "string", "enum": ["tree_navigation"] },
+                                  "confidence": { "type": ["number", "null"] },
+                                  "provider": { "type": ["string", "null"] }
+                                },
+                                "required": ["method", "confidence", "provider"],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "indexId",
+                              "documentId",
+                              "versionId",
+                              "documentVersion",
+                              "indexVersion",
+                              "displayName",
+                              "nodeId",
+                              "sectionPath",
+                              "excerpt",
+                              "truncated",
+                              "locator",
+                              "provenance"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "status": { "type": "string", "enum": ["complete", "partial", "empty"] },
+                        "warnings": { "type": "array", "items": { "type": "string" } },
+                        "activity": {
+                          "type": "object",
+                          "properties": {
+                            "documents": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "sectionsInspected": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "pagesRead": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "decisions": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "elapsedMs": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            }
+                          },
+                          "required": [
+                            "documents",
+                            "sectionsInspected",
+                            "pagesRead",
+                            "decisions",
+                            "elapsedMs"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "usage": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "inputTokens": { "type": "number" },
+                                "outputTokens": { "type": "number" }
+                              },
+                              "required": ["inputTokens", "outputTokens"],
+                              "additionalProperties": {}
+                            },
+                            { "type": "null" }
+                          ]
+                        },
+                        "costUsd": { "type": "number" }
+                      },
+                      "required": [
+                        "evidence",
+                        "status",
+                        "warnings",
+                        "activity",
+                        "usage",
+                        "costUsd"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "answer": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "answer": { "type": "string" },
+                            "citations": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "marker": { "type": "string" },
+                                  "evidenceId": { "type": "string" },
+                                  "documentId": {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                  },
+                                  "versionId": {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                  },
+                                  "page": {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "supported": { "type": ["boolean", "null"] },
+                                  "support": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "method": {
+                                            "type": "string",
+                                            "enum": ["decision", "lexical"]
+                                          },
+                                          "score": { "type": "number" }
+                                        },
+                                        "required": ["method", "score"],
+                                        "additionalProperties": false
+                                      },
+                                      { "type": "null" }
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "marker",
+                                  "evidenceId",
+                                  "documentId",
+                                  "versionId",
+                                  "page",
+                                  "supported",
+                                  "support"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": ["sufficient", "partial", "insufficient"]
+                            },
+                            "limitations": { "type": "array", "items": { "type": "string" } },
+                            "runId": { "type": "string" }
+                          },
+                          "required": ["answer", "citations", "status", "limitations", "runId"],
+                          "additionalProperties": false
+                        },
+                        { "type": "null" }
+                      ]
+                    },
+                    "model": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "provider": { "type": "string" },
+                            "model": { "type": "string" }
+                          },
+                          "required": ["provider", "model"],
+                          "additionalProperties": false
+                        },
+                        { "type": "null" }
+                      ]
+                    }
+                  },
+                  "required": ["retrieval", "answer", "model"],
                   "additionalProperties": false
                 }
               }

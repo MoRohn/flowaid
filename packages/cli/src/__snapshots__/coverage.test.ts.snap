@@ -129,6 +129,18 @@ notification list {--out}
 notification rotate-secret <id> {--out}
 notification test <id> {--out}
 notification update <id> {--name --config --events --enabled --slack-webhook-url --body --out}
+pageindex
+pageindex cancel <indexId> {--out}
+pageindex delete <documentId> {--out}
+pageindex document <documentId> {--out}
+pageindex documents <sourceId> {--out}
+pageindex file <documentId> <versionId> {--out}
+pageindex get-index <indexId> {--out}
+pageindex index <documentId> {--out}
+pageindex outline <indexId> {--out}
+pageindex query {--query --scope --answer --budget --body --out}
+pageindex status {--out}
+pageindex upload <sourceId> {--document-id --out}
 plugin
 plugin add <spec> {--frozen --local}
 plugin disable <plugin>
@@ -285,6 +297,7 @@ Commands:
   model|models                      model operations
   node|nodes                        node operations
   notification|notifications        notification operations
+  pageindex|pageindexs              pageindex operations
   plugin|plugins                    plugin operations
   provider|providers                provider operations
   review|reviews                    review operations
