@@ -47,7 +47,7 @@
     "@playwright/test": "1.63.0",
     "@types/node": "24.13.6",
     "esbuild": "0.28.2",
-    "eslint": "9.39.5",
+    "eslint": "10.11.0",
     "happy-dom": "20.14.5",
     "lefthook": "2.1.14",
     "openapi-typescript": "7.13.0",
