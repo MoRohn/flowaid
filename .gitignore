@@ -37,3 +37,8 @@ test-results/
 *.bak
 *.orig
 .axe-scratch/
+
+# Python (apps/pageindex)
+__pycache__/
+*.pyc
+.venv/
