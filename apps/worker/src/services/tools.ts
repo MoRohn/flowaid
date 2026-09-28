@@ -36,7 +36,7 @@ export interface ToolDeps {
   http: SafeFetch;
   repo: CredentialRepository;
   cache: RunCredentialCache;
-  /** development only */
+  /** FLOWAID_ALLOW_PRIVATE_NETWORK: OpenAPI operations may call private addresses */
   allowPrivateNetwork?: boolean;
   /** workflows as tools; without it `workflow` tools are refused */
   workflows?: Omit<WorkflowToolDeps, "db">;

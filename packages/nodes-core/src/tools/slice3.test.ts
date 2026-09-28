@@ -183,6 +183,20 @@ describe("flowaid.tools.db_query", () => {
     expect(r.result).toMatchObject({ kind: "error", error: { code: "FORBIDDEN" } });
   });
 
+  it("connects to loopback hosts when the private network is allowed (FLOWAID_ALLOW_PRIVATE_NETWORK)", async () => {
+    // nothing listens on port 1: past the address policy, the driver fails to connect instead
+    dbQueryConnector.network = { allowPrivate: true };
+    onTestFinished(() => {
+      dbQueryConnector.network = {};
+    });
+    const r = await runNode(dbQueryNode, {
+      config: { sql: "select 1" },
+      credentials: { database: { dsn: "postgres://u:p@127.0.0.1:1/app" } },
+    });
+    expect(r.result).toMatchObject({ kind: "error" });
+    expect(r.result).not.toMatchObject({ error: { code: "FORBIDDEN" } });
+  });
+
   it("re-checks the address at connect time (DNS rebinding)", async () => {
     let calls = 0;
     const client = await connectPostgres(

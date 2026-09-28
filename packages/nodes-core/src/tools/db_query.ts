@@ -52,7 +52,10 @@ export interface DbQueryClient {
 
 /** Where the node may connect: the safe fetch address policy (ARCHITECTURE.md §10.6). */
 export interface DbQueryNetwork {
-  /** Development and tests only: permit loopback, private and reserved database hosts. */
+  /**
+   * Permit loopback, private and reserved database hosts (and unix sockets): the worker sets it
+   * from FLOWAID_ALLOW_PRIVATE_NETWORK; tests set it to reach the test database.
+   */
   allowPrivate?: boolean;
   /** Injectable DNS (tests). */
   lookup?: LookupFn;
@@ -250,7 +253,10 @@ export const dbQueryNode = defineNode({
   },
 });
 
-/** Replaceable in tests; `network.allowPrivate` is for development and tests only. */
+/**
+ * Replaceable in tests. `network` is process-wide: the worker sets `allowPrivate` at boot from
+ * FLOWAID_ALLOW_PRIVATE_NETWORK.
+ */
 export const dbQueryConnector: {
   connect: (dsn: string, signal: AbortSignal) => Promise<DbQueryClient>;
   network: DbQueryNetwork;

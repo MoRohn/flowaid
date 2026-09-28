@@ -87,6 +87,7 @@ describe("EnvSchema", () => {
     expect(env.FLOWAID_JWT_KEYS_DIR).toBe(".flowaid/keys");
     expect(env.FLOWAID_ALLOW_INSECURE_HTTP).toBe(false);
     expect(env.FLOWAID_ALLOW_CROSS_SITE).toBe(false);
+    expect(env.FLOWAID_ALLOW_PRIVATE_NETWORK).toBe(false);
     expect(env.FLOWAID_MASTER_KEY_AUTOGENERATE).toBe(false);
     expect(env.SANDBOX_MODE).toBe("isolated-vm");
     expect(env.MCP_STDIO_ENABLED).toBe(false);
@@ -411,6 +412,21 @@ describe("production rules", () => {
     expect(
       firstIssue({ ...PRODUCTION, CORS_ORIGINS: "https://app.example.com,*" }, "CORS_ORIGINS"),
     ).toContain("must not contain *");
+  });
+
+  it("parses FLOWAID_ALLOW_PRIVATE_NETWORK as a boolean, in production too", () => {
+    expect(EnvSchema.parse({ ...MINIMAL, FLOWAID_ALLOW_PRIVATE_NETWORK: "true" })).toMatchObject({
+      FLOWAID_ALLOW_PRIVATE_NETWORK: true,
+    });
+    expect(EnvSchema.parse({ ...MINIMAL, FLOWAID_ALLOW_PRIVATE_NETWORK: "0" })).toMatchObject({
+      FLOWAID_ALLOW_PRIVATE_NETWORK: false,
+    });
+    expect(
+      issuesFor({ ...MINIMAL, FLOWAID_ALLOW_PRIVATE_NETWORK: "sometimes" }).has(
+        "FLOWAID_ALLOW_PRIVATE_NETWORK",
+      ),
+    ).toBe(true);
+    expect(issuesFor({ ...PRODUCTION, FLOWAID_ALLOW_PRIVATE_NETWORK: "true" }).size).toBe(0);
   });
 
   it("require https public URLs unless loopback or FLOWAID_ALLOW_INSECURE_HTTP", () => {

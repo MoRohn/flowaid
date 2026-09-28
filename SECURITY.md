@@ -54,6 +54,23 @@ it on this computer is its owner. The boundary is the computer itself:
 - Other local users and processes on the same computer are inside the boundary. Do not run
   local mode on a shared machine.
 
+## Private network access
+
+Outbound connections that workflows make refuse loopback, private-network, link-local and
+reserved addresses (including cloud metadata endpoints), also after DNS resolution and on every
+redirect. This covers the HTTP, GraphQL and database query nodes, AI nodes' HTTP calls,
+knowledge loaders, OpenAPI tools (import and calls), HTTP MCP servers and notification
+webhooks. It stops a workflow from probing the machine or network FlowAId runs on.
+
+`FLOWAID_ALLOW_PRIVATE_NETWORK=true` (off by default; set it for both the api and the worker)
+lifts that restriction for all of them at once, so flows can call your own `localhost` API or
+query a local PostgreSQL. The trade-off: anyone who can edit or import a workflow can then reach
+every service on your computer and your network, including admin interfaces that trust local
+callers. Turn it on only when you are the only author, and never on a cloud host, where the
+metadata endpoint hands out the host's credentials. `pnpm start` does not turn it on for you.
+In the compose stack the `worker-code` sandbox host does not read `.env`, so code nodes there
+stay restricted.
+
 ## Operating securely
 
 - Set a strong `FLOWAID_MASTER_KEY` (or a backed-up `FLOWAID_MASTER_KEY_FILE`) and explicit `FLOWAID_JWT_PRIVATE_KEY`/`FLOWAID_JWT_PUBLIC_KEY`; never reuse the example values in production.

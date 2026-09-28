@@ -102,7 +102,10 @@ export type LookupFn = (
 ) => void;
 
 export interface SafeFetchOptions {
-  /** Development only: permit private addresses (never set in production). */
+  /**
+   * Permit loopback, private and reserved addresses: FLOWAID_ALLOW_PRIVATE_NETWORK (an operator
+   * running FlowAId for themselves) and tests. Host allow/deny rules still apply.
+   */
   allowPrivate?: boolean;
   /** Only these hosts (exact or `*.suffix`); empty/undefined = any public host. */
   allowHosts?: readonly string[];

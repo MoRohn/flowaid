@@ -10,12 +10,11 @@ import {
   externalFromEnv,
   masterKeyFromEnv,
 } from "./services/credentials.js";
-import { createSafeFetch } from "@flowaid/providers";
 import { loadEnv } from "@flowaid/env";
 import { AuthService } from "./auth/service.js";
 import { JwtKeys } from "./auth/jwt.js";
 import { firstBoot } from "./bootstrap/firstBoot.js";
-import { configFromEnv, type ApiContext } from "./context.js";
+import { apiSafeFetch, configFromEnv, type ApiContext } from "./context.js";
 import { buildServer } from "./server.js";
 import { setupTelemetry, startMetricsListener } from "@flowaid/observability";
 import { createAlertDispatcher, smtpFromEnv } from "./services/alerts.js";
@@ -67,15 +66,12 @@ async function main(): Promise<void> {
     ),
     externalFromEnv(env),
   );
-  const http = createSafeFetch({
-    maxBytes: 25 * 1024 * 1024,
-    timeoutMs: 30_000,
-    userAgent: "FlowAId-API/1",
-  });
+  const config = configFromEnv(env);
+  const http = apiSafeFetch(config);
   // email channels need both SMTP_URL and SMTP_FROM (alerts and test sends use the same settings)
   const smtp = smtpFromEnv(env) ?? undefined;
   const ctx: ApiContext = {
-    config: configFromEnv(env),
+    config,
     db,
     keys,
     auth: new AuthService(db, keys, clock.now),
