@@ -35,16 +35,21 @@
     "sdk:types": "tsx --conditions=development scripts/gen-sdk-types.ts",
     "sdk:check": "tsx --conditions=development scripts/gen-sdk-types.ts --check",
     "test:acceptance": "playwright test",
-    "flowaid": "tsx --conditions=development packages/cli/src/main.ts"
+    "flowaid": "tsx --conditions=development packages/cli/src/main.ts",
+    "prepare": "node --disable-warning=ExperimentalWarning scripts/install-hooks.ts",
+    "changeset": "changeset",
+    "version-packages": "changeset version && node --disable-warning=ExperimentalWarning scripts/release-version.ts && pnpm --filter @flowaid/nodes-core --filter @flowaid/nodes-langchain manifest && prettier --write CHANGELOG.md \"{apps,packages}/*/CHANGELOG.md\" \"{apps,packages}/*/package.json\" \"packages/*/src/**/*.ts\""
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",
+    "@changesets/cli": "3.0.3",
     "@flowaid/config": "workspace:*",
     "@playwright/test": "1.63.0",
     "@types/node": "24.13.6",
     "esbuild": "0.28.2",
     "eslint": "9.39.5",
     "happy-dom": "20.14.5",
+    "lefthook": "2.1.14",
     "openapi-typescript": "7.13.0",
     "prettier": "3.9.8",
     "tsx": "4.23.15",

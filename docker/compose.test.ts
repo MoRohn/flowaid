@@ -341,3 +341,24 @@ describe("compose images and builds", () => {
     expect(dockerfile).toContain("org.opencontainers.image.revision");
   });
 });
+
+describe("compose.images.yml (published images)", () => {
+  it("swaps only where the app images come from, for a required release tag", () => {
+    const overlay = services(loadCompose("compose.images.yml"));
+    const target: Record<string, string> = {
+      api: "api",
+      worker: "worker",
+      "worker-code": "worker",
+      web: "web",
+    };
+    expect(Object.keys(overlay).sort()).toEqual(Object.keys(target).sort());
+    for (const [name, svc] of Object.entries(overlay)) {
+      expect(Object.keys(svc).sort(), name).toEqual(["image", "pull_policy"]);
+      expect(text(svc["image"]), name).toBe(
+        `\${FLOWAID_IMAGE_REGISTRY:-ghcr.io/morohn}/flowaid-${target[name] ?? ""}:\${FLOWAID_IMAGE_TAG:?set FLOWAID_IMAGE_TAG to a release, e.g. 0.4.0}`,
+      );
+      expect(text(svc["pull_policy"]), name).toBe("always");
+      expect(STACK[name], `${name} exists in compose.yml`).toBeDefined();
+    }
+  });
+});

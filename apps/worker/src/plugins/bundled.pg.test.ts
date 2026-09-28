@@ -2,6 +2,7 @@ import { afterAll, beforeAll, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { plugins, templates } from "@flowaid/database";
 import { createTestDatabase, describeDb, type TestDatabase } from "@flowaid/database/testing";
+import { PACKAGE_VERSION } from "@flowaid/nodes-langchain";
 import { loadBundledPlugins } from "./bundled.js";
 
 describeDb("bundled plugins are recorded in the plugins table (Postgres)", () => {
@@ -24,8 +25,8 @@ describeDb("bundled plugins are recorded in the plugins table (Postgres)", () =>
       workspaceId: null,
       source: "bundled",
       status: "enabled",
-      version: "0.1.0",
-      integrity: "0.1.0",
+      version: PACKAGE_VERSION,
+      integrity: PACKAGE_VERSION,
     });
     expect(rows[0]?.manifests.map((m) => m.id)).toContain("@flowaid/nodes-langchain.retriever");
     // its template is a global built-in, once, however often the worker boots

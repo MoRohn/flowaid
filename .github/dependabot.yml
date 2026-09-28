@@ -4,6 +4,9 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
   - package-ecosystem: npm
     directory: /
     schedule:
@@ -12,3 +15,15 @@ updates:
     groups:
       minor-and-patch:
         update-types: [minor, patch]
+  # the digest-pinned base images: node in the Dockerfile; postgres, redis, rustfs in compose
+  - package-ecosystem: docker
+    directory: /docker
+    schedule:
+      interval: weekly
+  - package-ecosystem: docker-compose
+    directory: /docker
+    schedule:
+      interval: weekly
+    groups:
+      compose-images:
+        patterns: ["*"]

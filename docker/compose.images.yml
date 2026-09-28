@@ -1,0 +1,22 @@
+# Run the published release images instead of building from source (docs/RELEASING.md):
+#
+#   FLOWAID_IMAGE_TAG=0.4.0 docker compose -f docker/compose.yml -f docker/compose.images.yml up -d
+#
+# (add `-f docker/compose.scale.yml` for the scale profile). Everything else (networks, secrets
+# scoping, the sandbox host's restrictions) comes from compose.yml unchanged; only where the
+# app images come from changes. Pin a digest for reproducible deploys:
+# FLOWAID_IMAGE_TAG=0.4.0@sha256:<digest of the manifest list>.
+
+services:
+  api:
+    image: ${FLOWAID_IMAGE_REGISTRY:-ghcr.io/morohn}/flowaid-api:${FLOWAID_IMAGE_TAG:?set FLOWAID_IMAGE_TAG to a release, e.g. 0.4.0}
+    pull_policy: always
+  worker:
+    image: ${FLOWAID_IMAGE_REGISTRY:-ghcr.io/morohn}/flowaid-worker:${FLOWAID_IMAGE_TAG:?set FLOWAID_IMAGE_TAG to a release, e.g. 0.4.0}
+    pull_policy: always
+  worker-code:
+    image: ${FLOWAID_IMAGE_REGISTRY:-ghcr.io/morohn}/flowaid-worker:${FLOWAID_IMAGE_TAG:?set FLOWAID_IMAGE_TAG to a release, e.g. 0.4.0}
+    pull_policy: always
+  web:
+    image: ${FLOWAID_IMAGE_REGISTRY:-ghcr.io/morohn}/flowaid-web:${FLOWAID_IMAGE_TAG:?set FLOWAID_IMAGE_TAG to a release, e.g. 0.4.0}
+    pull_policy: always

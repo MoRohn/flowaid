@@ -5,12 +5,14 @@ import { afterAll, beforeAll, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { plugins } from "@flowaid/database";
 import { describeDb } from "@flowaid/database/testing";
-import { packTarball } from "@flowaid/plugins";
+import { PLATFORM_SDK_VERSION, packTarball } from "@flowaid/plugins";
 import { startFakeRegistry, type FakeRegistry } from "@flowaid/plugins/testing";
 import { uuidv7 } from "@flowaid/shared";
 import type { NodeManifest } from "@flowaid/workflow-core";
 import { call, createTestApp, login, type Jar, type TestApp } from "./test/app.js";
 
+/** The range a package built for this platform declares (follows the release version). */
+const SDK = `^${PLATFORM_SDK_VERSION}`;
 const CORE = JSON.parse(
   readFileSync(join(import.meta.dirname, "../../../packages/nodes-core/manifest.json"), "utf8"),
 ) as { nodes: NodeManifest[] };
@@ -28,13 +30,13 @@ describeDb("plugins: install, discovery and management (Postgres)", () => {
       name: "@acme/nodes-crm",
       version: "1.0.0",
       description: "CRM lookups",
-      flowaid: { package: "nodePackage", sdk: "^0.1.0" },
+      flowaid: { package: "nodePackage", sdk: SDK },
       files: { "manifest.json": manifest("@acme/nodes-crm") },
     });
     await reg.publish({
       name: "@acme/tampered",
       version: "1.0.0",
-      flowaid: { sdk: "^0.1.0" },
+      flowaid: { sdk: SDK },
       files: { "manifest.json": manifest("@acme/tampered") },
       tamper: await packTarball({ "package.json": "{}" }),
     });
@@ -42,7 +44,7 @@ describeDb("plugins: install, discovery and management (Postgres)", () => {
       name: "@evil/nodes",
       version: "1.0.0",
       description: "CRM too",
-      flowaid: { sdk: "^0.1.0" },
+      flowaid: { sdk: SDK },
       files: { "manifest.json": manifest("@evil/nodes") },
     });
     t = await createTestApp({
@@ -189,7 +191,7 @@ describeDb("plugins: install, discovery and management (Postgres)", () => {
         name: "@acme/local-nodes",
         version: "0.3.0",
         keywords: ["flowaid-node"],
-        flowaid: { sdk: "^0.1.0" },
+        flowaid: { sdk: SDK },
       }),
     );
     writeFileSync(join(dir, "manifest.json"), manifest("@acme/local-nodes"));

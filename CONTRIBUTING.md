@@ -61,9 +61,12 @@ Useful commands:
 
 1. Branch from `main`.
 2. Keep the change focused on one plan item or issue, and reference it in the description.
-3. Make `pnpm check` pass (every gate CI runs).
-4. Update the docs the change affects: the package README, a guide page, `docs/STATUS.md`.
-5. A contract change needs an accepted RFC first.
+3. Make `pnpm check` pass (every gate CI runs). `pnpm install` sets up lefthook hooks that check
+   formatting and lint on commit, and boundaries and types on push.
+4. Add a changeset (`pnpm changeset`) when users will notice the change: it becomes the release
+   notes ([docs/RELEASING.md](docs/RELEASING.md)).
+5. Update the docs the change affects: the package README, a guide page, `docs/STATUS.md`.
+6. A contract change needs an accepted RFC first.
 
 ## Repository map
 

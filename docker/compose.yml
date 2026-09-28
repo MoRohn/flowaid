@@ -18,7 +18,7 @@
 # process of the worker (the plugin host). Run artifacts and code-export packages live in the
 # `flowaid-data` volume the api and worker share, or in S3 when S3_* is set.
 #
-# Images are pinned to a release tag and its digest; renovate bumps them.
+# Images are pinned to a release tag and its digest; Dependabot bumps them.
 #
 # Networks:
 #   internal  internal: true (no egress): postgres, redis, rustfs, api, worker, worker-code.

@@ -1,0 +1,17 @@
+# Hooks for contributors, installed by `pnpm install` (scripts/install-hooks.ts; skipped in CI).
+# Skip once with `--no-verify`, or set LEFTHOOK=0.
+pre-commit:
+  parallel: true
+  commands:
+    format:
+      glob: "*.{ts,tsx,js,mjs,md,json,yaml,yml,css}"
+      run: pnpm exec prettier --check --ignore-unknown {staged_files}
+    lint:
+      glob: "*.{ts,tsx,js,mjs}"
+      # each file is linted with its package's eslint.config.js, as `turbo run lint` does
+      run: pnpm exec eslint --flag v10_config_lookup_from_file --no-warn-ignored {staged_files}
+
+pre-push:
+  commands:
+    boundaries-and-types:
+      run: pnpm boundaries && pnpm typecheck:root
