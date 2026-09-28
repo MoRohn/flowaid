@@ -35,6 +35,7 @@
     "sdk:types": "tsx --conditions=development scripts/gen-sdk-types.ts",
     "sdk:check": "tsx --conditions=development scripts/gen-sdk-types.ts --check",
     "test:acceptance": "playwright test",
+    "eval:assistant": "pnpm --filter @flowaid/api eval:assistant",
     "flowaid": "tsx --conditions=development packages/cli/src/main.ts",
     "prepare": "node --disable-warning=ExperimentalWarning scripts/install-hooks.ts",
     "changeset": "changeset",

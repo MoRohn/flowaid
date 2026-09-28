@@ -1,4 +1,4 @@
-import base from "@flowaid/config/eslint";
+import base, { allowProcessEnv } from "@flowaid/config/eslint";
 import { boundaryConfig, testBoundaryConfig } from "../../eslint.boundaries.js";
 
 // The HTTP API. src/test/ holds test-only fixtures
@@ -26,5 +26,11 @@ export default [
       // res.json() is `any`; casts document the expected shape even when lint calls them redundant.
       "@typescript-eslint/no-unnecessary-type-assertion": "off",
     },
+  },
+  {
+    // `pnpm eval:assistant` is a developer command (excluded from the build), like the `pnpm
+    // start` launcher: it reads the provider key the person running it exported.
+    ...allowProcessEnv,
+    files: ["src/evals/**"],
   },
 ];

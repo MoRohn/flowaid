@@ -43,3 +43,13 @@ export {
   type SourceKind,
   type StatementKind,
 } from "./assistant.js";
+export {
+  ASSISTANT_EVAL_CASES,
+  fixtureTools,
+  formatEvalReport,
+  runAssistantEval,
+  scoreCase,
+  type AssistantEvalCase,
+  type CaseResult,
+  type EvalReport,
+} from "./evals/assistant.js";
