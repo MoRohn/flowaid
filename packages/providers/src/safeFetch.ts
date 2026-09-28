@@ -7,7 +7,8 @@
  *   link-local (incl. cloud metadata), CGNAT, multicast and unique-local addresses — at connect
  *   time, so DNS rebinding between check and use cannot slip through.
  * - Redirects are followed manually (at most 5), each hop re-checked; 301/302/303 downgrade
- *   non-GET/HEAD requests to GET without a body.
+ *   non-GET/HEAD requests to GET without a body. A hop to another origin keeps only
+ *   content-negotiation headers, so no credential header follows it.
  * - Responses are capped (25 MiB by default); per-workspace allow/deny host lists apply.
  */
 import { lookup as dnsLookup, type LookupAddress } from "node:dns";
@@ -21,6 +22,15 @@ import {
 } from "@flowaid/workflow-core";
 
 export const SAFE_FETCH_DEFAULTS = { maxRedirects: 5, maxBytes: 25 * 1024 * 1024 } as const;
+
+/** The only request headers a redirect to another origin keeps (plus Content-Type with a body). */
+const CROSS_ORIGIN_HEADERS = new Set([
+  "accept",
+  "accept-encoding",
+  "accept-language",
+  "cache-control",
+  "user-agent",
+]);
 
 function ipv4Blocked(ip: string): boolean {
   const [a = 0, b = 0, c = 0] = ip.split(".").map(Number);
@@ -41,20 +51,46 @@ function ipv4Blocked(ip: string): boolean {
   );
 }
 
+/** The eight 16-bit groups of a valid IPv6 address (a trailing dotted IPv4 becomes two). */
+function ipv6Groups(ip: string): number[] {
+  let text = ip.replace(/%.*$/, "");
+  const dotted = /(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(text);
+  if (dotted) {
+    const [a, b, c, d] = dotted.slice(1).map(Number) as [number, number, number, number];
+    text = `${text.slice(0, dotted.index)}${((a << 8) | b).toString(16)}:${((c << 8) | d).toString(16)}`;
+  }
+  const [head = "", tail] = text.split("::");
+  const parse = (part: string) => (part ? part.split(":").map((g) => parseInt(g, 16)) : []);
+  const left = parse(head);
+  const right = tail === undefined ? [] : parse(tail);
+  return [...left, ...Array<number>(8 - left.length - right.length).fill(0), ...right];
+}
+
+const v4Of = (hi: number, lo: number) => `${hi >> 8}.${hi & 255}.${lo >> 8}.${lo & 255}`;
+
 /** True for addresses a server-side fetch must never reach. */
 export function isBlockedAddress(address: string): boolean {
   const ip = address.replace(/^\[|\]$/g, "").toLowerCase();
   const kind = isIP(ip);
   if (kind === 4) return ipv4Blocked(ip);
   if (kind === 6) {
-    if (ip === "::" || ip === "::1") return true;
-    const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(ip);
-    if (mapped?.[1]) return ipv4Blocked(mapped[1]);
-    if (/^::ffff:/.test(ip)) return true;
-    // unique-local fc00::/7, link-local fe80::/10, multicast ff00::/8, documentation 2001:db8::/32, NAT64 64:ff9b::/96
-    return (
-      /^(?:f[cd]|fe[89ab]|ff)/.test(ip) || ip.startsWith("2001:db8:") || ip.startsWith("64:ff9b:")
-    );
+    const g = ipv6Groups(ip);
+    const [g0 = 0, g1 = 0, g2 = 0, , , g5 = 0, g6 = 0, g7 = 0] = g;
+    const zeroPrefix = (n: number) => g.slice(0, n).every((x) => x === 0);
+    // ::/96 covers ::, ::1 and the deprecated IPv4-compatible ::a.b.c.d; ::ffff:0:0/96 is mapped
+    if (zeroPrefix(6)) return true;
+    if (zeroPrefix(5) && g5 === 0xffff) return ipv4Blocked(v4Of(g6, g7));
+    if (zeroPrefix(5)) return true;
+    // NAT64 64:ff9b::/96 and its local-use 64:ff9b:1::/48 translate to any IPv4 address
+    if (g0 === 0x64 && g1 === 0xff9b) return true;
+    // 6to4 2002::/16 embeds the IPv4 relay target in the next 32 bits
+    if (g0 === 0x2002) return ipv4Blocked(v4Of(g1, g2));
+    // Teredo 2001:0::/32 tunnels to embedded IPv4 server and client addresses
+    if (g0 === 0x2001 && g1 === 0) return true;
+    // documentation 2001:db8::/32
+    if (g0 === 0x2001 && g1 === 0xdb8) return true;
+    // unique-local fc00::/7, link-local fe80::/10, site-local fec0::/10, multicast ff00::/8
+    return (g0 & 0xfe00) === 0xfc00 || (g0 & 0xff80) === 0xfe80 || (g0 & 0xff00) === 0xff00;
   }
   return true;
 }
@@ -201,10 +237,13 @@ export function createSafeFetch(o: SafeFetchOptions = {}): SafeFetch {
           headers.delete("content-type");
           headers.delete("content-length");
         }
-        // Never forward credentials to another origin.
+        // Never forward credentials to another origin: they may sit in any custom header
+        // (X-API-Key, an OpenAPI tool's apiKey header), so only content negotiation survives.
         if (next.origin !== new URL(input).origin) {
-          headers.delete("authorization");
-          headers.delete("cookie");
+          for (const name of [...headers.keys()]) {
+            if (!CROSS_ORIGIN_HEADERS.has(name) && !(name === "content-type" && body != null))
+              headers.delete(name);
+          }
         }
         continue;
       }

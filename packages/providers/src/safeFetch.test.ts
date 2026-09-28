@@ -5,13 +5,19 @@ import { createSafeFetch, isBlockedAddress, type LookupFn } from "./safeFetch.js
 
 let server: Server;
 let port = 0;
-const seen: { method: string; url: string; auth?: string }[] = [];
+const seen: {
+  method: string;
+  url: string;
+  auth?: string;
+  headers: Record<string, string | string[] | undefined>;
+}[] = [];
 
 beforeAll(async () => {
   server = createServer((req, res) => {
     seen.push({
       method: req.method ?? "",
       url: req.url ?? "",
+      headers: req.headers,
       ...(req.headers.authorization ? { auth: req.headers.authorization } : {}),
     });
     if (req.url === "/big") return void res.end("x".repeat(2048));
@@ -49,8 +55,24 @@ describe("isBlockedAddress", () => {
     ["fd12::1", true],
     ["fe80::1", true],
     ["::ffff:127.0.0.1", true],
+    ["::ffff:7f00:1", true],
+    // IPv4-compatible (deprecated): ::a.b.c.d reaches a.b.c.d on some stacks
+    ["::127.0.0.1", true],
+    ["::7f00:1", true],
+    ["::a9fe:a9fe", true],
+    // 6to4 2002::/16 carries an IPv4 address in bits 16-47
+    ["2002:7f00:1::1", true],
+    ["2002:a9fe:a9fe::", true],
+    ["2002:0808:0808::1", false],
+    // Teredo 2001::/32 tunnels to an embedded IPv4 server and client
+    ["2001:0:4136:e378:8000:63bf:3fff:fdd2", true],
+    ["2001::1", true],
+    ["0064:ff9b::7f00:1", true],
+    ["fec0::1", true],
+    ["2001:db8::1", true],
     ["8.8.8.8", false],
     ["2606:4700:4700::1111", false],
+    ["2001:4860:4860::8888", false],
   ])("%s → %s", (ip, blocked) => expect(isBlockedAddress(ip)).toBe(blocked));
 });
 
@@ -118,6 +140,32 @@ describe("createSafeFetch", () => {
     });
     expect(seen[0]?.auth).toBe("Bearer secret");
     expect(seen[1]?.auth).toBeUndefined();
+  });
+
+  it("forwards only safe headers when a redirect leaves the origin", async () => {
+    seen.length = 0;
+    const f = createSafeFetch({ allowPrivate: true, lookup: loopbackDns, userAgent: "flowaid" });
+    await f(`http://api.test:${port}/to-other-host`, {
+      headers: {
+        "x-api-key": "k-secret",
+        "private-token": "t-secret",
+        accept: "application/json",
+        "accept-language": "en",
+      },
+    });
+    expect(seen[0]?.headers["x-api-key"]).toBe("k-secret");
+    expect(seen[1]?.headers["x-api-key"]).toBeUndefined();
+    expect(seen[1]?.headers["private-token"]).toBeUndefined();
+    expect(seen[1]?.headers.accept).toBe("application/json");
+    expect(seen[1]?.headers["accept-language"]).toBe("en");
+    expect(seen[1]?.headers["user-agent"]).toBe("flowaid");
+  });
+
+  it("keeps custom headers on same-origin redirects", async () => {
+    seen.length = 0;
+    const f = createSafeFetch({ allowPrivate: true, lookup: loopbackDns });
+    await f(`http://api.test:${port}/redirect-303`, { headers: { "x-api-key": "k-secret" } });
+    expect(seen[1]?.headers["x-api-key"]).toBe("k-secret");
   });
 
   it("applies deny lists", async () => {
