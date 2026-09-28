@@ -715,7 +715,7 @@ const docs = {
   OLLAMA_HOST: {
     group: "providers",
     description:
-      "Base URL of a local Ollama server (`@flowaid/provider-ollama`). Unset disables the provider.",
+      'Base URL of a local Ollama server (`@flowaid/provider-ollama`). Unset disables the provider. Workflows may always reach this exact origin, even on this computer, without `FLOWAID_ALLOW_PRIVATE_NETWORK` (you configured it); "Ollama (no credential)" credentials use it.',
     required: false,
     example: "http://localhost:11434",
     secret: false,

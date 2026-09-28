@@ -184,7 +184,11 @@ const silent: WorkerLogger = {
  * recorded to, or replayed from, the fixture store instead of only reaching the vendor.
  */
 export function defaultProviderRegistry(
-  options: { fixtures?: { mode: FixtureMode; store: FixtureStore } } = {},
+  options: {
+    fixtures?: { mode: FixtureMode; store: FixtureStore };
+    /** OLLAMA_HOST: where Ollama models run when a workflow names no host */
+    ollamaHost?: string | undefined;
+  } = {},
 ): ProviderRegistry {
   const registry = new ProviderRegistry({ catalog: new DefaultModelCatalog() });
   const { fixtures } = options;
@@ -195,8 +199,8 @@ export function defaultProviderRegistry(
   register(typesafeFactory());
   for (const f of openaiFactories()) register(f);
   register(anthropicFactory());
-  register(ollamaFactory());
-  register(ollamaEmbeddingFactory());
+  register(ollamaFactory({ host: options.ollamaHost }));
+  register(ollamaEmbeddingFactory({ host: options.ollamaHost }));
   for (const f of rerankFactories()) register(f);
   return registry;
 }

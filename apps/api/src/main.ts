@@ -67,7 +67,7 @@ async function main(): Promise<void> {
     externalFromEnv(env),
   );
   const config = configFromEnv(env);
-  const http = apiSafeFetch(config);
+  const http = apiSafeFetch(config, env.OLLAMA_HOST ? [String(env.OLLAMA_HOST)] : []);
   // email channels need both SMTP_URL and SMTP_FROM (alerts and test sends use the same settings)
   const smtp = smtpFromEnv(env) ?? undefined;
   const ctx: ApiContext = {

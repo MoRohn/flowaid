@@ -20,7 +20,10 @@ describe("worker network policy (FLOWAID_ALLOW_PRIVATE_NETWORK)", () => {
 
   it("refuses loopback addresses by default, in the safe fetch and the database query node", async () => {
     reset();
-    const net = workerNetworkFromEnv({ FLOWAID_ALLOW_PRIVATE_NETWORK: false });
+    const net = workerNetworkFromEnv({
+      FLOWAID_ALLOW_PRIVATE_NETWORK: false,
+      OLLAMA_HOST: undefined,
+    });
     expect(net.allowPrivateNetwork).toBe(false);
     await expect(net.http(url)).rejects.toThrow(/private or reserved/);
     expect(dbQueryConnector.network.allowPrivate).toBe(false);
@@ -28,10 +31,22 @@ describe("worker network policy (FLOWAID_ALLOW_PRIVATE_NETWORK)", () => {
 
   it("reaches services on this computer when the operator allows it", async () => {
     reset();
-    const net = workerNetworkFromEnv({ FLOWAID_ALLOW_PRIVATE_NETWORK: true });
+    const net = workerNetworkFromEnv({
+      FLOWAID_ALLOW_PRIVATE_NETWORK: true,
+      OLLAMA_HOST: undefined,
+    });
     expect(net.allowPrivateNetwork).toBe(true);
     const res = await net.http(url);
     expect(await res.text()).toBe("local");
     expect(dbQueryConnector.network.allowPrivate).toBe(true);
+  });
+
+  it("always reaches the operator's OLLAMA_HOST, and nothing else private", async () => {
+    reset();
+    const origin = new URL(url).origin;
+    const net = workerNetworkFromEnv({ FLOWAID_ALLOW_PRIVATE_NETWORK: false, OLLAMA_HOST: origin });
+    expect(await (await net.http(url)).text()).toBe("local");
+    await expect(net.http("http://127.0.0.1:9/")).rejects.toThrow(/private or reserved/);
+    expect(dbQueryConnector.network.allowPrivate).toBe(false);
   });
 });

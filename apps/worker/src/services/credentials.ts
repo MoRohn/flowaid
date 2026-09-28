@@ -62,6 +62,8 @@ const FALLBACK: Record<string, (k: ServerKeys) => Record<string, string> | undef
   "openai.api_key": (k) => (k.openai ? { apiKey: k.openai } : undefined),
   "anthropic.api_key": (k) => (k.anthropic ? { apiKey: k.anthropic } : undefined),
   "ollama.host": (k) => (k.ollamaHost ? { host: k.ollamaHost } : undefined),
+  // "no credential" Ollama means the server's own OLLAMA_HOST when one is configured
+  "ollama.none": (k) => (k.ollamaHost ? { host: k.ollamaHost } : undefined),
 };
 
 /** The server's own key for a credential type (TYPESAFE_API_KEY, …), when configured. */
@@ -88,7 +90,13 @@ export function providerCredential(
     for (const s of plan?.secrets ?? []) {
       if (s.credentialType !== credentialType) continue;
       const id = await repo.resolveBinding(call.workflowId, call.environmentId, s.name);
-      if (id) return { id, value: await cache.for(call.runId).get(id) };
+      if (id) {
+        const value = await cache.for(call.runId).get(id);
+        // an "Ollama (no credential)" credential reaches the configured OLLAMA_HOST
+        return credentialType === "ollama.none" && !value.host && keys.ollamaHost
+          ? { id, value: { ...value, host: keys.ollamaHost } }
+          : { id, value };
+      }
     }
     const fallback = FALLBACK[credentialType]?.(keys);
     return fallback ? { id: `server:${providerId}`, value: fallback } : undefined;

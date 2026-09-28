@@ -71,6 +71,10 @@ metadata endpoint hands out the host's credentials. `pnpm start` does not turn i
 In the compose stack the `worker-code` sandbox host does not read `.env`, so code nodes there
 stay restricted.
 
+The one exception is `OLLAMA_HOST`: the exact origin you configure there is always reachable
+(and redirects from it are checked like any other request), so a local Ollama works without
+opening the private network to every workflow.
+
 ## Operating securely
 
 - Set a strong `FLOWAID_MASTER_KEY` (or a backed-up `FLOWAID_MASTER_KEY_FILE`) and explicit `FLOWAID_JWT_PRIVATE_KEY`/`FLOWAID_JWT_PUBLIC_KEY`; never reuse the example values in production.

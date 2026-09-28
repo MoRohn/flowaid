@@ -154,10 +154,12 @@ async function main(): Promise<void> {
     ? { packages: [], skipped: [] }
     : await loadBundledPlugins(env.FLOWAID_BUNDLED_PLUGINS, { db, log });
   const fixtureMode = env.FLOWAID_PROVIDER_FIXTURES;
+  const ollamaHost = env.OLLAMA_HOST ? String(env.OLLAMA_HOST) : undefined;
   const registry = defaultProviderRegistry(
     fixtureMode === "off"
-      ? {}
+      ? { ollamaHost }
       : {
+          ollamaHost,
           fixtures: {
             mode: fixtureMode,
             store: new FileFixtureStore(resolve(String(env.FLOWAID_PROVIDER_FIXTURES_DIR))),

@@ -22,18 +22,18 @@ import {
 import type { ApiContext } from "../context.js";
 
 /** The server's provider factories (the same set the worker registers). */
-export function defaultProviderRegistry(): ProviderRegistry {
+export function defaultProviderRegistry(ollamaHost?: string): ProviderRegistry {
   const registry = new ProviderRegistry({ catalog: new DefaultModelCatalog() });
   registry.register(typesafeFactory());
   for (const f of openaiFactories()) registry.register(f);
   registry.register(anthropicFactory());
-  registry.register(ollamaFactory());
-  registry.register(ollamaEmbeddingFactory());
+  registry.register(ollamaFactory({ host: ollamaHost }));
+  registry.register(ollamaEmbeddingFactory({ host: ollamaHost }));
   return registry;
 }
 
 export function registryOf(ctx: ApiContext): ProviderRegistry {
-  ctx.providers ??= defaultProviderRegistry();
+  ctx.providers ??= defaultProviderRegistry(serverKey(ctx, "ollama.host")?.host);
   return ctx.providers;
 }
 

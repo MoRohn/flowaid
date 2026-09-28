@@ -126,12 +126,17 @@ export function configFromEnv(env: Env): ApiConfig {
 }
 
 /** The API's SSRF-guarded fetch, honouring `allowPrivateNetwork`. */
-export function apiSafeFetch(config: Pick<ApiConfig, "allowPrivateNetwork">): SafeFetch {
+export function apiSafeFetch(
+  config: Pick<ApiConfig, "allowPrivateNetwork">,
+  /** operator-configured origins that may be private (OLLAMA_HOST) */
+  trustedOrigins: readonly string[] = [],
+): SafeFetch {
   return createSafeFetch({
     maxBytes: 25 * 1024 * 1024,
     timeoutMs: 30_000,
     userAgent: "FlowAId-API/1",
     allowPrivate: config.allowPrivateNetwork,
+    ...(trustedOrigins.length ? { trustedOrigins } : {}),
   });
 }
 

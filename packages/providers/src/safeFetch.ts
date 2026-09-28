@@ -111,6 +111,11 @@ export interface SafeFetchOptions {
   allowHosts?: readonly string[];
   /** Never these hosts (exact or `*.suffix`). */
   denyHosts?: readonly string[];
+  /**
+   * Exact origins (`http://127.0.0.1:11434`) the operator configured, e.g. `OLLAMA_HOST`: they
+   * may be private addresses. Only these origins; a redirect elsewhere is checked as usual.
+   */
+  trustedOrigins?: readonly string[];
   maxRedirects?: number;
   maxBytes?: number;
   /** Per-request timeout (in addition to the caller's signal). */
@@ -168,6 +173,19 @@ export function createGuardedLookup(
 
 export function createSafeFetch(o: SafeFetchOptions = {}): SafeFetch {
   const agent: Dispatcher = new Agent({ connect: { lookup: createGuardedLookup(o) } });
+  const trusted = new Set(
+    (o.trustedOrigins ?? []).flatMap((raw) => {
+      try {
+        return [new URL(raw).origin];
+      } catch {
+        return [];
+      }
+    }),
+  );
+  // operator-configured origins connect without the private-address guard
+  const trustedAgent: Dispatcher | null = trusted.size
+    ? new Agent({ connect: { lookup: createGuardedLookup({ ...o, allowPrivate: true }) } })
+    : null;
   const maxRedirects = o.maxRedirects ?? SAFE_FETCH_DEFAULTS.maxRedirects;
   const maxBytesDefault = o.maxBytes ?? SAFE_FETCH_DEFAULTS.maxBytes;
 
@@ -187,6 +205,7 @@ export function createSafeFetch(o: SafeFetchOptions = {}): SafeFetch {
       throw new SsrfBlockedError(`host ${host} is denied`);
     if (o.allowHosts && o.allowHosts.length > 0 && !o.allowHosts.some((r) => hostMatches(host, r)))
       throw new SsrfBlockedError(`host ${host} is not on the allow list`);
+    if (trusted.has(url.origin)) return url;
     if (!o.allowPrivate && isIP(host) && isBlockedAddress(host))
       throw new SsrfBlockedError(`refused to connect to ${host}: private or reserved address`);
     if (
@@ -223,7 +242,7 @@ export function createSafeFetch(o: SafeFetchOptions = {}): SafeFetch {
             ? { signal: signals.length === 1 ? signals[0] : AbortSignal.any(signals) }
             : {}),
           // @ts-expect-error undici's dispatcher option on Node's fetch
-          dispatcher: agent,
+          dispatcher: trustedAgent && trusted.has(url.origin) ? trustedAgent : agent,
         });
       } catch (error) {
         const cause = (error as { cause?: unknown }).cause;

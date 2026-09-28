@@ -29,6 +29,8 @@ beforeAll(async () => {
     if (req.url === "/loop") return void res.writeHead(302, { location: "/loop" }).end();
     if (req.url === "/to-metadata")
       return void res.writeHead(302, { location: "http://169.254.169.254/latest" }).end();
+    if (req.url === "/to-other-port")
+      return void res.writeHead(302, { location: "http://127.0.0.1:9/final" }).end();
     if (req.url === "/to-other-host")
       return void res.writeHead(302, { location: `http://other.test:${port}/final` }).end();
     res.setHeader("content-type", "application/json");
@@ -171,5 +173,32 @@ describe("createSafeFetch", () => {
   it("applies deny lists", async () => {
     const f = createSafeFetch({ denyHosts: ["*.evil.test"] });
     await expect(f("https://x.evil.test/")).rejects.toThrow(/denied/);
+  });
+});
+
+describe("trusted origins", () => {
+  it("reaches an operator-configured private origin, and only that origin", async () => {
+    const trusted = createSafeFetch({ trustedOrigins: [`http://127.0.0.1:${port}/`] });
+    const res = await trusted(`http://127.0.0.1:${port}/ok`);
+    expect(res.status).toBe(200);
+    // another port on the same private address is not trusted
+    await expect(trusted("http://127.0.0.1:9/")).rejects.toThrow(/private or reserved/);
+    // nor is localhost by name on this port (the origin must match exactly)
+    await expect(trusted(`http://localhost:${port}/ok`)).rejects.toThrow(/refused to connect/);
+  });
+
+  it("does not follow a trusted origin's redirect to an untrusted private address", async () => {
+    const trusted = createSafeFetch({ trustedOrigins: [`http://127.0.0.1:${port}`] });
+    await expect(trusted(`http://127.0.0.1:${port}/to-other-port`)).rejects.toThrow(
+      /private or reserved/,
+    );
+    await expect(trusted(`http://127.0.0.1:${port}/to-metadata`)).rejects.toThrow(
+      /private or reserved/,
+    );
+  });
+
+  it("ignores malformed entries", async () => {
+    const f = createSafeFetch({ trustedOrigins: ["not a url"] });
+    await expect(f(`http://127.0.0.1:${port}/ok`)).rejects.toThrow(/private or reserved/);
   });
 });
