@@ -29,6 +29,7 @@ describe("built-in catalogs", () => {
     ).toEqual({
       costUsd: 0.042,
       snapshot: { inputPerMTok: 0.042, outputPerMTok: 0 },
+      priced: true,
     });
     expect(catalog.resolveAlias("typesafe", "jev-latest")).toBe("jev-1.13.0");
     expect(catalog.rateLimitRpm("typesafe", "jev-latest")).toBe(1200);
@@ -60,10 +61,20 @@ describe("pricing", () => {
     expect(large.costUsd).toBeCloseTo((300_000 * 10 + 1_000 * 45) / 1e6, 10);
   });
 
-  it("prices unknown models at zero with no snapshot", () => {
-    expect(
-      new DefaultModelCatalog().price("acme", "x", { inputTokens: 10, outputTokens: 10 }),
-    ).toEqual({ costUsd: 0, snapshot: null });
+  it("prices unknown models at zero with no snapshot, flagged unpriced and warned once", () => {
+    const warnings: string[] = [];
+    const catalog = new DefaultModelCatalog({ warn: (m) => warnings.push(m) });
+    const usage = { inputTokens: 10, outputTokens: 10 };
+    expect(catalog.price("acme", "x", usage)).toEqual({
+      costUsd: 0,
+      snapshot: null,
+      priced: false,
+    });
+    catalog.price("acme", "x", usage);
+    // a zero-usage lookup (e.g. ordering candidates by price) is not a spend worth a warning
+    catalog.price("acme", "y", { inputTokens: 0, outputTokens: 0 });
+    expect(warnings).toEqual([expect.stringContaining("acme/x")]);
+    expect(catalog.price("openai", "gpt-4.1-mini", usage).priced).toBe(true);
   });
 });
 

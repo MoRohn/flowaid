@@ -123,13 +123,20 @@ export class DefaultModelCatalog implements ModelCatalog {
       overrides?: readonly CatalogEntry[];
       discovery?: readonly ModelDiscovery[];
       clock?: ProviderClock;
+      /** Where the once-per-model "unpriced" warning goes (default: console.warn). */
+      warn?: (message: string) => void;
     } = {},
   ) {
     this.base = [...(options.models ?? BUILTIN_MODELS)];
     this.overrides = [...(options.overrides ?? [])];
     this.discovery = new Map((options.discovery ?? []).map((d) => [d.provider, d]));
     this.clock = options.clock ?? systemClock;
+    this.warn = options.warn ?? ((message) => console.warn(message));
   }
+
+  private readonly warn: (message: string) => void;
+  /** Models already warned about as unpriced ("provider/model"). */
+  private readonly unpricedWarned = new Set<string>();
 
   private readonly discovery: Map<string, ModelDiscovery>;
   private readonly clock: ProviderClock;
@@ -208,14 +215,28 @@ export class DefaultModelCatalog implements ModelCatalog {
     return this.get(provider, model)?.limits?.rpm;
   }
 
+  /**
+   * The cost of `usage` and its snapshot. A model the catalog has no price for costs $0 with a
+   * null snapshot and `priced: false`, so callers and the UI can show it as unpriced rather than
+   * free; the first spend on each such model is also logged.
+   */
   price(
     provider: string,
     model: string,
     usage: TokenUsage,
-  ): { costUsd: number; snapshot: PriceSnapshot | null } {
+  ): { costUsd: number; snapshot: PriceSnapshot | null; priced: boolean } {
     const entry = this.get(provider, model);
     const pricing = entry?.pricing;
-    if (!pricing) return { costUsd: 0, snapshot: null };
+    if (!pricing) {
+      const key = `${provider}/${model}`;
+      if (usage.inputTokens + usage.outputTokens > 0 && !this.unpricedWarned.has(key)) {
+        this.unpricedWarned.add(key);
+        this.warn(
+          `flowaid: ${key} has no price in the model catalog; its usage is recorded at $0 (add a price override to account for it)`,
+        );
+      }
+      return { costUsd: 0, snapshot: null, priced: false };
+    }
     const tier =
       entry.longContext && usage.inputTokens > entry.longContext.thresholdTokens
         ? entry.longContext
@@ -228,7 +249,7 @@ export class DefaultModelCatalog implements ModelCatalog {
     if (cacheRead !== undefined) snapshot.cacheReadPerMTok = cacheRead;
     if (pricing.cacheWritePerMTok !== undefined)
       snapshot.cacheWritePerMTok = pricing.cacheWritePerMTok;
-    return { costUsd: costOf(usage, snapshot), snapshot };
+    return { costUsd: costOf(usage, snapshot), snapshot, priced: true };
   }
 }
 
