@@ -37,7 +37,7 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store pnpm fetch
 # ── build: install offline from the fetched store, build every app ────────────────────────
 FROM deps AS build
 # Public URL of the api, inlined into the web client bundle at build time.
-ARG NEXT_PUBLIC_FLOWAID_BASE_URL=http://localhost:3000
+ARG NEXT_PUBLIC_FLOWAID_BASE_URL=http://localhost:3001
 ENV NEXT_PUBLIC_FLOWAID_BASE_URL=${NEXT_PUBLIC_FLOWAID_BASE_URL}
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY . .
@@ -96,17 +96,17 @@ ENTRYPOINT ["/sbin/tini", "--"]
 # ── api ───────────────────────────────────────────────────────────────────────────────────
 FROM runtime-base AS api
 ENV HOST=0.0.0.0
-ENV PORT=3000
+ENV PORT=3001
 ENV FLOWAID_VENDOR_DIR=/opt/flowaid/vendor
 RUN mkdir -p /data && chown flowaid:flowaid /data
 WORKDIR /app
 COPY --from=deploy-api --chown=flowaid:flowaid /out/api ./
 COPY --from=vendor --chown=flowaid:flowaid /out/vendor /opt/flowaid/vendor
 USER flowaid
-EXPOSE 3000
+EXPOSE 3001
 VOLUME ["/data"]
 HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=12 \
-  CMD wget -qO- http://127.0.0.1:3000/v1/health || exit 1
+  CMD wget -qO- http://127.0.0.1:3001/v1/health || exit 1
 # The api entrypoint applies pending migrations (fail-fast) before it listens.
 CMD ["node", "dist/main.js"]
 
