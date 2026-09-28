@@ -2,29 +2,11 @@
  * Dashboard smoke (UPGRADE_PLAN P6-04): the workspace home shows the metrics overview, the
  * Overview nav entry is active, the filters change the range, and the metrics API answers.
  */
-import { existsSync, readFileSync } from "node:fs";
-import { parseEnv } from "node:util";
 import { expect, test } from "@playwright/test";
-
-function credentials(): { email: string; password: string } {
-  const file = ".flowaid/dev.env";
-  const local = existsSync(file)
-    ? (parseEnv(readFileSync(file, "utf8")) as Record<string, string>)
-    : {};
-  return {
-    email: process.env["E2E_EMAIL"] ?? local.FLOWAID_ADMIN_EMAIL ?? "owner@flowaid.local",
-    password: process.env["E2E_PASSWORD"] ?? local.FLOWAID_ADMIN_PASSWORD ?? "",
-  };
-}
+import { signIn } from "./helpers.ts";
 
 test("the dashboard renders the overview and reacts to its filters", async ({ page }) => {
-  const { email, password } = credentials();
-  await page.goto("/login");
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill(password);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).toHaveURL(/\/[a-z0-9-]+\/workflows$/);
-  const ws = new URL(page.url()).pathname.split("/")[1] as string;
+  const ws = await signIn(page);
 
   await page
     .getByRole("link", { name: /Overview/ })

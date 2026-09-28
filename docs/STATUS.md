@@ -54,19 +54,22 @@ compiled API, worker and Docker images run plain `node` on `dist`.
 
 ## Upgrade plan (`docs/UPGRADE_PLAN.md`)
 
-- **Phases 0–2:** complete (parts of P0-05 — release automation, git hooks, changesets — remain).
-- **Phase 3:** complete except OIDC, invitations and password-reset flows (P3-02). Code nodes run
+- **Phases 0–2:** complete, including release automation (changesets, `release.yml` publishing
+  multi-arch images to GHCR, lefthook).
+- **Phase 3:** complete. FlowAId is local-first (`FLOWAID_AUTH_MODE=auto`: on your own computer
+  it opens without a sign-in; behind public URLs it uses email and password), so OIDC,
+  invitations and password-reset flows are out of scope by decision. Code nodes run
   on the `worker-code` sandbox host, plugin nodes in a plugin host process, and artifacts go to
   S3 when `S3_*` is set.
 - **Phase 4:** complete; P4-02's UI items shipped with the web app.
 - **Phase 5:** complete: the journey runs against the production builds with provider-fixture
   replay and secret-canary log checks, and the UI accessibility gallery gates every push.
-- **Phase 6:** complete except P6-07 (identity extras), deferred with OIDC.
+- **Phase 6:** complete; of P6-07 only the Azure/GCP key services shipped (identity is out of
+  scope for a local-first app).
 - **Track J:** J-01 to J-07 in `@flowaid/jev`. **Track L:** designed, not started.
 
 ## Known gaps
 
-- Identity: no OIDC, invitations, password resets or TOTP MFA (P6-07).
 - AWS KMS and Secrets Manager need an AWS SDK client the apps do not wire yet; the other master key
   providers (`local`, `vault-transit`, `azure-keyvault`, `gcp-kms`) and external references
   (`env:`, `vault:`, `azure-kv:`, `gcp-sm:`) are configured from the environment.

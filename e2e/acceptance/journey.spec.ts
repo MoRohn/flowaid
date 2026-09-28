@@ -77,7 +77,7 @@ test("import → run → external review → publish → API run", async ({ page
     .click();
   await expect(page).toHaveURL(/\/human-tasks\/[0-9a-f-]{36}$/);
   await page.getByRole("button", { name: "Create link" }).click();
-  const link = await page.getByLabel("Review link").first().inputValue();
+  const link = await page.getByLabel("Review link", { exact: true }).first().inputValue();
   expect(link).toMatch(/\/review#t=[\w-]{40,}$/);
 
   // A reviewer with no session answers through the link; the token never reaches the server log.

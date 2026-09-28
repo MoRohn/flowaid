@@ -19,6 +19,7 @@ artifact download <id> {--inline --out}
 audit
 audit list {--limit --cursor --order --actor --action --resource-type --resource-id --from --to --out}
 auth
+auth local {--out}
 auth login {--email --password --body --out}
 auth logout {--out}
 auth logout-all {--out}

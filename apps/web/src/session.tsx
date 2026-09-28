@@ -15,6 +15,8 @@ export interface Session {
   workspaceName: string;
   environments: Environment[];
   features: Record<string, boolean>;
+  /** FlowAId on this computer for one person: no sign-in, sign-out or member management */
+  local: boolean;
   can(scope: string): boolean;
   signOut(): Promise<void>;
 }
@@ -73,6 +75,7 @@ export function SessionProvider({ ws, children }: { ws: string; children: ReactN
     workspaceName: workspace.name,
     environments: envs.data ?? [],
     features: me.data.features,
+    local: me.data.authMode === "local",
     can: (scope) => scopes.has(scope) || scopes.has("*"),
     signOut: async () => {
       await post("/v1/auth/logout", {}, { noRefresh: true }).catch(() => undefined);

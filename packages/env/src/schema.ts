@@ -18,6 +18,7 @@ import {
   EXPORT_MODES,
   FEATURE_KEYS,
   LOG_LEVELS,
+  AUTH_MODES,
   NODE_ENVS,
   PROVIDER_FIXTURE_MODES,
   SANDBOX_MODES,
@@ -695,6 +696,19 @@ export function crossFieldIssues(vars: Partial<Record<EnvVarName, unknown>>): Cr
       message: "FLOWAID_ADMIN_EMAIL and FLOWAID_ADMIN_PASSWORD must be set together",
     });
   }
+  // local mode serves this computer only: its public URLs must be loopback
+  if (has("FLOWAID_AUTH_MODE") && str("FLOWAID_AUTH_MODE") === "local") {
+    for (const name of ["FLOWAID_BASE_URL", "FLOWAID_WEB_URL"] as const) {
+      const url = has(name) ? urlOf(vars[name]) : undefined;
+      if (url !== undefined && !isLoopbackHost(url.hostname)) {
+        issues.push({
+          path: name,
+          message:
+            "must be a loopback URL while FLOWAID_AUTH_MODE is local (no sign-in); set FLOWAID_AUTH_MODE=password to serve other computers",
+        });
+      }
+    }
+  }
   if (has("PROMETHEUS_PORT") && has("PORT") && str("PROMETHEUS_PORT") === str("PORT")) {
     issues.push({ path: "PROMETHEUS_PORT", message: "must differ from PORT" });
   }
@@ -831,6 +845,7 @@ export function crossFieldIssues(vars: Partial<Record<EnvVarName, unknown>>): Cr
 export const EnvSchema = z
   .object({
     NODE_ENV: enumWithDefault("NODE_ENV", NODE_ENVS),
+    FLOWAID_AUTH_MODE: enumWithDefault("FLOWAID_AUTH_MODE", AUTH_MODES),
     LOG_LEVEL: enumWithDefault("LOG_LEVEL", LOG_LEVELS),
     HOST: stringWithDefault("HOST"),
     PORT: intWithDefault("PORT", PORT_RANGE),
@@ -956,4 +971,23 @@ export const ENV_SCHEMA_KEYS: readonly string[] = Object.keys(EnvSchema.shape);
       `EnvSchema fields differ from the documented variables:\n  documented: ${documented}\n  built:      ${built}`,
     );
   }
+}
+
+/**
+ * The sign-in mode in effect: an explicit `local` or `password`, or for `auto` (the default)
+ * `local` when the api and web URLs are loopback (FlowAId on your own computer), else `password`.
+ */
+export function resolveAuthMode(env: {
+  FLOWAID_AUTH_MODE?: string | undefined;
+  FLOWAID_BASE_URL?: string | undefined;
+  FLOWAID_WEB_URL?: string | undefined;
+}): "local" | "password" {
+  if (env.FLOWAID_AUTH_MODE === "local" || env.FLOWAID_AUTH_MODE === "password")
+    return env.FLOWAID_AUTH_MODE;
+  const loopback = (u: string | undefined) => {
+    if (u === undefined) return true;
+    const url = urlOf(u);
+    return url !== undefined && isLoopbackHost(url.hostname);
+  };
+  return loopback(env.FLOWAID_BASE_URL) && loopback(env.FLOWAID_WEB_URL) ? "local" : "password";
 }

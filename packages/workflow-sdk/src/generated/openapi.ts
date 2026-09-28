@@ -582,6 +582,61 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/auth/local": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Local mode: sign in as the workspace owner from this computer, without a password */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              expiresAt: number;
+              mustChangePassword: boolean;
+              user: {
+                email: string;
+                /** Format: uuid */
+                id: string;
+                name: string;
+                /** @enum {string} */
+                status: "active" | "invited" | "disabled";
+              };
+              workspaces: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                /** @enum {string} */
+                role: "owner" | "admin" | "editor" | "operator" | "viewer";
+                slug: string;
+              }[];
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/auth/login": {
     parameters: {
       query?: never;
@@ -3576,6 +3631,8 @@ export interface paths {
           };
           content: {
             "application/json": {
+              /** @enum {string} */
+              authMode: "local" | "password";
               features: {
                 [key: string]: boolean;
               };

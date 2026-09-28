@@ -506,11 +506,29 @@ if (opts.playground) {
     fail("the web app did not start (see the web lines above)");
 
   console.log(`\n${paint(32, "→")} ${paint(1, webUrl)}   (Ctrl+C to stop)`);
-  if (secrets.created || !existsSync(join(data, "signed-in")))
+  // local mode (loopback URLs, the default): this computer opens the app without signing in
+  const local = authModeOf(env) === "local";
+  if (local) console.log("  opens without a sign-in on this computer");
+  if ((!local || host !== browserHost) && (secrets.created || !existsSync(join(data, "signed-in"))))
     console.log(
-      `  sign in as ${paint(1, secrets.values.FLOWAID_ADMIN_EMAIL ?? "")} / ${paint(1, secrets.values.FLOWAID_ADMIN_PASSWORD ?? "")}   (also in .flowaid/dev.env)`,
+      `  ${local ? "other computers sign in" : "sign in"} as ${paint(1, secrets.values.FLOWAID_ADMIN_EMAIL ?? "")} / ${paint(1, secrets.values.FLOWAID_ADMIN_PASSWORD ?? "")}   (also in .flowaid/dev.env)`,
     );
   console.log(`  API ${apiUrl} · docs ${apiUrl}/docs\n`);
   writeFileSync(join(data, "signed-in"), "");
   if (opts.open) openBrowser(webUrl);
+}
+
+/** FLOWAID_AUTH_MODE as the api resolves it (`auto`: local when both URLs are loopback). */
+function authModeOf(env: NodeJS.ProcessEnv): "local" | "password" {
+  const mode = env.FLOWAID_AUTH_MODE;
+  if (mode === "local" || mode === "password") return mode;
+  const loopback = (u: string | undefined) => {
+    try {
+      const h = new URL(u ?? "http://localhost").hostname;
+      return h === "localhost" || h.endsWith(".localhost") || h === "[::1]" || /^127\./.test(h);
+    } catch {
+      return false;
+    }
+  };
+  return loopback(env.FLOWAID_BASE_URL) && loopback(env.FLOWAID_WEB_URL) ? "local" : "password";
 }

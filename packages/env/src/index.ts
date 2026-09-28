@@ -37,6 +37,7 @@ export {
   EnvSchema,
   crossFieldIssues,
   isLoopbackHost,
+  resolveAuthMode,
   siteOf,
 } from "./schema.js";
 export type { CrossFieldIssue, EnvVars, StdioCommandRule, TrustProxy } from "./schema.js";

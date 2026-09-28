@@ -30,6 +30,8 @@ export interface Me {
   user: { id: string; email: string; name: string; status: string } | null;
   workspaces: WorkspaceSummary[];
   features: Record<string, boolean>;
+  /** `local`: FlowAId on this computer for one person, no sign-in */
+  authMode?: "local" | "password";
 }
 export interface Environment {
   id: string;

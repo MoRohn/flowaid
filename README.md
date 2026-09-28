@@ -154,12 +154,12 @@ pnpm start
 1. **Checks your machine**: Node.js, pnpm, dependencies, free ports, and Docker (unless you pass
    a database). Anything wrong is reported with the command that fixes it.
 2. **Installs dependencies** from the lockfile when they are missing or stale.
-3. **Generates local secrets** once into `.flowaid/dev.env` (the credential master key and the
-   owner's password) and reads provider keys from `.env` and `.env.local`.
+3. **Generates local secrets** once into `.flowaid/dev.env` (the credential master key) and
+   reads provider keys from `.env` and `.env.local`.
 4. **Starts PostgreSQL 16 with pgvector** in a Docker container bound to loopback, with its data
    in a named volume, or uses `--database-url`.
 5. **Builds** what the apps need (cached by Turborepo), then **starts the API, the worker and the
-   web app**, waits until they are ready, and prints where to sign in. Ctrl+C stops everything.
+   web app**, waits until they are ready, and prints the address. Ctrl+C stops everything.
 
 ```text
 FlowAId · local stack
@@ -189,12 +189,14 @@ FlowAId · local stack
 ✓ API ready on http://127.0.0.1:3000
 
 → http://127.0.0.1:3001   (Ctrl+C to stop)
-  sign in as owner@flowaid.local / ••••••••••••••••   (also in .flowaid/dev.env)
+  opens without a sign-in on this computer
   API http://127.0.0.1:3000 · docs http://127.0.0.1:3000/docs
 ```
 
-Open <http://127.0.0.1:3001> and sign in. The API reference (OpenAPI 3.1) is at
-<http://127.0.0.1:3000/docs>.
+Open <http://127.0.0.1:3001>: FlowAId runs on your own computer for you, so there is no account
+and no sign-in. Only this computer can open it (loopback address, a localhost host name and a
+CSRF header are checked on every automatic session). The API reference (OpenAPI 3.1) is at
+<http://127.0.0.1:3000/docs>; scripts and webhooks use API keys from _Settings → API keys_.
 
 ### 3. Build and run your first workflow
 
@@ -539,16 +541,16 @@ boundaries.json         The allowed dependency graph between packages
 
 ## Roadmap
 
-Phases 0–6 of the [upgrade plan](docs/UPGRADE_PLAN.md) are complete except identity (P6-07):
-the compiler, runtime, database, providers, API, worker, SDK and CLI, code export, the LangChain
-packages, the web app and the acceptance gate; then model routing, the advisor, the full node
-catalog, observability, the importer and docs site, event correlation, plugins, knowledge,
-agents and the trigger UIs. Next:
+Phases 0–6 of the [upgrade plan](docs/UPGRADE_PLAN.md) are complete: the compiler, runtime,
+database, providers, API, worker, SDK and CLI, code export, the LangChain packages, the web app
+and the acceptance gate; then model routing, the advisor, the full node catalog, observability,
+the importer and docs site, event correlation, plugins, knowledge, agents and the trigger UIs;
+and versioned releases with published images. FlowAId is local-first: it runs on your own
+computer without accounts, so team identity (single sign-on, invitations, MFA) is deliberately
+not planned. Next:
 
-1. **Identity:** OIDC single sign-on with role mapping, invitations and password resets, TOTP
-   MFA, service accounts, and Azure and GCP master keys and secret references.
-2. **Release automation:** versioned releases, changesets and published images.
-3. **Alongside:** track J (Jev decision contracts across the platform) and track L (a Lean 4
+1. **Releases:** the first tagged release and its published images (`docs/RELEASING.md`).
+2. **Alongside:** track J (Jev decision contracts across the platform) and track L (a Lean 4
    checker that certifies run and evaluation results, see
    [LEAN_VERIFICATION.md](docs/design/LEAN_VERIFICATION.md)).
 

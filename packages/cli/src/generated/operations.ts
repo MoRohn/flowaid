@@ -168,6 +168,17 @@ export const OPERATIONS: readonly CliOperation[] = [
   },
   {
     noun: "auth",
+    verb: "local",
+    method: "POST",
+    path: "/v1/auth/local",
+    summary: "Local mode: sign in as the workspace owner from this computer, without a password",
+    auth: "public",
+    positional: [],
+    query: [],
+    body: null,
+  },
+  {
+    noun: "auth",
     verb: "login",
     method: "POST",
     path: "/v1/auth/login",

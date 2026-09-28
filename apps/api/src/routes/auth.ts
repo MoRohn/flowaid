@@ -6,6 +6,7 @@ import { z } from "zod";
 import {
   findUserByEmail,
   getUser,
+  memberships,
   issueRefreshToken,
   listUserWorkspaces,
   recordAudit,
@@ -17,8 +18,15 @@ import {
   users,
   type UserRow,
 } from "@flowaid/database";
-import { BadRequestError, RateLimitError, UnauthorizedError } from "@flowaid/workflow-core";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import {
+  BadRequestError,
+  ConflictError,
+  ForbiddenError,
+  NotFoundError,
+  RateLimitError,
+  UnauthorizedError,
+} from "@flowaid/workflow-core";
+import { and, asc, desc, eq, isNull, ne } from "drizzle-orm";
 import { hashSecret, randomToken } from "../auth/apiKey.js";
 import { ACCESS_TTL_S } from "../auth/jwt.js";
 import { hashPassword, passwordProblem, verifyPassword } from "../auth/passwords.js";
@@ -87,6 +95,68 @@ function clearCookies(ctx: ApiContext, reply: FastifyReply) {
     httpOnly: true,
     sameSite: "strict",
   });
+}
+
+/** 127.0.0.0/8 or ::1, also as an IPv4-mapped IPv6 address. */
+export function isLoopbackAddress(address: string | undefined): boolean {
+  const a = (address ?? "").trim().replace(/^::ffff:/i, "");
+  return a === "::1" || /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(a);
+}
+
+function hostnameOf(hostHeader: string): string {
+  try {
+    return new URL(`http://${hostHeader}`).hostname.toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
+/** localhost, *.localhost (RFC 6761), 127.x and [::1]: names that only ever reach this computer. */
+export function isLocalHostname(hostname: string): boolean {
+  const h = hostname.toLowerCase();
+  return (
+    h === "localhost" ||
+    h.endsWith(".localhost") ||
+    h === "[::1]" ||
+    h === "::1" ||
+    isLoopbackAddress(h)
+  );
+}
+
+/**
+ * Why a local sign-in request is refused, or null. It must come from this computer: the socket
+ * and every forwarded hop are loopback (the web app's proxy adds the browser's address), and the
+ * Host the browser used and its Origin are local names, so another site cannot reach it through
+ * DNS rebinding. The CSRF header forces a CORS preflight for cross-site pages.
+ */
+export function localSignInRefusal(req: {
+  socketAddress: string | undefined;
+  headers: Record<string, string | string[] | undefined>;
+}): string | null {
+  const header = (name: string) => {
+    const v = req.headers[name];
+    return Array.isArray(v) ? v.join(",") : v;
+  };
+  if (header("x-requested-with") !== "flowaid") return "missing X-Requested-With: flowaid";
+  if (!isLoopbackAddress(req.socketAddress)) return "not a loopback connection";
+  const forwarded = header("x-forwarded-for");
+  if (forwarded && !forwarded.split(",").every((a) => isLoopbackAddress(a))) {
+    return "forwarded from another computer";
+  }
+  const host = header("x-forwarded-host") ?? header("host") ?? "";
+  if (!isLocalHostname(hostnameOf(host.split(",")[0]?.trim() ?? "")))
+    return "not a local host name";
+  const origin = header("origin");
+  if (origin && origin !== "null") {
+    let name = "";
+    try {
+      name = new URL(origin).hostname;
+    } catch {
+      return "malformed origin";
+    }
+    if (!isLocalHostname(name)) return "cross-site origin";
+  }
+  return null;
 }
 
 const ua = (req: FastifyRequest) =>
@@ -160,6 +230,65 @@ export function authRoutes(app: FastifyInstance, ctx: ApiContext): void {
       setRefreshCookie(ctx, reply, refresh);
       req.audit = { resourceId: user.id, workspaceId: null, actor: { type: "user", id: user.id } };
       return sessionFor(ctx, user, row.familyId, reply);
+    },
+  );
+
+  r.post(
+    "/v1/auth/local",
+    {
+      config: {
+        auth: "public",
+        audit: { action: "auth.local", resource: "user" },
+        cli: { noun: "auth", verb: "local" },
+      },
+      schema: {
+        tags: ["auth"],
+        summary:
+          "Local mode: sign in as the workspace owner from this computer, without a password",
+        response: { 200: SessionResponseSchema },
+      },
+    },
+    async (req, reply) => {
+      if (ctx.config.authMode !== "local") throw new NotFoundError("local sign-in is off");
+      const refusal = localSignInRefusal({
+        socketAddress: req.socket.remoteAddress,
+        headers: req.headers,
+      });
+      if (refusal) throw new ForbiddenError(`local sign-in refused: ${refusal}`);
+      const refresh = randomToken();
+      const out = await ctx.db.system(async (tx) => {
+        // the first owner of any workspace: the person this computer belongs to
+        const [owner] = await tx
+          .select({ user: users })
+          .from(memberships)
+          .innerJoin(users, eq(users.id, memberships.userId))
+          .where(and(eq(memberships.role, "owner"), ne(users.status, "disabled")))
+          .orderBy(asc(memberships.createdAt))
+          .limit(1);
+        if (!owner) return null;
+        await recordLogin(tx, owner.user.id);
+        const row = await issueRefreshToken(tx, {
+          userId: owner.user.id,
+          tokenHash: hashSecret(refresh),
+          expiresAt: new Date(ctx.clock.now() + REFRESH_TTL_MS),
+          userAgent: ua(req),
+          ip: req.ip,
+        });
+        return { user: owner.user, familyId: row.familyId };
+      });
+      if (!out)
+        throw new ConflictError("no workspace owner yet; the api creates one on first boot");
+      setRefreshCookie(ctx, reply, refresh);
+      req.audit = {
+        resourceId: out.user.id,
+        workspaceId: null,
+        actor: { type: "user", id: out.user.id },
+      };
+      // nobody chose the first-boot password here, and nobody needs to
+      return {
+        ...(await sessionFor(ctx, out.user, out.familyId, reply)),
+        mustChangePassword: false,
+      };
     },
   );
 
@@ -436,6 +565,7 @@ export function authRoutes(app: FastifyInstance, ctx: ApiContext): void {
             aiBuilder: p?.workspaceId ? (await advisorModel(ctx, p.workspaceId)) !== null : false,
           },
         ),
+        authMode: ctx.config.authMode,
       };
     },
   );

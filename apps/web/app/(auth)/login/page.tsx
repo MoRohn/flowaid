@@ -1,8 +1,9 @@
 "use client";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useState, type FormEvent } from "react";
+import { Suspense, useEffect, useState, type FormEvent } from "react";
 import { Button, FieldError, FieldRow, Input, Label, LogoWordmark } from "@flowaid/ui/primitives";
-import { ApiError, post, setWorkspace } from "~/api/client";
+import { ApiError, post, setWorkspace, signInLocally } from "~/api/client";
+import { FullPageSpinner } from "~/session";
 
 interface SessionResponse {
   workspaces: { slug: string }[];
@@ -15,6 +16,21 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // FlowAId on your own computer signs you in by itself; the form is for server deployments
+  const [local, setLocal] = useState<"trying" | "off">("trying");
+  const next = params.get("next");
+  const safeNext = next && next.startsWith("/") && !next.startsWith("//") ? next : null;
+  useEffect(() => {
+    let live = true;
+    void signInLocally().then((ok) => {
+      if (!live) return;
+      if (ok) router.replace(safeNext ?? "/");
+      else setLocal("off");
+    });
+    return () => {
+      live = false;
+    };
+  }, [router, safeNext]);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -27,8 +43,6 @@ function LoginForm() {
         { email, password },
         { noRefresh: true },
       );
-      const next = params.get("next");
-      const safeNext = next && next.startsWith("/") && !next.startsWith("//") ? next : null;
       router.replace(
         safeNext ?? (res.workspaces[0] ? `/${res.workspaces[0].slug}/workflows` : "/"),
       );
@@ -46,6 +60,7 @@ function LoginForm() {
     }
   }
 
+  if (local === "trying") return <FullPageSpinner />;
   return (
     <form
       onSubmit={(e) => void submit(e)}

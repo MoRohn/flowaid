@@ -24,15 +24,28 @@ export function currentWorkspace(): string | null {
   return workspaceSlug;
 }
 
-let refreshing: Promise<boolean> | null = null;
-async function refreshSession(): Promise<boolean> {
-  refreshing ??= fetch("/v1/auth/refresh", {
+const authPost = (path: string) =>
+  fetch(path, {
     method: "POST",
     credentials: "same-origin",
     headers: { "x-requested-with": "flowaid" },
   })
     .then((r) => r.ok)
-    .catch(() => false)
+    .catch(() => false);
+
+/**
+ * Local mode (FlowAId on your own computer): the api signs this computer in as the owner, no
+ * password. Answers false where local sign-in is off or refused, and the login page takes over.
+ */
+export function signInLocally(): Promise<boolean> {
+  return authPost("/v1/auth/local");
+}
+
+let refreshing: Promise<boolean> | null = null;
+/** A 401: rotate the refresh token, or else sign in locally when the api allows it. */
+async function refreshSession(): Promise<boolean> {
+  refreshing ??= authPost("/v1/auth/refresh")
+    .then((ok) => ok || signInLocally())
     .finally(() => setTimeout(() => (refreshing = null), 0));
   return refreshing;
 }

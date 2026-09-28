@@ -5,7 +5,7 @@ import type { Database } from "@flowaid/database";
 import type { CredentialService } from "@flowaid/credentials";
 import type { QueueDriver, SafeFetch } from "@flowaid/workflow-core";
 import type { RunEventHub } from "./services/hub.js";
-import type { Env } from "@flowaid/env";
+import { resolveAuthMode, type Env } from "@flowaid/env";
 import type { ProviderRegistry } from "@flowaid/providers";
 import type { AuthService } from "./auth/service.js";
 import type { AlertDispatcher, SmtpSettings } from "@flowaid/observability";
@@ -14,6 +14,11 @@ import type { S3Options } from "@flowaid/storage";
 
 export interface ApiConfig {
   production: boolean;
+  /**
+   * `local`: one person on this computer, no sign-in (`POST /v1/auth/local` issues the owner's
+   * session to loopback requests); `password`: email and password sign-in.
+   */
+  authMode: "local" | "password";
   /** `Secure` cookies unless FLOWAID_ALLOW_INSECURE_HTTP */
   secureCookies: boolean;
   baseUrl: string;
@@ -70,6 +75,7 @@ export function configFromEnv(env: Env): ApiConfig {
   const trust = env.FLOWAID_TRUST_PROXY as unknown;
   return {
     production: env.flags.isProduction,
+    authMode: resolveAuthMode(env),
     secureCookies: !env.FLOWAID_ALLOW_INSECURE_HTTP,
     baseUrl: String(env.FLOWAID_BASE_URL),
     webUrl: String(env.FLOWAID_WEB_URL ?? env.FLOWAID_BASE_URL),
@@ -112,6 +118,7 @@ export function configFromEnv(env: Env): ApiConfig {
 export function defaultConfig(over: Partial<ApiConfig> = {}): ApiConfig {
   return {
     production: false,
+    authMode: "password",
     secureCookies: true,
     baseUrl: "http://localhost:3001",
     webUrl: "http://localhost:3000",

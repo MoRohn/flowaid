@@ -11,6 +11,7 @@ export const NODE_ENVS = ["development", "test", "production"] as const;
 
 /** pino log levels plus `silent`. */
 export const LOG_LEVELS = ["fatal", "error", "warn", "info", "debug", "trace", "silent"] as const;
+export const AUTH_MODES = ["auto", "local", "password"] as const;
 
 /** Worker pool names (`WorkerPoolSchema` in CONTRACTS.ts §5). */
 export const WORKER_POOLS = [
@@ -159,6 +160,16 @@ const docs = {
     example: "development",
     secret: false,
     values: NODE_ENVS,
+  },
+  FLOWAID_AUTH_MODE: {
+    group: "security",
+    description:
+      "How people reach the web app. `local`: FlowAId runs on your own computer for one person, with no sign-in; the api accepts the automatic local session only from this computer (loopback address, a localhost `Host`, the CSRF header), and `FLOWAID_BASE_URL`/`FLOWAID_WEB_URL` must be loopback URLs. `password`: email and password sign-in, for a server other people reach (the compose stack sets it). `auto` (the default): `local` when both URLs are loopback, `password` otherwise.",
+    default: "auto",
+    required: false,
+    example: "auto",
+    secret: false,
+    values: AUTH_MODES,
   },
   LOG_LEVEL: {
     group: "core",

@@ -14,7 +14,11 @@ import { AppFrame, PageBody } from "~/shell/AppFrame";
 
 const TABS = [
   { id: "workspace", label: "Workspace", visible: () => true },
-  { id: "members", label: "Members", visible: (s: Session) => s.can("workflows:read") },
+  {
+    id: "members",
+    label: "Members",
+    visible: (s: Session) => !s.local && s.can("workflows:read"),
+  },
   { id: "api-keys", label: "API keys", visible: (s: Session) => s.can("api_keys:manage") },
   { id: "environments", label: "Environments", visible: () => true },
   {
@@ -27,7 +31,11 @@ const TABS = [
     label: "Audit log",
     visible: (s: Session) => s.can("audit:read") && s.features.settings_audit === true,
   },
-  { id: "profile", label: "Profile", visible: (s: Session) => s.me.user !== null },
+  {
+    id: "profile",
+    label: "Profile",
+    visible: (s: Session) => !s.local && s.me.user !== null,
+  },
 ] as const;
 type TabId = (typeof TABS)[number]["id"];
 
@@ -39,7 +47,11 @@ function Settings() {
     <PageBody>
       <PageHeader
         title="Settings"
-        description={`${s.workspaceName} · your role: ${s.me.principal.role ?? "none"}`}
+        description={
+          s.local
+            ? `${s.workspaceName} workspace`
+            : `${s.workspaceName} · your role: ${s.me.principal.role ?? "none"}`
+        }
         tabs={tabs.map((t) => ({ id: t.id, label: t.label }))}
         tab={tab}
         onTabChange={(t) => setTab(t as TabId)}

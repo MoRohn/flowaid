@@ -2,29 +2,11 @@
  * Agents smoke (P6-10): the nav shows Agents, a preset created through the API is listed with its
  * model, bounds and tools, and it can be deleted from the page.
  */
-import { existsSync, readFileSync } from "node:fs";
-import { parseEnv } from "node:util";
 import { expect, test } from "@playwright/test";
-
-function credentials(): { email: string; password: string } {
-  const file = ".flowaid/dev.env";
-  const local = existsSync(file)
-    ? (parseEnv(readFileSync(file, "utf8")) as Record<string, string>)
-    : {};
-  return {
-    email: process.env["E2E_EMAIL"] ?? local.FLOWAID_ADMIN_EMAIL ?? "owner@flowaid.local",
-    password: process.env["E2E_PASSWORD"] ?? local.FLOWAID_ADMIN_PASSWORD ?? "",
-  };
-}
+import { signIn } from "./helpers.ts";
 
 test("agents page lists, shows and deletes a preset", async ({ page }) => {
-  const { email, password } = credentials();
-  await page.goto("/login");
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill(password);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).toHaveURL(/\/[a-z0-9-]+\/workflows$/);
-  const ws = new URL(page.url()).pathname.split("/")[1] as string;
+  const ws = await signIn(page);
 
   const name = `Smoke agent ${Date.now().toString(36)}`;
   const created = await page.request.post("/v1/agents", {

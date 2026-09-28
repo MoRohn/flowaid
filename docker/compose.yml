@@ -113,6 +113,9 @@ services:
       <<: *service-env
       HOST: 0.0.0.0
       PORT: "3000"
+      # a stack other people reach signs in with a password; `local` (no sign-in) is for
+      # `pnpm start` on your own computer, and the api container never sees loopback callers
+      FLOWAID_AUTH_MODE: ${FLOWAID_AUTH_MODE:-password}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3001}
       # Owner connection used only for migrations (DATABASE.md).
       DATABASE_ADMIN_URL: postgres://${POSTGRES_USER:-flowaid}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env (openssl rand -hex 16)}@postgres:5432/${POSTGRES_DB:-flowaid}

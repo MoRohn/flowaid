@@ -74,11 +74,16 @@ export function AppFrame({
           layoutToggles={Boolean(inspector || bottomPanel)}
           trailing={
             s.me.user ? (
-              <UserMenu
-                user={{ name: s.me.user.name || s.me.user.email, email: s.me.user.email }}
-                onProfile={() => go("settings?tab=profile")}
-                onSignOut={() => void s.signOut()}
-              />
+              s.local ? (
+                // one person on this computer: nobody to sign out or switch to
+                <UserMenu user={{ name: "You", email: "FlowAId on this computer" }} />
+              ) : (
+                <UserMenu
+                  user={{ name: s.me.user.name || s.me.user.email, email: s.me.user.email }}
+                  onProfile={() => go("settings?tab=profile")}
+                  onSignOut={() => void s.signOut()}
+                />
+              )
             ) : undefined
           }
           {...topbar}

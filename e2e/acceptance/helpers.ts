@@ -17,14 +17,23 @@ export function credentials(): { email: string; password: string } {
   };
 }
 
-/** Signs in as the owner and returns the workspace slug the app lands on. */
+const WORKSPACE_HOME = /\/[a-z0-9-]+\/workflows$/;
+
+/**
+ * Opens the app as the owner and returns the workspace slug it lands on. In local mode (the stack
+ * on this computer) the app signs in by itself; in password mode it fills the sign-in form.
+ */
 export async function signIn(page: Page): Promise<string> {
-  const { email, password } = credentials();
   await page.goto("/login");
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill(password);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).toHaveURL(/\/[a-z0-9-]+\/workflows$/);
+  const form = page.getByRole("button", { name: "Sign in" });
+  await Promise.race([form.waitFor(), page.waitForURL(WORKSPACE_HOME)]);
+  if (!WORKSPACE_HOME.test(page.url())) {
+    const { email, password } = credentials();
+    await page.getByLabel("Email").fill(email);
+    await page.getByLabel("Password").fill(password);
+    await form.click();
+  }
+  await expect(page).toHaveURL(WORKSPACE_HOME);
   return new URL(page.url()).pathname.split("/")[1] as string;
 }
 

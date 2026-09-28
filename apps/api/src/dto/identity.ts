@@ -40,6 +40,8 @@ export const MeResponseSchema = z.object({
   user: UserSchema.nullable(),
   workspaces: z.array(WorkspaceSummarySchema),
   features: z.record(FeatureKeySchema, z.boolean()),
+  /** `local`: one person on this computer, no sign-in; `password`: email and password */
+  authMode: z.enum(["local", "password"]),
 });
 
 export const WorkspaceSettingsSchema = z
