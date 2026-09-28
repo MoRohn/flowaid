@@ -1,9 +1,11 @@
 "use client";
 /** One human task with its run context: respond, escalate/reassign, or send an external link. */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { use, useMemo } from "react";
-import { Skeleton, toast } from "@flowaid/ui/primitives";
+import { ArrowRight, CircleCheck, Inbox } from "lucide-react";
+import { Button, Skeleton, toast } from "@flowaid/ui/primitives";
 import { ReviewPage, type EscalationTarget } from "@flowaid/ui/human";
 import type { HumanResponse } from "@flowaid/workflow-core";
 import { get, post } from "~/api/client";
@@ -13,6 +15,7 @@ import { ErrorPanel, errorMessage } from "~/shell/states";
 import { useCatalog, useMembers, useWorkflowNames } from "~/runs/api";
 import { humanizeId, respondedRecord } from "~/runs/humanTasks";
 import { ReviewLinks } from "~/runs/ReviewLinks";
+import type { HumanTask, Page } from "~/api/types";
 import type { HumanTaskDetail, RunDetail, VersionDetail } from "~/runs/types";
 import { nodeIndex, nodeRunViews, taskToApproval } from "~/runs/views";
 
@@ -49,6 +52,12 @@ export default function HumanTaskPage({ params }: { params: Promise<{ taskId: st
     enabled: Boolean(run.data?.workflowVersionId),
     staleTime: Infinity,
   });
+  // the inbox after this one: where "Next task" leads once this task is answered
+  const open = useQuery({
+    queryKey: ["human-tasks", s.ws, "open-next"],
+    queryFn: () => get<Page<HumanTask>>("/v1/human-tasks?status=open&limit=20"),
+  });
+  const nextTask = open.data?.items.find((t) => t.id !== taskId);
   const catalog = useCatalog(s.ws);
   const names = useWorkflowNames(s.ws);
   const members = useMembers(s.ws, s.me.principal.workspaceId);
@@ -72,6 +81,7 @@ export default function HumanTaskPage({ params }: { params: Promise<{ taskId: st
       );
       void qc.invalidateQueries({ queryKey: ["human-task", s.ws, taskId] });
       void qc.invalidateQueries({ queryKey: ["human-tasks", s.ws] });
+      void qc.invalidateQueries({ queryKey: ["run", s.ws, runId] });
     },
     onError: (e) => toast.error(errorMessage(e)),
   });
@@ -120,6 +130,31 @@ export default function HumanTaskPage({ params }: { params: Promise<{ taskId: st
             {STATUS_NOTE[task.status] ??
               "You can see this task, but answering it needs the approve permission (runs:approve)."}
           </p>
+        ) : null}
+        {task.status === "responded" ? (
+          <div
+            role="status"
+            className="mx-auto mt-6 flex w-full max-w-[640px] flex-wrap items-center gap-3 rounded-md border border-ok/30 bg-ok-soft px-4 py-3 text-sm text-ink"
+          >
+            <CircleCheck className="size-4 shrink-0 text-ok-text" strokeWidth={1.75} />
+            <span className="min-w-0 flex-1">
+              Answered. The run continues from here
+              {nextTask ? "; more tasks are waiting." : ", and the inbox is clear."}
+            </span>
+            <Button asChild variant="ghost" size="sm" leadingIcon={<Inbox strokeWidth={1.75} />}>
+              <Link href={`/${s.ws}/human-tasks`}>Inbox</Link>
+            </Button>
+            {nextTask ? (
+              <Button
+                asChild
+                variant="primary"
+                size="sm"
+                trailingIcon={<ArrowRight strokeWidth={1.75} />}
+              >
+                <Link href={`/${s.ws}/human-tasks/${nextTask.id}`}>Next task</Link>
+              </Button>
+            ) : null}
+          </div>
         ) : null}
         <ReviewPage
           card={{

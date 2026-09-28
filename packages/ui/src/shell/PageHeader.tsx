@@ -89,7 +89,7 @@ export const PageHeader = forwardRef<HTMLElement, PageHeaderProps>(function Page
         <div className="flex min-w-0 flex-wrap items-end justify-between gap-x-4 gap-y-2">
           {tabs && tabs.length > 0 ? (
             <Tabs value={tab} onValueChange={onTabChange} className="min-w-0">
-              <TabsList className="border-b-0">
+              <TabsList className="gap-3 border-b-0 sm:gap-4">
                 {tabs.map((t) => (
                   <TabsTrigger
                     key={t.id}

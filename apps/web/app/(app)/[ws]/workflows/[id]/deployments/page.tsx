@@ -16,6 +16,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  EmptyState,
   FieldRow,
   Select,
   SelectItem,
@@ -333,7 +334,22 @@ function Deployments({ workflow }: { workflow: WorkflowDetail }) {
   const versionNo = (vid: string | null) => published.find((v) => v.id === vid)?.version;
 
   if (published.length === 0)
-    return <Notice tone="info">Publish a version in the builder before deploying it.</Notice>;
+    return (
+      <EmptyState
+        icon={<Rocket strokeWidth={1.5} />}
+        title="Nothing to deploy yet"
+        description={`Publish the draft in the builder, then deploy that version here to ${s.environments
+          .map((e) => e.name)
+          .join(
+            ", ",
+          )}. API keys, webhooks and schedules run the version deployed to their environment.`}
+        primaryAction={
+          <Button variant="primary" asChild>
+            <Link href={`/${s.ws}/workflows/${workflow.id}`}>Open the builder</Link>
+          </Button>
+        }
+      />
+    );
 
   return (
     <div className="flex flex-col gap-4">

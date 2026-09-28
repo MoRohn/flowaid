@@ -21,7 +21,8 @@ import type {
 import type { RunView } from "@flowaid/ui";
 import {
   FlowCanvas,
-  applyAutoLayout,
+  autoLayout,
+  estimateNodeHeight,
   toCanvasEdge,
   type CanvasEdge,
   type CanvasNode,
@@ -152,23 +153,38 @@ function BuilderView({
   useEffect(() => {
     const d = store.getState().definition;
     if (!needsLayout(d)) return;
-    const laid = applyAutoLayout(
-      d.nodes.map((n) => ({
-        id: n.id,
-        ...(n.parent ? { parent: n.parent } : {}),
-        position: { x: 0, y: 0 },
-      })),
+    // cards at the size they will render at, so taller ones (decisions, routes) do not overlap
+    const views = new Map(project(d, null, [], catalog).nodes.map((v) => [v.id, v]));
+    const { positions, sizes } = autoLayout(
+      d.nodes.map((n) => {
+        const v = views.get(n.id);
+        return {
+          id: n.id,
+          ...(n.parent ? { parent: n.parent } : {}),
+          ...(v && n.kind !== "loop" && n.kind !== "foreach"
+            ? { width: 232, height: estimateNodeHeight(v) }
+            : {}),
+        };
+      }),
       [
         ...d.edges.map((e) => ({ id: e.id, source: e.from.node, target: e.to.node })),
         // data dependencies order the layers too (a gate sits after what it reads)
-        ...bindingDataEdges(d).map((e, i) => ({
-          id: `d${i}`,
+        ...bindingDataEdges(d).map((e) => ({
           source: e.from.node,
           target: e.to.node,
+          lane: false,
         })),
       ],
     );
-    store.getState().moveNodes(Object.fromEntries(laid.map((n) => [n.id, n.position])));
+    store.getState().moveNodes(
+      Object.fromEntries(
+        [...positions].map(([id, p]) => {
+          const size = sizes.get(id);
+          return [id, size ? { ...p, w: size.width, h: size.height } : p];
+        }),
+      ),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on open
   }, [store]);
 
   // --- live run overlay ---
@@ -202,6 +218,13 @@ function BuilderView({
     [definition.nodes, catalog],
   );
   const live = useLiveRun(runId, lookup);
+  // a run that finishes while its trace is on screen shows its result: that is what it was for
+  const liveStatus = live?.status;
+  const [seenStatus, setSeenStatus] = useState(liveStatus);
+  if (liveStatus !== seenStatus) {
+    setSeenStatus(liveStatus);
+    if (liveStatus === "completed" && bottomTab === "trace") setBottomTab("output");
+  }
   const runView: RunView | undefined = live
     ? {
         id: live.runId,

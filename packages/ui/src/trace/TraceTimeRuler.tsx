@@ -29,6 +29,8 @@ export const TraceTimeRuler = forwardRef<HTMLDivElement, TraceTimeRulerProps>(
         {ticks.map((t, i) => {
           const left = (t / totalMs) * 100;
           const last = i === ticks.length - 1;
+          // the "now" badge owns the right edge of a live ruler: labels there would collide
+          const hidden = live && left > 84;
           return (
             <span
               key={t}
@@ -36,14 +38,16 @@ export const TraceTimeRuler = forwardRef<HTMLDivElement, TraceTimeRulerProps>(
               style={{ left: `${left}%` }}
             >
               <span aria-hidden="true" className="absolute inset-y-0 left-0 w-px bg-border" />
-              <span
-                className={cn(
-                  "absolute top-1/2 -translate-y-1/2 whitespace-nowrap font-mono text-2xs leading-none text-ink-3 tabular",
-                  last && left > 90 ? "right-0.5" : "left-1",
-                )}
-              >
-                {formatTick(t)}
-              </span>
+              {hidden ? null : (
+                <span
+                  className={cn(
+                    "absolute top-1/2 -translate-y-1/2 whitespace-nowrap font-mono text-2xs leading-none text-ink-3 tabular",
+                    last && left > 90 ? "right-0.5" : "left-1",
+                  )}
+                >
+                  {formatTick(t)}
+                </span>
+              )}
             </span>
           );
         })}

@@ -18,6 +18,7 @@ import {
   ReactFlowProvider,
   SelectionMode,
   getNodesBounds,
+  useNodesInitialized,
   useReactFlow,
   useStore,
   useViewport,
@@ -86,6 +87,30 @@ import { useConnectionValidation } from "./useConnectionValidation";
 import "./canvas.css";
 
 export const CANVAS_MIN_ZOOM = 0.25;
+/** The smallest zoom a graph opens at: below it card text is unreadable, so a wide graph opens at
+ * this zoom on its start (the left) instead of fitting whole. The fit button still shows it all. */
+export const CANVAS_READABLE_ZOOM = 0.5;
+
+/**
+ * The viewport a graph opens at: `fitted` when that is readable, else `readable` zoom anchored on
+ * the graph's left edge and centred vertically (or its top when it is taller than the pane).
+ */
+export function openingViewport(
+  bounds: { x: number; y: number; width: number; height: number },
+  pane: { width: number; height: number },
+  fittedZoom: number,
+  readable = CANVAS_READABLE_ZOOM,
+  margin = 48,
+): { x: number; y: number; zoom: number } | null {
+  if (fittedZoom >= readable || bounds.width <= 0) return null;
+  const zoom = readable;
+  const x = margin - bounds.x * zoom;
+  const tall = bounds.height * zoom > pane.height - 2 * margin;
+  const y = tall
+    ? margin - bounds.y * zoom
+    : pane.height / 2 - (bounds.y + bounds.height / 2) * zoom;
+  return { x, y, zoom };
+}
 export const CANVAS_MAX_ZOOM = 2;
 export const CANVAS_SNAP = 8;
 
@@ -439,6 +464,22 @@ function FlowCanvasInner({
     [edges, run, runState, categoryOf],
   );
 
+  // --- opening viewport: readable, not a whole wide graph in miniature ----
+  const initialized = useNodesInitialized();
+  const opened = useRef(false);
+  useEffect(() => {
+    if (!fitViewOnInit || !initialized || opened.current) return;
+    opened.current = true;
+    const id = window.requestAnimationFrame(() => {
+      const pane = wrapperRef.current?.getBoundingClientRect();
+      const top = flow.getNodes().filter((n) => !n.parentId);
+      if (!pane || top.length === 0) return;
+      const next = openingViewport(getNodesBounds(top), pane, flow.getZoom());
+      if (next) void flow.setViewport(next);
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [fitViewOnInit, initialized, flow]);
+
   // --- follow the run ---------------------------------------------------
   const activeNodeId = useMemo(() => {
     if (!run) return null;
@@ -562,7 +603,12 @@ function FlowCanvasInner({
           ...(parent !== undefined ? { parent } : null),
         };
       }),
-      edges,
+      // data edges order the layers; only control edges get lanes of their own
+      edges.map((e) => ({
+        source: e.source,
+        target: e.target,
+        ...(e.type === "data" ? { lane: false } : {}),
+      })),
       { nodeGap: 40, layerGap: 96 },
     );
     moveNodes(positions);
@@ -913,6 +959,22 @@ function FlowCanvasInner({
                 Add node
                 <Shortcut shortcut="mod+k" size="sm" className="ml-1" />
               </Button>
+            </FlowPanel>
+          ) : null}
+          {!locked &&
+          nodes.length > 0 &&
+          nodes.every((n) => n.data.variant === "start" || n.data.variant === "end") ? (
+            // a new flow is only its input and output: say what comes next
+            <FlowPanel position="top-center" className="mt-3">
+              <p
+                role="note"
+                className="max-w-sm rounded-md border border-border bg-surface px-3 py-2 text-center text-xs leading-5 text-ink-2 shadow-1"
+              >
+                Add your first step with{" "}
+                <Shortcut shortcut="mod+k" size="sm" className="align-middle" /> or{" "}
+                <span className="font-medium text-ink">Add node</span>, then drag from a node&apos;s
+                right edge to the next one to connect them.
+              </p>
             </FlowPanel>
           ) : null}
           {children}

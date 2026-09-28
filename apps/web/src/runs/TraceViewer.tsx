@@ -247,6 +247,19 @@ export function TraceViewer({ runId }: { runId: string }) {
               }
             : {})}
           onOpenInBuilder={() => router.push(`/${s.ws}/workflows/${run.workflowId}`)}
+          onShowFailedNode={(n: NodeRunView) => {
+            setTab("timeline");
+            setSelected(n.id);
+          }}
+          {...(canReplay && run.status === "failed"
+            ? {
+                onRetryFailedNode: (n: NodeRunView) => {
+                  // a node inside a loop retries from its own panel (the scope decides which)
+                  if (n.scope) setSelected(n.id);
+                  else setAction({ kind: "retry", nodeRunId: n.id, nodeName: n.nodeName });
+                },
+              }
+            : {})}
           {...(openTaskId
             ? { onOpenReview: () => router.push(`/${s.ws}/human-tasks/${openTaskId}`) }
             : {})}

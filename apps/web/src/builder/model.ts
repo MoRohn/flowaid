@@ -620,6 +620,16 @@ export function needsLayout(def: WorkflowDefinition): boolean {
   const top = def.nodes.filter((n) => !n.parent);
   const pos = top.map((n) => def.layout?.nodes[n.id]);
   if (def.nodes.some((n) => !def.layout?.nodes[n.id])) return true;
+  // Children sit relative to their container: a container without a size, or a child outside
+  // its frame, is a layout written with absolute positions (by hand or by a tool).
+  for (const n of def.nodes) {
+    if (!n.parent) continue;
+    const frame = def.layout?.nodes[n.parent];
+    const at = def.layout?.nodes[n.id];
+    if (!frame || !at) return true;
+    if (frame.w === undefined || frame.h === undefined) return true;
+    if (at.x < 0 || at.y < 0 || at.x > frame.w || at.y > frame.h) return true;
+  }
   if (top.length <= 4) return false;
   const xs = new Set(pos.map((p) => p?.x));
   const ys = new Set(pos.map((p) => p?.y));

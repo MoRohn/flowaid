@@ -3,12 +3,17 @@
  *
  * 1. Back edges (found by DFS) are ignored so cycles do not break layering.
  * 2. Longest-path layering: a node's layer is one past its deepest predecessor.
- * 3. Barycenter ordering: nodes in each layer are sorted by the mean order of
+ * 3. Long edges: an edge that skips layers gets a small virtual node in every
+ *    layer it crosses, so it has a lane of its own instead of running through
+ *    the cards between its ends.
+ * 4. Barycenter ordering: nodes in each layer are sorted by the mean order of
  *    their neighbours in the adjacent layer, sweeping down and up a few times
  *    to reduce crossings.
- * 4. Coordinates: layers are stacked left to right with `layerGap` between the
- *    widest node of one layer and the next; nodes in a layer are stacked with
- *    `nodeGap` and each layer is centred on the mean centre of its predecessors.
+ * 5. Coordinates: layers are stacked left to right with `layerGap` between the
+ *    widest node of one layer and the next. Each node wants its centre at the
+ *    mean centre of its predecessors; lanes of long edges are placed first (so
+ *    those edges stay straight), then the cards, as close to where they want to
+ *    be as the order and `nodeGap` allow.
  *
  * Compound graphs (loop/foreach bodies, UI.md §4.2): nodes with a `parent` are
  * laid out inside their container first, innermost frames first, using only
@@ -44,6 +49,11 @@ export interface LayoutNodeInput {
 export interface LayoutEdgeInput {
   source: string;
   target: string;
+  /**
+   * `false`: the edge only orders the layers (a data dependency drawn over the graph); it gets no
+   * lane of its own and does not pull its target's position.
+   */
+  lane?: boolean;
 }
 
 export interface AutoLayoutOptions {
@@ -215,9 +225,20 @@ export function autoLayout(
       const target = representativeAt(e.target, level);
       if (source === undefined || target === undefined || source === target) continue;
       const key = `${source}\u0000${target}`;
-      if (seenPairs.has(key)) continue;
+      if (seenPairs.has(key)) {
+        // a laid-out edge wins over an ordering-only one between the same pair
+        if (e.lane !== false) {
+          const i = lifted.findIndex((l) => l.source === source && l.target === target);
+          if (i >= 0 && lifted[i]?.lane === false) lifted[i] = { source, target };
+        }
+        continue;
+      }
       seenPairs.add(key);
-      lifted.push(source === e.source && target === e.target ? e : { source, target });
+      lifted.push(
+        source === e.source && target === e.target
+          ? e
+          : { source, target, ...(e.lane === false ? { lane: false } : {}) },
+      );
     }
     const result = layoutFlat(boxes, lifted, { ...flat, origin: levelOrigin });
     backEdges.push(...result.backEdges);
@@ -256,15 +277,8 @@ function layoutFlat(
   );
 
   const preds = new Map<string, string[]>();
-  const succs = new Map<string, string[]>();
-  for (const id of ids) {
-    preds.set(id, []);
-    succs.set(id, []);
-  }
-  for (const e of forward) {
-    preds.get(e.target)?.push(e.source);
-    succs.get(e.source)?.push(e.target);
-  }
+  for (const id of ids) preds.set(id, []);
+  for (const e of forward) preds.get(e.target)?.push(e.source);
 
   // Longest-path layering (memoised DFS over the acyclic forward graph).
   const layerOf = new Map<string, number>();
@@ -283,6 +297,36 @@ function layoutFlat(
   const layers: string[][] = Array.from({ length: layerCount }, () => []);
   for (const id of ids) layers[layerOf.get(id) ?? 0]?.push(id);
 
+  // The virtual graph: every edge spans one layer, long edges through lane nodes.
+  const LANE = 24;
+  const lanes = new Set<string>();
+  const vPreds = new Map<string, string[]>();
+  const vSuccs = new Map<string, string[]>();
+  for (const id of ids) {
+    vPreds.set(id, []);
+    vSuccs.set(id, []);
+  }
+  const link = (a: string, b: string) => {
+    vSuccs.get(a)?.push(b);
+    vPreds.get(b)?.push(a);
+  };
+  forward.forEach((e, i) => {
+    if (e.lane === false) return;
+    const from = layerOf.get(e.source) ?? 0;
+    const to = layerOf.get(e.target) ?? 0;
+    let prev = e.source;
+    for (let l = from + 1; l < to; l++) {
+      const lane = `\u0000lane:${i}:${l}`;
+      lanes.add(lane);
+      vPreds.set(lane, []);
+      vSuccs.set(lane, []);
+      layers[l]?.push(lane);
+      link(prev, lane);
+      prev = lane;
+    }
+    link(prev, e.target);
+  });
+
   // Barycenter ordering.
   const order = new Map<string, number>();
   const reindex = () => {
@@ -299,7 +343,7 @@ function layoutFlat(
     for (const layer of seq) {
       const keyed = layer.map((id) => ({
         id,
-        b: bary(id, down ? (preds.get(id) ?? []) : (succs.get(id) ?? [])),
+        b: bary(id, down ? (vPreds.get(id) ?? []) : (vSuccs.get(id) ?? [])),
         i: order.get(id) ?? 0,
       }));
       keyed.sort((a, b) => a.b - b.b || a.i - b.i);
@@ -309,38 +353,57 @@ function layoutFlat(
   }
 
   // Coordinates.
-  const positions = new Map<string, CanvasPoint>();
+  const sizeOfId = (id: string) => {
+    if (lanes.has(id)) return { w: LANE, h: LANE };
+    const n = byId.get(id);
+    return n ? sizeOf(n, defaultWidth, defaultHeight) : { w: defaultWidth, h: defaultHeight };
+  };
+  const tops = new Map<string, number>();
   const centres = new Map<string, number>();
+  const xs = new Map<string, number>();
   let x = origin.x;
   for (const layer of layers) {
-    const sizes = layer.map((id) => {
-      const n = byId.get(id);
-      return n ? sizeOf(n, defaultWidth, defaultHeight) : { w: defaultWidth, h: defaultHeight };
-    });
-    const layerWidth = Math.max(0, ...sizes.map((s) => s.w));
+    const sizes = layer.map(sizeOfId);
+    const layerWidth = Math.max(
+      0,
+      ...layer.map((id, i) => (lanes.has(id) ? 0 : (sizes[i]?.w ?? 0))),
+    );
     const stackHeight =
       sizes.reduce((s, sz) => s + sz.h, 0) + Math.max(0, layer.length - 1) * nodeGap;
-
-    // Centre this layer on the mean centre of its predecessors (or the origin).
-    const predCentres: number[] = [];
-    for (const id of layer)
-      for (const p of preds.get(id) ?? []) {
+    // Where each node wants its top: centred on its predecessors, or a centred stack.
+    let fallback = origin.y;
+    const desired = layer.map((id, i) => {
+      const h = sizes[i]?.h ?? 0;
+      // laid-out predecessors, else what the node reads (ordering-only edges)
+      const laid = vPreds.get(id) ?? [];
+      const cs = (laid.length > 0 ? laid : (preds.get(id) ?? [])).flatMap((p) => {
         const c = centres.get(p);
-        if (c !== undefined) predCentres.push(c);
-      }
-    const target =
-      predCentres.length > 0
-        ? predCentres.reduce((a, b) => a + b, 0) / predCentres.length
-        : origin.y + stackHeight / 2;
-    let y = target - stackHeight / 2;
-    layer.forEach((id, i) => {
-      const sz = sizes[i] ?? { w: defaultWidth, h: defaultHeight };
-      positions.set(id, { x, y });
-      centres.set(id, y + sz.h / 2);
-      y += sz.h + nodeGap;
+        return c === undefined ? [] : [c];
+      });
+      const want = cs.length > 0 ? cs.reduce((a, b) => a + b, 0) / cs.length - h / 2 : fallback;
+      fallback += h + nodeGap;
+      return want;
+    });
+    if (layer.every((id) => (vPreds.get(id) ?? []).length + (preds.get(id) ?? []).length === 0)) {
+      // a first layer: one stack centred on the origin
+      let y = origin.y - stackHeight / 2;
+      layer.forEach((_, i) => {
+        desired[i] = y;
+        y += (sizes[i]?.h ?? 0) + nodeGap;
+      });
+    }
+    placeLayer(layer, sizes, desired, nodeGap, (id) => (lanes.has(id) ? 2 : 1)).forEach((y, i) => {
+      const id = layer[i] as string;
+      tops.set(id, y);
+      centres.set(id, y + (sizes[i]?.h ?? 0) / 2);
+      xs.set(id, lanes.has(id) ? x + (layerWidth - LANE) / 2 : x);
     });
     x += layerWidth + layerGap;
   }
+
+  const positions = new Map<string, CanvasPoint>();
+  for (const id of ids)
+    positions.set(id, { x: xs.get(id) ?? origin.x, y: tops.get(id) ?? origin.y });
 
   // Normalise so the top-most node sits at origin.y.
   let minY = Number.POSITIVE_INFINITY;
@@ -350,7 +413,60 @@ function layoutFlat(
     for (const [id, p] of positions) positions.set(id, { x: p.x, y: p.y + dy });
   }
 
-  return { positions, layers, backEdges };
+  const realLayers = layers.map((l) => l.filter((id) => !lanes.has(id)));
+  return { positions, layers: realLayers, backEdges };
+}
+
+/**
+ * Tops for one ordered layer: the highest-priority nodes take their desired top first, the rest
+ * go as close to theirs as the order and the gap allow (the priority method of layered drawing).
+ * Never overlaps: a final pass pushes anything still too close downwards.
+ */
+export function placeLayer(
+  layer: readonly string[],
+  sizes: readonly { h: number }[],
+  desired: readonly number[],
+  gap: number,
+  priority: (id: string) => number,
+): number[] {
+  const n = layer.length;
+  const h = (i: number) => sizes[i]?.h ?? 0;
+  const y: (number | undefined)[] = Array.from({ length: n }, () => undefined);
+  const byPriority = layer
+    .map((id, i) => ({ i, p: priority(id) }))
+    .sort((a, b) => b.p - a.p || a.i - b.i)
+    .map((x) => x.i);
+  for (const i of byPriority) {
+    // the room left by the placed neighbours, with the unplaced nodes between them
+    let lower = Number.NEGATIVE_INFINITY;
+    let between = 0;
+    for (let j = i - 1; j >= 0; j--) {
+      const yj = y[j];
+      if (yj !== undefined) {
+        lower = yj + h(j) + gap + between;
+        break;
+      }
+      between += h(j) + gap;
+    }
+    let upper = Number.POSITIVE_INFINITY;
+    between = 0;
+    for (let j = i + 1; j < n; j++) {
+      const yj = y[j];
+      if (yj !== undefined) {
+        upper = yj - gap - between - h(i);
+        break;
+      }
+      between += h(j) + gap;
+    }
+    const want = desired[i] ?? 0;
+    y[i] = lower > upper ? lower : Math.min(Math.max(want, lower), upper);
+  }
+  const out = y.map((v) => v ?? 0);
+  for (let i = 1; i < n; i++) {
+    const min = (out[i - 1] ?? 0) + h(i - 1) + gap;
+    if ((out[i] ?? 0) < min) out[i] = min;
+  }
+  return out;
 }
 
 /**

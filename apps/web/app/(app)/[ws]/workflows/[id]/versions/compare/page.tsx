@@ -2,7 +2,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, use, useMemo } from "react";
-import { Select, SelectItem } from "@flowaid/ui/primitives";
+import { GitCompare } from "lucide-react";
+import { Button, EmptyState, Select, SelectItem } from "@flowaid/ui/primitives";
 import { VersionCompare } from "@flowaid/ui/builder";
 import { DiffView } from "@flowaid/ui/data";
 import type { WorkflowDiff } from "@flowaid/ui";
@@ -28,12 +29,16 @@ function Compare({ id }: { id: string }) {
   const s = useSession();
   const router = useRouter();
   const params = useSearchParams();
-  const a = params.get("a") ?? "";
-  const b = params.get("b") ?? "";
   const versions = useQuery({
     queryKey: ["versions", s.ws, id],
     queryFn: () => get<VersionSummary[]>(`/v1/workflows/${id}/versions`),
   });
+  const published = (versions.data ?? [])
+    .filter((v) => v.kind === "published")
+    .sort((x, y) => (y.version ?? 0) - (x.version ?? 0));
+  // without a choice in the URL: the newest version against the one before it
+  const a = params.get("a") ?? published[1]?.id ?? "";
+  const b = params.get("b") ?? published[0]?.id ?? "";
   const deployments = useQuery({
     queryKey: ["deployments", s.ws, id],
     queryFn: () => get<Deployment[]>(`/v1/workflows/${id}/deployments`),
@@ -64,9 +69,6 @@ function Compare({ id }: { id: string }) {
     u.set(key, value);
     router.replace(`/${s.ws}/workflows/${id}/versions/compare?${u.toString()}`);
   };
-  const published = (versions.data ?? [])
-    .filter((v) => v.kind === "published")
-    .sort((x, y) => (y.version ?? 0) - (x.version ?? 0));
   const deployedTo = (vid: string) =>
     (deployments.data ?? [])
       .filter((d) => d.versionId === vid)
@@ -111,14 +113,31 @@ function Compare({ id }: { id: string }) {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex flex-wrap items-center gap-4">
-        {picker("a", a, "Base")}
-        <span className="text-ink-3" aria-hidden="true">
-          →
-        </span>
-        {picker("b", b, "Candidate")}
-      </div>
-      {!a || !b ? (
+      {published.length >= 2 ? (
+        <div className="flex flex-wrap items-center gap-4">
+          {picker("a", a, "Base")}
+          <span className="text-ink-3" aria-hidden="true">
+            →
+          </span>
+          {picker("b", b, "Candidate")}
+        </div>
+      ) : null}
+      {versions.isSuccess && published.length < 2 ? (
+        <EmptyState
+          icon={<GitCompare strokeWidth={1.5} />}
+          title="Nothing to compare yet"
+          description={
+            published.length === 1
+              ? "Compare shows what changed between two published versions. Publish the draft again after a change, then compare v1 with it."
+              : "Compare shows what changed between two published versions. Publish the draft from the builder first."
+          }
+          primaryAction={
+            <Button variant="primary" onClick={() => router.push(`/${s.ws}/workflows/${id}`)}>
+              Open the builder
+            </Button>
+          }
+        />
+      ) : !a || !b ? (
         <Notice tone="info">Choose two versions to compare.</Notice>
       ) : a === b ? (
         <Notice tone="info">Both sides are the same version.</Notice>

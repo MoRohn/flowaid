@@ -65,7 +65,8 @@ export interface BuilderState {
     parent: string | undefined,
     positions?: Record<string, { x: number; y: number }>,
   ): void;
-  moveNodes(positions: Record<string, { x: number; y: number }>): void;
+  /** Moves nodes; `w`/`h` also size containers (auto layout fits them around their children). */
+  moveNodes(positions: Record<string, { x: number; y: number; w?: number; h?: number }>): void;
   setInputsSchema(schema: JsonSchema): void;
   setOutputsSchema(schema: JsonSchema): void;
   updateDefinition(recipe: (d: Draft<WorkflowDefinition>) => void, label: string): void;
@@ -307,7 +308,13 @@ export function createBuilderStore(init: {
             d.layout ??= { nodes: {} };
             for (const [id, p] of Object.entries(positions)) {
               const cur = d.layout.nodes[id];
-              d.layout.nodes[id] = { ...cur, x: Math.round(p.x), y: Math.round(p.y) };
+              d.layout.nodes[id] = {
+                ...cur,
+                x: Math.round(p.x),
+                y: Math.round(p.y),
+                ...(p.w !== undefined ? { w: Math.round(p.w) } : {}),
+                ...(p.h !== undefined ? { h: Math.round(p.h) } : {}),
+              };
             }
           },
           false,
