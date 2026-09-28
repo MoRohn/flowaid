@@ -21,6 +21,11 @@ import {
 
 const SEVERITY_TONE = { critical: "danger", warning: "warn", info: "info" } as const;
 const SEVERITY_LABEL = { critical: "Critical", warning: "Warning", info: "Notice" } as const;
+const BASELINE_LABEL: Record<InsightWindow, string> = {
+  "24h": "the 4 days before",
+  "7d": "the 4 weeks before",
+  "30d": "the 4 months before",
+};
 const WINDOW_LABEL: Record<InsightWindow, string> = {
   "24h": "the last 24 hours",
   "7d": "the last 7 days",
@@ -88,11 +93,9 @@ function NeedsAttention({
               icon={<Hourglass className="size-4 text-warn" strokeWidth={1.75} aria-hidden />}
               title={`${a.openApprovals.count} ${a.openApprovals.count === 1 ? "approval is" : "approvals are"} waiting`}
               detail={[
-                a.openApprovals.oldestAt
-                  ? `oldest ${ago(a.openApprovals.oldestAt, now)} ago`
-                  : null,
+                a.openApprovals.oldestAt ? `oldest ${ago(a.openApprovals.oldestAt, now)}` : null,
                 a.openApprovals.expiringSoon > 0
-                  ? `${a.openApprovals.expiringSoon} expire within a day`
+                  ? `${a.openApprovals.expiringSoon} ${a.openApprovals.expiringSoon === 1 ? "expires" : "expire"} within a day`
                   : null,
               ]
                 .filter(Boolean)
@@ -126,13 +129,7 @@ function WhatChanged({
   now: number;
 }) {
   return (
-    <Panel
-      title="What changed"
-      meta={report ? `${WINDOW_LABEL[window]} vs the 4× longer span before` : undefined}
-      scroll={false}
-      padded={false}
-      aria-busy={!report}
-    >
+    <Panel title="What changed" scroll={false} padded={false} aria-busy={!report}>
       {!report ? (
         <RowSkeletons />
       ) : report.insights.length === 0 ? (
@@ -149,7 +146,8 @@ function WhatChanged({
       )}
       {report ? (
         <p className="border-t border-border px-3 py-2 text-2xs text-ink-3">
-          Production runs only · computed {ago(report.computedAt, now)} ago
+          {WINDOW_LABEL[window].replace(/^the l/, "L")} against {BASELINE_LABEL[window]} ·
+          production runs only · computed {ago(report.computedAt, now)}
         </p>
       ) : null}
     </Panel>

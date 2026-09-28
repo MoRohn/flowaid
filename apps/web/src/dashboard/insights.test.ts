@@ -37,10 +37,11 @@ describe("insight helpers", () => {
 
   it("says how long ago, coarsely", () => {
     const now = Date.parse("2026-09-28T12:00:00Z");
-    expect(ago("2026-09-28T11:59:40Z", now)).toBe("1 minute");
-    expect(ago("2026-09-28T11:30:00Z", now)).toBe("30 minutes");
-    expect(ago("2026-09-28T09:00:00Z", now)).toBe("3 hours");
-    expect(ago("2026-09-26T12:00:00Z", now)).toBe("2 days");
+    expect(ago("2026-09-28T11:59:40Z", now)).toBe("just now");
+    expect(ago("2026-09-28T11:58:50Z", now)).toBe("1 minute ago");
+    expect(ago("2026-09-28T11:30:00Z", now)).toBe("30 minutes ago");
+    expect(ago("2026-09-28T09:00:00Z", now)).toBe("3 hours ago");
+    expect(ago("2026-09-26T12:00:00Z", now)).toBe("2 days ago");
   });
 
   it("writes the evidence as checkable lines", () => {

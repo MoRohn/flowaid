@@ -66,7 +66,7 @@ describe("Attention", () => {
     const list = await screen.findByRole("list", { name: "Needs attention" });
     const approvals = within(list).getByRole("link", { name: /2 approvals are waiting/ });
     expect(approvals.getAttribute("href")).toBe("/default/human-tasks");
-    expect(approvals.textContent).toContain("oldest 2 days ago · 1 expire within a day");
+    expect(approvals.textContent).toContain("oldest 2 days ago · 1 expires within a day");
     const failing = within(list).getByRole("link", { name: /Support triage/ });
     expect(failing.getAttribute("href")).toContain("/default/runs?");
     expect(failing.getAttribute("href")).toContain("status=failed");
@@ -84,6 +84,7 @@ describe("Attention", () => {
     expect(within(changes).getByRole("link", { name: "Versions" }).getAttribute("href")).toBe(
       "/default/workflows/wf-1/versions",
     );
+    expect(screen.getByText(/Last 7 days against the 4 weeks before/)).toBeTruthy();
     expect(screen.getByText(/computed 2 minutes ago/)).toBeTruthy();
   });
 

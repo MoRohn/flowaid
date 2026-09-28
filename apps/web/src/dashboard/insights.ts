@@ -77,12 +77,12 @@ export function runsHref(
   return `/${ws}/runs?${query}`;
 }
 
-/** "3 hours", "2 days": how long ago an ISO time was, coarsely. */
+/** "just now", "3 hours ago", "2 days ago": how long ago an ISO time was, coarsely. */
 export function ago(iso: string, now: number): string {
   const s = Math.max(0, Math.round((now - Date.parse(iso)) / 1000));
-  const unit = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
-  if (s < 90) return unit(Math.max(1, Math.round(s / 60)), "minute");
-  if (s < 90 * 60) return unit(Math.round(s / 60), "minute");
+  const unit = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"} ago`;
+  if (s < 60) return "just now";
+  if (s < 90 * 60) return unit(Math.max(1, Math.round(s / 60)), "minute");
   if (s < 36 * 3600) return unit(Math.round(s / 3600), "hour");
   return unit(Math.round(s / 86_400), "day");
 }

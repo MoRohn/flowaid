@@ -84,9 +84,9 @@ describe("AskPanel", () => {
     });
     expect(screen.getByText("Looking through your workspace…")).toBeTruthy();
     expect(screen.getByRole("alert").textContent).toContain("Wait a moment");
-    expect(screen.getByRole("button", { name: "Ask" }).disabled).toBe(true);
+    expect(screen.getByRole("button", { name: "Ask" }).hasAttribute("disabled")).toBe(true);
     const clear = screen.getByRole("button", { name: "Clear conversation" });
-    expect(clear.disabled).toBe(true);
+    expect(clear.hasAttribute("disabled")).toBe(true);
     cleanup();
     const q = mount({ turns: [{ id: "t1", question: "Done?", answer: ANSWER }] });
     fireEvent.click(screen.getByRole("button", { name: "Clear conversation" }));
