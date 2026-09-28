@@ -46,7 +46,10 @@ for (const colorScheme of ["light", "dark"] as const) {
     test("the sign-in page has no axe violations", async ({ page }) => {
       await page.goto("/login");
       const form = page.getByRole("button", { name: "Sign in" });
-      await Promise.race([form.waitFor(), page.waitForURL(/\/[a-z0-9-]+\/workflows$/)]);
+      await Promise.race([
+        form.waitFor(),
+        page.waitForURL(/\/(?!login$)[a-z0-9-]+(\/workflows)?$/),
+      ]);
       test.skip(!(await form.isVisible()), "local mode signs in by itself: there is no form");
       expect(await audit(page)).toEqual([]);
     });

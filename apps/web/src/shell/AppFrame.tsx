@@ -1,23 +1,18 @@
 "use client";
 /**
- * The workspace frame every signed-in page renders: `AppShell` with the feature-keyed `SideNav`,
- * a `TopBar` (breadcrumbs plus page actions), the command menu and the user menu. Pages pass
- * their own inspector and bottom panel (the builder does).
+ * The workspace frame every page renders: `AppShell` with the feature-keyed `SideNav`, a `TopBar`
+ * (breadcrumbs plus page actions), the workspace command menu, the help menu and, where people
+ * sign in, the user menu. Pages pass their own inspector and bottom panel (the builder does).
  */
 import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { Plus } from "lucide-react";
-import {
-  AppShell,
-  CommandMenu,
-  SideNav,
-  TopBar,
-  UserMenu,
-  type TopBarProps,
-} from "@flowaid/ui/shell";
+import { AppShell, SideNav, TopBar, UserMenu, type TopBarProps } from "@flowaid/ui/shell";
 import { Button, IconButton } from "@flowaid/ui/primitives";
 import { useSession } from "~/session";
+import { HelpMenu } from "./HelpMenu";
 import { NAV, NAV_SECONDARY, visibleNav } from "./nav";
+import { WorkspaceCommandMenu } from "./WorkspaceCommandMenu";
 
 export interface AppFrameProps extends Partial<Omit<TopBarProps, "breadcrumbs">> {
   crumbs: { label: string; href?: string }[];
@@ -70,21 +65,20 @@ export function AppFrame({
             label: c.label,
             ...(c.href ? { onClick: () => router.push(c.href as string) } : {}),
           }))}
-          onLogoClick={() => go("workflows")}
+          onLogoClick={() => go("")}
           layoutToggles={Boolean(inspector || bottomPanel)}
           trailing={
-            s.me.user ? (
-              s.local ? (
-                // one person on this computer: nobody to sign out or switch to
-                <UserMenu user={{ name: "You", email: "FlowAId on this computer" }} />
-              ) : (
+            <span className="flex items-center gap-1">
+              <HelpMenu ws={s.ws} dashboard={s.features.dashboard === true} />
+              {/* one person on this computer has no account to show, sign out of or switch */}
+              {s.me.user && !s.local ? (
                 <UserMenu
                   user={{ name: s.me.user.name || s.me.user.email, email: s.me.user.email }}
                   onProfile={() => go("settings?tab=profile")}
                   onSignOut={() => void s.signOut()}
                 />
-              )
-            ) : undefined
+              ) : null}
+            </span>
           }
           {...topbar}
         />
@@ -100,9 +94,14 @@ export function AppFrame({
           }}
           themeToggle
           workspace={{
-            workspaces: s.me.workspaces.map((w) => ({ id: w.slug, name: w.name, plan: w.role })),
+            // the role only means something where other people share the workspace
+            workspaces: s.me.workspaces.map((w) => ({
+              id: w.slug,
+              name: w.name,
+              ...(s.local ? {} : { plan: w.role }),
+            })),
             currentId: s.ws,
-            onChange: (slug) => router.push(`/${slug}/workflows`),
+            onChange: (slug) => router.push(`/${slug}`),
             onSettings: () => go("settings"),
           }}
           header={(collapsed) =>
@@ -133,7 +132,7 @@ export function AppFrame({
       {...(inspector ? { inspector } : {})}
       {...(bottomPanel ? { bottomPanel } : {})}
       commandMenu={
-        <CommandMenu
+        <WorkspaceCommandMenu
           pages={[...items, ...secondary].map((e) => ({
             id: e.id,
             label: e.label,

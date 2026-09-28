@@ -43,9 +43,7 @@ function LoginForm() {
         { email, password },
         { noRefresh: true },
       );
-      router.replace(
-        safeNext ?? (res.workspaces[0] ? `/${res.workspaces[0].slug}/workflows` : "/"),
-      );
+      router.replace(safeNext ?? (res.workspaces[0] ? `/${res.workspaces[0].slug}` : "/"));
     } catch (err) {
       setError(
         err instanceof ApiError

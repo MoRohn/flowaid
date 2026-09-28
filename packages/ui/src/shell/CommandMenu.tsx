@@ -58,6 +58,8 @@ export interface CommandMenuProps {
   onAskAi?: (query: string) => void;
   /** Hide the theme group. */
   themeGroup?: boolean;
+  /** Groups placed before Navigate (create actions, the workspace's own things). */
+  leadingGroups?: CommandGroupView[];
   /** Extra groups appended after the built-in ones. */
   extraGroups?: CommandGroupView[];
   placeholder?: string;
@@ -76,6 +78,7 @@ export function CommandMenu({
   recent = [],
   onAskAi,
   themeGroup = true,
+  leadingGroups = [],
   extraGroups = [],
   placeholder = "Search pages, workflows, runs or type a command…",
 }: CommandMenuProps) {
@@ -109,6 +112,7 @@ export function CommandMenu({
         ],
       });
     }
+    list.push(...leadingGroups);
     if (pages.length > 0) {
       list.push({
         id: "navigate",
@@ -185,7 +189,18 @@ export function CommandMenu({
       });
     }
     return [...list, ...extraGroups];
-  }, [query, onAskAi, pages, actions, recent, themeGroup, setting, setTheme, extraGroups]);
+  }, [
+    query,
+    onAskAi,
+    pages,
+    actions,
+    recent,
+    themeGroup,
+    setting,
+    setTheme,
+    leadingGroups,
+    extraGroups,
+  ]);
 
   return (
     <CommandPalette

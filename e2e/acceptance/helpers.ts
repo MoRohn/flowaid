@@ -17,7 +17,8 @@ export function credentials(): { email: string; password: string } {
   };
 }
 
-const WORKSPACE_HOME = /\/[a-z0-9-]+\/workflows$/;
+// the workspace home (the Overview) or its workflows; never the sign-in page itself
+const WORKSPACE_HOME = /\/(?!login$)[a-z0-9-]+(\/workflows)?$/;
 
 /**
  * Opens the app as the owner and returns the workspace slug it lands on. In local mode (the stack
