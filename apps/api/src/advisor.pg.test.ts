@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { builderPromptHash } from "@flowaid/advisor";
 import { describeDb } from "@flowaid/database/testing";
 import { DefaultModelCatalog, ProviderRegistry, booleanDecision } from "@flowaid/providers";
 import type {
@@ -194,9 +195,10 @@ describeDb("advisor: AI builder, critic and cost optimizer (Postgres)", () => {
       // the system prompt carried the workspace's catalog; the repair round the compiler's errors
       expect(requests[0]?.messages[0]?.content).toMatch(/flowaid\.ai\.generate/);
       expect(requests[1]?.messages.at(-1)?.content).toMatch(/E_/);
-      const audit = await t.db.admin<{ details: { iterations: number } }[]>`
+      const audit = await t.db.admin<{ details: { iterations: number; promptHash: string } }[]>`
         select details from audit_events where action = 'workflow.ai_generate'`;
       expect(audit[0]?.details.iterations).toBe(2);
+      expect(audit[0]?.details.promptHash).toBe(builderPromptHash());
     });
 
     it("critiques with the rubric and the decision chain's judge", async () => {
@@ -215,6 +217,22 @@ describeDb("advisor: AI builder, critic and cost optimizer (Postgres)", () => {
       expect(advice.map((a) => a.rule)).not.toContain("no_failover");
       const plain = await call(t.app, jar, "POST", `/v1/workflows/${workflowId}/ai/critique`, {});
       expect(plain.json().advice.some((a: { source: string }) => a.source === "judge")).toBe(false);
+    });
+
+    it("rate-limits judged critiques like generation, not the rubric alone", async () => {
+      const judged: number[] = [];
+      for (let i = 0; i < 21; i += 1)
+        judged.push(
+          (
+            await call(t.app, jar, "POST", `/v1/workflows/${workflowId}/ai/critique`, {
+              judge: true,
+            })
+          ).statusCode,
+        );
+      // one judged call was made by the previous test in this minute
+      expect(judged.filter((c) => c === 429).length).toBeGreaterThan(0);
+      const plain = await call(t.app, jar, "POST", `/v1/workflows/${workflowId}/ai/critique`, {});
+      expect(plain.statusCode).toBe(200);
     });
 
     it("suggests a cheaper model from 30 days of node runs", async () => {

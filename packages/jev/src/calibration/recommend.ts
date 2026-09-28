@@ -4,9 +4,24 @@
  * Recommendations are never applied automatically: accepting one creates a contract draft that
  * goes through review and rollout like any other change. Irreversible consequences never get an
  * automation threshold.
+ *
+ * Statistics. Labels drawn with inclusion probability π are weighted 1/π, so the precision above a
+ * threshold is a weighted mean and its Wilson bound uses Kish's effective sample size
+ * (Σw)²/Σw² rather than the raw label count (which would overstate the evidence). The scan
+ * tests up to 50 thresholds and takes the first that passes, so the bound's confidence level is
+ * Bonferroni-corrected: each of the m distinct candidate regions (thresholds selecting the same
+ * labels are one test) is checked at one-sided level 0.025/m, i.e. z = Φ⁻¹(1 − 0.025/m), which keeps
+ * the chance that any recommended threshold's true precision is below target at or under 2.5 %.
+ * With m = 1 this is the usual two-sided 95 % Wilson bound (z = 1.96).
  */
 import type { ConsequenceClass } from "../wire.js";
-import { calibrationMetrics, wilsonLower, type CalibrationObservation } from "./metrics.js";
+import {
+  calibrationMetrics,
+  kishEffectiveSize,
+  normalQuantile,
+  wilsonLower,
+  type CalibrationObservation,
+} from "./metrics.js";
 import type { ThresholdRecommendation } from "./schemas.js";
 
 const TARGETS: Record<
@@ -22,6 +37,8 @@ const MAX_ECE = 0.05;
 const MAX_NEAR_MASS = 0.15;
 const NEAR_BAND = 0.03;
 const IMPROVE_FLOOR_ACCURACY = 0.6;
+/** One-sided error rate of the lower bound, split across the thresholds scanned (Bonferroni). */
+const LOWER_BOUND_ALPHA = 0.025;
 
 export interface RecommendInput {
   observations: readonly CalibrationObservation[];
@@ -91,13 +108,21 @@ export function recommendThresholds(input: RecommendInput): ThresholdRecommendat
     n: number;
     near: number;
   } | null = null;
-  for (let i = 50; i <= 99 && eceOk; i += 1) {
-    const t = i / 100;
+  const thresholds = Array.from({ length: 50 }, (_, i) => (50 + i) / 100);
+  // m: the distinct candidate regions the scan may test (nested sets, so distinct by size)
+  const regions = new Set(
+    thresholds
+      .map((t) => labeled.filter((o) => o.confidence >= t).length)
+      .filter((n) => n >= target.minLabeled),
+  ).size;
+  const z = normalQuantile(1 - LOWER_BOUND_ALPHA / Math.max(1, regions));
+  for (const t of eceOk ? thresholds : []) {
     const inRegion = labeled.filter((o) => o.confidence >= t);
     if (inRegion.length < target.minLabeled) continue;
-    const w = inRegion.reduce((s, o) => s + weight(o), 0);
+    const weights = inRegion.map(weight);
+    const w = weights.reduce((s, x) => s + x, 0);
     const precision = inRegion.reduce((s, o) => s + weight(o) * correct(o), 0) / w;
-    const lower95 = wilsonLower(precision, inRegion.length);
+    const lower95 = wilsonLower(precision, kishEffectiveSize(weights), z);
     const near =
       decisions > 0
         ? input.observations.filter((o) => o.confidence >= t && o.confidence < t + NEAR_BAND)
@@ -112,7 +137,7 @@ export function recommendThresholds(input: RecommendInput): ThresholdRecommendat
   }
   if (chosen === null && eceOk) {
     warnings.push(
-      `No threshold reaches precision ${target.precision} (Wilson 95% lower bound) with at least ${target.minLabeled} labeled decisions; recommend no automation.`,
+      `No threshold reaches precision ${target.precision} (Wilson lower bound at 95%, Bonferroni-corrected over ${Math.max(1, regions)} candidate thresholds) with at least ${target.minLabeled} labeled decisions; recommend no automation.`,
     );
   }
 

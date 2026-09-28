@@ -323,7 +323,16 @@ describe("registry provider access", () => {
     };
     expect((await g.generate({ messages: [] }, ctx)).text).toBe("hi");
     for await (const _ of g.stream({ messages: [] }, ctx)) void _;
-    expect(events.map((e) => e.type)).toEqual(["GENERATION_COMPLETED"]);
+    // a stream is accounted too, priced from the catalog (acme/m has no price: $0)
+    expect(events.map((e) => e.type)).toEqual(["GENERATION_COMPLETED", "GENERATION_COMPLETED"]);
+    expect(events[1]).toMatchObject({
+      provider: "acme",
+      model: "m",
+      costUsd: 0,
+      priceSnapshot: null,
+      finishReason: "stop",
+      outputChars: 1,
+    });
     expect(deltas).toEqual(["h"]);
     expect(g.health().status).toBe("healthy");
     expect(access.embedding({ provider: "acme", model: "e" }).id).toBe("acme");
@@ -394,6 +403,76 @@ describe("registry provider access", () => {
     expect(result.attempts?.map((a) => a.outcome)).toEqual(["error", "ok"]);
     expect(events.map((e) => e.type)).toEqual(["PROVIDER_FAILOVER", "GENERATION_COMPLETED"]);
     expect(events[0]).toMatchObject({ from: "primary/m", to: "backup/m" });
+  });
+
+  it("prices a stream at the candidate that served it", async () => {
+    const registry = new ProviderRegistry({ catalog: new DefaultModelCatalog() });
+    const make = (id: string, model: string, fails: boolean): GenerationProvider => ({
+      id,
+      model,
+      capabilities: {
+        tools: true,
+        jsonSchema: true,
+        vision: false,
+        streaming: true,
+        thinking: false,
+        maxContext: 1000,
+      },
+      generate: () => Promise.reject(new Error("unused")),
+      stream: () => ({
+        async *[Symbol.asyncIterator]() {
+          await Promise.resolve();
+          if (fails) throw new NetworkError(`${id} unreachable`);
+          yield { type: "text" as const, delta: "ok" };
+          yield { type: "usage" as const, usage: { inputTokens: 1000, outputTokens: 100 } };
+          yield { type: "done" as const, finishReason: "length" as const };
+        },
+      }),
+      health: () => ({
+        status: "healthy",
+        errorRate1m: 0,
+        p95LatencyMs: 0,
+        consecutiveFailures: 0,
+        checkedAt: "",
+      }),
+    });
+    registry.register({
+      id: "openai",
+      kind: "generation",
+      create: () => make("openai", "gpt-4.1-mini", true),
+    });
+    registry.register({
+      id: "anthropic",
+      kind: "generation",
+      create: () => make("anthropic", "claude-sonnet-5", false),
+    });
+    const events: NodeEmitted[] = [];
+    const access = registryProviderAccess(registry, callFor(events), {
+      credential: () => Promise.resolve(undefined),
+      http: () => Promise.reject(new Error("no")),
+    });
+    const g = access.generation({
+      candidates: [
+        { provider: "openai", model: "gpt-4.1-mini" },
+        { provider: "anthropic", model: "claude-sonnet-5" },
+      ],
+      strategy: "ordered",
+    });
+    const ctx = {
+      signal: new AbortController().signal,
+      runId: "r",
+      nodeRunId: "n",
+      idempotencyKey: null,
+    };
+    for await (const _ of g.stream({ messages: [] }, ctx)) void _;
+    expect(events.map((e) => e.type)).toEqual(["PROVIDER_FAILOVER", "GENERATION_COMPLETED"]);
+    expect(events[1]).toMatchObject({
+      provider: "anthropic",
+      model: "claude-sonnet-5",
+      finishReason: "length",
+      priceSnapshot: { inputPerMTok: 2, outputPerMTok: 10 },
+    });
+    expect((events[1] as { costUsd: number }).costUsd).toBeCloseTo((1000 * 2 + 100 * 10) / 1e6, 12);
   });
 });
 

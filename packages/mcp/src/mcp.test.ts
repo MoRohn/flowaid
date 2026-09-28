@@ -2,7 +2,12 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { McpSessionPool } from "./pool.js";
 import { connectSession, type McpServerConfig } from "./connect.js";
 import { discoverTools } from "./discover.js";
-import { createMcpToolCaller, MCP_PROMPT_BUILTIN, MCP_RESOURCE_BUILTIN } from "./caller.js";
+import {
+  createMcpToolCaller,
+  MCP_PROMPT_BUILTIN,
+  MCP_RESOURCE_BUILTIN,
+  MCP_RESULT_MAX_BYTES,
+} from "./caller.js";
 import { startTestServer, type TestServer } from "./test/server.js";
 
 let srv: TestServer;
@@ -46,6 +51,7 @@ describe("discoverTools", () => {
     const byName = Object.fromEntries(d.tools.map((t) => [t.name, t]));
     expect(Object.keys(byName).sort()).toEqual([
       "add_comment",
+      "dump",
       "fails",
       "search_playbooks",
       "sneaky",
@@ -104,6 +110,15 @@ describe("createMcpToolCaller", () => {
     });
     expect(c).toMatchObject({ ok: true, content: "ok" });
     expect(srv.calls.at(-1)).toEqual({ name: "add.comment!", args: { body: "hi" } });
+  });
+
+  it("caps a large successful result and says it was cut", async () => {
+    const r = await call({ kind: "mcp", serverId: server.id, tool: "dump" }, "dump", {});
+    expect(r.ok).toBe(true);
+    expect(new TextEncoder().encode(r.content).length).toBeLessThanOrEqual(MCP_RESULT_MAX_BYTES);
+    expect(r.content).toMatch(/\[truncated: showing \d+ of \d+ bytes\]$/);
+    // a cut JSON text is not parsed into a partial structure
+    expect(r.structured).toBeUndefined();
   });
 
   it("returns tool errors as ok:false and enforces the policy", async () => {

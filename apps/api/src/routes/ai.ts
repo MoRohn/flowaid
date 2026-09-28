@@ -6,9 +6,11 @@
  *   workspace's catalog and a compiler repair loop. Nothing is saved: the client creates the
  *   workflow (or saves the draft) when a person accepts the result.
  * - `POST /v1/workflows/:id/ai/critique { definition?, judge? }` → `Advice[]`: the rubric, plus
- *   an optional yes/no judge through the workspace's decision chain.
+ *   an optional yes/no judge through the workspace's decision chain. A judged critique calls a
+ *   model, so it is rate-limited like generation (20 a minute per principal); the rubric alone
+ *   is cheap and keeps a looser limit of its own.
  */
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { CRITIC_CHECKS, critique, generateWorkflow, type Judge } from "@flowaid/advisor";
@@ -58,6 +60,21 @@ const callCtx = (signal: AbortSignal) => ({
   idempotencyKey: null,
 });
 
+/** Model-backed AI calls a principal may make per minute (generation, judged critiques). */
+const AI_CALLS_PER_MINUTE = 20;
+const RUBRIC_CALLS_PER_MINUTE = 300;
+
+/** Whether a critique request asks for the judge (the body is parsed by the rate-limit hook). */
+const wantsJudge = (req: FastifyRequest) =>
+  (req.body as { judge?: unknown } | undefined)?.judge === true;
+
+/** The global limiter's key for the caller: session, API key, else IP. */
+function principalKey(req: FastifyRequest): string {
+  const p = req.principal;
+  if (!p) return `ip:${req.ip}`;
+  return p.type === "user" ? `sid:${p.sid ?? p.id}` : `key:${p.id}`;
+}
+
 function parseDefinition(raw: unknown): WorkflowDefinition {
   const parsed = WorkflowDefinitionSchema.safeParse(raw);
   if (!parsed.success) throw new BadRequestError("the definition does not parse");
@@ -74,7 +91,7 @@ export function aiRoutes(app: FastifyInstance, ctx: ApiContext): void {
         auth: "session_or_api_key",
         scope: "workflows:write",
         audit: { action: "workflow.ai_generate", resource: "workflow" },
-        rateLimit: { max: 20, timeWindow: 60_000 },
+        rateLimit: { max: AI_CALLS_PER_MINUTE, timeWindow: 60_000 },
         cli: { noun: "workflow", verb: "ai-generate" },
       },
       schema: {
@@ -162,6 +179,8 @@ export function aiRoutes(app: FastifyInstance, ctx: ApiContext): void {
           model: `${model.ref.provider}/${model.ref.model}`,
           iterations: out.iterations,
           costUsd: out.costUsd,
+          promptHash: out.promptHash,
+          safetyFindings: out.safety.map((a) => a.rule),
           ok: out.definition !== null && !out.diagnostics.some((d) => d.severity === "error"),
         },
       };
@@ -176,6 +195,14 @@ export function aiRoutes(app: FastifyInstance, ctx: ApiContext): void {
         auth: "session_or_api_key",
         scope: "workflows:read",
         audit: false,
+        // judged and plain critiques count in separate buckets: only the judge calls a model
+        rateLimit: {
+          max: (req: FastifyRequest) =>
+            wantsJudge(req) ? AI_CALLS_PER_MINUTE : RUBRIC_CALLS_PER_MINUTE,
+          timeWindow: 60_000,
+          keyGenerator: (req: FastifyRequest) =>
+            `${wantsJudge(req) ? "critic-judge" : "critic"}:${principalKey(req)}`,
+        },
         cli: { noun: "workflow", verb: "critique", positional: ["id"] },
       },
       schema: {
