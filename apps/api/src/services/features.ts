@@ -37,7 +37,6 @@ export function featuresFor(
   const disabled = new Set(config.featuresDisabled);
   const out = {} as Record<FeatureKey, boolean>;
   for (const key of FEATURE_KEYS) out[key] = FEATURES_SHIPPED.has(key) && !disabled.has(key);
-  out.oidc = config.hasOidc && !disabled.has("oidc");
   // LangChain nodes exist when the worker has registered its bundled package and it is enabled
   out.langchain =
     !disabled.has("langchain") &&

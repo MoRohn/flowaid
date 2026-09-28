@@ -66,7 +66,6 @@ export const FEATURE_KEYS = [
   "advisor",
   "code_export",
   "langchain",
-  "oidc",
   "schedules",
   "mcp_exposures",
   "dashboard",
@@ -81,7 +80,6 @@ export const ENV_GROUPS = [
   "database",
   "queue",
   "security",
-  "oidc",
   "execution",
   "storage",
   "providers",
@@ -98,7 +96,6 @@ export const ENV_GROUP_TITLES: Readonly<Record<EnvGroup, string>> = {
   database: "Database (PostgreSQL 16 + pgvector)",
   queue: "Queue and workers",
   security: "Security and first boot",
-  oidc: "Single sign-on (OIDC)",
   execution: "Execution, sandbox and plugins",
   storage: "Object storage (S3-compatible)",
   providers: "AI providers",
@@ -529,39 +526,6 @@ const docs = {
     example: "<value>",
     secret: true,
     pattern: true,
-  },
-
-  // ── oidc ────────────────────────────────────────────────────────────────────────
-  OIDC_ISSUER: {
-    group: "oidc",
-    description:
-      "Issuer URL of the OpenID Connect provider (`/.well-known/openid-configuration` is discovered from it). Setting it enables `features.oidc` and the `/v1/auth/oidc/*` routes; `OIDC_CLIENT_ID` and `OIDC_CLIENT_SECRET` are then required. Must be `https:` in production unless `FLOWAID_ALLOW_INSECURE_HTTP=true`.",
-    required: false,
-    example: "https://login.example.com/realms/flowaid",
-    secret: false,
-  },
-  OIDC_CLIENT_ID: {
-    group: "oidc",
-    description: "Client id registered with the OIDC provider for the flowaid web app.",
-    required: false,
-    example: "flowaid",
-    secret: false,
-  },
-  OIDC_CLIENT_SECRET: {
-    group: "oidc",
-    description:
-      "Client secret matching `OIDC_CLIENT_ID`, used for the authorization-code exchange (with PKCE).",
-    required: false,
-    example: "<client secret>",
-    secret: true,
-  },
-  OIDC_ROLE_CLAIM: {
-    group: "oidc",
-    description:
-      "ID-token claim whose value (`owner`, `admin`, `editor` or `viewer`, or a list containing one) sets the workspace role on every OIDC login. Unset keeps roles managed in flowaid; new SSO users join as `viewer`.",
-    required: false,
-    example: "flowaid_role",
-    secret: false,
   },
 
   // ── execution ───────────────────────────────────────────────────────────────────

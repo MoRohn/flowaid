@@ -574,7 +574,6 @@
                           "advisor",
                           "code_export",
                           "langchain",
-                          "oidc",
                           "schedules",
                           "mcp_exposures",
                           "dashboard"
@@ -600,7 +599,6 @@
                         "advisor",
                         "code_export",
                         "langchain",
-                        "oidc",
                         "schedules",
                         "mcp_exposures",
                         "dashboard"

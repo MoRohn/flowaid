@@ -74,7 +74,8 @@ describeDb("identity and access (Postgres)", () => {
     const me = (await call(t.app, jar, "GET", "/v1/me")).json();
     expect(me.principal).toMatchObject({ type: "user", workspaceSlug: "default", role: "owner" });
     expect(me.principal.scopes).toContain("admin");
-    expect(me.features).toMatchObject({ workflows: true, knowledge: true, oidc: false });
+    expect(me.features).toMatchObject({ workflows: true, knowledge: true });
+    expect(me.features).not.toHaveProperty("oidc");
     expect(await audit("auth.login")).toBeGreaterThan(0);
   });
 
