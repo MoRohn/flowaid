@@ -32,6 +32,13 @@ export {
   type IndexSettings,
 } from "./capabilities.js";
 export {
+  PageIndexSourceConfigSchema,
+  StoredIndexSettingsSchema,
+  indexRequestFromSource,
+  type PageIndexSourceConfig,
+  type StoredIndexSettings,
+} from "./source.js";
+export {
   JobResultSchema,
   JobStateSchema,
   JobStatusSchema,
