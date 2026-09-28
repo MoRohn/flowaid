@@ -28,6 +28,7 @@ import {
   createDatabaseFromEnv,
 } from "@flowaid/database";
 import { loadEnv, pickEnv } from "@flowaid/env";
+import { PageIndexServiceClient } from "@flowaid/pageindex";
 import { RegistryClient } from "@flowaid/plugins";
 import { FileFixtureStore } from "@flowaid/providers/recording-fs";
 import { createSandbox } from "@flowaid/sandbox";
@@ -251,6 +252,20 @@ async function main(): Promise<void> {
         }
       : {}),
     exports: { vendorDir: String(env.FLOWAID_VENDOR_DIR ?? "/opt/flowaid/vendor") },
+    // the PageIndex service is operator configuration on a private network: its client uses
+    // plain fetch, not the workflow egress guard
+    ...(env.flags.hasPageIndex
+      ? {
+          pageindex: {
+            client: new PageIndexServiceClient({
+              baseUrl: String(env.FLOWAID_PAGEINDEX_URL),
+              token: String(env.FLOWAID_PAGEINDEX_TOKEN),
+              // a submission uploads the PDF (up to 50 MiB)
+              timeoutMs: 120_000,
+            }),
+          },
+        }
+      : {}),
     concurrency: Number(env.WORKER_CONCURRENCY ?? 8),
     pools: env.WORKER_POOLS,
     retentionCron: String(env.RETENTION_SWEEP_CRON),
