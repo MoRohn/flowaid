@@ -30,6 +30,7 @@ import { AddToEvaluationDialog } from "./AddToEvaluationDialog";
 import { fetchAllEvents, useCatalog, useWorkflowNames } from "./api";
 import { CostPanel } from "./CostPanel";
 import { nodeCategory } from "./graph";
+import { NodeRunAside } from "./NodeRunAside";
 import { NodeRunPanel } from "./NodeRunPanel";
 import { RunActionDialog, type RunAction, type RunActionRequest } from "./RunActionDialog";
 import { RunGraph } from "./RunGraph";
@@ -197,7 +198,7 @@ export function TraceViewer({ runId }: { runId: string }) {
 
   const canReplay = s.can("runs:replay");
   const panel = current ? (
-    <div className="w-[380px] shrink-0 border-l border-border bg-surface max-lg:hidden">
+    <NodeRunAside label={`Node run ${current.nodeName}`} onClose={() => setSelected(undefined)}>
       <NodeRunPanel
         nodeRun={current}
         attempts={attempts}
@@ -222,7 +223,7 @@ export function TraceViewer({ runId }: { runId: string }) {
             }
           : {})}
       />
-    </div>
+    </NodeRunAside>
   ) : null;
 
   return (
