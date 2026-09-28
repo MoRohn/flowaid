@@ -9,6 +9,7 @@ import {
   recordingEmbeddingProvider,
   recordingFactory,
   recordingGenerationProvider,
+  recordingRerankProvider,
 } from "./recording.js";
 import type { DecisionProvider, ProviderFactory } from "@flowaid/workflow-core";
 import { FileFixtureStore } from "./recording-fs.js";
@@ -85,6 +86,28 @@ describe("record → replay", () => {
     expect(
       await recordingEmbeddingProvider(inner, "replay", store).embed(["x"], ctx()),
     ).toMatchObject({ vectors: [[1, 2]] });
+  });
+
+  it("records and replays reranks keyed by query and documents", async () => {
+    const store = new MemoryFixtureStore();
+    let calls = 0;
+    const inner = {
+      id: "cohere",
+      model: "rerank-4",
+      rerank: () => {
+        calls++;
+        return Promise.resolve({ scores: [0.9, 0.1], costUsd: 0.001 });
+      },
+      health: () => HEALTHY,
+    };
+    await recordingRerankProvider(inner, "record", store).rerank("q", ["a", "b"], ctx());
+    const replay = recordingRerankProvider(inner, "replay", store);
+    expect(await replay.rerank("q", ["a", "b"], ctx())).toEqual({
+      scores: [0.9, 0.1],
+      costUsd: 0.001,
+    });
+    expect(calls).toBe(1);
+    await expect(replay.rerank("q", ["b", "a"], ctx())).rejects.toThrow(/No recorded cohere/);
   });
 
   it("keys by provider, model, method and request hash", () => {

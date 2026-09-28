@@ -115,7 +115,9 @@ describe("ExternalResolver", () => {
     await expect(
       empty.resolve("aws-sm:arn:aws:secretsmanager:eu-west-1:123456789012:secret:x"),
     ).rejects.toThrow(/not configured/);
-    await expect(empty.resolve("azure-kv:my-vault/x")).rejects.toThrow(/P6-07/);
+    await expect(empty.resolve("azure-kv:my-vault/x")).rejects.toThrow(
+      /Key Vault is not configured/,
+    );
     const vault = new ExternalResolver({
       vault: {
         address: "https://v",

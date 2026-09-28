@@ -10203,6 +10203,67 @@
         }
       }
     },
+    "/v1/human-tasks/{id}/review-links": {
+      "get": {
+        "tags": ["human-tasks"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "x-cli": { "noun": "task", "verb": "review-links", "positional": ["id"] },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["runs:read"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "createdAt": { "type": "string" },
+                      "expiresAt": { "type": "string" },
+                      "usedAt": { "type": ["string", "null"] },
+                      "revokedAt": { "type": ["string", "null"] },
+                      "createdBy": { "type": "string" },
+                      "status": {
+                        "type": "string",
+                        "enum": ["active", "used", "revoked", "expired"]
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "createdAt",
+                      "expiresAt",
+                      "usedAt",
+                      "revokedAt",
+                      "createdBy",
+                      "status"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/human-tasks/{id}/review-link/{linkId}": {
       "delete": {
         "tags": ["human-tasks"],
@@ -10345,6 +10406,133 @@
             }
           }
         }
+      }
+    },
+    "/v1/saved-views": {
+      "get": {
+        "tags": ["runs"],
+        "parameters": [
+          {
+            "schema": { "type": "string", "enum": ["runs"] },
+            "in": "query",
+            "name": "scope",
+            "required": true
+          }
+        ],
+        "x-cli": { "noun": "view", "verb": "list" },
+        "x-auth": "session",
+        "x-scopes": ["runs:read"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "scope": { "type": "string", "enum": ["runs"] },
+                      "name": { "type": "string" },
+                      "filters": {
+                        "type": "object",
+                        "propertyNames": { "type": "string" },
+                        "additionalProperties": {}
+                      },
+                      "createdAt": { "type": "string" },
+                      "updatedAt": { "type": "string" }
+                    },
+                    "required": ["id", "scope", "name", "filters", "createdAt", "updatedAt"],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Save a view; a view with the same name is replaced",
+        "tags": ["runs"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "scope": { "type": "string", "enum": ["runs"] },
+                  "name": { "type": "string", "minLength": 1, "maxLength": 80 },
+                  "filters": {
+                    "type": "object",
+                    "propertyNames": { "type": "string" },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": ["scope", "name", "filters"]
+              }
+            }
+          }
+        },
+        "x-cli": { "noun": "view", "verb": "save" },
+        "x-auth": "session",
+        "x-scopes": ["runs:read"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "scope": { "type": "string", "enum": ["runs"] },
+                    "name": { "type": "string" },
+                    "filters": {
+                      "type": "object",
+                      "propertyNames": { "type": "string" },
+                      "additionalProperties": {}
+                    },
+                    "createdAt": { "type": "string" },
+                    "updatedAt": { "type": "string" }
+                  },
+                  "required": ["id", "scope", "name", "filters", "createdAt", "updatedAt"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/saved-views/{id}": {
+      "delete": {
+        "tags": ["runs"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "x-cli": { "noun": "view", "verb": "delete", "positional": ["id"] },
+        "x-auth": "session",
+        "x-scopes": ["runs:read"],
+        "responses": { "204": { "description": "No content" } }
       }
     },
     "/v1/plugins": {

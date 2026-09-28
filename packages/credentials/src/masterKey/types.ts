@@ -4,7 +4,8 @@
  * master so a boot with the wrong key fails loudly (E_MASTER_KEY_MISMATCH) instead of producing
  * garbage.
  */
-export type MasterProviderId = "env" | "file" | "aws-kms" | "vault-transit";
+export type MasterProviderId =
+  "env" | "file" | "aws-kms" | "vault-transit" | "azure-keyvault" | "gcp-kms";
 
 export interface MasterKeyProvider {
   readonly id: MasterProviderId;

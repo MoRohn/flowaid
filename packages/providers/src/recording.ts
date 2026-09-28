@@ -184,6 +184,21 @@ export function recordingEmbeddingProvider(
   };
 }
 
+export function recordingRerankProvider(
+  inner: RerankProvider,
+  mode: FixtureMode,
+  store: FixtureStore,
+): RerankProvider {
+  const rec = new Recorder(mode, store, inner.id, inner.model);
+  return {
+    id: inner.id,
+    model: inner.model,
+    rerank: (query: string, docs: string[], ctx: DecisionCallContext) =>
+      rec.call("rerank", { query, docs }, () => inner.rerank(query, docs, ctx)),
+    health: () => inner.health(),
+  };
+}
+
 /**
  * Wraps a registered factory so every provider it creates records or replays. In `replay` mode the
  * factory stops asking for a credential and the provider gets a placeholder key: nothing reaches
@@ -201,8 +216,7 @@ export function recordingFactory<
       case "embedding":
         return recordingEmbeddingProvider(provider as EmbeddingProvider, mode, store) as T;
       case "rerank":
-        // not recorded: rerank calls reach the vendor (or fail without a key) in every mode
-        return provider;
+        return recordingRerankProvider(provider as RerankProvider, mode, store) as T;
     }
   };
   const { credentialType, ...rest } = factory;

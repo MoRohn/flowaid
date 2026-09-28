@@ -469,7 +469,7 @@ export const encryptionKeys = pgTable("encryption_keys", {
   // KEK versions wrapped by the master key provider
   version: integer("version").primaryKey(),
   wrappedKek: text("wrapped_kek").notNull(),
-  masterProvider: text("master_provider").notNull(), // env | file | aws-kms | vault-transit (| azure-keyvault | gcp-kms later)
+  masterProvider: text("master_provider").notNull(), // env | file | aws-kms | vault-transit | azure-keyvault | gcp-kms
   masterKcv: text("master_kcv").notNull(), // v1.1: base64(first 8 bytes of HMAC-SHA256(master, 'flowaid/master-kcv/v1')); verified at boot (E_MASTER_KEY_MISMATCH)
   active: boolean("active").notNull().default(true),
   createdAt: createdAt(),
@@ -1402,6 +1402,27 @@ export const alertDeliveries = pgTable(
     uniqueIndex("alert_deliveries_key_uq").on(t.channelId, t.key),
     index("alert_deliveries_ws_idx").on(t.workspaceId, t.createdAt.desc()),
   ],
+);
+
+/* ───────────────────────── saved views ───────────────────────── */
+export const savedViews = pgTable(
+  "saved_views",
+  {
+    // a person's named filters of a list (the runs list), per workspace
+    id: uuid("id").primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    scope: text("scope", { enum: ["runs"] }).notNull(),
+    name: text("name").notNull(),
+    filters: jsonb("filters").$type<JsonObject>().notNull(), // the list's serialized filter state
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex("saved_views_name_uq").on(t.workspaceId, t.userId, t.scope, t.name)],
 );
 
 /* ───────────────────────── audit ───────────────────────── */

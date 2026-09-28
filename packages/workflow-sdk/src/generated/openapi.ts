@@ -2236,6 +2236,53 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/human-tasks/{id}/review-links": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              createdAt: string;
+              createdBy: string;
+              expiresAt: string;
+              /** Format: uuid */
+              id: string;
+              revokedAt: string | null;
+              /** @enum {string} */
+              status: "active" | "used" | "revoked" | "expired";
+              usedAt: string | null;
+            }[];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/jobs/{id}": {
     parameters: {
       query?: never;
@@ -5361,6 +5408,131 @@ export interface paths {
     put?: never;
     post?: never;
     delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/saved-views": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query: {
+          scope: "runs";
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              createdAt: string;
+              filters: {
+                [key: string]: unknown;
+              };
+              /** Format: uuid */
+              id: string;
+              name: string;
+              /** @enum {string} */
+              scope: "runs";
+              updatedAt: string;
+            }[];
+          };
+        };
+      };
+    };
+    put?: never;
+    /** Save a view; a view with the same name is replaced */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            filters: {
+              [key: string]: unknown;
+            };
+            name: string;
+            /** @enum {string} */
+            scope: "runs";
+          };
+        };
+      };
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              createdAt: string;
+              filters: {
+                [key: string]: unknown;
+              };
+              /** Format: uuid */
+              id: string;
+              name: string;
+              /** @enum {string} */
+              scope: "runs";
+              updatedAt: string;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/saved-views/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description No content */
+        204: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
     options?: never;
     head?: never;
     patch?: never;

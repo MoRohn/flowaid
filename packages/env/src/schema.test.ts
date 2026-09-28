@@ -155,6 +155,19 @@ describe("EnvSchema", () => {
             input[key] = ENV_VAR_DOCS[key].example;
           }
         }
+        // the documented examples describe one Azure Key Vault setup
+        if (name === "FLOWAID_MASTER_KEY_PROVIDER" || name === "FLOWAID_MASTER_KEY_ID") {
+          input.FLOWAID_MASTER_KEY_PROVIDER = ENV_VAR_DOCS.FLOWAID_MASTER_KEY_PROVIDER.example;
+          input.FLOWAID_MASTER_KEY_ID = ENV_VAR_DOCS.FLOWAID_MASTER_KEY_ID.example;
+        }
+        if (name === "VAULT_ADDR" || name === "VAULT_TOKEN") {
+          input.VAULT_ADDR = ENV_VAR_DOCS.VAULT_ADDR.example;
+          input.VAULT_TOKEN = ENV_VAR_DOCS.VAULT_TOKEN.example;
+        }
+        if (name === "AZURE_CLIENT_SECRET") {
+          input.AZURE_TENANT_ID = ENV_VAR_DOCS.AZURE_TENANT_ID.example;
+          input.AZURE_CLIENT_ID = ENV_VAR_DOCS.AZURE_CLIENT_ID.example;
+        }
         const result = EnvSchema.safeParse(input);
         expect(
           result.success,

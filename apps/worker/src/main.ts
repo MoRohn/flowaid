@@ -8,8 +8,18 @@
  * host): no master key, no credentials, no plugins, no scheduler — only the delegated nodes of
  * its pools.
  */
+import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { CredentialService, KeyRing, envMasterKey, fileMasterKey } from "@flowaid/credentials";
+import {
+  CredentialService,
+  ExternalResolver,
+  KeyRing,
+  envMasterKey,
+  externalResolverOptionsFromEnv,
+  fileMasterKey,
+  masterKeyProviderFromEnv,
+  type KeyServiceDeps,
+} from "@flowaid/credentials";
 import {
   PgCredentialRepository,
   PgEventBus,
@@ -106,14 +116,22 @@ async function main(): Promise<void> {
   }
 
   const bus = redisUrl ? new RedisEventBus(redisUrl) : new PgEventBus(db.sql);
-  const master = env.FLOWAID_MASTER_KEY
-    ? envMasterKey(String(env.FLOWAID_MASTER_KEY))
-    : await fileMasterKey({ path: String(env.FLOWAID_MASTER_KEY_FILE), autogenerate: false });
+  // key services are platform configuration: plain fetch, and the key file from disk
+  const keyDeps: KeyServiceDeps = {
+    http: (url, init) => fetch(url, init),
+    readFile: (path) => readFileSync(path, "utf8"),
+  };
+  const master = await masterKeyProviderFromEnv(env, keyDeps, async () =>
+    env.FLOWAID_MASTER_KEY
+      ? envMasterKey(String(env.FLOWAID_MASTER_KEY))
+      : fileMasterKey({ path: String(env.FLOWAID_MASTER_KEY_FILE), autogenerate: false }),
+  );
   const keyring = new KeyRing(master, new PgKekStore(db));
   await keyring.verifyMaster();
   const credentials = new CredentialService({
     repository: new PgCredentialRepository(db),
     keyring,
+    external: new ExternalResolver(externalResolverOptionsFromEnv(env, keyDeps)),
   });
   const http = createSafeFetch({ timeoutMs: 120_000, userAgent: "FlowAId-Worker/1" });
   const dataDir = dirname(String(env.FLOWAID_MASTER_KEY_FILE ?? "/data/master.key"));

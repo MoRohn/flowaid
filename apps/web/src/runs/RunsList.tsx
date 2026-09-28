@@ -25,6 +25,7 @@ import { useSession } from "~/session";
 import { ErrorPanel, errorMessage } from "~/shell/states";
 import { toEnvironmentViews } from "~/views";
 import { useVersionNumbers, useWorkflowNames } from "./api";
+import { SavedViewsMenu } from "./SavedViewsMenu";
 import { isActiveRun, toRunRow } from "./views";
 
 const PAGE = 50;
@@ -126,6 +127,13 @@ export function RunsList({ workflowId }: { workflowId?: string }) {
             facets={facets}
             options={{ workflow: workflowOptions }}
             searchPlaceholder="Search runs"
+          />
+        }
+        toolbarEnd={
+          <SavedViewsMenu
+            ws={s.ws}
+            query={serializeFilters(filters)}
+            onApply={(q) => router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false })}
           />
         }
         emptyState={

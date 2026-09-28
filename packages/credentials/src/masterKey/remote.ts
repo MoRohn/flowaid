@@ -8,7 +8,7 @@ import { createHash } from "node:crypto";
 import { CredentialError, type SafeFetch } from "@flowaid/workflow-core";
 import type { MasterKeyProvider } from "./types.js";
 
-function identityKcv(identity: string): string {
+export function identityKcv(identity: string): string {
   return createHash("sha256").update(identity).digest().subarray(0, 8).toString("base64");
 }
 
