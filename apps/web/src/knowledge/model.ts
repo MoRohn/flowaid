@@ -1,6 +1,13 @@
 /** Knowledge sources in the web app (API.md §3, `/v1/knowledge/*`): response shapes and form logic. */
+import {
+  DEFAULT_INDEX_MODEL,
+  type IndexMode,
+  type IndexOptimize,
+  type IndexProvider,
+  type PageIndexConfig,
+} from "./pageindex/model";
 
-export type SourceKind = "files" | "text" | "url" | "sitemap" | "github";
+export type SourceKind = "files" | "text" | "url" | "sitemap" | "github" | "pageindex";
 export type SourceStatus = "new" | "syncing" | "ready" | "stale" | "error";
 export type SearchMode = "hybrid" | "vector" | "keyword";
 
@@ -72,7 +79,11 @@ export const KIND_LABEL: Record<SourceKind, string> = {
   url: "Web pages",
   sitemap: "Sitemap",
   github: "GitHub repository",
+  pageindex: "PageIndex documents (PDF)",
 };
+
+/** PDFs indexed into section trees by the PageIndex service (docs/pageindex/API.md). */
+export const isPageIndexKind = (kind: SourceKind): boolean => kind === "pageindex";
 
 /** Uploads are added by hand; the other kinds are fetched by the sync job. */
 export const isUploadKind = (kind: SourceKind): boolean => kind === "files" || kind === "text";
@@ -114,6 +125,13 @@ export interface SourceForm {
   chunkTokens: number;
   overlapTokens: number;
   credentialId: string | null;
+  /** pageindex: the model that writes section summaries */
+  indexProvider: IndexProvider;
+  indexModel: string;
+  /** pageindex: a workspace credential of the model's type (null: the server key) */
+  indexCredentialId: string | null;
+  indexMode: IndexMode;
+  indexOptimize: IndexOptimize;
 }
 
 export const EMPTY_SOURCE: SourceForm = {
@@ -130,6 +148,11 @@ export const EMPTY_SOURCE: SourceForm = {
   chunkTokens: 400,
   overlapTokens: 60,
   credentialId: null,
+  indexProvider: "ollama",
+  indexModel: DEFAULT_INDEX_MODEL.ollama,
+  indexCredentialId: null,
+  indexMode: "flash",
+  indexOptimize: "off",
 };
 
 /** What the form is missing (null when it can be submitted). */
@@ -139,6 +162,7 @@ export function sourceFormError(f: SourceForm): string | null {
   if (f.kind === "sitemap" && !f.urls.trim()) return "Add the sitemap URL";
   if (f.kind === "github" && !/^[\w.-]+\/[\w.-]+$/.test(f.repo.trim()))
     return "Name the repository as owner/name";
+  if (f.kind === "pageindex") return f.indexModel.trim() ? null : "Name the indexing model";
   if (f.embeddingProvider.trim() && !f.embeddingModel.trim()) return "Name the embedding model";
   if (f.overlapTokens >= f.chunkTokens) return "Overlap must be smaller than the chunk size";
   return null;
@@ -158,6 +182,15 @@ function loaderConfig(f: SourceForm): Record<string, unknown> {
         ...(f.ref.trim() ? { ref: f.ref.trim() } : {}),
         ...(f.path.trim() ? { path: f.path.trim() } : {}),
       };
+    case "pageindex": {
+      const config: PageIndexConfig = {
+        indexModel: { provider: f.indexProvider, model: f.indexModel.trim() },
+        credentialId: f.indexCredentialId,
+        mode: f.indexMode,
+        optimize: f.indexOptimize,
+      };
+      return { ...config };
+    }
     case "files":
     case "text":
       return {};
@@ -166,6 +199,8 @@ function loaderConfig(f: SourceForm): Record<string, unknown> {
 
 /** The `POST /v1/knowledge/sources` body. */
 export function sourceBody(f: SourceForm): Record<string, unknown> {
+  // PageIndex builds its own section tree: no chunker, embedding or source-level credential
+  if (f.kind === "pageindex") return { name: f.name.trim(), kind: f.kind, config: loaderConfig(f) };
   return {
     name: f.name.trim(),
     kind: f.kind,
@@ -191,9 +226,12 @@ export function mimeOf(
   return "text/plain";
 }
 
-/** A short "3 documents · 41 chunks" line. */
-export function countsLine(s: Pick<KnowledgeSource, "documents" | "chunks">): string {
+/** A short "3 documents · 41 chunks" line (PageIndex sources have no chunks). */
+export function countsLine(
+  s: Pick<KnowledgeSource, "documents" | "chunks"> & { kind?: SourceKind },
+): string {
   const p = (n: number, one: string) => `${n.toLocaleString("en-US")} ${one}${n === 1 ? "" : "s"}`;
+  if (s.kind === "pageindex") return p(s.documents, "document");
   return `${p(s.documents, "document")} · ${p(s.chunks, "chunk")}`;
 }
 

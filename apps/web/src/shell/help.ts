@@ -17,6 +17,7 @@ export const HELP = {
   evaluations: doc("docs/design/ARCHITECTURE.md#104-evaluation-flowaidevaluation"),
   humanInTheLoop: doc("docs/design/ARCHITECTURE.md#101-human-in-the-loop"),
   knowledge: doc("docs/design/ARCHITECTURE.md#108-knowledge--rag-flowaidknowledge-p6-09"),
+  pageindexSetup: doc("docs/pageindex/SETUP.md"),
   api: doc("docs/design/API.md"),
   triggers: doc("docs/design/API.md#6-webhook-ingress-and-callbacks"),
   environment: doc("packages/env/README.md"),
