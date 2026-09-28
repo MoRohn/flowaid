@@ -54,8 +54,10 @@ async function main(): Promise<void> {
   const queue = redisUrl
     ? new BullMqQueueDriver({ connection: { url: redisUrl } })
     : new PgQueueDriver(db.sql);
-  const bus = redisUrl ? new RedisEventBus(redisUrl) : new PgEventBus(db.sql);
-  const hub = new RunEventHub(bus);
+  const commits = new PgEventBus(db.sql);
+  const bus = redisUrl ? new RedisEventBus(redisUrl) : commits;
+  // commit notices always come from Postgres (sent with the append transaction)
+  const hub = new RunEventHub(bus, commits);
   const credentials = await createCredentialService(
     db,
     await masterKeyFromEnv(env, db, (path) =>

@@ -9,6 +9,7 @@ import { and, eq } from "drizzle-orm";
 import type { CredentialService } from "@flowaid/credentials";
 import {
   PgCredentialRepository,
+  PgEventBus,
   PgRunStore,
   RUN_EVENTS_CHANNEL,
   environments,
@@ -82,6 +83,7 @@ export interface WorkerLogger {
 export interface WorkerDeps {
   db: Database;
   queue: QueueDriver;
+  /** Ephemeral fan-out (generation deltas): Redis pub/sub in scale mode, else Postgres. */
   bus: EventBus;
   credentials: CredentialService;
   http: SafeFetch;
@@ -339,7 +341,6 @@ export function createWorker(deps: WorkerDeps): Worker {
   const orchestrator = new Orchestrator({
     store,
     queue: deps.queue,
-    bus: deps.bus,
     registry,
     services,
     workerId,
@@ -652,7 +653,10 @@ export function createWorker(deps: WorkerDeps): Worker {
       }
       stops.push(() => Promise.resolve(executor.abortAll()));
       // Terminal runs: release their credentials and complete subflows into their parents.
-      const unsub = await deps.bus.subscribe(RUN_EVENTS_CHANNEL, (m) => {
+      // Commit notices are `pg_notify`s sent inside the append transaction, so they are read
+      // from Postgres whichever bus carries the ephemeral traffic.
+      const commits = new PgEventBus(deps.db.sql);
+      const unsub = await commits.subscribe(RUN_EVENTS_CHANNEL, (m) => {
         const msg = m as { runId?: string; fromSeq?: number; toSeq?: number };
         if (typeof msg.runId !== "string") return;
         const runId = msg.runId;

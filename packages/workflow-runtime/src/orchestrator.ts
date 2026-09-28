@@ -7,10 +7,10 @@
  *    recovers the state from the latest checkpoint plus the log after it; node runs that were
  *    running under a lost worker are reported with a `recovered` trigger first;
  * 3. runs `step()`, then appends its events in one fenced transaction — `WorkerLostError` means
- *    another worker owns the run, so this one drops it and aborts its executions;
- * 4. publishes `{ runId, fromSeq, toSeq }`, checkpoints every 200 events and before the lease is
- *    released, then performs the effects (executions are tracked; an execution finishing calls
- *    `handle` with its result).
+ *    another worker owns the run, so this one drops it and aborts its executions (the store
+ *    sends the commit notice `{ runId, fromSeq, toSeq }` with that transaction);
+ * 4. checkpoints every 200 events and before the lease is released, then performs the effects
+ *    (executions are tracked; an execution finishing calls `handle` with its result).
  *
  * `startMaintenance()` fires due timers (compare-and-set, so a timer fires once however many
  * workers poll), renews leases, takes over expired ones and picks up cancel requests.
@@ -19,7 +19,6 @@ import {
   CancelledError,
   WorkerLostError,
   type DurableRunEvent,
-  type EventBus,
   type ExecutionPlan,
   type JsonObject,
   type JsonValue,
@@ -58,7 +57,6 @@ export type HandleResult = "ok" | "busy" | "lost" | "terminal" | "missing";
 export interface OrchestratorOptions {
   store: RunStore & { cancelTimer?(timerId: string): Promise<boolean> };
   queue: QueueDriver;
-  bus?: EventBus;
   registry: NodeRegistry;
   services?: NodeServices;
   workerId?: string;
@@ -342,11 +340,6 @@ export class Orchestrator {
       } catch (e) {
         this.error(e, "onEvents", runId);
       }
-    }
-    if (result.events.length > 0) {
-      await this.o.bus
-        ?.publish(`run:${runId}`, { runId, fromSeq: before + 1, toSeq: lastSeq })
-        .catch((e: unknown) => this.error(e, "publish", runId));
     }
     const terminal = TERMINAL.has(held.state.run.status);
     const releasing = result.effects.some((e) => e.type === "release_lease");
