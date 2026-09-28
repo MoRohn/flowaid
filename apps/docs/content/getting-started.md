@@ -36,7 +36,7 @@ administrator and serves the web app and the API. `pnpm start -- --help` lists e
 Every published workflow is an HTTP endpoint, a CLI command and an MCP tool:
 
 ```sh
-curl -X POST http://localhost:3000/v1/workflows/<workflow-id>/run \
+curl -X POST http://flowaid.localhost:3000/v1/workflows/<workflow-id>/run \
   -H "Authorization: Bearer $FLOWAID_API_KEY" -H "Content-Type: application/json" \
   -d '{"input":{"message":"Refund please"}}'
 

@@ -13,6 +13,8 @@ export const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 
 /** Where the UI playground listens unless told otherwise (packages/ui/playground/vite.config.ts). */
 export const DEFAULT_HOST = "127.0.0.1";
+/** The name the local app is opened at: *.localhost always reaches this computer (RFC 6761). */
+export const DEFAULT_DOMAIN = "flowaid.localhost";
 export const DEFAULT_PORT = 5178;
 
 /** `info` never blocks; `warn` is fixable later or automatically; `fail` stops `pnpm start`. */

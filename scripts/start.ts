@@ -23,6 +23,7 @@ import { join, resolve } from "node:path";
 import { parseArgs, parseEnv } from "node:util";
 
 import {
+  DEFAULT_DOMAIN,
   DEFAULT_HOST,
   DEFAULT_PORT,
   ROOT,
@@ -43,6 +44,8 @@ Options
   --port <n>          Web app port (default 3001)
   --api-port <n>      API port (default 3000)
   --host <address>    Interface to bind (default ${DEFAULT_HOST}; 0.0.0.0 exposes it on your network)
+  --domain <name>     Name in the app's address (default ${DEFAULT_DOMAIN}; any *.localhost name
+                      reaches this computer, as does 127.0.0.1)
   --database-url <u>  Use this Postgres instead of a Docker container (or set DATABASE_URL)
   --prod              Run production builds instead of watch mode
   --open              Open the browser once the web app is ready
@@ -64,6 +67,7 @@ try {
       port: { type: "string" },
       "api-port": { type: "string", default: "3000" },
       host: { type: "string", default: DEFAULT_HOST },
+      domain: { type: "string", default: DEFAULT_DOMAIN },
       "database-url": { type: "string" },
       prod: { type: "boolean", default: false },
       open: { type: "boolean", default: false },
@@ -94,7 +98,16 @@ function portOption(value: string, flag: string): number {
 const host = opts.host;
 const webPort = portOption(opts.port ?? String(opts.playground ? DEFAULT_PORT : 3001), "--port");
 const apiPort = portOption(opts["api-port"], "--api-port");
-const browserHost = host === "0.0.0.0" ? "127.0.0.1" : host;
+// Bound to loopback (or every interface), the app is addressed by its name: browsers and the OS
+// resolve any *.localhost name to this computer (RFC 6761), so http://flowaid.localhost:3001
+// needs no hosts-file entry. A specific interface address is used as given.
+if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/i.test(opts.domain)) {
+  console.error(`--domain: "${opts.domain}" is not a host name`);
+  process.exit(2);
+}
+const loopbackBind = host === "localhost" || host === "::1" || /^127\./.test(host);
+const exposed = !loopbackBind;
+const browserHost = loopbackBind || host === "0.0.0.0" ? opts.domain : host;
 
 const color = useColor();
 const paint = (code: number, text: string) => (color ? `\u001b[${code}m${text}\u001b[0m` : text);
@@ -509,7 +522,7 @@ if (opts.playground) {
   // local mode (loopback URLs, the default): this computer opens the app without signing in
   const local = authModeOf(env) === "local";
   if (local) console.log("  opens without a sign-in on this computer");
-  if ((!local || host !== browserHost) && (secrets.created || !existsSync(join(data, "signed-in"))))
+  if ((!local || exposed) && (secrets.created || !existsSync(join(data, "signed-in"))))
     console.log(
       `  ${local ? "other computers sign in" : "sign in"} as ${paint(1, secrets.values.FLOWAID_ADMIN_EMAIL ?? "")} / ${paint(1, secrets.values.FLOWAID_ADMIN_PASSWORD ?? "")}   (also in .flowaid/dev.env)`,
     );
