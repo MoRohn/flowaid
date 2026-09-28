@@ -17,7 +17,8 @@ test("knowledge: create a source, add a document, search it", async ({ page }) =
 
   await page.getByRole("button", { name: "New source" }).first().click();
   await page.getByLabel("Name").fill(NAME);
-  await page.getByRole("switch", { name: /Embed chunks/ }).click();
+  // keyword search: no embedding model or key in the acceptance stack
+  await page.getByRole("radio", { name: /Keywords only/ }).check();
   await page.getByRole("button", { name: "Create source" }).click();
   await expect(page.getByRole("heading", { name: NAME })).toBeVisible();
 

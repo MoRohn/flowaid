@@ -16,7 +16,7 @@
   <img alt="Status: beta" src="https://img.shields.io/badge/status-beta-2f5be8">
   <img alt="TypeScript 5.9 strict" src="https://img.shields.io/badge/TypeScript-5.9%20strict-17171c">
   <img alt="Node.js 24+" src="https://img.shields.io/badge/node-%E2%89%A524-17171c">
-  <img alt="Tests: 5,399 passing" src="https://img.shields.io/badge/tests-5%2C399%20passing-1f9d64">
+  <img alt="Tests: 5,471 passing" src="https://img.shields.io/badge/tests-5%2C471%20passing-1f9d64">
 </p>
 
 ---
