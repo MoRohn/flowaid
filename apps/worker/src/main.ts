@@ -83,7 +83,17 @@ async function main(): Promise<void> {
   const redisUrl = env.REDIS_URL ? String(env.REDIS_URL) : null;
   const queue = redisUrl
     ? new BullMqQueueDriver({ connection: { url: redisUrl } })
-    : new PgQueueDriver(db.sql);
+    : new PgQueueDriver(db.sql, {
+        onError: (error, job) =>
+          log.error(
+            {
+              err: error instanceof Error ? error.message : String(error),
+              job: job.type,
+              ...("runId" in job && job.runId ? { runId: job.runId } : {}),
+            },
+            "queue job failed",
+          ),
+      });
   const sandboxMode =
     String(env.SANDBOX_MODE ?? "isolated-vm") === "container" ? "container" : "isolated-vm";
 
