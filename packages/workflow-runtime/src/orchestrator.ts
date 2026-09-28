@@ -524,16 +524,25 @@ export class Orchestrator {
 
   /* ─── maintenance ─── */
 
-  /** Fires due timers once (compare-and-set). */
+  /**
+   * Fires due timers. The row is marked fired only after the run handled the trigger (its
+   * TIMER_FIRED event is durable; the projection marks the row in the same transaction), so a
+   * timer whose run another worker holds stays due and fires on a later poll. A timer handled
+   * twice is harmless: the run's state no longer has it and `step()` ignores it.
+   */
   async fireDueTimers(limit = 50): Promise<number> {
     const due = await this.o.store.dueTimers(this.now(), limit);
     let fired = 0;
     for (const timer of due) {
-      if (!(await this.o.store.markTimerFired(timer.id))) continue;
-      fired += 1;
-      await this.handle(timer.runId, { type: "timer", timerId: timer.id }).catch((e: unknown) =>
-        this.error(e, "timer", timer.runId),
+      const result = await this.handle(timer.runId, { type: "timer", timerId: timer.id }).catch(
+        (e: unknown) => {
+          this.error(e, "timer", timer.runId);
+          return "busy" as const;
+        },
       );
+      if (result === "busy" || result === "lost") continue;
+      await this.o.store.markTimerFired(timer.id);
+      if (result === "ok") fired += 1;
     }
     return fired;
   }

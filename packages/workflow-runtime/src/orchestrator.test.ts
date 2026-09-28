@@ -391,6 +391,30 @@ describe("Orchestrator on shared stores", () => {
     await new Promise((r) => setTimeout(r, 20));
     expect(await store.getRun(runId)).toMatchObject({ status: "completed", output: "woke" });
   });
+
+  it("keeps a due timer pending while another worker holds the run", async () => {
+    const { store, make, create } = setup(
+      [
+        start,
+        { id: "w", kind: "wait", name: "w", until: { type: "delay", ms: 30 } },
+        { id: "out", kind: "output", name: "out", value: { kind: "literal", value: "woke" } },
+      ],
+      [edge("e0", "start", "done", "w"), edge("e1", "w", "done", "out")],
+    );
+    const runId = await create();
+    const a = make("worker-a");
+    await a.handle(runId, { type: "start" });
+    expect((await store.getRun(runId))?.status).toBe("waiting");
+    expect(await store.acquireLease(runId, "worker-other", 60_000)).not.toBeNull();
+    await new Promise((r) => setTimeout(r, 40));
+    expect(await a.fireDueTimers()).toBe(0);
+    expect(await store.dueTimers(new Date(), 10)).toHaveLength(1);
+    await store.releaseLease(runId, "worker-other");
+    expect(await a.fireDueTimers()).toBe(1);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(await store.getRun(runId)).toMatchObject({ status: "completed", output: "woke" });
+    expect(await store.dueTimers(new Date(), 10)).toHaveLength(0);
+  });
 });
 
 describe("write-time redaction", () => {

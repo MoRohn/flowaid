@@ -43,6 +43,7 @@ import type {
   ExecutionPlan,
   Job,
   QueueDriver,
+  QueueName,
   Run,
   RunEventOf,
   SafeFetch,
@@ -56,6 +57,7 @@ import {
   downstreamOf,
   registryProviderAccess,
   type NodeServices,
+  type Trigger,
 } from "@flowaid/workflow-runtime";
 import { artifactAccessFor } from "./services/artifacts.js";
 import {
@@ -68,7 +70,12 @@ import { stateAccessFor } from "./services/state.js";
 import { toolAccessFor } from "./services/tools.js";
 import { runEvaluationJob } from "./jobs/evaluation.js";
 import { runExportJob } from "./jobs/export.js";
-import { delegateNode, poolExecutor, takeDelegatedResult } from "./delegation.js";
+import {
+  clearDelegatedResult,
+  delegateNode,
+  poolExecutor,
+  readDelegatedResult,
+} from "./delegation.js";
 import { runTraceReviewJob, wantsReview } from "./jobs/traceReview.js";
 import { recordRunMetrics, type AlertDispatcher, type Instruments } from "@flowaid/observability";
 import { runIngestJob } from "./jobs/ingest.js";
@@ -103,6 +110,8 @@ export interface WorkerDeps {
   /** judge provider and timing for evaluation runs */
   evaluation?: { judge?: DecisionProvider; caseTimeoutMs?: number; pollMs?: number };
   maintenance?: { timerPollMs?: number; heartbeatMs?: number; reapMs?: number };
+  /** delay before a run job is redelivered when another worker holds the run (default 1 s) */
+  busyRetryMs?: number;
   /** code export (`export.package` on the `jobs` queue): FLOWAID_VENDOR_DIR for vendored mode */
   exports?: { vendorDir?: string | null };
   /**
@@ -486,47 +495,63 @@ export function createWorker(deps: WorkerDeps): Worker {
   });
 
   let handled = 0;
-  const handle = async (job: Job): Promise<void> => {
-    handled++;
+  /** The trigger a run job carries (null: nothing to hand the run, or not a run job). */
+  const triggerOf = async (job: Job): Promise<{ runId: string; trigger: Trigger } | null> => {
     switch (job.type) {
       case "run.start":
-        await orchestrator.handle(job.runId, { type: "start" });
-        return;
+        return { runId: job.runId, trigger: { type: "start" } };
       case "run.resume":
         // Retry-node (§5.9): the API reopened the failed run; retry its failed nodes.
-        await orchestrator.handle(
-          job.runId,
-          job.reason === "manual_retry" ? { type: "manual_retry", by: "api" } : { type: "resume" },
-        );
-        return;
+        return {
+          runId: job.runId,
+          trigger:
+            job.reason === "manual_retry"
+              ? { type: "manual_retry", by: "api" }
+              : { type: "resume" },
+        };
       case "run.control":
-        await orchestrator.handle(job.runId, { type: "cancel", by: job.by, reason: job.reason });
-        return;
-      case "run.signal":
-        if (job.signal.type === "event")
-          await orchestrator.handle(job.runId, {
-            type: "event",
-            eventName: job.signal.eventName,
-            payload: job.signal.payload,
-            ...(job.signal.correlationKey !== undefined
-              ? { correlationKey: job.signal.correlationKey }
-              : {}),
-          });
-        else if (job.signal.type === "subflow_completed")
-          await completeChild(job.signal.childRunId);
-        else if (job.signal.type === "delegated_result") {
-          const result = await takeDelegatedResult(deps.db, job.signal.nodeRunId);
-          if (result)
-            await orchestrator.handle(job.runId, {
-              type: "delegated_result",
-              nodeRunId: job.signal.nodeRunId,
-              result,
-            });
-        }
-        return;
+        return { runId: job.runId, trigger: { type: "cancel", by: job.by, reason: job.reason } };
       case "timer.fire":
-        await orchestrator.handle(job.runId, { type: "timer", timerId: job.timerId });
-        return;
+        return { runId: job.runId, trigger: { type: "timer", timerId: job.timerId } };
+      case "run.signal":
+        switch (job.signal.type) {
+          case "event":
+            return {
+              runId: job.runId,
+              trigger: {
+                type: "event",
+                eventName: job.signal.eventName,
+                payload: job.signal.payload,
+                ...(job.signal.correlationKey !== undefined
+                  ? { correlationKey: job.signal.correlationKey }
+                  : {}),
+              },
+            };
+          case "subflow_completed": {
+            // A finished child run reports back to its parent's subflow node.
+            const child = await store.getRun(job.signal.childRunId);
+            if (!child?.parentRunId) return null;
+            return {
+              runId: child.parentRunId,
+              trigger: {
+                type: "subflow_completed",
+                childRunId: child.id,
+                status: child.status,
+                output: child.output,
+                error: child.error,
+              },
+            };
+          }
+          case "delegated_result": {
+            const result = await readDelegatedResult(deps.db, job.signal.nodeRunId);
+            if (!result) return null;
+            return {
+              runId: job.runId,
+              trigger: { type: "delegated_result", nodeRunId: job.signal.nodeRunId, result },
+            };
+          }
+        }
+        return null;
       case "node.exec":
       case "schedule.tick":
       case "ingest.source":
@@ -537,22 +562,29 @@ export function createWorker(deps: WorkerDeps): Worker {
       case "partition.ensure":
       case "draft_versions.gc":
         log.warn({ type: job.type }, "job type not handled by this worker");
-        return;
+        return null;
     }
   };
-
-  /** A finished child run reports back to its parent's subflow node. */
-  const completeChild = async (childRunId: string) => {
-    const child = await store.getRun(childRunId);
-    if (!child?.parentRunId) return;
-    await orchestrator.handle(child.parentRunId, {
-      type: "subflow_completed",
-      childRunId,
-      status: child.status,
-      output: child.output,
-      error: child.error,
-    });
-  };
+  /**
+   * The handler of a run queue. When another worker holds the run (`busy`) or took it over
+   * mid-trigger (`lost`), the job goes back on its queue after `busyRetryMs`: completing it would
+   * drop the trigger. A lease always lapses or is released, so the retries end.
+   */
+  const runJobs =
+    (queue: QueueName) =>
+    async (job: Job): Promise<void> => {
+      handled++;
+      const target = await triggerOf(job);
+      if (!target) return;
+      const result = await orchestrator.handle(target.runId, target.trigger);
+      if (result === "busy" || result === "lost") {
+        await deps.queue.enqueue(queue, job, { delayMs: deps.busyRetryMs ?? 1_000 });
+        return;
+      }
+      // the outcome is in the run's log now (or the run no longer needs it)
+      if (target.trigger.type === "delegated_result")
+        await clearDelegatedResult(deps.db, target.trigger.nodeRunId);
+    };
 
   const stops: (() => Promise<void>)[] = [];
   return {
@@ -563,8 +595,12 @@ export function createWorker(deps: WorkerDeps): Worker {
     },
     async start() {
       const concurrency = deps.concurrency ?? 8;
-      const general = await deps.queue.consume("run:general", handle, { concurrency });
-      const control = await deps.queue.consume("run:control", handle, { concurrency: 2 });
+      const general = await deps.queue.consume("run:general", runJobs("run:general"), {
+        concurrency,
+      });
+      const control = await deps.queue.consume("run:control", runJobs("run:control"), {
+        concurrency: 2,
+      });
       const evaluation = await deps.queue.consume(
         "evaluation",
         async (job) => {
