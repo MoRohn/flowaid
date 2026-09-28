@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Evidence } from "@flowaid/workflow-core";
-import { INSUFFICIENT_MARKER, checkCitations, claims, lexicalSupport } from "./cite.js";
+import { INSUFFICIENT_MARKER, checkCitations, claimText, claims, lexicalSupport } from "./cite.js";
 
 const ev = (id: string, page: number, excerpt: string): Evidence => ({
   id,
@@ -28,6 +28,17 @@ describe("claims and lexical support", () => {
     expect(claims("A team lead approves it [E1]. Deletion takes 30 days [E2][E1].")).toEqual([
       { text: "A team lead approves it [E1].", markers: ["E1"] },
       { text: "Deletion takes 30 days [E2][E1].", markers: ["E2", "E1"] },
+    ]);
+  });
+  it("does not split inside quotes, after list numbers or after abbreviations", () => {
+    expect(
+      claims(
+        '[E1] Policy.pdf, section "3. Approvals", page 2: A director approves it. See e.g. Section 4. Done [E2].',
+      ).map((c) => [c.text, c.markers]),
+    ).toEqual([
+      ['[E1] Policy.pdf, section "3. Approvals", page 2: A director approves it.', ["E1"]],
+      ["See e.g. Section 4.", []],
+      ["Done [E2].", ["E2"]],
     ]);
   });
   it("needs every number and most content words in the excerpt", () => {
@@ -125,5 +136,23 @@ describe("checkCitations", () => {
     expect(seen).toEqual(["A team lead approves mid-sized refunds .|E1"]);
     expect(g.citations[0]?.support).toEqual({ method: "decision", score: 0.93 });
     expect(g.status).toBe("sufficient");
+  });
+  it("judges the claim, not a copy of the evidence header the model echoed", async () => {
+    const e = EVIDENCE[0];
+    if (!e) throw new Error("fixture");
+    const echoed =
+      '[E1] Handbook.pdf, section "Policies › Refunds", page 1: Refunds up to $1,000 need a team lead.';
+    expect(claimText(echoed, e)).toBe("Refunds up to $1,000 need a team lead.");
+    expect(claimText("Handbook.pdf, pages 1–2: A team lead approves refunds [E1].", e)).toBe(
+      "A team lead approves refunds .",
+    );
+    expect(
+      claimText(
+        'Handbook.pdf, section "Refunds", page 1 states that a team lead approves it [E1].',
+        e,
+      ),
+    ).toBe("a team lead approves it .");
+    const g = await checkCitations({ answer: echoed, evidence: EVIDENCE, runId: "r" });
+    expect(g.citations[0]?.supported).toBe(true);
   });
 });

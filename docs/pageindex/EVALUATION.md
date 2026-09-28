@@ -45,13 +45,19 @@ All runs on 2026-09-28, on this machine (Apple silicon, Ollama in Docker on the 
 - **Indexing and answers:** `ollama/qwen2.5:3b`, a 3B model.
 - **Navigator and citation judge:** TypeSafe Jev (`jev-latest`), live.
 
-| run                                               | evidence recall | citation validity | citation support | answer correctness | abstention     | latency / question | navigator cost |
-| ------------------------------------------------- | --------------- | ----------------- | ---------------- | ------------------ | -------------- | ------------------ | -------------- |
-| 1: before the section-snippet fix                 | 67% (6/9)       | 100% (12/12)      | 67% (8/12)       | 56% (5/9)          | 100% (2/2)     | 7.4 s              | $0.00047       |
-| 2: section options carry their own text (current) | **100% (9/9)**  | **100% (9/9)**    | 78% (7/9)        | 56% (5/9)          | **100% (2/2)** | 6.9 s              | $0.00043       |
+| run                                                          | evidence recall | citation validity | citation support | answer correctness | abstention     | latency / question | navigator cost |
+| ------------------------------------------------------------ | --------------- | ----------------- | ---------------- | ------------------ | -------------- | ------------------ | -------------- |
+| 1: before the section-snippet fix                            | 67% (6/9)       | 100% (12/12)      | 67% (8/12)       | 56% (5/9)          | 100% (2/2)     | 7.4 s              | $0.00047       |
+| 2: section options carry their own text (current)            | **100% (9/9)**  | **100% (9/9)**    | 78% (7/9)        | 56% (5/9)          | **100% (2/2)** | 6.9 s              | $0.00043       |
+| 3: sentence splitting and header fixes in the citation check | 89% (8/9)       | 100% (10/10)      | 70% (7/10)       | 44% (4/9)          | 100% (2/2)     | 9.7 s              | $0.00043       |
 
-In run 2, **evidence recall, citation validity and abstention pass. Citation support (78%) and
-answer correctness (56%) miss their thresholds.**
+In runs 2 and 3, **evidence recall, citation validity and abstention pass. Citation support
+(78%, 70%) and answer correctness (56%, 44%) miss their thresholds.**
+
+The runs vary because every run re-indexes with the 3B model (its summaries change the
+navigator's options) and the 3B writer phrases answers differently. With nine answerable
+questions, one case is 11 points. In run 3, retrieval missed the contradiction's §1.1 page
+once.
 
 What run 2 shows, case by case:
 

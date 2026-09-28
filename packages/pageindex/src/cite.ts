@@ -38,17 +38,59 @@ const STOP = new Set(
   ),
 );
 
+/**
+ * The claim a sentence makes about `e`: without citation markers, and without a copy of the
+ * evidence header (`Handbook.pdf, section "Refunds", page 2:`) that models sometimes echo.
+ */
+export function claimText(sentence: string, e: Evidence): string {
+  const name = e.displayName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const header = new RegExp(
+    `^\\s*${name}(?:,\\s*section\\s+"[^"]*")?,\\s*pages?\\s+\\d+(?:[–-]\\d+)?(?::|\\s+(?:states|says|notes|shows)(?:\\s+that)?)\\s*`,
+    "i",
+  );
+  return sentence.replace(MARKER, " ").replace(/\s+/g, " ").trim().replace(header, "").trim();
+}
+
 /** Sentences (with their citation markers) of an answer. */
 export function claims(answer: string): { text: string; markers: string[] }[] {
-  const parts = answer
-    .replace(/\r/g, "")
-    .split(/(?<=[.!?])\s+(?=[A-Z0-9"“(])|\n+/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-  return parts.map((text) => ({
+  return splitSentences(answer.replace(/\r/g, "")).map((text) => ({
     text,
     markers: [...new Set([...text.matchAll(MARKER)].map((m) => m[1] ?? ""))].filter(Boolean),
   }));
+}
+
+const ABBREVIATIONS = /(?:^|\s)(?:e\.g|i\.e|etc|vs|dr|mr|mrs|ms|no|nr|approx|fig|sec|p|pp)$/i;
+
+/**
+ * Sentences, split at `.`, `!` or `?` followed by space and a capital, digit, quote or bracket,
+ * and at line breaks, but never inside double quotes (`section "3. Approvals"`), after a list
+ * number (`3.`) or after a common abbreviation (`e.g.`).
+ */
+function splitSentences(text: string): string[] {
+  const out: string[] = [];
+  let start = 0;
+  let quoted = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === '"' || ch === "“" || ch === "”")
+      quoted = ch === "“" ? true : ch === "”" ? false : !quoted;
+    if (ch === "\n") {
+      out.push(text.slice(start, i));
+      start = i + 1;
+      quoted = false;
+      continue;
+    }
+    if (quoted || (ch !== "." && ch !== "!" && ch !== "?")) continue;
+    const rest = text.slice(i + 1);
+    if (!/^\s+["“(A-Z0-9[]/.test(rest)) continue;
+    const before = text.slice(start, i);
+    if (ch === "." && (/(?:^|["“(]\s*)\d{1,3}$/.test(before.trim()) || ABBREVIATIONS.test(before)))
+      continue;
+    out.push(text.slice(start, i + 1));
+    start = i + 1;
+  }
+  out.push(text.slice(start));
+  return out.map((s) => s.trim()).filter(Boolean);
 }
 
 const words = (s: string) =>
@@ -99,7 +141,7 @@ export async function checkCitations(input: CheckInput): Promise<GroundedAnswer>
         continue;
       }
       const id = `c${i}_${marker}`;
-      checks.push({ id, claim: s.text.replace(MARKER, "").trim(), evidence: e });
+      checks.push({ id, claim: claimText(s.text, e), evidence: e });
       citations.push({
         marker,
         evidenceId: e.id,
