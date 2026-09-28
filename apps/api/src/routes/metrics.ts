@@ -22,6 +22,8 @@ const Filters = z.object({
   versionId: z.uuid().optional(),
   from: z.iso.datetime({ offset: true }).optional(),
   to: z.iso.datetime({ offset: true }).optional(),
+  /** `production` (default): API, UI, webhook, schedule, MCP and subflow runs; `all` adds evaluations, replays, restarts and forks */
+  origin: z.enum(["production", "all"]).default("production"),
 });
 
 const Nullable = z.number().nullable();
@@ -78,6 +80,7 @@ export function metricsRoutes(app: FastifyInstance, ctx: ApiContext): void {
     environmentId: q.environmentId ?? p.environmentId ?? undefined,
     versionId: q.versionId,
     workflowIds: p.workflowIds ? [...p.workflowIds] : null,
+    origin: q.origin,
   });
 
   r.get(

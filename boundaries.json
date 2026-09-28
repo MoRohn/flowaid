@@ -97,6 +97,11 @@
       "dir": "packages/knowledge",
       "allow": ["workflow-core", "shared"]
     },
+    "insights": {
+      "dir": "packages/insights",
+      "allow": ["shared"],
+      "browserSafe": true
+    },
     "advisor": {
       "dir": "packages/advisor",
       "allow": ["workflow-core", "workflow-compiler", "providers", "shared"]
@@ -176,6 +181,7 @@
         "importer",
         "codegen",
         "advisor",
+        "insights",
         "knowledge",
         "nodes-core/manifest",
         "plugins"

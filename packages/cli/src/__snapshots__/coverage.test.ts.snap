@@ -64,6 +64,8 @@ event
 event publish <eventName> {--payload --correlation-key --environment-id --body --out}
 import
 import external <file> {--name --dry-run --local --out}
+insights
+insights get {--window --workflow-id --environment-id --out}
 job
 job get <id> {--out}
 knowledge
@@ -110,8 +112,8 @@ member list <id> {--out}
 member remove <id> <userId> {--out}
 member update <id> <userId> {--role --body --out}
 metrics
-metrics overview {--workflow-id --environment-id --version-id --from --to --out}
-metrics timeseries {--workflow-id --environment-id --version-id --from --to --bucket --out}
+metrics overview {--workflow-id --environment-id --version-id --from --to --origin --out}
+metrics timeseries {--workflow-id --environment-id --version-id --from --to --origin --bucket --out}
 model
 model list {--provider --kind --out}
 node
@@ -268,6 +270,7 @@ Commands:
   environment|environments          environment operations
   evaluation|evaluations            evaluation operations
   event|events                      event operations
+  insights                          insights operations
   job|jobs                          job operations
   knowledge|knowledges              knowledge operations
   mcp-exposure|mcp-exposures        mcp-exposure operations

@@ -8311,6 +8311,12 @@
             "in": "query",
             "name": "to",
             "required": false
+          },
+          {
+            "schema": { "default": "production", "type": "string", "enum": ["production", "all"] },
+            "in": "query",
+            "name": "origin",
+            "required": false
           }
         ],
         "x-cli": { "noun": "metrics", "verb": "overview" },
@@ -8502,6 +8508,12 @@
             "required": false
           },
           {
+            "schema": { "default": "production", "type": "string", "enum": ["production", "all"] },
+            "in": "query",
+            "name": "origin",
+            "required": false
+          },
+          {
             "schema": { "default": "1h", "type": "string", "enum": ["1m", "1h", "1d"] },
             "in": "query",
             "name": "bucket",
@@ -8629,6 +8641,247 @@
                     }
                   },
                   "required": ["items"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/insights": {
+      "get": {
+        "summary": "What needs attention and what changed, per workflow, with evidence",
+        "tags": ["metrics"],
+        "parameters": [
+          {
+            "schema": { "default": "7d", "type": "string", "enum": ["24h", "7d", "30d"] },
+            "in": "query",
+            "name": "window",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "query",
+            "name": "workflowId",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "query",
+            "name": "environmentId",
+            "required": false
+          }
+        ],
+        "x-cli": { "noun": "insights", "verb": "get" },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["runs:read"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "computedAt": { "type": "string" },
+                    "window": {
+                      "type": "object",
+                      "properties": { "from": { "type": "string" }, "to": { "type": "string" } },
+                      "required": ["from", "to"],
+                      "additionalProperties": false
+                    },
+                    "baseline": {
+                      "type": "object",
+                      "properties": { "from": { "type": "string" }, "to": { "type": "string" } },
+                      "required": ["from", "to"],
+                      "additionalProperties": false
+                    },
+                    "attention": {
+                      "type": "object",
+                      "properties": {
+                        "openApprovals": {
+                          "type": "object",
+                          "properties": {
+                            "count": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "oldestAt": { "type": ["string", "null"] },
+                            "expiringSoon": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            }
+                          },
+                          "required": ["count", "oldestAt", "expiringSoon"],
+                          "additionalProperties": false
+                        },
+                        "failingWorkflows": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "workflowId": { "type": "string" },
+                              "workflowName": { "type": "string" },
+                              "failed": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              "finished": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              }
+                            },
+                            "required": ["workflowId", "workflowName", "failed", "finished"],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": ["openApprovals", "failingWorkflows"],
+                      "additionalProperties": false
+                    },
+                    "insights": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": { "type": "string" },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "failure_rate",
+                              "latency",
+                              "cost",
+                              "confidence_drop",
+                              "new_error"
+                            ]
+                          },
+                          "severity": { "type": "string", "enum": ["critical", "warning", "info"] },
+                          "workflowId": { "type": "string" },
+                          "workflowName": { "type": "string" },
+                          "title": { "type": "string" },
+                          "summary": { "type": "string" },
+                          "evidence": {
+                            "type": "object",
+                            "properties": {
+                              "metric": { "type": "string" },
+                              "recent": {
+                                "type": "object",
+                                "properties": {
+                                  "value": { "type": "number" },
+                                  "n": {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "interval": {
+                                    "type": "object",
+                                    "properties": {
+                                      "lo": { "type": "number" },
+                                      "hi": { "type": "number" }
+                                    },
+                                    "required": ["lo", "hi"],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": ["value", "n"],
+                                "additionalProperties": false
+                              },
+                              "baseline": {
+                                "type": "object",
+                                "properties": {
+                                  "value": { "type": "number" },
+                                  "n": {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "interval": {
+                                    "type": "object",
+                                    "properties": {
+                                      "lo": { "type": "number" },
+                                      "hi": { "type": "number" }
+                                    },
+                                    "required": ["lo", "hi"],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": ["value", "n"],
+                                "additionalProperties": false
+                              },
+                              "effect": {
+                                "type": "object",
+                                "properties": {
+                                  "ratio": { "type": "number" },
+                                  "points": { "type": "number" }
+                                },
+                                "additionalProperties": false
+                              },
+                              "test": {
+                                "type": "string",
+                                "enum": ["fisher_exact", "mann_whitney_u", "novelty"]
+                              },
+                              "pValue": { "type": ["number", "null"] },
+                              "qValue": { "type": ["number", "null"] }
+                            },
+                            "required": [
+                              "metric",
+                              "recent",
+                              "baseline",
+                              "effect",
+                              "test",
+                              "pValue",
+                              "qValue"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "attribution": {
+                            "type": "object",
+                            "properties": {
+                              "versionId": { "type": "string" },
+                              "version": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  { "type": "null" }
+                                ]
+                              },
+                              "share": { "type": "number" }
+                            },
+                            "required": ["versionId", "version", "share"],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "severity",
+                          "workflowId",
+                          "workflowName",
+                          "title",
+                          "summary",
+                          "evidence"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["computedAt", "window", "baseline", "attention", "insights"],
                   "additionalProperties": false
                 }
               }

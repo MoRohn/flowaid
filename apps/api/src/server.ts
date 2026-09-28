@@ -32,6 +32,7 @@ import { knowledgeRoutes } from "./routes/knowledge.js";
 import { evaluationRoutes } from "./routes/evaluations.js";
 import { agentRoutes } from "./routes/agents.js";
 import { metricsRoutes } from "./routes/metrics.js";
+import { insightRoutes } from "./routes/insights.js";
 import { aiRoutes } from "./routes/ai.js";
 import { optimizeRoutes } from "./routes/optimize.js";
 import { exportRoutes } from "./routes/export.js";
@@ -117,6 +118,7 @@ export async function buildServer(ctx: ApiContext, o: BuildOptions = {}): Promis
   evaluationRoutes(app, ctx);
   agentRoutes(app, ctx);
   metricsRoutes(app, ctx);
+  insightRoutes(app, ctx);
   knowledgeRoutes(app, ctx);
   optimizeRoutes(app, ctx);
   aiRoutes(app, ctx);

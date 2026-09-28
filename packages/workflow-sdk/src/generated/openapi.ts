@@ -2338,6 +2338,112 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/insights": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** What needs attention and what changed, per workflow, with evidence */
+    get: {
+      parameters: {
+        query?: {
+          environmentId?: string;
+          window?: "24h" | "7d" | "30d";
+          workflowId?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              attention: {
+                failingWorkflows: {
+                  failed: number;
+                  finished: number;
+                  workflowId: string;
+                  workflowName: string;
+                }[];
+                openApprovals: {
+                  count: number;
+                  expiringSoon: number;
+                  oldestAt: string | null;
+                };
+              };
+              baseline: {
+                from: string;
+                to: string;
+              };
+              computedAt: string;
+              insights: {
+                attribution?: {
+                  share: number;
+                  version: number | null;
+                  versionId: string;
+                };
+                evidence: {
+                  baseline: {
+                    interval?: {
+                      hi: number;
+                      lo: number;
+                    };
+                    n: number;
+                    value: number;
+                  };
+                  effect: {
+                    points?: number;
+                    ratio?: number;
+                  };
+                  metric: string;
+                  pValue: number | null;
+                  qValue: number | null;
+                  recent: {
+                    interval?: {
+                      hi: number;
+                      lo: number;
+                    };
+                    n: number;
+                    value: number;
+                  };
+                  /** @enum {string} */
+                  test: "fisher_exact" | "mann_whitney_u" | "novelty";
+                };
+                id: string;
+                /** @enum {string} */
+                kind: "failure_rate" | "latency" | "cost" | "confidence_drop" | "new_error";
+                /** @enum {string} */
+                severity: "critical" | "warning" | "info";
+                summary: string;
+                title: string;
+                workflowId: string;
+                workflowName: string;
+              }[];
+              window: {
+                from: string;
+                to: string;
+              };
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/jobs/{id}": {
     parameters: {
       query?: never;
@@ -3829,6 +3935,7 @@ export interface paths {
         query?: {
           environmentId?: string;
           from?: string;
+          origin?: "production" | "all";
           to?: string;
           versionId?: string;
           workflowId?: string;
@@ -3912,6 +4019,7 @@ export interface paths {
           bucket?: "1m" | "1h" | "1d";
           environmentId?: string;
           from?: string;
+          origin?: "production" | "all";
           to?: string;
           versionId?: string;
           workflowId?: string;
