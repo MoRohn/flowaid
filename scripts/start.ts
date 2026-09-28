@@ -3,6 +3,8 @@
  * web app — on this machine.
  *
  * 1. Preflight: Node.js, pnpm, dependencies, free ports, and Docker when no database is given.
+ *    The app opens at http://flowaid.localhost:3000 (the API beside it on 3001); when another app
+ *    holds a default port the next free one is used, while a port passed explicitly must be free.
  * 2. Installs dependencies when they are missing or older than pnpm-lock.yaml.
  * 3. Configuration: `.env` and `.env.local` (provider keys and overrides), plus local secrets
  *    generated once into `.flowaid/dev.env` (master key, owner password) and printed once.
@@ -44,14 +46,16 @@ import {
   useColor,
   type CheckResult,
 } from "./preflight.ts";
+import { DEFAULT_API_PORT, DEFAULT_WEB_PORT } from "./ports.ts";
 
 const HELP = `Usage: pnpm start [options]
 
 Start FlowAId locally: Postgres, the API, the worker and the web app.
 
 Options
-  --port <n>          Web app port (default 3001)
-  --api-port <n>      API port (default 3000)
+  --port <n>          Web app port, the one in the address (default ${DEFAULT_WEB_PORT}; when another
+                      app holds it, the next free port is used)
+  --api-port <n>      API port (default ${DEFAULT_API_PORT}; likewise)
   --host <address>    Interface to bind (default ${DEFAULT_HOST}; 0.0.0.0 exposes it on your network)
   --domain <name>     Name in the app's address (default ${DEFAULT_DOMAIN}; any *.localhost name
                       reaches this computer, as does 127.0.0.1)
@@ -77,7 +81,7 @@ try {
     args: argv[0] === "--" ? argv.slice(1) : argv,
     options: {
       port: { type: "string" },
-      "api-port": { type: "string", default: "3000" },
+      "api-port": { type: "string" },
       host: { type: "string", default: DEFAULT_HOST },
       domain: { type: "string", default: DEFAULT_DOMAIN },
       "database-url": { type: "string" },
@@ -110,10 +114,25 @@ function portOption(value: string, flag: string): number {
   return n;
 }
 const host = opts.host;
-const webPort = portOption(opts.port ?? String(opts.playground ? DEFAULT_PORT : 3001), "--port");
-const apiPort = portOption(opts["api-port"], "--api-port");
+const webRequested =
+  opts.port !== undefined
+    ? portOption(opts.port, "--port")
+    : opts.playground
+      ? DEFAULT_PORT
+      : DEFAULT_WEB_PORT;
+const apiRequested =
+  opts["api-port"] !== undefined ? portOption(opts["api-port"], "--api-port") : DEFAULT_API_PORT;
+if (
+  !opts.playground &&
+  opts.port !== undefined &&
+  opts["api-port"] !== undefined &&
+  webRequested === apiRequested
+) {
+  console.error(`--port and --api-port must differ (both are ${webRequested}).`);
+  process.exit(2);
+}
 // Bound to loopback (or every interface), the app is addressed by its name: browsers and the OS
-// resolve any *.localhost name to this computer (RFC 6761), so http://flowaid.localhost:3001
+// resolve any *.localhost name to this computer (RFC 6761), so http://flowaid.localhost:3000
 // needs no hosts-file entry. A specific interface address is used as given.
 if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/i.test(opts.domain)) {
   console.error(`--domain: "${opts.domain}" is not a host name`);
@@ -402,14 +421,26 @@ console.log(
 heading("Preflight");
 const fileEnv = { ...readEnvFile(join(ROOT, ".env")), ...readEnvFile(join(ROOT, ".env.local")) };
 const databaseUrl = opts["database-url"] ?? process.env.DATABASE_URL ?? fileEnv.DATABASE_URL;
-const results: CheckResult[] = await runPreflight({ host, port: webPort });
+// a default port another app holds moves to the next free one; an explicit port must be free
+const webCheck = await checkPort(host, webRequested, {
+  name: opts.playground ? "Playground port" : "Web port",
+  explicit: opts.port !== undefined,
+  avoid: opts.playground || opts.port !== undefined ? [] : [apiRequested],
+});
+const apiCheck = opts.playground
+  ? null
+  : await checkPort(host, apiRequested, {
+      name: "API port",
+      flag: "--api-port",
+      explicit: opts["api-port"] !== undefined,
+      avoid: [webCheck.port],
+    });
+const webPort = webCheck.port;
+const apiPort = apiCheck?.port ?? apiRequested;
+const results: CheckResult[] = runPreflight({
+  ports: apiCheck ? [webCheck, apiCheck] : [webCheck],
+});
 if (!opts.playground) {
-  const api = await checkPort(host, apiPort);
-  results.push({
-    ...api,
-    name: "API port",
-    ...(api.fix ? { fix: `${api.fix} (or pass --api-port)` } : {}),
-  });
   if (databaseUrl) {
     const i = results.findIndex((r) => r.name === "Docker");
     if (i >= 0) results[i] = { name: "Database", status: "ok", detail: "using DATABASE_URL" };
@@ -421,11 +452,15 @@ if (!opts.playground) {
       fix: "start Docker Desktop, or pass --database-url postgres://… (Postgres 16 with pgvector)",
     });
   }
-  const web = results.findIndex((r) => r.name === "Playground port");
-  if (web >= 0) results[web] = { ...(results[web] as CheckResult), name: "Web port" };
 }
 console.log(formatReport(results, color));
 if (hasFailures(results)) fail("Fix the items marked ✗ and run pnpm start again.");
+if (webPort !== webRequested)
+  warn(
+    `port ${webRequested} is in use (another app); FlowAId is on http://${browserHost}:${webPort} instead`,
+  );
+if (apiCheck && apiPort !== apiRequested)
+  warn(`port ${apiRequested} is in use (another app); the API is on port ${apiPort} instead`);
 
 heading("Dependencies");
 const deps = results.find((r) => r.name === "Dependencies");

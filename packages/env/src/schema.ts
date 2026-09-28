@@ -716,7 +716,7 @@ export function crossFieldIssues(vars: Partial<Record<EnvVarName, unknown>>): Cr
     issues.push({
       path: "CORS_ORIGINS",
       message:
-        "must not contain * (the api allows credentialed requests, so any site could act as the signed-in user); list the web app's origin instead, e.g. http://localhost:3001",
+        "must not contain * (the api allows credentialed requests, so any site could act as the signed-in user); list the web app's origin instead, e.g. http://localhost:3000",
     });
   }
 

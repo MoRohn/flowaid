@@ -58,10 +58,10 @@ describe("EnvSchema", () => {
     expect(env.NODE_ENV).toBe("development");
     expect(env.LOG_LEVEL).toBe("info");
     expect(env.HOST).toBe("127.0.0.1");
-    expect(env.PORT).toBe(3000);
-    expect(env.FLOWAID_BASE_URL).toBe("http://localhost:3000");
-    expect(env.FLOWAID_WEB_URL).toBe("http://localhost:3001");
-    expect(env.CORS_ORIGINS).toEqual(["http://localhost:3001"]);
+    expect(env.PORT).toBe(3001);
+    expect(env.FLOWAID_BASE_URL).toBe("http://localhost:3001");
+    expect(env.FLOWAID_WEB_URL).toBe("http://localhost:3000");
+    expect(env.CORS_ORIGINS).toEqual(["http://localhost:3000"]);
     expect(env.RATE_LIMIT_MAX).toBe(600);
     expect(env.FLOWAID_API_INTERNAL_URL).toBeUndefined();
     expect(env.FLOWAID_TRUST_PROXY).toBe(false);
@@ -185,7 +185,7 @@ describe("EnvSchema", () => {
       S3_FORCE_PATH_STYLE: "off",
       LOG_LEVEL: "debug",
       WORKER_POOLS: "general, code ,retrieval",
-      CORS_ORIGINS: "https://app.example.com/, http://localhost:3001",
+      CORS_ORIGINS: "https://app.example.com/, http://localhost:3000",
       PROMETHEUS_PORT: "9464",
       FLOWAID_FEATURES_DISABLED: "agents, ai_builder",
       FLOWAID_BUNDLED_PLUGINS: "@flowaid/nodes-langchain,@acme/nodes-crm",
@@ -199,7 +199,7 @@ describe("EnvSchema", () => {
     expect(env.S3_FORCE_PATH_STYLE).toBe(false);
     expect(env.LOG_LEVEL).toBe("debug");
     expect(env.WORKER_POOLS).toEqual(["general", "code", "retrieval"]);
-    expect(env.CORS_ORIGINS).toEqual(["https://app.example.com", "http://localhost:3001"]);
+    expect(env.CORS_ORIGINS).toEqual(["https://app.example.com", "http://localhost:3000"]);
     expect(env.PROMETHEUS_PORT).toBe(9464);
     expect(env.FLOWAID_FEATURES_DISABLED).toEqual(["agents", "ai_builder"]);
     expect(env.FLOWAID_BUNDLED_PLUGINS).toEqual(["@flowaid/nodes-langchain", "@acme/nodes-crm"]);

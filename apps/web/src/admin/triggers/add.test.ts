@@ -40,7 +40,7 @@ describe("adding a trigger to a draft", () => {
   });
 
   it("writes a request with the headers each signature scheme needs", () => {
-    const url = "http://127.0.0.1:3000/hooks/default/dev/orders";
+    const url = "http://127.0.0.1:3001/hooks/default/dev/orders";
     const signed = exampleWebhookRequest(url, "hmac_sha256");
     expect(signed).toContain("x-signature: sha256=$SIG");
     expect(signed).toContain("x-timestamp: $TS");

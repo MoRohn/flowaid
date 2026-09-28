@@ -6,8 +6,8 @@ describe("FLOWAID_AUTH_MODE", () => {
     expect(resolveAuthMode({})).toBe("local");
     expect(
       resolveAuthMode({
-        FLOWAID_BASE_URL: "http://127.0.0.1:3000",
-        FLOWAID_WEB_URL: "http://localhost:3001",
+        FLOWAID_BASE_URL: "http://127.0.0.1:3001",
+        FLOWAID_WEB_URL: "http://localhost:3000",
       }),
     ).toBe("local");
     expect(
@@ -26,7 +26,7 @@ describe("FLOWAID_AUTH_MODE", () => {
     });
     expect(issues.map((i) => i.path)).toContain("FLOWAID_WEB_URL");
     expect(
-      crossFieldIssues({ FLOWAID_AUTH_MODE: "local", FLOWAID_WEB_URL: "http://localhost:3001" }),
+      crossFieldIssues({ FLOWAID_AUTH_MODE: "local", FLOWAID_WEB_URL: "http://localhost:3000" }),
     ).toEqual([]);
   });
 });

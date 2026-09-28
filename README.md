@@ -274,19 +274,22 @@ the worker and the web app:
 
 ```text
 [6/6] Start
-✓ API ready on http://flowaid.localhost:3000
+✓ API ready on http://flowaid.localhost:3001
 
-→ http://flowaid.localhost:3001   (Ctrl+C to stop)
+→ http://flowaid.localhost:3000   (Ctrl+C to stop)
   opens without a sign-in on this computer
-  API http://flowaid.localhost:3000 · docs http://flowaid.localhost:3000/docs
+  API http://flowaid.localhost:3001 · docs http://flowaid.localhost:3001/docs
 ```
 
-Open <http://flowaid.localhost:3001>. Any `*.localhost` name reaches your own computer, so the
-address needs no setup (`http://127.0.0.1:3001` works too, and `--domain` picks another name).
+Open <http://flowaid.localhost:3000>. Any `*.localhost` name reaches your own computer, so the
+address needs no setup (`http://127.0.0.1:3000` works too, and `--domain` picks another name).
+The API sits beside it on port 3001. When another app already uses 3000, `pnpm start` moves to
+the next free port and says where, for example
+`port 3000 is in use (another app); FlowAId is on http://flowaid.localhost:3002 instead`.
 There is no account to create: FlowAId signs this computer in by
 itself (the API checks for a loopback address, a local host name and a CSRF header on every such
 session, so other computers and web pages cannot use it). The API reference (OpenAPI 3.1) is at
-<http://flowaid.localhost:3000/docs>.
+<http://flowaid.localhost:3001/docs>.
 
 ### 3. Your first workflow
 
@@ -316,7 +319,7 @@ you go:
 Create an API key under _Settings → API keys_ (pin it to an environment), then:
 
 ```sh
-curl -X POST http://flowaid.localhost:3000/v1/workflows/<workflow-id>/run \
+curl -X POST http://flowaid.localhost:3001/v1/workflows/<workflow-id>/run \
   -H "Authorization: Bearer fa_live_…" -H "Content-Type: application/json" \
   -d '{"input": {"message": "I was charged twice for order 1182"}, "mode": "sync"}'
 ```
@@ -328,7 +331,7 @@ answers `202` with the human task. From TypeScript, with `@flowaid/workflow-sdk`
 import { Flowaid } from "@flowaid/workflow-sdk";
 
 const fa = new Flowaid({
-  baseUrl: "http://flowaid.localhost:3000",
+  baseUrl: "http://flowaid.localhost:3001",
   apiKey: process.env.FLOWAID_API_KEY,
 });
 const run = await fa.workflows.run(workflowId, { message: "Refund please" });
@@ -342,14 +345,14 @@ From a terminal, with the `flowaid` CLI (`packages/cli`; every API operation is 
 `pnpm flowaid` runs it from a checkout):
 
 ```sh
-pnpm flowaid login --api-url http://flowaid.localhost:3000 --api-key fa_live_…
+pnpm flowaid login --api-url http://flowaid.localhost:3001 --api-key fa_live_…
 pnpm flowaid workflow run <workflow-id> --input '{"message":"Refund please"}' --watch
 pnpm flowaid workflow package <workflow-id> --version 1 --out refund-triage.zip   # runnable code
 pnpm flowaid validate ./my-flow.json                                               # no server
 ```
 
 **As MCP tools.** Under _Integrations → Workflows as MCP tools_, expose a workflow and mint an
-MCP token; any MCP client can then list and call it at `http://flowaid.localhost:3000/mcp/<workspace>`
+MCP token; any MCP client can then list and call it at `http://flowaid.localhost:3001/mcp/<workspace>`
 (streamable HTTP, `Authorization: Bearer <token>`).
 
 **From webhooks, schedules and events.** Triggers in a workflow's definition become live URLs,
@@ -360,7 +363,7 @@ cron schedules and event subscriptions when a version is deployed to an environm
 | Command                                    | What it does                                                                         |
 | ------------------------------------------ | ------------------------------------------------------------------------------------ |
 | `pnpm start --open`                        | Also opens the browser                                                               |
-| `pnpm start --port 3101 --api-port 3100`   | Serves the web app and the API on other ports                                        |
+| `pnpm start --port 3100 --api-port 3101`   | Serves the web app and the API on these ports (and stops if either is taken)         |
 | `pnpm start --database-url postgres://…`   | Uses your PostgreSQL 16 (with pgvector) instead of the Docker container              |
 | `pnpm start --prod`                        | Runs the production builds (Next's standalone server, compiled API and worker)       |
 | `pnpm start --domain my.flowaid.localhost` | Opens the app under another name (any `*.localhost` name reaches this computer)      |
@@ -376,8 +379,9 @@ cron schedules and event subscriptions when a version is deployed to an environm
 
 - **`Node.js … is older than the required >=24.0.0`**: run `nvm install` (it reads `.nvmrc`),
   then open a new terminal.
-- **`Web port …` or `API port … is already in use`**: stop the other process, or pass `--port`
-  and `--api-port`.
+- **`Web port …` or `API port … is already in use`**: a port you passed with `--port` or
+  `--api-port` is taken; stop the other app or pass another port. (Busy default ports are not an
+  error: `pnpm start` moves to the next free one.)
 - **`no DATABASE_URL and the Docker daemon is not running`**: start Docker Desktop, or pass
   `--database-url`.
 - **`secret TYPESAFE_API_KEY is not bound in this environment`** when running: bind the

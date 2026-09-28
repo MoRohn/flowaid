@@ -8,7 +8,7 @@ describeDb("CORS and readiness (Postgres)", () => {
   let t: TestApp;
   beforeAll(async () => {
     // a hand-built config with a wildcard: the server still answers exact origins only
-    t = await createTestApp({ corsOrigins: ["*", "http://localhost:3001"] });
+    t = await createTestApp({ corsOrigins: ["*", "http://localhost:3000"] });
   });
   afterAll(() => t.close());
   const preflight = (origin: string) =>
@@ -21,8 +21,8 @@ describeDb("CORS and readiness (Postgres)", () => {
   it("never reflects an arbitrary origin with credentials", async () => {
     const evil = await preflight("https://evil.example");
     expect(evil.headers["access-control-allow-origin"]).toBeUndefined();
-    const web = await preflight("http://localhost:3001");
-    expect(web.headers["access-control-allow-origin"]).toBe("http://localhost:3001");
+    const web = await preflight("http://localhost:3000");
+    expect(web.headers["access-control-allow-origin"]).toBe("http://localhost:3000");
     expect(web.headers["access-control-allow-credentials"]).toBe("true");
   });
 

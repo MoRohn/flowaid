@@ -3,7 +3,7 @@ import { isLocalHostname, isLoopbackAddress, localSignInRefusal } from "../route
 
 const ok = {
   socketAddress: "127.0.0.1",
-  headers: { "x-requested-with": "flowaid", host: "localhost:3000" },
+  headers: { "x-requested-with": "flowaid", host: "localhost:3001" },
 };
 
 describe("local sign-in checks", () => {
@@ -26,8 +26,8 @@ describe("local sign-in checks", () => {
         headers: {
           ...ok.headers,
           "x-forwarded-for": "127.0.0.1",
-          "x-forwarded-host": "127.0.0.1:3001",
-          origin: "http://127.0.0.1:3001",
+          "x-forwarded-host": "127.0.0.1:3000",
+          origin: "http://127.0.0.1:3000",
         },
       }),
     ).toBeNull();
@@ -39,7 +39,7 @@ describe("local sign-in checks", () => {
       localSignInRefusal({ ...ok, headers: { ...ok.headers, "x-forwarded-for": "192.168.1.20" } }),
     ).toMatch(/another computer/);
     expect(
-      localSignInRefusal({ ...ok, headers: { ...ok.headers, host: "rebind.evil.example:3000" } }),
+      localSignInRefusal({ ...ok, headers: { ...ok.headers, host: "rebind.evil.example:3001" } }),
     ).toMatch(/host/);
     expect(
       localSignInRefusal({
@@ -62,7 +62,7 @@ describe("local sign-in checks", () => {
       socketAddress: "127.0.0.1",
       headers: {
         "x-requested-with": "flowaid",
-        host: "127.0.0.1:3000",
+        host: "127.0.0.1:3001",
         "x-forwarded-for": "127.0.0.1",
         "x-forwarded-host": "localhost",
         "x-flowaid-client-unverified": "1",
