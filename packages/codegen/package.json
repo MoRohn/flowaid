@@ -29,7 +29,7 @@
   "dependencies": {
     "@flowaid/workflow-core": "workspace:*",
     "@flowaid/workflow-sdk": "workspace:*",
-    "prettier": "3.9.8"
+    "prettier": "3.9.9"
   },
   "devDependencies": {
     "@flowaid/config": "workspace:*",
