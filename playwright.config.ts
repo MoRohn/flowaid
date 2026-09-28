@@ -18,7 +18,7 @@ export default defineConfig({
   reporter: process.env["CI"] ? [["github"], ["html", { open: "never" }]] : "list",
   use: {
     ...devices["Desktop Chrome"],
-    baseURL: process.env["E2E_BASE_URL"] ?? "http://127.0.0.1:3001",
+    baseURL: process.env["E2E_BASE_URL"] ?? "http://127.0.0.1:3000",
     viewport: { width: 1440, height: 900 },
     trace: "retain-on-failure",
     screenshot: "only-on-failure",

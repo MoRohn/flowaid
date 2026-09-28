@@ -35,7 +35,7 @@ Useful commands:
 | `pnpm format` / `pnpm format:check` | Prettier                                                                                                           |
 | `pnpm env:check`                    | `.env.example` and `packages/env/README.md` match the environment schema                                           |
 | `pnpm start`                        | Preflight, install, build, then the whole stack on this computer (`--playground` serves the UI playground instead) |
-| `pnpm preflight`                    | Check Node.js, pnpm, dependencies and the playground port                                                          |
+| `pnpm preflight`                    | Check Node.js, pnpm, dependencies and the web (3000) and API (3001) ports                                          |
 | `pnpm check`                        | Every CI gate in one command                                                                                       |
 
 ### PostgreSQL and Redis suites
