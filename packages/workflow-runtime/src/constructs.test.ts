@@ -956,3 +956,54 @@ describe("run deadline timer id", () => {
     );
   });
 });
+
+describe("node cost", () => {
+  const plan = planOf({
+    nodes: [start, transform("a", "start.x"), out("out", ref("a", "result"))],
+  });
+  const generation = (costUsd: number) => ({
+    type: "GENERATION_COMPLETED" as const,
+    provider: "acme",
+    model: "m",
+    usage: { inputTokens: 100, outputTokens: 10 },
+    costUsd,
+    priceSnapshot: null,
+    finishReason: "stop" as const,
+    outputChars: 2,
+    latencyMs: 1,
+  });
+
+  it("records a streamed generation's charged cost on the node that reported none", async () => {
+    const sim = await simulate({
+      plan,
+      input,
+      executors: { a: () => okResult({ result: 1 }, { events: [generation(0.25)] }) },
+    });
+    expect(sim.status).toBe("completed");
+    expect(sim.of("NODE_COMPLETED").find((e) => e.nodeId === "a")).toMatchObject({
+      costUsd: 0.25,
+      usage: { inputTokens: 100, outputTokens: 10 },
+    });
+    expect(sim.of("RUN_COMPLETED")[0]?.costUsd).toBeCloseTo(0.25, 10);
+  });
+
+  it("does not double count a node that reports the cost its events charged", async () => {
+    const sim = await simulate({
+      plan,
+      input,
+      executors: {
+        a: () =>
+          okResult(
+            { result: 1 },
+            {
+              events: [generation(0.25)],
+              costUsd: 0.25,
+              usage: { inputTokens: 100, outputTokens: 10 },
+            },
+          ),
+      },
+    });
+    expect(sim.of("NODE_COMPLETED").find((e) => e.nodeId === "a")?.costUsd).toBe(0.25);
+    expect(sim.of("RUN_COMPLETED")[0]?.costUsd).toBeCloseTo(0.25, 10);
+  });
+});

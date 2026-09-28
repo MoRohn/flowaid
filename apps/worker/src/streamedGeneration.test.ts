@@ -31,7 +31,18 @@ function registry(): ProviderRegistry {
       thinking: false,
       maxContext: 128_000,
     },
-    generate: () => Promise.reject(new Error("the node should stream")),
+    generate: () =>
+      Promise.resolve({
+        text: "Hello there.",
+        toolCalls: [],
+        finishReason: "stop" as const,
+        usage: { inputTokens: 1_000_000, outputTokens: 500_000 },
+        costUsd: 0.5,
+        priceSnapshot: null,
+        provider: "openai",
+        model: "gpt-4.1-mini",
+        latencyMs: 1,
+      }),
     stream: () => ({
       async *[Symbol.asyncIterator]() {
         await Promise.resolve();
@@ -50,7 +61,7 @@ function registry(): ProviderRegistry {
   return r;
 }
 
-function definition(maxCostUsd?: number): WorkflowDefinition {
+function definition(maxCostUsd?: number, stream = true): WorkflowDefinition {
   return {
     $schema: "https://flowaid.dev/schemas/workflow/v1",
     id: "00000000-0000-4000-8000-0000000000e1",
@@ -67,7 +78,7 @@ function definition(maxCostUsd?: number): WorkflowDefinition {
         type: "flowaid.ai.generate",
         typeVersion: "1.0.0",
         name: "Generate",
-        config: { model: { provider: "openai", model: "gpt-4.1-mini" }, stream: true },
+        config: { model: { provider: "openai", model: "gpt-4.1-mini" }, stream },
         inputs: { prompt: { kind: "ref", ref: { kind: "port", node: "start", port: "q" } } },
         credentials: { llm: "OPENAI_API_KEY" },
       },
@@ -105,6 +116,25 @@ describe("streamed generation cost", () => {
     const cost = (completed[0] as { costUsd: number }).costUsd;
     expect(cost).toBeGreaterThan(0);
     expect(result.costUsd).toBeCloseTo(cost, 10);
+    // the node row carries the charged cost and usage too, not only what the node reported
+    const gen = result.nodeRuns.find((n) => n.nodeId === "gen");
+    expect(gen?.costUsd).toBeCloseTo(cost, 10);
+    expect(gen?.usage).toMatchObject({ inputTokens: 1_000_000, outputTokens: 500_000 });
+  });
+
+  it("counts a non-streamed generation once, on the node and the run", async () => {
+    const result = await runLocally(definition(undefined, false), {
+      input: { q: "hi" },
+      nodes: [coreNodes],
+      providers: registry(),
+      secrets: { OPENAI_API_KEY: "sk-test" },
+    });
+    expect(result.error).toBeNull();
+    expect(result.events.filter((e) => e.type === "GENERATION_COMPLETED")).toHaveLength(1);
+    expect(result.costUsd).toBeCloseTo(0.5, 10);
+    const gen = result.nodeRuns.find((n) => n.nodeId === "gen");
+    expect(gen?.costUsd).toBeCloseTo(0.5, 10);
+    expect(gen?.usage).toEqual({ inputTokens: 1_000_000, outputTokens: 500_000 });
   });
 
   it("holds a streamed generation to the run's maxCostUsd", async () => {

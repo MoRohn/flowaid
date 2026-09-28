@@ -50,6 +50,7 @@ import { reduce } from "./reduce.js";
 import { ready, scopeDrained, scopeFailure, verdict } from "./ready.js";
 import {
   ACTIVE,
+  atLeastUsage,
   childScopePath,
   nodeKey,
   nodeState,
@@ -698,9 +699,13 @@ class Stepper {
           );
           return;
         }
+        // A streamed generation's cost reaches the node only as GENERATION_COMPLETED: the node
+        // records at least what its generation and decision events charged. The reducer counts
+        // only the part above that spend, so nothing is charged twice.
+        const spent = nodeState(this.s, scope, nodeId);
         this.complete(scope, nodeId, result.output, node.controlOut.length > 0 ? [route] : [], {
-          usage: result.usage ?? null,
-          costUsd: result.costUsd ?? 0,
+          usage: atLeastUsage(result.usage ?? null, spent.spentUsage),
+          costUsd: Math.max(result.costUsd ?? 0, spent.spentUsd),
           latencyMs: result.latencyMs,
         });
         return;
