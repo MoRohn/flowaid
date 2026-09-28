@@ -220,6 +220,20 @@ Every route also declares `x-cli: { noun, verb, positional[] }`, from which the 
 | GET `/v1/health` · `/v1/ready` (db, queue, bus) · `GET /metrics` (Prometheus, internal listener) · `GET /v1/openapi.json` · `GET /docs`                                                                 | public / internal                  |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | GET `/v1/alerts/deliveries`                                                                                                                                                                             | audit:read                         | observability alerts sent to notification channels (`alert_deliveries`: one per channel and occurrence; `human_task.created`, `run.failed`, `trace_review.page`, `schedule.failed`, `webhook.rejected`), newest first                                                                                                                                                                                                                                                                                                                                                                                                            |
 
+### 3.10 PageIndex documents (RFC-0022)
+
+PageIndex sources are knowledge sources of kind `pageindex` (created with `POST /v1/knowledge/sources`
+and `config: { indexModel, credentialId, mode, optimize }`); they never sync, and their documents
+are PDFs uploaded to `/v1/pageindex/*`. The routes (status, documents and their versions, the
+original file, index requests, cancellation, outlines, deletion and the `POST /v1/pageindex/query`
+playground), their shapes and their errors (`PAGEINDEX_DISABLED`, `PAGEINDEX_UNAVAILABLE`,
+`UNSUPPORTED_MEDIA_TYPE`, `INDEX_NOT_READY`) are specified in
+[`docs/pageindex/API.md`](../pageindex/API.md). They use the knowledge scopes. The upload takes
+the PDF itself as the body (at most 50 MiB, its own raw parser; every other route keeps the
+2 MiB JSON limit). Deleting a document revokes it at once and queues `pageindex.cleanup`;
+deleting a `pageindex` source revokes its documents, removes their upstream indexes and files,
+and only then deletes the row.
+
 ## 4. Running a workflow
 
 ```ts

@@ -274,6 +274,9 @@ importers:
       '@flowaid/openapi-tools':
         specifier: workspace:*
         version: link:../../packages/openapi-tools
+      '@flowaid/pageindex':
+        specifier: workspace:*
+        version: link:../../packages/pageindex
       '@flowaid/plugins':
         specifier: workspace:*
         version: link:../../packages/plugins

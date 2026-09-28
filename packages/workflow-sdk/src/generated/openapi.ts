@@ -2728,7 +2728,7 @@ export interface paths {
             };
             credentialId?: string | null;
             /** @enum {string} */
-            kind: "files" | "text" | "url" | "sitemap" | "github";
+            kind: "files" | "text" | "url" | "sitemap" | "github" | "pageindex";
             name: string;
             /** @default {} */
             pipeline?: {
@@ -4548,6 +4548,1386 @@ export interface paths {
               id: string;
               label: string;
             }[];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/pageindex/documents/{documentId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** A document with its versions and indexes */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          documentId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              document: {
+                activeIndex: {
+                  active: boolean;
+                  /** @enum {string} */
+                  backend: "pageindex";
+                  backendVersion: string | null;
+                  capabilities: {
+                    blocks: boolean;
+                    formats: string[];
+                    ocr: boolean;
+                    pageLabels: boolean;
+                    /** @enum {string} */
+                    pageLocators: "physical";
+                  };
+                  configHash: string;
+                  createdAt: string;
+                  displayName: string;
+                  /** Format: uuid */
+                  documentId: string;
+                  documentVersion: number;
+                  error: {
+                    code: string;
+                    message: string;
+                  } | null;
+                  /** Format: uuid */
+                  indexId: string;
+                  indexModel: string | null;
+                  indexVersion: number;
+                  /** @enum {string} */
+                  mode: "local";
+                  pageCount: number | null;
+                  readyAt: string | null;
+                  /** Format: uuid */
+                  sourceId: string;
+                  stage: string | null;
+                  /** @enum {string} */
+                  state:
+                    | "queued"
+                    | "running"
+                    | "ready"
+                    | "failed"
+                    | "cancel_requested"
+                    | "canceled"
+                    | "superseded"
+                    | "deleted";
+                  /** Format: uuid */
+                  versionId: string;
+                } | null;
+                /** Format: uuid */
+                documentId: string;
+                latestIndex: {
+                  active: boolean;
+                  /** @enum {string} */
+                  backend: "pageindex";
+                  backendVersion: string | null;
+                  capabilities: {
+                    blocks: boolean;
+                    formats: string[];
+                    ocr: boolean;
+                    pageLabels: boolean;
+                    /** @enum {string} */
+                    pageLocators: "physical";
+                  };
+                  configHash: string;
+                  createdAt: string;
+                  displayName: string;
+                  /** Format: uuid */
+                  documentId: string;
+                  documentVersion: number;
+                  error: {
+                    code: string;
+                    message: string;
+                  } | null;
+                  /** Format: uuid */
+                  indexId: string;
+                  indexModel: string | null;
+                  indexVersion: number;
+                  /** @enum {string} */
+                  mode: "local";
+                  pageCount: number | null;
+                  readyAt: string | null;
+                  /** Format: uuid */
+                  sourceId: string;
+                  stage: string | null;
+                  /** @enum {string} */
+                  state:
+                    | "queued"
+                    | "running"
+                    | "ready"
+                    | "failed"
+                    | "cancel_requested"
+                    | "canceled"
+                    | "superseded"
+                    | "deleted";
+                  /** Format: uuid */
+                  versionId: string;
+                } | null;
+                latestVersion: {
+                  bytes: number;
+                  contentSha256: string;
+                  displayName: string;
+                  /** Format: uuid */
+                  documentId: string;
+                  mediaType: string;
+                  pageCount: number | null;
+                  /** Format: uuid */
+                  sourceId: string;
+                  version: number;
+                  /** Format: uuid */
+                  versionId: string;
+                };
+                /** @enum {string} */
+                status: "pending" | "indexed" | "error" | "deleted";
+                title: string;
+                versions: number;
+              };
+              indexes: {
+                active: boolean;
+                /** @enum {string} */
+                backend: "pageindex";
+                backendVersion: string | null;
+                capabilities: {
+                  blocks: boolean;
+                  formats: string[];
+                  ocr: boolean;
+                  pageLabels: boolean;
+                  /** @enum {string} */
+                  pageLocators: "physical";
+                };
+                configHash: string;
+                createdAt: string;
+                displayName: string;
+                /** Format: uuid */
+                documentId: string;
+                documentVersion: number;
+                error: {
+                  code: string;
+                  message: string;
+                } | null;
+                /** Format: uuid */
+                indexId: string;
+                indexModel: string | null;
+                indexVersion: number;
+                /** @enum {string} */
+                mode: "local";
+                pageCount: number | null;
+                readyAt: string | null;
+                /** Format: uuid */
+                sourceId: string;
+                stage: string | null;
+                /** @enum {string} */
+                state:
+                  | "queued"
+                  | "running"
+                  | "ready"
+                  | "failed"
+                  | "cancel_requested"
+                  | "canceled"
+                  | "superseded"
+                  | "deleted";
+                /** Format: uuid */
+                versionId: string;
+              }[];
+              versions: {
+                bytes: number;
+                contentSha256: string;
+                displayName: string;
+                /** Format: uuid */
+                documentId: string;
+                mediaType: string;
+                pageCount: number | null;
+                /** Format: uuid */
+                sourceId: string;
+                version: number;
+                /** Format: uuid */
+                versionId: string;
+              }[];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    /** Revoke a document and its indexes now; upstream cleanup runs as a job */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          documentId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        202: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** Format: uuid */
+              documentId: string;
+              /** @enum {string} */
+              status: "deleted";
+            };
+          };
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/pageindex/documents/{documentId}/index": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Build (or join) the latest version's index with the source's settings; retries a failed build */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          documentId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              created: boolean;
+              index: {
+                active: boolean;
+                /** @enum {string} */
+                backend: "pageindex";
+                backendVersion: string | null;
+                capabilities: {
+                  blocks: boolean;
+                  formats: string[];
+                  ocr: boolean;
+                  pageLabels: boolean;
+                  /** @enum {string} */
+                  pageLocators: "physical";
+                };
+                configHash: string;
+                createdAt: string;
+                displayName: string;
+                /** Format: uuid */
+                documentId: string;
+                documentVersion: number;
+                error: {
+                  code: string;
+                  message: string;
+                } | null;
+                /** Format: uuid */
+                indexId: string;
+                indexModel: string | null;
+                indexVersion: number;
+                /** @enum {string} */
+                mode: "local";
+                pageCount: number | null;
+                readyAt: string | null;
+                /** Format: uuid */
+                sourceId: string;
+                stage: string | null;
+                /** @enum {string} */
+                state:
+                  | "queued"
+                  | "running"
+                  | "ready"
+                  | "failed"
+                  | "cancel_requested"
+                  | "canceled"
+                  | "superseded"
+                  | "deleted";
+                /** Format: uuid */
+                versionId: string;
+              };
+            };
+          };
+        };
+        /** @description Default Response */
+        202: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              created: boolean;
+              index: {
+                active: boolean;
+                /** @enum {string} */
+                backend: "pageindex";
+                backendVersion: string | null;
+                capabilities: {
+                  blocks: boolean;
+                  formats: string[];
+                  ocr: boolean;
+                  pageLabels: boolean;
+                  /** @enum {string} */
+                  pageLocators: "physical";
+                };
+                configHash: string;
+                createdAt: string;
+                displayName: string;
+                /** Format: uuid */
+                documentId: string;
+                documentVersion: number;
+                error: {
+                  code: string;
+                  message: string;
+                } | null;
+                /** Format: uuid */
+                indexId: string;
+                indexModel: string | null;
+                indexVersion: number;
+                /** @enum {string} */
+                mode: "local";
+                pageCount: number | null;
+                readyAt: string | null;
+                /** Format: uuid */
+                sourceId: string;
+                stage: string | null;
+                /** @enum {string} */
+                state:
+                  | "queued"
+                  | "running"
+                  | "ready"
+                  | "failed"
+                  | "cancel_requested"
+                  | "canceled"
+                  | "superseded"
+                  | "deleted";
+                /** Format: uuid */
+                versionId: string;
+              };
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/pageindex/documents/{documentId}/versions/{versionId}/file": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The original PDF of one version, inline */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          documentId: string;
+          versionId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/pageindex/indexes/{indexId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          indexId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              active: boolean;
+              /** @enum {string} */
+              backend: "pageindex";
+              backendVersion: string | null;
+              capabilities: {
+                blocks: boolean;
+                formats: string[];
+                ocr: boolean;
+                pageLabels: boolean;
+                /** @enum {string} */
+                pageLocators: "physical";
+              };
+              configHash: string;
+              createdAt: string;
+              displayName: string;
+              /** Format: uuid */
+              documentId: string;
+              documentVersion: number;
+              error: {
+                code: string;
+                message: string;
+              } | null;
+              /** Format: uuid */
+              indexId: string;
+              indexModel: string | null;
+              indexVersion: number;
+              /** @enum {string} */
+              mode: "local";
+              pageCount: number | null;
+              readyAt: string | null;
+              /** Format: uuid */
+              sourceId: string;
+              stage: string | null;
+              /** @enum {string} */
+              state:
+                | "queued"
+                | "running"
+                | "ready"
+                | "failed"
+                | "cancel_requested"
+                | "canceled"
+                | "superseded"
+                | "deleted";
+              /** Format: uuid */
+              versionId: string;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/pageindex/indexes/{indexId}/cancel": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Cancel a build: a queued one at once, a running one when the worker next checks */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          indexId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              active: boolean;
+              /** @enum {string} */
+              backend: "pageindex";
+              backendVersion: string | null;
+              capabilities: {
+                blocks: boolean;
+                formats: string[];
+                ocr: boolean;
+                pageLabels: boolean;
+                /** @enum {string} */
+                pageLocators: "physical";
+              };
+              configHash: string;
+              createdAt: string;
+              displayName: string;
+              /** Format: uuid */
+              documentId: string;
+              documentVersion: number;
+              error: {
+                code: string;
+                message: string;
+              } | null;
+              /** Format: uuid */
+              indexId: string;
+              indexModel: string | null;
+              indexVersion: number;
+              /** @enum {string} */
+              mode: "local";
+              pageCount: number | null;
+              readyAt: string | null;
+              /** Format: uuid */
+              sourceId: string;
+              stage: string | null;
+              /** @enum {string} */
+              state:
+                | "queued"
+                | "running"
+                | "ready"
+                | "failed"
+                | "cancel_requested"
+                | "canceled"
+                | "superseded"
+                | "deleted";
+              /** Format: uuid */
+              versionId: string;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/pageindex/indexes/{indexId}/outline": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The section tree of a ready (or superseded) index */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          indexId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              outline: unknown[];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/pageindex/query": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Retrieve evidence by navigating the scope's indexes; optionally answer with checked citations */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            /** @default false */
+            answer?: boolean;
+            budget?: {
+              branching?: number;
+              excerptChars?: number;
+              maxDecisions?: number;
+              maxPages?: number;
+              maxPagesPerSection?: number;
+              maxSections?: number;
+              minProbability?: number;
+            };
+            query: string;
+            scope: {
+              documentIds?: string[];
+              indexIds?: string[];
+              sourceIds?: string[];
+            };
+          };
+        };
+      };
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              answer: {
+                answer: string;
+                citations: {
+                  /** Format: uuid */
+                  documentId: string;
+                  evidenceId: string;
+                  marker: string;
+                  page: number;
+                  support: {
+                    /** @enum {string} */
+                    method: "decision" | "lexical";
+                    score: number;
+                  } | null;
+                  supported: boolean | null;
+                  /** Format: uuid */
+                  versionId: string;
+                }[];
+                limitations: string[];
+                runId: string;
+                /** @enum {string} */
+                status: "sufficient" | "partial" | "insufficient";
+              } | null;
+              model: {
+                model: string;
+                provider: string;
+              } | null;
+              retrieval: {
+                activity: {
+                  decisions: number;
+                  documents: number;
+                  elapsedMs: number;
+                  pagesRead: number;
+                  sectionsInspected: number;
+                };
+                costUsd: number;
+                evidence: {
+                  displayName: string;
+                  /** Format: uuid */
+                  documentId: string;
+                  documentVersion: number;
+                  excerpt: string;
+                  id: string;
+                  /** Format: uuid */
+                  indexId: string;
+                  indexVersion: number;
+                  locator: {
+                    endPage: number;
+                    /** @enum {string} */
+                    kind: "pdf_page";
+                    page: number;
+                    pageLabel: string | null;
+                  };
+                  nodeId: string | null;
+                  provenance: {
+                    confidence: number | null;
+                    /** @enum {string} */
+                    method: "tree_navigation";
+                    provider: string | null;
+                  };
+                  sectionPath: string[];
+                  truncated: boolean;
+                  /** Format: uuid */
+                  versionId: string;
+                }[];
+                /** @enum {string} */
+                status: "complete" | "partial" | "empty";
+                usage:
+                  | ({
+                      inputTokens: number;
+                      outputTokens: number;
+                    } & {
+                      [key: string]: unknown;
+                    })
+                  | null;
+                warnings: string[];
+              };
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/pageindex/sources/{sourceId}/documents": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** A pageindex source's documents, newest first */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          sourceId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              items: {
+                activeIndex: {
+                  active: boolean;
+                  /** @enum {string} */
+                  backend: "pageindex";
+                  backendVersion: string | null;
+                  capabilities: {
+                    blocks: boolean;
+                    formats: string[];
+                    ocr: boolean;
+                    pageLabels: boolean;
+                    /** @enum {string} */
+                    pageLocators: "physical";
+                  };
+                  configHash: string;
+                  createdAt: string;
+                  displayName: string;
+                  /** Format: uuid */
+                  documentId: string;
+                  documentVersion: number;
+                  error: {
+                    code: string;
+                    message: string;
+                  } | null;
+                  /** Format: uuid */
+                  indexId: string;
+                  indexModel: string | null;
+                  indexVersion: number;
+                  /** @enum {string} */
+                  mode: "local";
+                  pageCount: number | null;
+                  readyAt: string | null;
+                  /** Format: uuid */
+                  sourceId: string;
+                  stage: string | null;
+                  /** @enum {string} */
+                  state:
+                    | "queued"
+                    | "running"
+                    | "ready"
+                    | "failed"
+                    | "cancel_requested"
+                    | "canceled"
+                    | "superseded"
+                    | "deleted";
+                  /** Format: uuid */
+                  versionId: string;
+                } | null;
+                /** Format: uuid */
+                documentId: string;
+                latestIndex: {
+                  active: boolean;
+                  /** @enum {string} */
+                  backend: "pageindex";
+                  backendVersion: string | null;
+                  capabilities: {
+                    blocks: boolean;
+                    formats: string[];
+                    ocr: boolean;
+                    pageLabels: boolean;
+                    /** @enum {string} */
+                    pageLocators: "physical";
+                  };
+                  configHash: string;
+                  createdAt: string;
+                  displayName: string;
+                  /** Format: uuid */
+                  documentId: string;
+                  documentVersion: number;
+                  error: {
+                    code: string;
+                    message: string;
+                  } | null;
+                  /** Format: uuid */
+                  indexId: string;
+                  indexModel: string | null;
+                  indexVersion: number;
+                  /** @enum {string} */
+                  mode: "local";
+                  pageCount: number | null;
+                  readyAt: string | null;
+                  /** Format: uuid */
+                  sourceId: string;
+                  stage: string | null;
+                  /** @enum {string} */
+                  state:
+                    | "queued"
+                    | "running"
+                    | "ready"
+                    | "failed"
+                    | "cancel_requested"
+                    | "canceled"
+                    | "superseded"
+                    | "deleted";
+                  /** Format: uuid */
+                  versionId: string;
+                } | null;
+                latestVersion: {
+                  bytes: number;
+                  contentSha256: string;
+                  displayName: string;
+                  /** Format: uuid */
+                  documentId: string;
+                  mediaType: string;
+                  pageCount: number | null;
+                  /** Format: uuid */
+                  sourceId: string;
+                  version: number;
+                  /** Format: uuid */
+                  versionId: string;
+                };
+                /** @enum {string} */
+                status: "pending" | "indexed" | "error" | "deleted";
+                title: string;
+                versions: number;
+              }[];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    /** Upload a PDF (the body, at most 50 MiB; X-File-Name URL-encoded) and index it; ?documentId= adds a version */
+    post: {
+      parameters: {
+        query?: {
+          documentId?: string;
+        };
+        header?: never;
+        path: {
+          sourceId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              created: boolean;
+              document: {
+                activeIndex: {
+                  active: boolean;
+                  /** @enum {string} */
+                  backend: "pageindex";
+                  backendVersion: string | null;
+                  capabilities: {
+                    blocks: boolean;
+                    formats: string[];
+                    ocr: boolean;
+                    pageLabels: boolean;
+                    /** @enum {string} */
+                    pageLocators: "physical";
+                  };
+                  configHash: string;
+                  createdAt: string;
+                  displayName: string;
+                  /** Format: uuid */
+                  documentId: string;
+                  documentVersion: number;
+                  error: {
+                    code: string;
+                    message: string;
+                  } | null;
+                  /** Format: uuid */
+                  indexId: string;
+                  indexModel: string | null;
+                  indexVersion: number;
+                  /** @enum {string} */
+                  mode: "local";
+                  pageCount: number | null;
+                  readyAt: string | null;
+                  /** Format: uuid */
+                  sourceId: string;
+                  stage: string | null;
+                  /** @enum {string} */
+                  state:
+                    | "queued"
+                    | "running"
+                    | "ready"
+                    | "failed"
+                    | "cancel_requested"
+                    | "canceled"
+                    | "superseded"
+                    | "deleted";
+                  /** Format: uuid */
+                  versionId: string;
+                } | null;
+                /** Format: uuid */
+                documentId: string;
+                latestIndex: {
+                  active: boolean;
+                  /** @enum {string} */
+                  backend: "pageindex";
+                  backendVersion: string | null;
+                  capabilities: {
+                    blocks: boolean;
+                    formats: string[];
+                    ocr: boolean;
+                    pageLabels: boolean;
+                    /** @enum {string} */
+                    pageLocators: "physical";
+                  };
+                  configHash: string;
+                  createdAt: string;
+                  displayName: string;
+                  /** Format: uuid */
+                  documentId: string;
+                  documentVersion: number;
+                  error: {
+                    code: string;
+                    message: string;
+                  } | null;
+                  /** Format: uuid */
+                  indexId: string;
+                  indexModel: string | null;
+                  indexVersion: number;
+                  /** @enum {string} */
+                  mode: "local";
+                  pageCount: number | null;
+                  readyAt: string | null;
+                  /** Format: uuid */
+                  sourceId: string;
+                  stage: string | null;
+                  /** @enum {string} */
+                  state:
+                    | "queued"
+                    | "running"
+                    | "ready"
+                    | "failed"
+                    | "cancel_requested"
+                    | "canceled"
+                    | "superseded"
+                    | "deleted";
+                  /** Format: uuid */
+                  versionId: string;
+                } | null;
+                latestVersion: {
+                  bytes: number;
+                  contentSha256: string;
+                  displayName: string;
+                  /** Format: uuid */
+                  documentId: string;
+                  mediaType: string;
+                  pageCount: number | null;
+                  /** Format: uuid */
+                  sourceId: string;
+                  version: number;
+                  /** Format: uuid */
+                  versionId: string;
+                };
+                /** @enum {string} */
+                status: "pending" | "indexed" | "error" | "deleted";
+                title: string;
+                versions: number;
+              };
+              index: {
+                active: boolean;
+                /** @enum {string} */
+                backend: "pageindex";
+                backendVersion: string | null;
+                capabilities: {
+                  blocks: boolean;
+                  formats: string[];
+                  ocr: boolean;
+                  pageLabels: boolean;
+                  /** @enum {string} */
+                  pageLocators: "physical";
+                };
+                configHash: string;
+                createdAt: string;
+                displayName: string;
+                /** Format: uuid */
+                documentId: string;
+                documentVersion: number;
+                error: {
+                  code: string;
+                  message: string;
+                } | null;
+                /** Format: uuid */
+                indexId: string;
+                indexModel: string | null;
+                indexVersion: number;
+                /** @enum {string} */
+                mode: "local";
+                pageCount: number | null;
+                readyAt: string | null;
+                /** Format: uuid */
+                sourceId: string;
+                stage: string | null;
+                /** @enum {string} */
+                state:
+                  | "queued"
+                  | "running"
+                  | "ready"
+                  | "failed"
+                  | "cancel_requested"
+                  | "canceled"
+                  | "superseded"
+                  | "deleted";
+                /** Format: uuid */
+                versionId: string;
+              };
+              version: {
+                bytes: number;
+                contentSha256: string;
+                displayName: string;
+                /** Format: uuid */
+                documentId: string;
+                mediaType: string;
+                pageCount: number | null;
+                /** Format: uuid */
+                sourceId: string;
+                version: number;
+                /** Format: uuid */
+                versionId: string;
+              };
+            };
+          };
+        };
+        /** @description Default Response */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              created: boolean;
+              document: {
+                activeIndex: {
+                  active: boolean;
+                  /** @enum {string} */
+                  backend: "pageindex";
+                  backendVersion: string | null;
+                  capabilities: {
+                    blocks: boolean;
+                    formats: string[];
+                    ocr: boolean;
+                    pageLabels: boolean;
+                    /** @enum {string} */
+                    pageLocators: "physical";
+                  };
+                  configHash: string;
+                  createdAt: string;
+                  displayName: string;
+                  /** Format: uuid */
+                  documentId: string;
+                  documentVersion: number;
+                  error: {
+                    code: string;
+                    message: string;
+                  } | null;
+                  /** Format: uuid */
+                  indexId: string;
+                  indexModel: string | null;
+                  indexVersion: number;
+                  /** @enum {string} */
+                  mode: "local";
+                  pageCount: number | null;
+                  readyAt: string | null;
+                  /** Format: uuid */
+                  sourceId: string;
+                  stage: string | null;
+                  /** @enum {string} */
+                  state:
+                    | "queued"
+                    | "running"
+                    | "ready"
+                    | "failed"
+                    | "cancel_requested"
+                    | "canceled"
+                    | "superseded"
+                    | "deleted";
+                  /** Format: uuid */
+                  versionId: string;
+                } | null;
+                /** Format: uuid */
+                documentId: string;
+                latestIndex: {
+                  active: boolean;
+                  /** @enum {string} */
+                  backend: "pageindex";
+                  backendVersion: string | null;
+                  capabilities: {
+                    blocks: boolean;
+                    formats: string[];
+                    ocr: boolean;
+                    pageLabels: boolean;
+                    /** @enum {string} */
+                    pageLocators: "physical";
+                  };
+                  configHash: string;
+                  createdAt: string;
+                  displayName: string;
+                  /** Format: uuid */
+                  documentId: string;
+                  documentVersion: number;
+                  error: {
+                    code: string;
+                    message: string;
+                  } | null;
+                  /** Format: uuid */
+                  indexId: string;
+                  indexModel: string | null;
+                  indexVersion: number;
+                  /** @enum {string} */
+                  mode: "local";
+                  pageCount: number | null;
+                  readyAt: string | null;
+                  /** Format: uuid */
+                  sourceId: string;
+                  stage: string | null;
+                  /** @enum {string} */
+                  state:
+                    | "queued"
+                    | "running"
+                    | "ready"
+                    | "failed"
+                    | "cancel_requested"
+                    | "canceled"
+                    | "superseded"
+                    | "deleted";
+                  /** Format: uuid */
+                  versionId: string;
+                } | null;
+                latestVersion: {
+                  bytes: number;
+                  contentSha256: string;
+                  displayName: string;
+                  /** Format: uuid */
+                  documentId: string;
+                  mediaType: string;
+                  pageCount: number | null;
+                  /** Format: uuid */
+                  sourceId: string;
+                  version: number;
+                  /** Format: uuid */
+                  versionId: string;
+                };
+                /** @enum {string} */
+                status: "pending" | "indexed" | "error" | "deleted";
+                title: string;
+                versions: number;
+              };
+              index: {
+                active: boolean;
+                /** @enum {string} */
+                backend: "pageindex";
+                backendVersion: string | null;
+                capabilities: {
+                  blocks: boolean;
+                  formats: string[];
+                  ocr: boolean;
+                  pageLabels: boolean;
+                  /** @enum {string} */
+                  pageLocators: "physical";
+                };
+                configHash: string;
+                createdAt: string;
+                displayName: string;
+                /** Format: uuid */
+                documentId: string;
+                documentVersion: number;
+                error: {
+                  code: string;
+                  message: string;
+                } | null;
+                /** Format: uuid */
+                indexId: string;
+                indexModel: string | null;
+                indexVersion: number;
+                /** @enum {string} */
+                mode: "local";
+                pageCount: number | null;
+                readyAt: string | null;
+                /** Format: uuid */
+                sourceId: string;
+                stage: string | null;
+                /** @enum {string} */
+                state:
+                  | "queued"
+                  | "running"
+                  | "ready"
+                  | "failed"
+                  | "cancel_requested"
+                  | "canceled"
+                  | "superseded"
+                  | "deleted";
+                /** Format: uuid */
+                versionId: string;
+              };
+              version: {
+                bytes: number;
+                contentSha256: string;
+                displayName: string;
+                /** Format: uuid */
+                documentId: string;
+                mediaType: string;
+                pageCount: number | null;
+                /** Format: uuid */
+                sourceId: string;
+                version: number;
+                /** Format: uuid */
+                versionId: string;
+              };
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/pageindex/status": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Whether PageIndex is configured and its service answers, and what it can do */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              enabled: boolean;
+              modes: {
+                cloud: {
+                  available: boolean;
+                  capabilities: {
+                    blocks: boolean;
+                    formats: string[];
+                    ocr: boolean;
+                    pageLabels: boolean;
+                    /** @enum {string} */
+                    pageLocators: "physical";
+                  } | null;
+                  processing: string;
+                };
+                local: {
+                  available: boolean;
+                  capabilities: {
+                    blocks: boolean;
+                    formats: string[];
+                    ocr: boolean;
+                    pageLabels: boolean;
+                    /** @enum {string} */
+                    pageLocators: "physical";
+                  } | null;
+                  processing: string;
+                };
+              };
+              protocol: string;
+              reachable: boolean;
+              sdkVersion: string | null;
+            };
           };
         };
       };
