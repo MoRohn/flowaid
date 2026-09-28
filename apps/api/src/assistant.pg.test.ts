@@ -66,9 +66,8 @@ const tool = (name: string, args: Record<string, unknown> = {}): Partial<Generat
 /** the JSON inside the last tool message the model was shown */
 function lastToolData(req: GenerationRequest | undefined): { data: unknown; sources: string[] } {
   const content = req?.messages.filter((m) => m.role === "tool").at(-1)?.content;
-  const body = (typeof content === "string" ? content : "")
-    .replace(/^<untrusted_data[^>]*>\n/, "")
-    .replace(/\n<\/untrusted_data>$/, "");
+  // between the <<<UNTRUSTED …>>> and <<<END UNTRUSTED>>> lines
+  const body = (typeof content === "string" ? content : "").split("\n").slice(1, -1).join("\n");
   return JSON.parse(body) as { data: unknown; sources: string[] };
 }
 

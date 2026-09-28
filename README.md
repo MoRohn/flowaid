@@ -366,6 +366,10 @@ cron schedules and event subscriptions when a version is deployed to an environm
   `--database-url`.
 - **`secret TYPESAFE_API_KEY is not bound in this environment`** when running: bind the
   workflow's secret to a credential in the workflow's _Settings → Secrets_.
+- **`refused to connect to 127.0.0.1: private or reserved address`** (or `FORBIDDEN` from a
+  database query node): workflows may not reach this computer or your network by default. To
+  call your own local services, add `FLOWAID_ALLOW_PRIVATE_NETWORK=true` to `.env` and restart
+  (see [SECURITY.md](SECURITY.md#private-network-access) for the trade-off).
 - **A reset**: stop FlowAId, then `docker rm -f flowaid-dev-db && docker volume rm flowaid-dev-db`
   and delete `.flowaid/` (this deletes every workflow, run and credential).
 

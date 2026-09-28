@@ -33,7 +33,6 @@ export {
   ASSISTANT_SYSTEM_PROMPT,
   ask,
   assistantPromptHash,
-  wrapUntrusted,
   type AskInput,
   type AssistantAnswer,
   type AssistantSource,

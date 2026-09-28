@@ -111,6 +111,7 @@ export interface WorkerDeps {
   stdioPolicy?: StdioPolicy;
   workerId?: string;
   concurrency?: number;
+  /** FLOWAID_ALLOW_PRIVATE_NETWORK (with an `http` built to match: see network.ts) */
   allowPrivateNetwork?: boolean;
   log?: WorkerLogger;
   /** judge provider and timing for evaluation runs */

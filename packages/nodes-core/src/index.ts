@@ -118,6 +118,7 @@ export {
   sessionNode,
   checkpointNode,
 };
+export { dbQueryConnector, type DbQueryNetwork } from "./tools/db_query.js";
 export { gateOutcome, type GateOutcome } from "./decision/confidence_gate.js";
 export { combine } from "./decision/consensus.js";
 export { splitText } from "./data/split.js";

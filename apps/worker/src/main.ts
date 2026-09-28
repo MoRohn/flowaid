@@ -28,7 +28,6 @@ import {
   createDatabaseFromEnv,
 } from "@flowaid/database";
 import { loadEnv, pickEnv } from "@flowaid/env";
-import { createSafeFetch } from "@flowaid/providers";
 import { RegistryClient } from "@flowaid/plugins";
 import { FileFixtureStore } from "@flowaid/providers/recording-fs";
 import { createSandbox } from "@flowaid/sandbox";
@@ -36,6 +35,7 @@ import { artifactStorageFrom } from "@flowaid/storage";
 import { BullMqQueueDriver, RedisEventBus } from "@flowaid/workflow-runtime";
 import { coreNodes } from "@flowaid/nodes-core";
 import { heartbeatPath, startHeartbeat } from "./heartbeat.js";
+import { workerNetworkFromEnv } from "./network.js";
 import { createPoolWorker } from "./poolWorker.js";
 import { startScheduler } from "./jobs/scheduler.js";
 import { loadBundledPlugins, registerPluginProviders } from "./plugins/bundled.js";
@@ -94,6 +94,8 @@ async function main(): Promise<void> {
             "queue job failed",
           ),
       });
+  // FLOWAID_ALLOW_PRIVATE_NETWORK: whether workflows may reach loopback and private addresses
+  const network = workerNetworkFromEnv(env);
   const sandboxMode =
     String(env.SANDBOX_MODE ?? "isolated-vm") === "container" ? "container" : "isolated-vm";
 
@@ -103,7 +105,7 @@ async function main(): Promise<void> {
       db,
       queue,
       pools,
-      http: createSafeFetch({ timeoutMs: 120_000, userAgent: "FlowAId-Worker/1" }),
+      http: network.http,
       ...(pools.includes("code") ? { sandbox: createSandbox(sandboxMode) } : {}),
       concurrency: Number(env.WORKER_CONCURRENCY ?? 4),
       log,
@@ -143,7 +145,7 @@ async function main(): Promise<void> {
     keyring,
     external: new ExternalResolver(externalResolverOptionsFromEnv(env, keyDeps)),
   });
-  const http = createSafeFetch({ timeoutMs: 120_000, userAgent: "FlowAId-Worker/1" });
+  const http = network.http;
   const dataDir = dirname(String(env.FLOWAID_MASTER_KEY_FILE ?? "/data/master.key"));
 
   // Bundled plugins (e.g. @flowaid/nodes-langchain) load unless features.langchain is disabled.
@@ -237,6 +239,7 @@ async function main(): Promise<void> {
       ...(env.OLLAMA_HOST ? { ollamaHost: String(env.OLLAMA_HOST) } : {}),
     },
     sandbox: createSandbox(sandboxMode),
+    allowPrivateNetwork: network.allowPrivateNetwork,
     ...(env.flags.mcpStdioEnabled
       ? {
           stdioPolicy: {

@@ -47,7 +47,7 @@ import type {
 
 /* ───────────────────────── custom types ───────────────────────── */
 // Unsized: sources choose their embedding model, so vectors of different dimensions share the
-// table; migration 0005 adds a partial HNSW index per common dimension (see DATABASE.md).
+// table; migration 0007 adds a partial HNSW index per common dimension (see DATABASE.md).
 const vector = customType<{ data: number[]; driverData: string }>({
   dataType() {
     return "vector";
@@ -573,7 +573,7 @@ export const runEvents = pgTable(
     check("run_events_payload_size", sql`pg_column_size(${t.payload}) < 262144`),
   ],
 );
-// RUN_EVENTS_PARTITIONED=true: migration 0003 converts to PARTITION BY RANGE (at), monthly partitions created 3 months ahead by the sweep job.
+// RUN_EVENTS_PARTITIONED=true: migration 0002 converts to PARTITION BY RANGE (at), monthly partitions created 3 months ahead by the sweep job.
 
 export const nodeRuns = pgTable(
   "node_runs",
@@ -1048,7 +1048,7 @@ export const documents = pgTable(
     status: text("status", { enum: ["pending", "indexed", "error", "deleted"] })
       .notNull()
       .default("pending"),
-    // v1.2 (0005): the normalised text of inline documents (uploads), so a source can be
+    // v1.2 (0007): the normalised text of inline documents (uploads), so a source can be
     // re-indexed after its pipeline changes; null for documents a loader can fetch again
     content: text("content"),
     error: text("error"),
@@ -1079,7 +1079,7 @@ export const chunks = pgTable(
   (t) => [
     index("chunks_doc_idx").on(t.documentId, t.ordinal),
     index("chunks_source_idx").on(t.sourceId),
-    // HNSW needs a fixed dimension: partial expression indexes per dimension live in 0005
+    // HNSW needs a fixed dimension: partial expression indexes per dimension live in 0007
     index("chunks_tsv_gin").using("gin", t.tsv),
     index("chunks_meta_gin").using("gin", t.metadata),
   ],

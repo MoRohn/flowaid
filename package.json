@@ -21,7 +21,7 @@
     "test": "turbo run test",
     "test:e2e": "turbo run test:e2e",
     "db:migrate": "pnpm --filter @flowaid/database migrate",
-    "db:generate": "pnpm --filter @flowaid/database generate",
+    "db:generate": "pnpm --filter @flowaid/database db:generate",
     "format": "prettier --write \"**/*.{ts,tsx,md,json,yaml,yml,css}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,md,json,yaml,yml,css}\"",
     "clean": "turbo run clean && rm -rf node_modules",

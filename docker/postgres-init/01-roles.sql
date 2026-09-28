@@ -3,7 +3,7 @@
 -- POSTGRES_USER with ON_ERROR_STOP). It creates the two login roles the stack connects with:
 --
 --   flowaid_app   api and worker (DATABASE_URL). Table privileges and the row-level-security
---                 policies come from migrations/0002_rls.sql (DATABASE.md), which the api runs
+--                 policies come from migrations/0001_rls.sql (DATABASE.md), which the api runs
 --                 as the owner through DATABASE_ADMIN_URL.
 --   flowaid_code  worker-code, the sandbox host: queue_jobs, node_runs and run_events (insert)
 --                 only, granted by the same migration. Its password is never the owner's.

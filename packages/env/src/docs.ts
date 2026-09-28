@@ -420,6 +420,15 @@ const docs = {
     example: "true",
     secret: false,
   },
+  FLOWAID_ALLOW_PRIVATE_NETWORK: {
+    group: "security",
+    description:
+      "Let workflows reach loopback, private-network and link-local addresses: the HTTP, GraphQL and database query nodes, knowledge loaders, OpenAPI tools (import and calls), HTTP MCP servers and notification webhooks. Off by default, so a workflow cannot probe the machine or network it runs on. Turn it on when you run FlowAId for yourself and want flows to call your own `localhost` services or local databases; every workflow author can then reach them. Set it for both the api and the worker.",
+    default: "false",
+    required: false,
+    example: "true",
+    secret: false,
+  },
   FLOWAID_ALLOW_CROSS_SITE: {
     group: "security",
     description:

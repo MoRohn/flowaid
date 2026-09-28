@@ -4,6 +4,7 @@ import { join } from "node:path";
 import type { Database } from "@flowaid/database";
 import type { CredentialService } from "@flowaid/credentials";
 import type { QueueDriver, SafeFetch } from "@flowaid/workflow-core";
+import { createSafeFetch } from "@flowaid/providers";
 import type { RunEventHub } from "./services/hub.js";
 import { resolveAuthMode, type Env } from "@flowaid/env";
 import type { ProviderRegistry } from "@flowaid/providers";
@@ -29,7 +30,11 @@ export interface ApiConfig {
   sseMaxStreamsPerPrincipal: number;
   featuresDisabled: readonly string[];
   hasRedis: boolean;
-  /** Development and tests only: outbound calls may reach private addresses. Never in production. */
+  /**
+   * FLOWAID_ALLOW_PRIVATE_NETWORK: outbound calls (OpenAPI import, MCP discovery, credential
+   * tests, notification test sends) may reach loopback and private addresses; `http` is built to
+   * match (`apiSafeFetch`).
+   */
   allowPrivateNetwork: boolean;
   /** Local artifact storage shared with the worker (`<data>/artifacts`); null when unavailable. */
   artifactsDir: string | null;
@@ -89,7 +94,7 @@ export function configFromEnv(env: Env): ApiConfig {
     sseMaxStreamsPerPrincipal: Number(env.FLOWAID_SSE_MAX_STREAMS_PER_PRINCIPAL ?? 20),
     featuresDisabled: env.FLOWAID_FEATURES_DISABLED ?? [],
     hasRedis: env.flags.hasRedis,
-    allowPrivateNetwork: false,
+    allowPrivateNetwork: env.FLOWAID_ALLOW_PRIVATE_NETWORK,
     artifactsDir: `${String(env.FLOWAID_MASTER_KEY_FILE ?? "/data/master.key").replace(/\/[^/]*$/, "")}/artifacts`,
     s3:
       env.S3_ENDPOINT && env.S3_BUCKET && env.S3_ACCESS_KEY && env.S3_SECRET_KEY
@@ -112,6 +117,16 @@ export function configFromEnv(env: Env): ApiConfig {
       allowLocal: env.FLOWAID_PLUGIN_ALLOW_LOCAL,
     },
   };
+}
+
+/** The API's SSRF-guarded fetch, honouring `allowPrivateNetwork`. */
+export function apiSafeFetch(config: Pick<ApiConfig, "allowPrivateNetwork">): SafeFetch {
+  return createSafeFetch({
+    maxBytes: 25 * 1024 * 1024,
+    timeoutMs: 30_000,
+    userAgent: "FlowAId-API/1",
+    allowPrivate: config.allowPrivateNetwork,
+  });
 }
 
 /** Sensible defaults for tests and local development. */
