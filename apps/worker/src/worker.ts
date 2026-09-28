@@ -21,6 +21,7 @@ import {
 } from "@flowaid/database";
 import { McpSessionPool, connectSession, type StdioPolicy } from "@flowaid/mcp";
 import type { NodePackage } from "@flowaid/node-sdk";
+import type { PageIndexServiceClient } from "@flowaid/pageindex";
 import { coreNodes } from "@flowaid/nodes-core";
 import {
   DefaultModelCatalog,
@@ -86,6 +87,13 @@ import {
   type RetentionSweepReport,
 } from "./jobs/maintenance.js";
 import { knowledgeServiceFor, type KnowledgeDeps } from "./services/knowledge.js";
+import { documentIndexAccessFor } from "./services/documents.js";
+import {
+  reconcilePageIndex,
+  runCleanupJob,
+  runIndexJob,
+  type PageIndexJobDeps,
+} from "./jobs/pageindex.js";
 
 export interface WorkerLogger {
   info(data: Record<string, unknown>, msg: string): void;
@@ -137,6 +145,17 @@ export interface WorkerDeps {
   /** public web URL for links in alerts */
   webUrl?: string;
   traceReview?: { judge?: DecisionProvider };
+  /**
+   * RFC-0022: the PageIndex service (FLOWAID_PAGEINDEX_URL/TOKEN). Without it, document nodes
+   * fail with BAD_REQUEST and PageIndex jobs wait on the queue until it is configured.
+   */
+  pageindex?: {
+    client: PageIndexServiceClient;
+    /** job timing (tests shorten it) */
+    pollMs?: number;
+    retryDelayMs?: number;
+    timeoutMs?: number;
+  };
 }
 
 export const ALL_POOLS: readonly WorkerPool[] = [
@@ -274,7 +293,31 @@ export function createWorker(deps: WorkerDeps): Worker {
         runId: call.runId,
         nodeRunId: call.nodeRunId,
       }),
+    documents: (call) =>
+      documentIndexAccessFor(
+        { db: deps.db, queue: deps.queue, client: deps.pageindex?.client ?? null },
+        { workspaceId: call.workspaceId, signal: call.signal },
+      ),
   };
+  // PageIndex builds poll the service for minutes: stopping the worker aborts them (they resume)
+  const stopping = new AbortController();
+  const pageindexJobs: PageIndexJobDeps | null = deps.pageindex
+    ? {
+        db: deps.db,
+        queue: deps.queue,
+        client: deps.pageindex.client,
+        credentials: deps.credentials,
+        storage,
+        serverKeys,
+        log,
+        signal: stopping.signal,
+        ...(deps.pageindex.pollMs !== undefined ? { pollMs: deps.pageindex.pollMs } : {}),
+        ...(deps.pageindex.retryDelayMs !== undefined
+          ? { retryDelayMs: deps.pageindex.retryDelayMs }
+          : {}),
+        ...(deps.pageindex.timeoutMs !== undefined ? { timeoutMs: deps.pageindex.timeoutMs } : {}),
+      }
+    : null;
 
   // ── observability: metrics, alerts and trace reviews of finished runs ──
   const labels = new Map<string, { env: string; slug: string }>();
@@ -678,6 +721,16 @@ export function createWorker(deps: WorkerDeps): Worker {
       const ingest = await deps.queue.consume(
         "ingest",
         async (job) => {
+          if (job.type === "pageindex.index" || job.type === "pageindex.cleanup") {
+            if (!pageindexJobs) {
+              // re-queued by reconciliation once the service is configured
+              log.warn({ type: job.type }, "PageIndex is not configured; job skipped");
+              return;
+            }
+            if (job.type === "pageindex.index") await runIndexJob(pageindexJobs, job);
+            else await runCleanupJob(pageindexJobs, job);
+            return;
+          }
           if (job.type !== "ingest.source") return;
           const r = await runIngestJob(knowledge, job.sourceId);
           if (r)
@@ -686,7 +739,8 @@ export function createWorker(deps: WorkerDeps): Worker {
               "knowledge source synced",
             );
         },
-        { concurrency: 2 },
+        // index builds hold a slot while they poll the service
+        { concurrency: deps.pageindex ? 4 : 2 },
       );
       const maintenance = await deps.queue.consume(
         "maintenance",
@@ -709,6 +763,7 @@ export function createWorker(deps: WorkerDeps): Worker {
       stops.push(
         () => maintenance.stop(),
         () => ingest.stop(),
+        () => Promise.resolve(stopping.abort(new Error("the worker is stopping"))),
         () => general.stop(),
         () => control.stop(),
         () => evaluation.stop(),
@@ -802,6 +857,15 @@ export function createWorker(deps: WorkerDeps): Worker {
         reapMs: 15_000,
         ...deps.maintenance,
       });
+      // builds and cleanups a crash or a lost enqueue left behind
+      if (pageindexJobs)
+        await reconcilePageIndex({ db: deps.db, queue: deps.queue })
+          .then((r) => {
+            if (r.indexes || r.cleanups) log.info(r, "PageIndex work re-queued");
+          })
+          .catch((error: unknown) =>
+            log.error({ err: String(error) }, "PageIndex reconciliation failed"),
+          );
       log.info({ workerId, concurrency }, "worker started");
     },
     async stop() {

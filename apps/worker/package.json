@@ -34,6 +34,7 @@
     "@flowaid/nodes-langchain": "workspace:*",
     "@flowaid/observability": "workspace:*",
     "@flowaid/openapi-tools": "workspace:*",
+    "@flowaid/pageindex": "workspace:*",
     "@flowaid/provider-anthropic": "workspace:*",
     "@flowaid/provider-ollama": "workspace:*",
     "@flowaid/provider-openai": "workspace:*",

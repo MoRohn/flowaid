@@ -218,6 +218,7 @@
         "langchain",
         "nodes-langchain",
         "knowledge",
+        "pageindex",
         "plugins"
       ]
     },
