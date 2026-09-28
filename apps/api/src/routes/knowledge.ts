@@ -21,13 +21,26 @@ import type { Principal } from "../auth/principal.js";
 import type { ApiContext } from "../context.js";
 import { IdParams, ListQuery, NoContent, decodeCursor, encodeCursor, page } from "../dto/common.js";
 import { indexFor, knowledgeServiceFor } from "../services/knowledge.js";
+import {
+  checkPageIndexConfig,
+  deleteDocument as deletePageIndexDocument,
+  deletePageIndexSource,
+  requirePageIndex,
+} from "../services/pageindex.js";
 
 type SourceRow = typeof knowledgeSources.$inferSelect;
 type DocumentRow = typeof documents.$inferSelect;
 
 /** Kinds whose documents are uploaded (the others are fetched by a loader on sync). */
 export const UPLOAD_KINDS = ["files", "text"] as const;
-const SOURCE_KINDS = [...UPLOAD_KINDS, "url", "sitemap", "github"] as const;
+/**
+ * PageIndex sources (RFC-0022) hold uploaded PDFs indexed by the PageIndex service: no loader,
+ * no sync, and their uploads go through `POST /v1/pageindex/sources/:id/documents`.
+ */
+export const PAGEINDEX_KIND = "pageindex";
+const SOURCE_KINDS = [...UPLOAD_KINDS, "url", "sitemap", "github", PAGEINDEX_KIND] as const;
+/** Kinds that never sync: their documents arrive by upload. */
+const NO_SYNC_KINDS: readonly string[] = [...UPLOAD_KINDS, PAGEINDEX_KIND];
 
 const ModelRefSchema = z.object({ provider: z.string().min(1), model: z.string().min(1) });
 const PipelineSchema = z.object({
@@ -136,8 +149,25 @@ const sourceDto = (s: SourceRow, counts: { documents: number; chunks: number }) 
   updatedAt: s.updatedAt.toISOString(),
 });
 
-/** Remote kinds need what their loader reads. */
-function checkConfig(kind: string, config: JsonObject): void {
+/**
+ * Remote kinds need what their loader reads; pageindex sources need an indexing model (and a
+ * credential of its type, when they name one). Returns the config as stored.
+ */
+async function checkConfig(
+  tx: Tx,
+  workspaceId: string,
+  kind: string,
+  config: JsonObject,
+): Promise<JsonObject> {
+  if (kind === PAGEINDEX_KIND) {
+    const c = await checkPageIndexConfig(tx, workspaceId, config);
+    return {
+      indexModel: { provider: c.indexModel.provider, model: c.indexModel.model },
+      credentialId: c.credentialId,
+      mode: c.mode,
+      optimize: c.optimize,
+    };
+  }
   const has = (k: string) => typeof config[k] === "string" && config[k] !== "";
   if (kind === "url" && !has("url") && !Array.isArray(config.urls))
     throw new BadRequestError("a url source needs config.url or config.urls");
@@ -148,6 +178,7 @@ function checkConfig(kind: string, config: JsonObject): void {
     !(typeof config.repo === "string" && /^[\w.-]+\/[\w.-]+$/.test(config.repo))
   )
     throw new BadRequestError("a github source needs config.repo (owner/name)");
+  return config;
 }
 
 async function checkCredential(tx: Tx, workspaceId: string, id: string | null | undefined) {
@@ -250,11 +281,12 @@ export function knowledgeRoutes(app: FastifyInstance, ctx: ApiContext): void {
     async (req, reply) => {
       const p = need(req.principal);
       const b = req.body;
-      const config = b.config as JsonObject;
-      checkConfig(b.kind, config);
+      // PageIndex sources are indexed by the PageIndex service, so they need it configured
+      if (b.kind === PAGEINDEX_KIND) requirePageIndex(ctx.config);
       if (b.pipeline.index && b.pipeline.index.adapter !== "pgvector" && !b.pipeline.index.url)
         throw new BadRequestError("a remote index needs pipeline.index.url");
       const row = await ctx.db.tenant(p.workspaceId, async (tx) => {
+        const config = await checkConfig(tx, p.workspaceId, b.kind, b.config as JsonObject);
         const [dup] = await tx
           .select({ id: knowledgeSources.id })
           .from(knowledgeSources)
@@ -279,7 +311,7 @@ export function knowledgeRoutes(app: FastifyInstance, ctx: ApiContext): void {
         return created as SourceRow;
       });
       req.audit.resourceId = row.id;
-      if (!(UPLOAD_KINDS as readonly string[]).includes(row.kind)) await enqueueSync(row.id);
+      if (!NO_SYNC_KINDS.includes(row.kind)) await enqueueSync(row.id);
       return reply.code(201).send(sourceDto(row, { documents: 0, chunks: 0 }));
     },
   );
@@ -332,16 +364,21 @@ export function knowledgeRoutes(app: FastifyInstance, ctx: ApiContext): void {
       const b = req.body;
       const { row, reindex } = await ctx.db.tenant(p.workspaceId, async (tx) => {
         const s = await loadSource(tx, p, req.params.id);
-        if (b.config) checkConfig(s.kind, b.config as JsonObject);
+        const config = b.config
+          ? await checkConfig(tx, p.workspaceId, s.kind, b.config as JsonObject)
+          : undefined;
         await checkCredential(tx, p.workspaceId, b.credentialId);
         await checkCredential(tx, p.workspaceId, b.pipeline?.embeddingCredentialId);
+        // a pageindex source's settings apply to the next index request; nothing syncs
         const pipelineChanged =
-          b.pipeline !== undefined && JSON.stringify(b.pipeline) !== JSON.stringify(s.pipeline);
+          s.kind !== PAGEINDEX_KIND &&
+          b.pipeline !== undefined &&
+          JSON.stringify(b.pipeline) !== JSON.stringify(s.pipeline);
         const [updated] = await tx
           .update(knowledgeSources)
           .set({
             ...(b.name ? { name: b.name } : {}),
-            ...(b.config ? { config: b.config as JsonObject } : {}),
+            ...(config ? { config } : {}),
             ...(b.pipeline ? { pipeline: b.pipeline } : {}),
             ...(b.credentialId !== undefined ? { credentialId: b.credentialId } : {}),
             ...(pipelineChanged ? { status: "stale" as const } : {}),
@@ -355,7 +392,10 @@ export function knowledgeRoutes(app: FastifyInstance, ctx: ApiContext): void {
             .update(documents)
             .set({ status: "pending", updatedAt: new Date() })
             .where(eq(documents.sourceId, s.id));
-        return { row: updated as SourceRow, reindex: pipelineChanged || b.config !== undefined };
+        return {
+          row: updated as SourceRow,
+          reindex: s.kind !== PAGEINDEX_KIND && (pipelineChanged || b.config !== undefined),
+        };
       });
       req.audit.resourceId = row.id;
       if (reindex) await enqueueSync(row.id);
@@ -377,6 +417,12 @@ export function knowledgeRoutes(app: FastifyInstance, ctx: ApiContext): void {
     async (req, reply) => {
       const p = need(req.principal);
       const s = await ctx.db.tenant(p.workspaceId, (tx) => loadSource(tx, p, req.params.id));
+      // PageIndex documents leave indexes upstream and files in storage: revoke, clean up, then
+      // delete the row (see deletePageIndexSource for the order)
+      if (s.kind === PAGEINDEX_KIND) {
+        await deletePageIndexSource(ctx, p.workspaceId, s.id);
+        return reply.code(204).send(null);
+      }
       // remote indexes keep their own copy; pgvector chunks cascade with the row
       if (
         (s.pipeline as Pipeline).index?.adapter &&
@@ -413,6 +459,10 @@ export function knowledgeRoutes(app: FastifyInstance, ctx: ApiContext): void {
     async (req, reply) => {
       const p = need(req.principal);
       const s = await ctx.db.tenant(p.workspaceId, (tx) => loadSource(tx, p, req.params.id));
+      if (s.kind === PAGEINDEX_KIND)
+        throw new BadRequestError(
+          "a pageindex source does not sync; index a document with POST /v1/pageindex/documents/:documentId/index",
+        );
       await enqueueSync(s.id);
       return reply.code(202).send({ id: s.id, status: "queued" });
     },
@@ -509,6 +559,10 @@ export function knowledgeRoutes(app: FastifyInstance, ctx: ApiContext): void {
       const p = need(req.principal);
       const rows = await ctx.db.tenant(p.workspaceId, async (tx) => {
         const s = await loadSource(tx, p, req.params.id);
+        if (s.kind === PAGEINDEX_KIND)
+          throw new BadRequestError(
+            "a pageindex source takes PDFs: upload the file itself with POST /v1/pageindex/sources/:sourceId/documents",
+          );
         if (!(UPLOAD_KINDS as readonly string[]).includes(s.kind))
           throw new BadRequestError(`a ${s.kind} source loads its own documents; sync it instead`);
         const out: DocumentRow[] = [];
@@ -559,8 +613,13 @@ export function knowledgeRoutes(app: FastifyInstance, ctx: ApiContext): void {
     },
     async (req, reply) => {
       const p = need(req.principal);
-      const d = await ctx.db.tenant(p.workspaceId, (tx) => loadDocument(tx, p, req.params.id));
-      await knowledgeServiceFor(ctx, p.workspaceId).deleteDocument(d.sourceId, d.externalId);
+      const { d, s } = await ctx.db.tenant(p.workspaceId, async (tx) => {
+        const d = await loadDocument(tx, p, req.params.id);
+        return { d, s: await loadSource(tx, p, d.sourceId) };
+      });
+      // a PageIndex document is revoked and cleaned up like DELETE /v1/pageindex/documents/:id
+      if (s.kind === PAGEINDEX_KIND) await deletePageIndexDocument(ctx, p.workspaceId, d.id);
+      else await knowledgeServiceFor(ctx, p.workspaceId).deleteDocument(d.sourceId, d.externalId);
       return reply.code(204).send(null);
     },
   );

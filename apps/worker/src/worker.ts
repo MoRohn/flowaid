@@ -9,6 +9,7 @@ import { and, eq } from "drizzle-orm";
 import type { CredentialService } from "@flowaid/credentials";
 import {
   PgCredentialRepository,
+  PgEventBus,
   PgRunStore,
   RUN_EVENTS_CHANNEL,
   environments,
@@ -20,6 +21,7 @@ import {
 } from "@flowaid/database";
 import { McpSessionPool, connectSession, type StdioPolicy } from "@flowaid/mcp";
 import type { NodePackage } from "@flowaid/node-sdk";
+import type { PageIndexServiceClient } from "@flowaid/pageindex";
 import { coreNodes } from "@flowaid/nodes-core";
 import {
   DefaultModelCatalog,
@@ -42,6 +44,7 @@ import type {
   ExecutionPlan,
   Job,
   QueueDriver,
+  QueueName,
   Run,
   RunEventOf,
   SafeFetch,
@@ -55,6 +58,7 @@ import {
   downstreamOf,
   registryProviderAccess,
   type NodeServices,
+  type Trigger,
 } from "@flowaid/workflow-runtime";
 import { artifactAccessFor } from "./services/artifacts.js";
 import {
@@ -67,11 +71,29 @@ import { stateAccessFor } from "./services/state.js";
 import { toolAccessFor } from "./services/tools.js";
 import { runEvaluationJob } from "./jobs/evaluation.js";
 import { runExportJob } from "./jobs/export.js";
-import { delegateNode, poolExecutor, takeDelegatedResult } from "./delegation.js";
+import {
+  clearDelegatedResult,
+  delegateNode,
+  poolExecutor,
+  readDelegatedResult,
+} from "./delegation.js";
 import { runTraceReviewJob, wantsReview } from "./jobs/traceReview.js";
 import { recordRunMetrics, type AlertDispatcher, type Instruments } from "@flowaid/observability";
 import { runIngestJob } from "./jobs/ingest.js";
+import {
+  isMaintenanceJob,
+  runMaintenanceJob,
+  scheduleRetentionSweep,
+  type RetentionSweepReport,
+} from "./jobs/maintenance.js";
 import { knowledgeServiceFor, type KnowledgeDeps } from "./services/knowledge.js";
+import { documentIndexAccessFor } from "./services/documents.js";
+import {
+  reconcilePageIndex,
+  runCleanupJob,
+  runIndexJob,
+  type PageIndexJobDeps,
+} from "./jobs/pageindex.js";
 
 export interface WorkerLogger {
   info(data: Record<string, unknown>, msg: string): void;
@@ -82,6 +104,7 @@ export interface WorkerLogger {
 export interface WorkerDeps {
   db: Database;
   queue: QueueDriver;
+  /** Ephemeral fan-out (generation deltas): Redis pub/sub in scale mode, else Postgres. */
   bus: EventBus;
   credentials: CredentialService;
   http: SafeFetch;
@@ -96,11 +119,18 @@ export interface WorkerDeps {
   stdioPolicy?: StdioPolicy;
   workerId?: string;
   concurrency?: number;
+  /** FLOWAID_ALLOW_PRIVATE_NETWORK (with an `http` built to match: see network.ts) */
   allowPrivateNetwork?: boolean;
   log?: WorkerLogger;
   /** judge provider and timing for evaluation runs */
   evaluation?: { judge?: DecisionProvider; caseTimeoutMs?: number; pollMs?: number };
   maintenance?: { timerPollMs?: number; heartbeatMs?: number; reapMs?: number };
+  /** delay before a run job is redelivered when another worker holds the run (default 1 s) */
+  busyRetryMs?: number;
+  /** how often the queue-depth and active-runs gauges are sampled (default 15 s) */
+  metricsSampleMs?: number;
+  /** RETENTION_SWEEP_CRON: enqueues `retention.sweep` on the maintenance queue; null disables */
+  retentionCron?: string | null;
   /** code export (`export.package` on the `jobs` queue): FLOWAID_VENDOR_DIR for vendored mode */
   exports?: { vendorDir?: string | null };
   /**
@@ -115,6 +145,17 @@ export interface WorkerDeps {
   /** public web URL for links in alerts */
   webUrl?: string;
   traceReview?: { judge?: DecisionProvider };
+  /**
+   * RFC-0022: the PageIndex service (FLOWAID_PAGEINDEX_URL/TOKEN). Without it, document nodes
+   * fail with BAD_REQUEST and PageIndex jobs wait on the queue until it is configured.
+   */
+  pageindex?: {
+    client: PageIndexServiceClient;
+    /** job timing (tests shorten it) */
+    pollMs?: number;
+    retryDelayMs?: number;
+    timeoutMs?: number;
+  };
 }
 
 export const ALL_POOLS: readonly WorkerPool[] = [
@@ -125,6 +166,11 @@ export const ALL_POOLS: readonly WorkerPool[] = [
   "retrieval",
   "high_memory",
 ];
+
+/** Both built-in queue drivers count the jobs waiting on a queue (the queue-depth gauge). */
+type CountingQueue = QueueDriver & { depth(queue: QueueName): Promise<number> };
+const countsJobs = (queue: QueueDriver): queue is CountingQueue =>
+  "depth" in queue && typeof queue.depth === "function";
 
 const TERMINAL = new Set(["RUN_COMPLETED", "RUN_FAILED", "RUN_CANCELLED", "RUN_TIMED_OUT"]);
 const silent: WorkerLogger = {
@@ -138,7 +184,11 @@ const silent: WorkerLogger = {
  * recorded to, or replayed from, the fixture store instead of only reaching the vendor.
  */
 export function defaultProviderRegistry(
-  options: { fixtures?: { mode: FixtureMode; store: FixtureStore } } = {},
+  options: {
+    fixtures?: { mode: FixtureMode; store: FixtureStore };
+    /** OLLAMA_HOST: where Ollama models run when a workflow names no host */
+    ollamaHost?: string | undefined;
+  } = {},
 ): ProviderRegistry {
   const registry = new ProviderRegistry({ catalog: new DefaultModelCatalog() });
   const { fixtures } = options;
@@ -149,8 +199,8 @@ export function defaultProviderRegistry(
   register(typesafeFactory());
   for (const f of openaiFactories()) register(f);
   register(anthropicFactory());
-  register(ollamaFactory());
-  register(ollamaEmbeddingFactory());
+  register(ollamaFactory({ host: options.ollamaHost }));
+  register(ollamaEmbeddingFactory({ host: options.ollamaHost }));
   for (const f of rerankFactories()) register(f);
   return registry;
 }
@@ -162,6 +212,8 @@ export interface Worker {
   stop(): Promise<void>;
   /** jobs handled so far (diagnostics, tests) */
   readonly handled: number;
+  /** the last `retention.sweep` this worker ran (the heartbeat file carries it) */
+  readonly lastRetentionSweep: RetentionSweepReport | null;
 }
 
 export function createWorker(deps: WorkerDeps): Worker {
@@ -245,7 +297,31 @@ export function createWorker(deps: WorkerDeps): Worker {
         runId: call.runId,
         nodeRunId: call.nodeRunId,
       }),
+    documents: (call) =>
+      documentIndexAccessFor(
+        { db: deps.db, queue: deps.queue, client: deps.pageindex?.client ?? null },
+        { workspaceId: call.workspaceId, signal: call.signal },
+      ),
   };
+  // PageIndex builds poll the service for minutes: stopping the worker aborts them (they resume)
+  const stopping = new AbortController();
+  const pageindexJobs: PageIndexJobDeps | null = deps.pageindex
+    ? {
+        db: deps.db,
+        queue: deps.queue,
+        client: deps.pageindex.client,
+        credentials: deps.credentials,
+        storage,
+        serverKeys,
+        log,
+        signal: stopping.signal,
+        ...(deps.pageindex.pollMs !== undefined ? { pollMs: deps.pageindex.pollMs } : {}),
+        ...(deps.pageindex.retryDelayMs !== undefined
+          ? { retryDelayMs: deps.pageindex.retryDelayMs }
+          : {}),
+        ...(deps.pageindex.timeoutMs !== undefined ? { timeoutMs: deps.pageindex.timeoutMs } : {}),
+      }
+    : null;
 
   // ── observability: metrics, alerts and trace reviews of finished runs ──
   const labels = new Map<string, { env: string; slug: string }>();
@@ -339,7 +415,6 @@ export function createWorker(deps: WorkerDeps): Worker {
   const orchestrator = new Orchestrator({
     store,
     queue: deps.queue,
-    bus: deps.bus,
     registry,
     services,
     workerId,
@@ -485,50 +560,68 @@ export function createWorker(deps: WorkerDeps): Worker {
   });
 
   let handled = 0;
-  const handle = async (job: Job): Promise<void> => {
-    handled++;
+  /** The trigger a run job carries (null: nothing to hand the run, or not a run job). */
+  const triggerOf = async (job: Job): Promise<{ runId: string; trigger: Trigger } | null> => {
     switch (job.type) {
       case "run.start":
-        await orchestrator.handle(job.runId, { type: "start" });
-        return;
+        return { runId: job.runId, trigger: { type: "start" } };
       case "run.resume":
         // Retry-node (§5.9): the API reopened the failed run; retry its failed nodes.
-        await orchestrator.handle(
-          job.runId,
-          job.reason === "manual_retry" ? { type: "manual_retry", by: "api" } : { type: "resume" },
-        );
-        return;
+        return {
+          runId: job.runId,
+          trigger:
+            job.reason === "manual_retry"
+              ? { type: "manual_retry", by: "api" }
+              : { type: "resume" },
+        };
       case "run.control":
-        await orchestrator.handle(job.runId, { type: "cancel", by: job.by, reason: job.reason });
-        return;
-      case "run.signal":
-        if (job.signal.type === "event")
-          await orchestrator.handle(job.runId, {
-            type: "event",
-            eventName: job.signal.eventName,
-            payload: job.signal.payload,
-            ...(job.signal.correlationKey !== undefined
-              ? { correlationKey: job.signal.correlationKey }
-              : {}),
-          });
-        else if (job.signal.type === "subflow_completed")
-          await completeChild(job.signal.childRunId);
-        else if (job.signal.type === "delegated_result") {
-          const result = await takeDelegatedResult(deps.db, job.signal.nodeRunId);
-          if (result)
-            await orchestrator.handle(job.runId, {
-              type: "delegated_result",
-              nodeRunId: job.signal.nodeRunId,
-              result,
-            });
-        }
-        return;
+        return { runId: job.runId, trigger: { type: "cancel", by: job.by, reason: job.reason } };
       case "timer.fire":
-        await orchestrator.handle(job.runId, { type: "timer", timerId: job.timerId });
-        return;
+        return { runId: job.runId, trigger: { type: "timer", timerId: job.timerId } };
+      case "run.signal":
+        switch (job.signal.type) {
+          case "event":
+            return {
+              runId: job.runId,
+              trigger: {
+                type: "event",
+                eventName: job.signal.eventName,
+                payload: job.signal.payload,
+                ...(job.signal.correlationKey !== undefined
+                  ? { correlationKey: job.signal.correlationKey }
+                  : {}),
+              },
+            };
+          case "subflow_completed": {
+            // A finished child run reports back to its parent's subflow node.
+            const child = await store.getRun(job.signal.childRunId);
+            if (!child?.parentRunId) return null;
+            return {
+              runId: child.parentRunId,
+              trigger: {
+                type: "subflow_completed",
+                childRunId: child.id,
+                status: child.status,
+                output: child.output,
+                error: child.error,
+              },
+            };
+          }
+          case "delegated_result": {
+            const result = await readDelegatedResult(deps.db, job.signal.nodeRunId);
+            if (!result) return null;
+            return {
+              runId: job.runId,
+              trigger: { type: "delegated_result", nodeRunId: job.signal.nodeRunId, result },
+            };
+          }
+        }
+        return null;
       case "node.exec":
       case "schedule.tick":
       case "ingest.source":
+      case "pageindex.index":
+      case "pageindex.cleanup":
       case "evaluation.run":
       case "trace_review.run":
       case "export.package":
@@ -536,23 +629,31 @@ export function createWorker(deps: WorkerDeps): Worker {
       case "partition.ensure":
       case "draft_versions.gc":
         log.warn({ type: job.type }, "job type not handled by this worker");
-        return;
+        return null;
     }
   };
+  /**
+   * The handler of a run queue. When another worker holds the run (`busy`) or took it over
+   * mid-trigger (`lost`), the job goes back on its queue after `busyRetryMs`: completing it would
+   * drop the trigger. A lease always lapses or is released, so the retries end.
+   */
+  const runJobs =
+    (queue: QueueName) =>
+    async (job: Job): Promise<void> => {
+      handled++;
+      const target = await triggerOf(job);
+      if (!target) return;
+      const result = await orchestrator.handle(target.runId, target.trigger);
+      if (result === "busy" || result === "lost") {
+        await deps.queue.enqueue(queue, job, { delayMs: deps.busyRetryMs ?? 1_000 });
+        return;
+      }
+      // the outcome is in the run's log now (or the run no longer needs it)
+      if (target.trigger.type === "delegated_result")
+        await clearDelegatedResult(deps.db, target.trigger.nodeRunId);
+    };
 
-  /** A finished child run reports back to its parent's subflow node. */
-  const completeChild = async (childRunId: string) => {
-    const child = await store.getRun(childRunId);
-    if (!child?.parentRunId) return;
-    await orchestrator.handle(child.parentRunId, {
-      type: "subflow_completed",
-      childRunId,
-      status: child.status,
-      output: child.output,
-      error: child.error,
-    });
-  };
-
+  let lastRetentionSweep: RetentionSweepReport | null = null;
   const stops: (() => Promise<void>)[] = [];
   return {
     id: workerId,
@@ -560,10 +661,17 @@ export function createWorker(deps: WorkerDeps): Worker {
     get handled() {
       return handled;
     },
+    get lastRetentionSweep() {
+      return lastRetentionSweep;
+    },
     async start() {
       const concurrency = deps.concurrency ?? 8;
-      const general = await deps.queue.consume("run:general", handle, { concurrency });
-      const control = await deps.queue.consume("run:control", handle, { concurrency: 2 });
+      const general = await deps.queue.consume("run:general", runJobs("run:general"), {
+        concurrency,
+      });
+      const control = await deps.queue.consume("run:control", runJobs("run:control"), {
+        concurrency: 2,
+      });
       const evaluation = await deps.queue.consume(
         "evaluation",
         async (job) => {
@@ -617,6 +725,16 @@ export function createWorker(deps: WorkerDeps): Worker {
       const ingest = await deps.queue.consume(
         "ingest",
         async (job) => {
+          if (job.type === "pageindex.index" || job.type === "pageindex.cleanup") {
+            if (!pageindexJobs) {
+              // re-queued by reconciliation once the service is configured
+              log.warn({ type: job.type }, "PageIndex is not configured; job skipped");
+              return;
+            }
+            if (job.type === "pageindex.index") await runIndexJob(pageindexJobs, job);
+            else await runCleanupJob(pageindexJobs, job);
+            return;
+          }
           if (job.type !== "ingest.source") return;
           const r = await runIngestJob(knowledge, job.sourceId);
           if (r)
@@ -625,10 +743,31 @@ export function createWorker(deps: WorkerDeps): Worker {
               "knowledge source synced",
             );
         },
-        { concurrency: 2 },
+        // index builds hold a slot while they poll the service
+        { concurrency: deps.pageindex ? 4 : 2 },
       );
+      const maintenance = await deps.queue.consume(
+        "maintenance",
+        async (job) => {
+          if (!isMaintenanceJob(job)) return;
+          const report = await runMaintenanceJob({ db: deps.db, storage, log }, job);
+          if (report) lastRetentionSweep = report;
+        },
+        { concurrency: 1 },
+      );
+      if (deps.retentionCron) {
+        const stopCron = scheduleRetentionSweep({
+          queue: deps.queue,
+          cron: deps.retentionCron,
+          onError: (error) =>
+            log.error({ err: String(error) }, "scheduling the retention sweep failed"),
+        });
+        stops.push(() => Promise.resolve(stopCron()));
+      }
       stops.push(
+        () => maintenance.stop(),
         () => ingest.stop(),
+        () => Promise.resolve(stopping.abort(new Error("the worker is stopping"))),
         () => general.stop(),
         () => control.stop(),
         () => evaluation.stop(),
@@ -652,7 +791,10 @@ export function createWorker(deps: WorkerDeps): Worker {
       }
       stops.push(() => Promise.resolve(executor.abortAll()));
       // Terminal runs: release their credentials and complete subflows into their parents.
-      const unsub = await deps.bus.subscribe(RUN_EVENTS_CHANNEL, (m) => {
+      // Commit notices are `pg_notify`s sent inside the append transaction, so they are read
+      // from Postgres whichever bus carries the ephemeral traffic.
+      const commits = new PgEventBus(deps.db.sql);
+      const unsub = await commits.subscribe(RUN_EVENTS_CHANNEL, (m) => {
         const msg = m as { runId?: string; fromSeq?: number; toSeq?: number };
         if (typeof msg.runId !== "string") return;
         const runId = msg.runId;
@@ -678,12 +820,56 @@ export function createWorker(deps: WorkerDeps): Worker {
           );
       });
       stops.push(unsub);
+      // Gauges: jobs waiting per queue this worker consumes, runs this worker holds.
+      const instruments = deps.instruments;
+      if (instruments) {
+        const queues: QueueName[] = [
+          "run:general",
+          "run:control",
+          "evaluation",
+          "jobs",
+          "trace_review",
+          "ingest",
+          "maintenance",
+          ...[...localPools].map((p): QueueName => `run:${p}`),
+        ];
+        const queue = deps.queue;
+        const sample = async () => {
+          instruments.workerActiveRuns.record(orchestrator.activeRuns, { pool: "general" });
+          if (!countsJobs(queue)) return;
+          for (const name of queues)
+            instruments.queueDepth.record(await queue.depth(name), { queue: name });
+        };
+        let sampling = false;
+        const timer = setInterval(() => {
+          if (sampling) return;
+          sampling = true;
+          void sample()
+            .catch((error: unknown) =>
+              log.warn({ err: String(error) }, "sampling queue metrics failed"),
+            )
+            .finally(() => {
+              sampling = false;
+            });
+        }, deps.metricsSampleMs ?? 15_000);
+        timer.unref();
+        stops.push(() => Promise.resolve(clearInterval(timer)));
+      }
       orchestrator.startMaintenance({
         timerPollMs: 1_000,
         heartbeatMs: 10_000,
         reapMs: 15_000,
         ...deps.maintenance,
       });
+      // builds and cleanups a crash or a lost enqueue left behind
+      if (pageindexJobs)
+        await reconcilePageIndex({ db: deps.db, queue: deps.queue })
+          .then((r) => {
+            if (r.indexes || r.cleanups) log.info(r, "PageIndex work re-queued");
+          })
+          .catch((error: unknown) =>
+            log.error({ err: String(error) }, "PageIndex reconciliation failed"),
+          );
       log.info({ workerId, concurrency }, "worker started");
     },
     async stop() {

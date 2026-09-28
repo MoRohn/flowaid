@@ -154,6 +154,44 @@ describeDb("worker end to end (Postgres)", () => {
     expect(run.output).toEqual({ action: "approve" });
   });
 
+  it("redelivers a trigger that arrives while another worker holds the run", async () => {
+    const { workflowId, versionId } = await h.deploy("Approval (busy)", {
+      inputs: { type: "object", properties: {} },
+      outputs: { type: "object", properties: { action: {} } },
+      nodes: [
+        { id: "start", kind: "input", name: "Input" },
+        {
+          id: "approve",
+          kind: "human",
+          name: "Approve",
+          mode: { type: "approval" },
+          title: { kind: "template", source: "Approve?" },
+        },
+        {
+          id: "done",
+          kind: "output",
+          name: "Done",
+          value: { kind: "object", fields: { action: ref("approve", "decision", "/action") } },
+        },
+      ],
+      edges: [{ id: "c1", from: { node: "start", port: "done" }, to: { node: "approve" } }],
+    });
+    const runId = await h.start(workflowId, versionId, {});
+    await h.waitFor(runId, ["waiting_for_human"]);
+    const [task] = await h.db.app.system((tx) =>
+      tx.select().from(humanTasks).where(eq(humanTasks.runId, runId)),
+    );
+    await h.store.respondHumanTask(task?.id as string, { action: "approve" }, "user:1");
+    // another worker holds the run when the resume job is handled
+    expect(await h.store.acquireLease(runId, "worker-elsewhere", 60_000)).not.toBeNull();
+    await h.queue.enqueue("run:general", { type: "run.resume", runId, reason: "human" });
+    await new Promise((r) => setTimeout(r, 300));
+    expect((await h.store.getRun(runId))?.status).toBe("waiting_for_human");
+    await h.store.releaseLease(runId, "worker-elsewhere");
+    const run = await h.waitFor(runId, ["completed", "failed"]);
+    expect(run.output).toEqual({ action: "approve" });
+  });
+
   it("fails runs with a node error and cancels on request", async () => {
     const { workflowId, versionId } = await h.deploy("Breaks", {
       inputs: { type: "object", properties: {} },

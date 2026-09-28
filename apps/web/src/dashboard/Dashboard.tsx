@@ -1,8 +1,9 @@
 "use client";
 /**
- * The workspace dashboard (UI.md §1 `page.tsx`, P6-04): metric tiles with 24-point trends, runs
- * and failures over time, AI cost, decision confidence against the gate, and provider failures,
- * for a time range, workflow and environment.
+ * The workspace dashboard (UI.md §1 `page.tsx`, P6-04): what needs attention and what changed
+ * (V2 insights), then metric tiles with 24-point trends, runs and failures over time, AI cost,
+ * decision confidence against the gate, and provider failures, for a time range, workflow and
+ * environment.
  */
 import { useQuery } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
@@ -29,6 +30,8 @@ import { PageHeader } from "@flowaid/ui/shell";
 import { get, qs } from "~/api/client";
 import type { Environment, Page, WorkflowSummary } from "~/api/types";
 import { ErrorPanel } from "~/shell/states";
+import { Attention } from "./Attention";
+import { insightWindowFor } from "./insights";
 import {
   carryForward,
   confidenceSamples,
@@ -133,6 +136,14 @@ export function Dashboard({ ws, environments, now = Date.now, intro }: Dashboard
           ))}
         </Select>
       </div>
+
+      <Attention
+        ws={ws}
+        window={insightWindowFor(preset)}
+        workflowId={workflowId}
+        environmentId={environmentId}
+        now={now}
+      />
 
       {overview.isError ? (
         <ErrorPanel error={overview.error} onRetry={() => void overview.refetch()} />

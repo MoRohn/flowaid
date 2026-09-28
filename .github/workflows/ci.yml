@@ -34,6 +34,16 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # Turbo's local cache: tasks whose inputs did not change since the last run on this branch
+      # (or on main) replay their logs and outputs instead of running again.
+      - uses: actions/cache@v6
+        with:
+          path: .turbo/cache
+          key: turbo-${{ runner.os }}-${{ github.job }}-${{ github.ref_name }}-${{ github.sha }}
+          restore-keys: |
+            turbo-${{ runner.os }}-${{ github.job }}-${{ github.ref_name }}-
+            turbo-${{ runner.os }}-${{ github.job }}-main-
+
       - name: Startup preflight
         run: pnpm preflight
 
@@ -82,6 +92,16 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+
+      # Turbo's local cache: tasks whose inputs did not change since the last run on this branch
+      # (or on main) replay their logs and outputs instead of running again.
+      - uses: actions/cache@v6
+        with:
+          path: .turbo/cache
+          key: turbo-${{ runner.os }}-${{ github.job }}-${{ github.ref_name }}-${{ github.sha }}
+          restore-keys: |
+            turbo-${{ runner.os }}-${{ github.job }}-${{ github.ref_name }}-
+            turbo-${{ runner.os }}-${{ github.job }}-main-
 
       # Three packages at a time: each Vitest run already uses every core, and running all
       # packages at once starved CPU-heavy property tests past their timeouts.
@@ -143,3 +163,6 @@ jobs:
 
       - name: Worker (orchestrator, nodes, scheduler) against PostgreSQL 16
         run: pnpm --filter @flowaid/worker test
+
+      - name: Core nodes (the db_query PostgreSQL case) against PostgreSQL 16
+        run: pnpm --filter @flowaid/nodes-core test

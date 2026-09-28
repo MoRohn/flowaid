@@ -46,6 +46,13 @@ export function buildMcpServer(calls: TestServer["calls"]): McpServer {
       return { content: [{ type: "text", text: "ok" }] };
     },
   );
+  server.registerTool(
+    "dump",
+    { description: "Returns a very large result.", inputSchema: {} },
+    () => ({
+      content: [{ type: "text", text: `[${JSON.stringify("A".repeat(400_000))}]` }],
+    }),
+  );
   server.registerTool("fails", { description: "Always fails.", inputSchema: {} }, () => ({
     content: [{ type: "text", text: "backend exploded" }],
     isError: true,

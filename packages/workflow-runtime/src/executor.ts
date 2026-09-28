@@ -11,6 +11,7 @@ import type {
   AnyNodeDefinition,
   ArtifactAccess,
   CredentialAccess,
+  DocumentIndexAccess,
   ExecutionContext,
   KnowledgeAccess,
   NodeLogger,
@@ -110,6 +111,8 @@ export interface NodeServices {
   sandbox?: SandboxExecutor;
   /** RFC-0021: the workspace's knowledge base, for nodes declaring `knowledge` */
   knowledge?: (call: ExecutionCall) => KnowledgeAccess;
+  /** RFC-0022: the workspace's document indexes, for nodes declaring `documents` */
+  documents?: (call: ExecutionCall) => DocumentIndexAccess;
   clock?: () => Date;
 }
 
@@ -288,6 +291,7 @@ export async function executeTask(
             ...ctx,
             sandbox: bindSandbox(services.sandbox, ctx),
             ...(services.knowledge ? { knowledge: services.knowledge(scopedCall) } : {}),
+            ...(services.documents ? { documents: services.documents(scopedCall) } : {}),
           },
           def.capabilities,
         ),

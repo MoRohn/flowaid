@@ -4,6 +4,7 @@ import { join } from "node:path";
 import type { Database } from "@flowaid/database";
 import type { CredentialService } from "@flowaid/credentials";
 import type { QueueDriver, SafeFetch } from "@flowaid/workflow-core";
+import { createSafeFetch } from "@flowaid/providers";
 import type { RunEventHub } from "./services/hub.js";
 import { resolveAuthMode, type Env } from "@flowaid/env";
 import type { ProviderRegistry } from "@flowaid/providers";
@@ -29,8 +30,11 @@ export interface ApiConfig {
   sseMaxStreamsPerPrincipal: number;
   featuresDisabled: readonly string[];
   hasRedis: boolean;
-  hasOidc: boolean;
-  /** Development and tests only: outbound calls may reach private addresses. Never in production. */
+  /**
+   * FLOWAID_ALLOW_PRIVATE_NETWORK: outbound calls (OpenAPI import, MCP discovery, credential
+   * tests, notification test sends) may reach loopback and private addresses; `http` is built to
+   * match (`apiSafeFetch`).
+   */
   allowPrivateNetwork: boolean;
   /** Local artifact storage shared with the worker (`<data>/artifacts`); null when unavailable. */
   artifactsDir: string | null;
@@ -40,6 +44,8 @@ export interface ApiConfig {
   exportMode: "npm" | "vendored";
   /** The packed runtime packages exist (FLOWAID_VENDOR_DIR/SHA256SUMS), so vendored exports work. */
   vendorAvailable: boolean;
+  /** The PageIndex service (FLOWAID_PAGEINDEX_URL/TOKEN); null turns PageIndex off. */
+  pageIndex: { url: string; token: string } | null;
   /** Plugins (ARCHITECTURE.md §3.5): the allow-list, the npm registry, and whether local installs are accepted. */
   plugins: { allowList: readonly string[]; registry: string; allowLocal: boolean };
 }
@@ -69,6 +75,8 @@ export interface ApiContext {
   alerts?: AlertDispatcher;
   /** SMTP for `email` channels (SMTP_URL, SMTP_FROM); test sends explain its absence */
   smtp?: SmtpSettings;
+  /** readiness probe of Redis (REDIS_URL): resolves once it answers; absent without Redis */
+  pingRedis?: () => Promise<void>;
 }
 
 export function configFromEnv(env: Env): ApiConfig {
@@ -88,8 +96,7 @@ export function configFromEnv(env: Env): ApiConfig {
     sseMaxStreamsPerPrincipal: Number(env.FLOWAID_SSE_MAX_STREAMS_PER_PRINCIPAL ?? 20),
     featuresDisabled: env.FLOWAID_FEATURES_DISABLED ?? [],
     hasRedis: env.flags.hasRedis,
-    hasOidc: env.flags.hasOidc,
-    allowPrivateNetwork: false,
+    allowPrivateNetwork: env.FLOWAID_ALLOW_PRIVATE_NETWORK,
     artifactsDir: `${String(env.FLOWAID_MASTER_KEY_FILE ?? "/data/master.key").replace(/\/[^/]*$/, "")}/artifacts`,
     s3:
       env.S3_ENDPOINT && env.S3_BUCKET && env.S3_ACCESS_KEY && env.S3_SECRET_KEY
@@ -106,12 +113,31 @@ export function configFromEnv(env: Env): ApiConfig {
     vendorAvailable: existsSync(
       join(String(env.FLOWAID_VENDOR_DIR ?? "/opt/flowaid/vendor"), "SHA256SUMS"),
     ),
+    pageIndex:
+      env.FLOWAID_PAGEINDEX_URL && env.FLOWAID_PAGEINDEX_TOKEN
+        ? { url: String(env.FLOWAID_PAGEINDEX_URL), token: env.FLOWAID_PAGEINDEX_TOKEN }
+        : null,
     plugins: {
       allowList: env.FLOWAID_PLUGIN_ALLOWED_SCOPES,
       registry: String(env.FLOWAID_PLUGIN_REGISTRY),
       allowLocal: env.FLOWAID_PLUGIN_ALLOW_LOCAL,
     },
   };
+}
+
+/** The API's SSRF-guarded fetch, honouring `allowPrivateNetwork`. */
+export function apiSafeFetch(
+  config: Pick<ApiConfig, "allowPrivateNetwork">,
+  /** operator-configured origins that may be private (OLLAMA_HOST) */
+  trustedOrigins: readonly string[] = [],
+): SafeFetch {
+  return createSafeFetch({
+    maxBytes: 25 * 1024 * 1024,
+    timeoutMs: 30_000,
+    userAgent: "FlowAId-API/1",
+    allowPrivate: config.allowPrivateNetwork,
+    ...(trustedOrigins.length ? { trustedOrigins } : {}),
+  });
 }
 
 /** Sensible defaults for tests and local development. */
@@ -128,12 +154,12 @@ export function defaultConfig(over: Partial<ApiConfig> = {}): ApiConfig {
     sseMaxStreamsPerPrincipal: 20,
     featuresDisabled: [],
     hasRedis: false,
-    hasOidc: false,
     allowPrivateNetwork: false,
     artifactsDir: null,
     s3: null,
     exportMode: "npm",
     vendorAvailable: false,
+    pageIndex: null,
     plugins: { allowList: ["@flowaid"], registry: "https://registry.npmjs.org", allowLocal: false },
     ...over,
   };

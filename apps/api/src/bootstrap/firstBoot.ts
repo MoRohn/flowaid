@@ -54,7 +54,12 @@ export async function firstBoot(
   return db.system(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(4711)`);
     const [{ n } = { n: 0 }] = await tx.select({ n: sql<number>`count(*)::int` }).from(users);
-    if (n > 0) return { created: false };
+    // Built-in templates are refreshed on every boot, so an upgraded install gets new ones
+    // (seedTemplates upserts by slug and never touches workspace templates).
+    if (n > 0) {
+      await seedTemplates(tx, builtInTemplates());
+      return { created: false };
+    }
     const generated = o.adminPassword ? undefined : randomBytes(18).toString("base64url");
     const email = o.adminEmail ?? "owner@flowaid.local";
     const owner = await createUser(tx, {

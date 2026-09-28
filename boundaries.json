@@ -64,6 +64,7 @@
         "mcp",
         "openapi-tools",
         "knowledge",
+        "pageindex",
         "workflow-core",
         "shared"
       ]
@@ -96,6 +97,15 @@
     "knowledge": {
       "dir": "packages/knowledge",
       "allow": ["workflow-core", "shared"]
+    },
+    "pageindex": {
+      "dir": "packages/pageindex",
+      "allow": ["workflow-core", "shared"]
+    },
+    "insights": {
+      "dir": "packages/insights",
+      "allow": ["shared"],
+      "browserSafe": true
     },
     "advisor": {
       "dir": "packages/advisor",
@@ -176,7 +186,9 @@
         "importer",
         "codegen",
         "advisor",
+        "insights",
         "knowledge",
+        "pageindex",
         "nodes-core/manifest",
         "plugins"
       ]
@@ -208,6 +220,7 @@
         "langchain",
         "nodes-langchain",
         "knowledge",
+        "pageindex",
         "plugins"
       ]
     },

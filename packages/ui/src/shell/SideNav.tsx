@@ -8,6 +8,7 @@ import {
 } from "react";
 import { Monitor, Moon, PanelLeftClose, PanelLeftOpen, Sun } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { isPlainClick } from "@/lib/events";
 import { IconButton, Tooltip, TooltipProvider } from "@/primitives";
 import { useTheme, type ThemeSetting } from "@/theme";
 import { useAppShellOptional } from "./AppShellContext";
@@ -22,6 +23,8 @@ export interface SideNavItem {
   count?: number;
   /** Tone for the count: warn draws the eye to pending approvals. */
   countTone?: "neutral" | "warn" | "danger";
+  /** What the count counts, read after it by screen readers: "3 pending". */
+  countLabel?: string;
   disabled?: boolean;
   /** Shortcut hint shown in the collapsed tooltip, e.g. "g w". */
   shortcut?: string;
@@ -175,33 +178,41 @@ export const SideNav = forwardRef<HTMLElement, SideNavProps>(function SideNav(
           <span className="min-w-0 flex-1 truncate">{item.label}</span>
         )}
         {item.count !== undefined && item.count > 0 ? (
-          collapsed ? (
-            <span
-              role="img"
-              aria-label={`${item.count}`}
-              className={cn(
-                "absolute right-1 top-1 size-1.5 rounded-full",
-                item.countTone === "warn"
-                  ? "bg-warn"
-                  : item.countTone === "danger"
-                    ? "bg-danger"
-                    : "bg-ink-3",
-              )}
-            />
-          ) : (
-            <span
-              className={cn(
-                "shrink-0 rounded-xs px-1 font-mono text-2xs leading-4 tabular",
-                item.countTone === "warn"
-                  ? "bg-warn-soft text-warn-text"
-                  : item.countTone === "danger"
-                    ? "bg-danger-soft text-danger-text"
-                    : "text-ink-3",
-              )}
-            >
-              {item.count}
+          <>
+            {/* the dot or number is decoration; the accessible name carries "3 pending" */}
+            <span className="sr-only">
+              {`${item.count}${item.countLabel ? ` ${item.countLabel}` : ""}`}
             </span>
-          )
+            {collapsed ? (
+              <span
+                aria-hidden="true"
+                data-nav-count=""
+                className={cn(
+                  "absolute right-1 top-1 size-1.5 rounded-full",
+                  item.countTone === "warn"
+                    ? "bg-warn"
+                    : item.countTone === "danger"
+                      ? "bg-danger"
+                      : "bg-ink-3",
+                )}
+              />
+            ) : (
+              <span
+                aria-hidden="true"
+                data-nav-count=""
+                className={cn(
+                  "shrink-0 rounded-xs px-1 font-mono text-2xs leading-4 tabular",
+                  item.countTone === "warn"
+                    ? "bg-warn-soft text-warn-text"
+                    : item.countTone === "danger"
+                      ? "bg-danger-soft text-danger-text"
+                      : "text-ink-3",
+                )}
+              >
+                {item.count}
+              </span>
+            )}
+          </>
         ) : null}
       </>
     );
@@ -217,7 +228,8 @@ export const SideNav = forwardRef<HTMLElement, SideNavProps>(function SideNav(
         href={item.href}
         {...shared}
         onClick={(e) => {
-          if (onNavigate) {
+          // cmd/ctrl/shift/middle click keeps the browser's own "open in a new tab"
+          if (onNavigate && isPlainClick(e)) {
             e.preventDefault();
             onNavigate(item.id, item);
           }

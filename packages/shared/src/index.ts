@@ -59,3 +59,13 @@ export { InvariantError, assertDefined, assertNever, invariant } from "./assert.
 
 export type { Limiter } from "./async.js";
 export { AbortError, TimeoutError, isAbortError, pLimit, sleep, withTimeout } from "./async.js";
+
+export type { CapLimits, UntrustedOptions } from "./untrusted.js";
+export {
+  UNTRUSTED_CLOSE,
+  approxTokens,
+  capText,
+  escapeDelimiters,
+  untrustedOpen,
+  wrapUntrusted,
+} from "./untrusted.js";

@@ -72,6 +72,7 @@ export const NodeCapabilitySchema = z.enum([
   "sandbox",
   "suspend",
   "knowledge",
+  "documents",
 ]);
 export type NodeCapability = z.infer<typeof NodeCapabilitySchema>;
 

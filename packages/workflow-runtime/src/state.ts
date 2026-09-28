@@ -243,4 +243,20 @@ export function subtractUsage(a: TokenUsage, b: TokenUsage): TokenUsage {
   };
 }
 
+/** A node's usage: what it reported, raised to what its events already charged (null if neither). */
+export function atLeastUsage(reported: TokenUsage | null, spent: TokenUsage): TokenUsage | null {
+  if (totalTokens(spent) === 0) return reported;
+  if (!reported) return spent;
+  const out: TokenUsage = {
+    ...reported,
+    inputTokens: Math.max(reported.inputTokens, spent.inputTokens),
+    outputTokens: Math.max(reported.outputTokens, spent.outputTokens),
+  };
+  if (spent.cacheReadTokens !== undefined)
+    out.cacheReadTokens = Math.max(reported.cacheReadTokens ?? 0, spent.cacheReadTokens);
+  if (spent.cacheWriteTokens !== undefined)
+    out.cacheWriteTokens = Math.max(reported.cacheWriteTokens ?? 0, spent.cacheWriteTokens);
+  return out;
+}
+
 export const totalTokens = (u: TokenUsage): number => u.inputTokens + u.outputTokens;

@@ -32,7 +32,12 @@ import {
   type Run,
   type RunStatus,
 } from "@flowaid/workflow-core";
-import { canSeeWorkflow, type Principal } from "../auth/principal.js";
+import {
+  assertEnvironmentAllowed,
+  canSeeWorkflow,
+  canUseEnvironment,
+  type Principal,
+} from "../auth/principal.js";
 import type { ApiContext } from "../context.js";
 import { IdParams, ListQuery, NoContent, decodeCursor, encodeCursor, page } from "../dto/common.js";
 import {
@@ -60,7 +65,12 @@ const need = (p: Principal | null): Principal => {
 
 async function visibleRun(ctx: ApiContext, p: Principal, id: string): Promise<Run> {
   const run = await new PgRunStore(ctx.db, { workspaceId: p.workspaceId }).getRun(id);
-  if (!run || run.workspaceId !== p.workspaceId || !canSeeWorkflow(p, run.workflowId))
+  if (
+    !run ||
+    run.workspaceId !== p.workspaceId ||
+    !canSeeWorkflow(p, run.workflowId) ||
+    !canUseEnvironment(p, run.environmentId)
+  )
     throw new NotFoundError(`run ${id} not found`);
   return run;
 }
@@ -360,6 +370,8 @@ export function runRoutes(app: FastifyInstance, ctx: ApiContext): void {
       const p = need(req.principal);
       if (req.query.workflowId && !canSeeWorkflow(p, req.query.workflowId))
         return { items: [], next_cursor: null };
+      if (req.query.environmentId) assertEnvironmentAllowed(p, req.query.environmentId);
+      const environmentId = req.query.environmentId ?? p.environmentId;
       const statuses =
         req.query.status === undefined
           ? undefined
@@ -370,7 +382,7 @@ export function runRoutes(app: FastifyInstance, ctx: ApiContext): void {
         listRuns(tx, {
           workspaceId: p.workspaceId,
           ...(req.query.workflowId ? { workflowId: req.query.workflowId } : {}),
-          ...(req.query.environmentId ? { environmentId: req.query.environmentId } : {}),
+          ...(environmentId ? { environmentId } : {}),
           ...(statuses ? { status: statuses } : {}),
           ...(req.query.origin ? { origin: req.query.origin as Run["origin"] } : {}),
           ...(req.query.sessionId ? { sessionId: req.query.sessionId } : {}),

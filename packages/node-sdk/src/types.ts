@@ -21,6 +21,9 @@ import type {
   JsonObject,
   JsonValue,
   GenerationPolicy,
+  DocumentScope,
+  IndexReference,
+  IndexRequestResult,
   KnowledgeDocumentInput,
   KnowledgeSearchRequest,
   KnowledgeSearchResult,
@@ -33,6 +36,7 @@ import type {
   NodeMetadata,
   NodePolicy,
   NodeTypeId,
+  OutlineNode,
   PortName,
   PortRule,
   ProviderFactory,
@@ -187,6 +191,8 @@ export interface ExecutionContext<TConfig = JsonObject> {
   readonly sandbox?: SandboxAccess;
   /** RFC-0021: present for nodes declaring 'knowledge' when the host has a knowledge base */
   readonly knowledge?: KnowledgeAccess;
+  /** RFC-0022: present for nodes declaring 'documents' when the host has document indexes */
+  readonly documents?: DocumentIndexAccess;
 }
 /** RFC-0019: the sandbox bound to the calling node (bridges already scoped). Without an executor: SandboxError SANDBOX_UNAVAILABLE. */
 export interface SandboxAccess {
@@ -199,6 +205,16 @@ export interface KnowledgeAccess {
   search(req: KnowledgeSearchRequest): Promise<KnowledgeSearchResult>;
   upsertDocument(doc: KnowledgeDocumentInput): Promise<KnowledgeUpsertResult>;
   deleteDocument(sourceId: string, externalId: string): Promise<boolean>;
+}
+/** RFC-0022: the workspace's document indexes, bound to the calling node's run and signal. Ids outside the workspace are refused (NOT_FOUND). */
+export interface DocumentIndexAccess {
+  /** ready, active indexes in the scope (pinned `indexIds` resolve exactly) */
+  resolve(scope: DocumentScope): Promise<IndexReference[]>;
+  getIndex(indexId: string): Promise<IndexReference>;
+  outline(indexId: string): Promise<OutlineNode[]>;
+  readPages(indexId: string, pages: number[]): Promise<{ page: number; text: string }[]>;
+  /** starts (or joins) indexing of the document's latest version with its source's settings */
+  requestIndex(documentId: string): Promise<IndexRequestResult>;
 }
 
 export type NodeResult<TOutput> =

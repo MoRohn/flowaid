@@ -3,7 +3,7 @@
 The `flowaid` command line (`docs/design/API.md` §8.3).
 
 ```sh
-flowaid login --api-url http://localhost:3000 --api-key fa_live_…
+flowaid login --api-url http://localhost:3001 --api-key fa_live_…
 flowaid workflows list
 flowaid workflow run <id> --input @input.json --watch
 flowaid run events <runId> --follow
@@ -44,5 +44,5 @@ Every API operation is a command, `flowaid <noun> <verb>`. The commands are gene
 
 The CLI picks its settings in this order: flags (`--api-url`, `--api-key`, `--workspace`),
 then the environment (`FLOWAID_API_URL`, `FLOWAID_API_KEY`, `FLOWAID_WORKSPACE`), then the
-saved profile. The default URL is `http://localhost:3000`. The CLI's own version flag is `-V`,
+saved profile. The default URL is `http://localhost:3001`. The CLI's own version flag is `-V`,
 because `--version` belongs to `workflow export` and `workflow package`.

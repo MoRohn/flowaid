@@ -28,7 +28,7 @@ import {
   createDatabaseFromEnv,
 } from "@flowaid/database";
 import { loadEnv, pickEnv } from "@flowaid/env";
-import { createSafeFetch } from "@flowaid/providers";
+import { PageIndexServiceClient } from "@flowaid/pageindex";
 import { RegistryClient } from "@flowaid/plugins";
 import { FileFixtureStore } from "@flowaid/providers/recording-fs";
 import { createSandbox } from "@flowaid/sandbox";
@@ -36,6 +36,7 @@ import { artifactStorageFrom } from "@flowaid/storage";
 import { BullMqQueueDriver, RedisEventBus } from "@flowaid/workflow-runtime";
 import { coreNodes } from "@flowaid/nodes-core";
 import { heartbeatPath, startHeartbeat } from "./heartbeat.js";
+import { workerNetworkFromEnv } from "./network.js";
 import { createPoolWorker } from "./poolWorker.js";
 import { startScheduler } from "./jobs/scheduler.js";
 import { loadBundledPlugins, registerPluginProviders } from "./plugins/bundled.js";
@@ -83,7 +84,19 @@ async function main(): Promise<void> {
   const redisUrl = env.REDIS_URL ? String(env.REDIS_URL) : null;
   const queue = redisUrl
     ? new BullMqQueueDriver({ connection: { url: redisUrl } })
-    : new PgQueueDriver(db.sql);
+    : new PgQueueDriver(db.sql, {
+        onError: (error, job) =>
+          log.error(
+            {
+              err: error instanceof Error ? error.message : String(error),
+              job: job.type,
+              ...("runId" in job && job.runId ? { runId: job.runId } : {}),
+            },
+            "queue job failed",
+          ),
+      });
+  // FLOWAID_ALLOW_PRIVATE_NETWORK: whether workflows may reach loopback and private addresses
+  const network = workerNetworkFromEnv(env);
   const sandboxMode =
     String(env.SANDBOX_MODE ?? "isolated-vm") === "container" ? "container" : "isolated-vm";
 
@@ -93,7 +106,7 @@ async function main(): Promise<void> {
       db,
       queue,
       pools,
-      http: createSafeFetch({ timeoutMs: 120_000, userAgent: "FlowAId-Worker/1" }),
+      http: network.http,
       ...(pools.includes("code") ? { sandbox: createSandbox(sandboxMode) } : {}),
       concurrency: Number(env.WORKER_CONCURRENCY ?? 4),
       log,
@@ -133,7 +146,7 @@ async function main(): Promise<void> {
     keyring,
     external: new ExternalResolver(externalResolverOptionsFromEnv(env, keyDeps)),
   });
-  const http = createSafeFetch({ timeoutMs: 120_000, userAgent: "FlowAId-Worker/1" });
+  const http = network.http;
   const dataDir = dirname(String(env.FLOWAID_MASTER_KEY_FILE ?? "/data/master.key"));
 
   // Bundled plugins (e.g. @flowaid/nodes-langchain) load unless features.langchain is disabled.
@@ -141,10 +154,12 @@ async function main(): Promise<void> {
     ? { packages: [], skipped: [] }
     : await loadBundledPlugins(env.FLOWAID_BUNDLED_PLUGINS, { db, log });
   const fixtureMode = env.FLOWAID_PROVIDER_FIXTURES;
+  const ollamaHost = env.OLLAMA_HOST ? String(env.OLLAMA_HOST) : undefined;
   const registry = defaultProviderRegistry(
     fixtureMode === "off"
-      ? {}
+      ? { ollamaHost }
       : {
+          ollamaHost,
           fixtures: {
             mode: fixtureMode,
             store: new FileFixtureStore(resolve(String(env.FLOWAID_PROVIDER_FIXTURES_DIR))),
@@ -227,6 +242,7 @@ async function main(): Promise<void> {
       ...(env.OLLAMA_HOST ? { ollamaHost: String(env.OLLAMA_HOST) } : {}),
     },
     sandbox: createSandbox(sandboxMode),
+    allowPrivateNetwork: network.allowPrivateNetwork,
     ...(env.flags.mcpStdioEnabled
       ? {
           stdioPolicy: {
@@ -238,8 +254,23 @@ async function main(): Promise<void> {
         }
       : {}),
     exports: { vendorDir: String(env.FLOWAID_VENDOR_DIR ?? "/opt/flowaid/vendor") },
+    // the PageIndex service is operator configuration on a private network: its client uses
+    // plain fetch, not the workflow egress guard
+    ...(env.flags.hasPageIndex
+      ? {
+          pageindex: {
+            client: new PageIndexServiceClient({
+              baseUrl: String(env.FLOWAID_PAGEINDEX_URL),
+              token: String(env.FLOWAID_PAGEINDEX_TOKEN),
+              // a submission uploads the PDF (up to 50 MiB)
+              timeoutMs: 120_000,
+            }),
+          },
+        }
+      : {}),
     concurrency: Number(env.WORKER_CONCURRENCY ?? 8),
     pools: env.WORKER_POOLS,
+    retentionCron: String(env.RETENTION_SWEEP_CRON),
     log,
   });
   await worker.start();
@@ -279,7 +310,9 @@ async function main(): Promise<void> {
         .catch(() => undefined);
     },
   });
-  const stopHeartbeat = startHeartbeat(heartbeatPath(env));
+  const stopHeartbeat = startHeartbeat(heartbeatPath(env), 10_000, () => ({
+    retentionSweep: worker.lastRetentionSweep,
+  }));
 
   const shutdown = async (signal: string) => {
     log.info({ signal }, "shutting down");

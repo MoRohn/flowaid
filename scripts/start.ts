@@ -3,6 +3,8 @@
  * web app — on this machine.
  *
  * 1. Preflight: Node.js, pnpm, dependencies, free ports, and Docker when no database is given.
+ *    The app opens at http://flowaid.localhost:3000 (the API beside it on 3001); when another app
+ *    holds a default port the next free one is used, while a port passed explicitly must be free.
  * 2. Installs dependencies when they are missing or older than pnpm-lock.yaml.
  * 3. Configuration: `.env` and `.env.local` (provider keys and overrides), plus local secrets
  *    generated once into `.flowaid/dev.env` (master key, owner password) and printed once.
@@ -17,8 +19,15 @@
  * Runs on plain Node (native type stripping) so it works before `pnpm install`.
  */
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
-import { randomBytes } from "node:crypto";
-import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { createHash, randomBytes } from "node:crypto";
+import {
+  appendFileSync,
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 import { join, resolve } from "node:path";
 import { parseArgs, parseEnv } from "node:util";
 
@@ -27,22 +36,26 @@ import {
   DEFAULT_HOST,
   DEFAULT_PORT,
   ROOT,
+  authModeForBind,
   checkPort,
   formatReport,
   hasFailures,
+  isLoopbackBind,
   probe,
   runPreflight,
   useColor,
   type CheckResult,
 } from "./preflight.ts";
+import { DEFAULT_API_PORT, DEFAULT_WEB_PORT } from "./ports.ts";
 
-const HELP = `Usage: pnpm start [options]
+const HELP = `Usage: ./flowaid [options]   (or: pnpm start [options])
 
 Start FlowAId locally: Postgres, the API, the worker and the web app.
 
 Options
-  --port <n>          Web app port (default 3001)
-  --api-port <n>      API port (default 3000)
+  --port <n>          Web app port, the one in the address (default ${DEFAULT_WEB_PORT}; when another
+                      app holds it, the next free port is used)
+  --api-port <n>      API port (default ${DEFAULT_API_PORT}; likewise)
   --host <address>    Interface to bind (default ${DEFAULT_HOST}; 0.0.0.0 exposes it on your network)
   --domain <name>     Name in the app's address (default ${DEFAULT_DOMAIN}; any *.localhost name
                       reaches this computer, as does 127.0.0.1)
@@ -51,6 +64,9 @@ Options
   --open              Open the browser once the web app is ready
   --verify            Run every CI gate (pnpm check) before starting
   --skip-install      Never install dependencies, even when they are missing or stale
+  --pageindex         Also run the PageIndex service for PDF document indexes (needs Python 3.10+;
+                      the first run installs its pinned packages into .flowaid/pageindex-venv)
+  --pageindex-port <n> PageIndex service port (default 8765)
   --playground        Serve the @flowaid/ui component playground instead (port ${DEFAULT_PORT})
   -h, --help          Show this help
 
@@ -65,7 +81,7 @@ try {
     args: argv[0] === "--" ? argv.slice(1) : argv,
     options: {
       port: { type: "string" },
-      "api-port": { type: "string", default: "3000" },
+      "api-port": { type: "string" },
       host: { type: "string", default: DEFAULT_HOST },
       domain: { type: "string", default: DEFAULT_DOMAIN },
       "database-url": { type: "string" },
@@ -74,6 +90,8 @@ try {
       verify: { type: "boolean", default: false },
       "skip-install": { type: "boolean", default: false },
       playground: { type: "boolean", default: false },
+      pageindex: { type: "boolean", default: false },
+      "pageindex-port": { type: "string", default: "8765" },
       help: { type: "boolean", short: "h", default: false },
     },
   });
@@ -96,16 +114,31 @@ function portOption(value: string, flag: string): number {
   return n;
 }
 const host = opts.host;
-const webPort = portOption(opts.port ?? String(opts.playground ? DEFAULT_PORT : 3001), "--port");
-const apiPort = portOption(opts["api-port"], "--api-port");
+const webRequested =
+  opts.port !== undefined
+    ? portOption(opts.port, "--port")
+    : opts.playground
+      ? DEFAULT_PORT
+      : DEFAULT_WEB_PORT;
+const apiRequested =
+  opts["api-port"] !== undefined ? portOption(opts["api-port"], "--api-port") : DEFAULT_API_PORT;
+if (
+  !opts.playground &&
+  opts.port !== undefined &&
+  opts["api-port"] !== undefined &&
+  webRequested === apiRequested
+) {
+  console.error(`--port and --api-port must differ (both are ${webRequested}).`);
+  process.exit(2);
+}
 // Bound to loopback (or every interface), the app is addressed by its name: browsers and the OS
-// resolve any *.localhost name to this computer (RFC 6761), so http://flowaid.localhost:3001
+// resolve any *.localhost name to this computer (RFC 6761), so http://flowaid.localhost:3000
 // needs no hosts-file entry. A specific interface address is used as given.
 if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/i.test(opts.domain)) {
   console.error(`--domain: "${opts.domain}" is not a host name`);
   process.exit(2);
 }
-const loopbackBind = host === "localhost" || host === "::1" || /^127\./.test(host);
+const loopbackBind = isLoopbackBind(host);
 const exposed = !loopbackBind;
 const browserHost = loopbackBind || host === "0.0.0.0" ? opts.domain : host;
 
@@ -118,7 +151,7 @@ const fail = (text: string): never => {
   process.exit(1);
 };
 
-const TOTAL = (opts.playground ? 4 : 6) + (opts.verify ? 1 : 0);
+const TOTAL = (opts.playground ? 4 : 6) + (opts.verify ? 1 : 0) + (opts.pageindex ? 1 : 0);
 let step = 0;
 const heading = (text: string) => {
   step += 1;
@@ -172,6 +205,73 @@ function localSecrets(): { values: Record<string, string>; created: boolean } {
     { mode: 0o600 },
   );
   return { values, created: true };
+}
+
+// ─── PageIndex ───────────────────────────────────────────────────────────────────────────────
+
+const PAGEINDEX_DIR = join(ROOT, "apps/pageindex");
+
+/** A Python 3.10+ interpreter: FLOWAID_PYTHON, else the newest python3.x on PATH. */
+function findPython(): string | null {
+  const candidates = [
+    process.env.FLOWAID_PYTHON,
+    "python3.13",
+    "python3.12",
+    "python3.11",
+    "python3.10",
+    "python3",
+  ].filter((c): c is string => Boolean(c));
+  return (
+    candidates.find(
+      (cmd) =>
+        spawnSync(cmd, ["-c", "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)"])
+          .status === 0,
+    ) ?? null
+  );
+}
+
+/**
+ * The service's virtualenv in .flowaid/pageindex-venv, (re)installed from the hash-locked
+ * requirements when they change. Returns its python.
+ */
+async function ensurePageIndexVenv(): Promise<string> {
+  const venv = join(ROOT, ".flowaid/pageindex-venv");
+  const python = join(venv, process.platform === "win32" ? "Scripts/python.exe" : "bin/python");
+  const lock = readFileSync(join(PAGEINDEX_DIR, "requirements.lock"));
+  const stamp = join(venv, ".requirements.sha256");
+  const want = createHash("sha256").update(lock).digest("hex");
+  if (existsSync(python) && existsSync(stamp) && readFileSync(stamp, "utf8") === want) {
+    ok("PageIndex packages up to date");
+    return python;
+  }
+  const base = findPython();
+  if (!base)
+    fail(
+      "--pageindex needs Python 3.10 or newer (python3.10 … python3.13 on PATH, or set FLOWAID_PYTHON)",
+    );
+  await mustRun("PageIndex virtualenv created", base as string, ["-m", "venv", "--clear", venv]);
+  await mustRun("PageIndex packages installed (pinned, hash-checked)", python, [
+    "-m",
+    "pip",
+    "install",
+    "--quiet",
+    "--require-hashes",
+    "--only-binary=:all:",
+    "-r",
+    join(PAGEINDEX_DIR, "requirements.lock"),
+  ]);
+  writeFileSync(stamp, want);
+  return python;
+}
+
+/** The shared token, generated once into .flowaid/dev.env. */
+function pageIndexToken(secrets: Record<string, string>): string {
+  const existing = secrets.FLOWAID_PAGEINDEX_TOKEN;
+  if (existing) return existing;
+  const token = randomBytes(32).toString("hex");
+  appendFileSync(join(ROOT, ".flowaid", "dev.env"), `FLOWAID_PAGEINDEX_TOKEN=${token}\n`);
+  secrets.FLOWAID_PAGEINDEX_TOKEN = token;
+  return token;
 }
 
 // ─── database ────────────────────────────────────────────────────────────────────────────────
@@ -321,14 +421,26 @@ console.log(
 heading("Preflight");
 const fileEnv = { ...readEnvFile(join(ROOT, ".env")), ...readEnvFile(join(ROOT, ".env.local")) };
 const databaseUrl = opts["database-url"] ?? process.env.DATABASE_URL ?? fileEnv.DATABASE_URL;
-const results: CheckResult[] = await runPreflight({ host, port: webPort });
+// a default port another app holds moves to the next free one; an explicit port must be free
+const webCheck = await checkPort(host, webRequested, {
+  name: opts.playground ? "Playground port" : "Web port",
+  explicit: opts.port !== undefined,
+  avoid: opts.playground || opts.port !== undefined ? [] : [apiRequested],
+});
+const apiCheck = opts.playground
+  ? null
+  : await checkPort(host, apiRequested, {
+      name: "API port",
+      flag: "--api-port",
+      explicit: opts["api-port"] !== undefined,
+      avoid: [webCheck.port],
+    });
+const webPort = webCheck.port;
+const apiPort = apiCheck?.port ?? apiRequested;
+const results: CheckResult[] = runPreflight({
+  ports: apiCheck ? [webCheck, apiCheck] : [webCheck],
+});
 if (!opts.playground) {
-  const api = await checkPort(host, apiPort);
-  results.push({
-    ...api,
-    name: "API port",
-    ...(api.fix ? { fix: `${api.fix} (or pass --api-port)` } : {}),
-  });
   if (databaseUrl) {
     const i = results.findIndex((r) => r.name === "Docker");
     if (i >= 0) results[i] = { name: "Database", status: "ok", detail: "using DATABASE_URL" };
@@ -340,11 +452,15 @@ if (!opts.playground) {
       fix: "start Docker Desktop, or pass --database-url postgres://… (Postgres 16 with pgvector)",
     });
   }
-  const web = results.findIndex((r) => r.name === "Playground port");
-  if (web >= 0) results[web] = { ...(results[web] as CheckResult), name: "Web port" };
 }
 console.log(formatReport(results, color));
 if (hasFailures(results)) fail("Fix the items marked ✗ and run pnpm start again.");
+if (webPort !== webRequested)
+  warn(
+    `port ${webRequested} is in use (another app); FlowAId is on http://${browserHost}:${webPort} instead`,
+  );
+if (apiCheck && apiPort !== apiRequested)
+  warn(`port ${apiRequested} is in use (another app); the API is on port ${apiPort} instead`);
 
 heading("Dependencies");
 const deps = results.find((r) => r.name === "Dependencies");
@@ -407,6 +523,14 @@ if (opts.playground) {
       ? "generated local secrets in .flowaid/dev.env"
       : "local secrets from .flowaid/dev.env",
   );
+  // never local mode (no sign-in) where other computers can connect
+  const bindAuth = authModeForBind(
+    host,
+    secrets.values.FLOWAID_AUTH_MODE ?? fileEnv.FLOWAID_AUTH_MODE ?? process.env.FLOWAID_AUTH_MODE,
+  );
+  if ("error" in bindAuth) fail(bindAuth.error);
+  else if (bindAuth.forced)
+    warn(`--host ${host} is reachable from your network: every browser signs in (password mode)`);
   const providers = [
     "TYPESAFE_API_KEY",
     "OPENAI_API_KEY",
@@ -436,15 +560,33 @@ if (opts.playground) {
     "--output-logs=errors-only",
   ]);
 
+  // PageIndex (optional): the service runs from its own virtualenv; the api and worker find it
+  // through FLOWAID_PAGEINDEX_URL/TOKEN unless .env already points at another instance.
+  let pageIndexPython: string | null = null;
+  if (opts.pageindex) {
+    heading("PageIndex");
+    pageIndexPython = await ensurePageIndexVenv();
+  }
+
   heading("Start");
   const data = join(ROOT, ".flowaid");
+  const pageIndexPort = portOption(opts["pageindex-port"], "--pageindex-port");
+  const pageIndexEnv: Record<string, string> = pageIndexPython
+    ? {
+        FLOWAID_PAGEINDEX_URL: `http://127.0.0.1:${pageIndexPort}`,
+        FLOWAID_PAGEINDEX_TOKEN: pageIndexToken(secrets.values),
+      }
+    : {};
   mkdirSync(join(data, "keys"), { recursive: true });
   const apiUrl = `http://${browserHost}:${apiPort}`;
   const webUrl = `http://${browserHost}:${webPort}`;
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     ...fileEnv,
-    ...secrets.values,
+    // the generated PageIndex token only travels with --pageindex (which also sets its URL)
+    ...Object.fromEntries(
+      Object.entries(secrets.values).filter(([k]) => k !== "FLOWAID_PAGEINDEX_TOKEN"),
+    ),
     NODE_ENV: opts.prod ? "production" : "development",
     DATABASE_URL: dbUrl,
     FLOWAID_MASTER_KEY_FILE: join(data, "master.key"),
@@ -458,6 +600,8 @@ if (opts.playground) {
     CORS_ORIGINS: fileEnv.CORS_ORIGINS ?? webUrl,
     // the web app's proxy runs on this machine: trust its X-Forwarded-For (rate limits, audit)
     FLOWAID_TRUST_PROXY: fileEnv.FLOWAID_TRUST_PROXY ?? "loopback",
+    ...("mode" in bindAuth && bindAuth.mode ? { FLOWAID_AUTH_MODE: bindAuth.mode } : {}),
+    ...pageIndexEnv,
     LOG_LEVEL: process.env.LOG_LEVEL ?? fileEnv.LOG_LEVEL ?? "warn",
     // provider record/replay (P5-03): off | record | replay, fixtures at the repo root whatever the cwd
     FLOWAID_PROVIDER_FIXTURES:
@@ -474,6 +618,20 @@ if (opts.playground) {
   const api = join(ROOT, "apps/api");
   const worker = join(ROOT, "apps/worker");
   const web = join(ROOT, "apps/web");
+  if (pageIndexPython) {
+    // only what the service needs: never the master key, database or provider keys
+    start("pidx", 35, pageIndexPython, ["-m", "flowaid_pageindex"], PAGEINDEX_DIR, {
+      PATH: process.env.PATH ?? "",
+      HOME: process.env.HOME ?? "",
+      FLOWAID_PAGEINDEX_TOKEN: pageIndexEnv.FLOWAID_PAGEINDEX_TOKEN ?? "",
+      FLOWAID_PAGEINDEX_HOST: "127.0.0.1",
+      FLOWAID_PAGEINDEX_PORT: String(pageIndexPort),
+      FLOWAID_PAGEINDEX_DATA_DIR: join(data, "pageindex"),
+    });
+    if (!(await waitFor(`http://127.0.0.1:${pageIndexPort}/readyz`, 60_000)))
+      fail("the PageIndex service did not become ready (see the pidx lines above)");
+    ok(`PageIndex service ready on http://127.0.0.1:${pageIndexPort}`);
+  }
   start(
     "api",
     34,
@@ -513,6 +671,8 @@ if (opts.playground) {
       {
         ...env,
         PORT: String(webPort),
+        // the web app's proxy reads its bind address from here (src/server/proxy.ts)
+        HOSTNAME: host,
       },
     );
   if (!(await waitFor(`http://127.0.0.1:${webPort}/login`, 180_000)))

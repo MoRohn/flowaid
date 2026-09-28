@@ -34,13 +34,32 @@ Contract changes follow [RFCS.md](design/RFCS.md) and add a `minor` changeset fo
    - the node package manifests are regenerated.
 2. Review that pull request like any other (CI runs on it when `RELEASE_TOKEN` is set, see
    below) and merge it.
-3. The workflow sees no pending changesets and no `v<version>` tag, tags the merge commit,
-   builds the images for `linux/amd64` and `linux/arm64`, pushes them with SBOMs and provenance,
+3. The workflow sees no pending changesets and no `v<version>` tag, waits for CI and E2E to pass
+   on the merge commit (below), tags it, builds the images for `linux/amd64` and `linux/arm64`, pushes them with SBOMs and provenance,
    attests them, and creates the GitHub release with the CHANGELOG section as its notes.
 
 A tag pushed by hand (`git tag -a v0.4.1 -m "FlowAId 0.4.1" && git push origin v0.4.1`) publishes
 that commit the same way; use it to re-run a release whose image build failed. A version with a
 hyphen (`0.5.0-rc.1`) is published as a pre-release and does not move `latest` or `0.5`.
+
+### The CI and E2E gate
+
+Nothing is tagged or published from a commit that has not passed CI and E2E. Before the Release
+workflow tags a merge commit (or, for a tag pushed by hand, in its `gate` job before anything is
+built), [`.github/scripts/wait-for-checks.sh`](../.github/scripts/wait-for-checks.sh) polls the
+commit's check runs until the `check`, `test` and `integration` jobs of CI and the
+`acceptance journey` and `ui gallery (axe, console)` jobs of E2E have finished. If every one
+succeeded the release goes ahead; if any failed or was cancelled, or they are still running
+after an hour, the run fails and nothing is released. Opening or updating the Version packages
+pull request never waits.
+
+After a failed gate, fix `main` (or re-run the failed job) and re-run the Release workflow:
+the version is still untagged, so the next run on `main` releases it once its commit is green.
+A newer push to `main` cancels CI on the older commit, so that commit's release fails the gate
+and the newer commit's run releases instead. A tag pushed by hand must point at a commit that CI
+and E2E ran on (a commit on `main`); otherwise the gate waits for checks that never start and
+fails after an hour. When a job is renamed in `ci.yml` or `e2e.yml`, update the list in the
+script.
 
 To try the versioning locally without committing: `pnpm version-packages`, inspect the diff,
 then discard it.
@@ -100,7 +119,8 @@ source repository.
   present; when the token is refused it warns and falls back to the default token, so a release
   is never blocked by it.
 - **Branch protection**: require the `check`, `test`, `integration` and `acceptance journey`
-  checks on `main`, so a release is only ever cut from a green commit.
+  checks on pull requests to `main`, so `main` stays green; the release gate above checks the
+  same jobs again on the commit it releases.
 
 ## Contributor hooks
 

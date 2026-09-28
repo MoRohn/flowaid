@@ -137,6 +137,39 @@ describe("WorkflowCriticPanel", () => {
     expect(onApplyFix).toHaveBeenCalledWith(expect.objectContaining({ id: "1" }));
   });
 
+  it("says who raised a finding and previews the fix before applying it", async () => {
+    const onApplyFix = vi.fn();
+    render(
+      <WorkflowCriticPanel
+        findings={[
+          {
+            ...(FINDINGS[0] as CriticFindingView),
+            source: "rule",
+            fixTitle: "Insert an approval gate",
+          },
+          { ...(FINDINGS[1] as CriticFindingView), source: "judge", fixAvailable: false },
+        ]}
+        onApplyFix={onApplyFix}
+        renderFixPreview={(f) => <p>would change {f.id}</p>}
+      />,
+    );
+    expect(screen.getByText("Rule")).toBeInTheDocument();
+    expect(screen.getByText("AI judge")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Unguarded refund" }));
+    expect(screen.getByText("Insert an approval gate")).toBeInTheDocument();
+
+    const preview = screen.getByRole("button", { name: "Preview fix" });
+    await userEvent.click(preview);
+    expect(preview).toHaveAttribute("aria-expanded", "true");
+    const group = screen.getByRole("group", { name: "Fix preview: Unguarded refund" });
+    expect(group).toHaveTextContent("Insert an approval gate");
+    expect(group).toHaveTextContent("would change 1");
+    expect(onApplyFix).not.toHaveBeenCalled();
+    await userEvent.click(within(group).getByRole("button", { name: "Apply fix" }));
+    expect(onApplyFix).toHaveBeenCalledWith(expect.objectContaining({ id: "1" }));
+    expect(screen.queryByRole("group", { name: /Fix preview/ })).not.toBeInTheDocument();
+  });
+
   it("renders the empty state with the checks that ran and a re-run button", async () => {
     const onRerun = vi.fn();
     render(

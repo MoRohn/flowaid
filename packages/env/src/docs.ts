@@ -63,10 +63,11 @@ export const FEATURE_KEYS = [
   "settings_notifications",
   "agents",
   "ai_builder",
+  "assistant",
+  "pageindex",
   "advisor",
   "code_export",
   "langchain",
-  "oidc",
   "schedules",
   "mcp_exposures",
   "dashboard",
@@ -81,7 +82,6 @@ export const ENV_GROUPS = [
   "database",
   "queue",
   "security",
-  "oidc",
   "execution",
   "storage",
   "providers",
@@ -98,7 +98,6 @@ export const ENV_GROUP_TITLES: Readonly<Record<EnvGroup, string>> = {
   database: "Database (PostgreSQL 16 + pgvector)",
   queue: "Queue and workers",
   security: "Security and first boot",
-  oidc: "Single sign-on (OIDC)",
   execution: "Execution, sandbox and plugins",
   storage: "Object storage (S3-compatible)",
   providers: "AI providers",
@@ -191,37 +190,38 @@ const docs = {
   },
   PORT: {
     group: "core",
-    description: "TCP port of the api (HTTP, SSE, webhooks, MCP endpoint).",
-    default: "3000",
+    description:
+      "TCP port of the api (HTTP, SSE, webhooks, MCP endpoint). The web app, the address people open, is on 3000 beside it. Under compose it is the host port the api is published on (the container always listens on 3001).",
+    default: "3001",
     required: false,
-    example: "3000",
+    example: "3001",
     secret: false,
   },
   FLOWAID_BASE_URL: {
     group: "core",
     description:
       "Public URL of the api as seen by browsers, webhook callers and MCP clients. Used to build external review links, webhook URLs and the OpenAPI `servers` entry. In production it must be `https:` unless the host is loopback or `FLOWAID_ALLOW_INSECURE_HTTP=true`.",
-    default: "http://localhost:3000",
+    default: "http://localhost:3001",
     required: false,
-    example: "http://localhost:3000",
+    example: "http://localhost:3001",
     secret: false,
   },
   FLOWAID_WEB_URL: {
     group: "core",
     description:
       "Public URL of the web app. Used for deep links in notifications and as the default CORS origin. Same production rule as `FLOWAID_BASE_URL`.",
-    default: "http://localhost:3001",
+    default: "http://localhost:3000",
     required: false,
-    example: "http://localhost:3001",
+    example: "http://localhost:3000",
     secret: false,
   },
   CORS_ORIGINS: {
     group: "core",
     description:
-      "Comma-separated list of browser origins allowed to call the api with credentials. `*` reflects every request origin and is rejected in production, as is an origin cross-site with `FLOWAID_BASE_URL` unless `FLOWAID_ALLOW_CROSS_SITE=true`.",
-    default: "http://localhost:3001",
+      "Comma-separated list of browser origins allowed to call the api with credentials. `*` is always rejected (the api allows credentialed requests); in production so is an origin cross-site with `FLOWAID_BASE_URL` unless `FLOWAID_ALLOW_CROSS_SITE=true`.",
+    default: "http://localhost:3000",
     required: false,
-    example: "http://localhost:3001,https://flowaid.example.com",
+    example: "http://localhost:3000,https://flowaid.example.com",
     secret: false,
   },
   RATE_LIMIT_MAX: {
@@ -236,9 +236,9 @@ const docs = {
   FLOWAID_API_INTERNAL_URL: {
     group: "core",
     description:
-      "URL the web app's server side uses to reach the api over the deployment's private network (compose: `http://api:3000`). Unset means `FLOWAID_BASE_URL`.",
+      "URL the web app's server side uses to reach the api over the deployment's private network (compose: `http://api:3001`). Unset means `FLOWAID_BASE_URL`.",
     required: false,
-    example: "http://api:3000",
+    example: "http://api:3001",
     secret: false,
   },
   FLOWAID_TRUST_PROXY: {
@@ -422,6 +422,15 @@ const docs = {
     example: "true",
     secret: false,
   },
+  FLOWAID_ALLOW_PRIVATE_NETWORK: {
+    group: "security",
+    description:
+      "Let workflows reach loopback, private-network and link-local addresses: the HTTP, GraphQL and database query nodes, knowledge loaders, OpenAPI tools (import and calls), HTTP MCP servers and notification webhooks. Off by default, so a workflow cannot probe the machine or network it runs on. Turn it on when you run FlowAId for yourself and want flows to call your own `localhost` services or local databases; every workflow author can then reach them. Set it for both the api and the worker.",
+    default: "false",
+    required: false,
+    example: "true",
+    secret: false,
+  },
   FLOWAID_ALLOW_CROSS_SITE: {
     group: "security",
     description:
@@ -529,39 +538,6 @@ const docs = {
     example: "<value>",
     secret: true,
     pattern: true,
-  },
-
-  // ── oidc ────────────────────────────────────────────────────────────────────────
-  OIDC_ISSUER: {
-    group: "oidc",
-    description:
-      "Issuer URL of the OpenID Connect provider (`/.well-known/openid-configuration` is discovered from it). Setting it enables `features.oidc` and the `/v1/auth/oidc/*` routes; `OIDC_CLIENT_ID` and `OIDC_CLIENT_SECRET` are then required. Must be `https:` in production unless `FLOWAID_ALLOW_INSECURE_HTTP=true`.",
-    required: false,
-    example: "https://login.example.com/realms/flowaid",
-    secret: false,
-  },
-  OIDC_CLIENT_ID: {
-    group: "oidc",
-    description: "Client id registered with the OIDC provider for the flowaid web app.",
-    required: false,
-    example: "flowaid",
-    secret: false,
-  },
-  OIDC_CLIENT_SECRET: {
-    group: "oidc",
-    description:
-      "Client secret matching `OIDC_CLIENT_ID`, used for the authorization-code exchange (with PKCE).",
-    required: false,
-    example: "<client secret>",
-    secret: true,
-  },
-  OIDC_ROLE_CLAIM: {
-    group: "oidc",
-    description:
-      "ID-token claim whose value (`owner`, `admin`, `editor` or `viewer`, or a list containing one) sets the workspace role on every OIDC login. Unset keeps roles managed in flowaid; new SSO users join as `viewer`.",
-    required: false,
-    example: "flowaid_role",
-    secret: false,
   },
 
   // ── execution ───────────────────────────────────────────────────────────────────
@@ -739,10 +715,26 @@ const docs = {
   OLLAMA_HOST: {
     group: "providers",
     description:
-      "Base URL of a local Ollama server (`@flowaid/provider-ollama`). Unset disables the provider.",
+      'Base URL of a local Ollama server (`@flowaid/provider-ollama`). Unset disables the provider. Workflows may always reach this exact origin, even on this computer, without `FLOWAID_ALLOW_PRIVATE_NETWORK` (you configured it); "Ollama (no credential)" credentials use it.',
     required: false,
     example: "http://localhost:11434",
     secret: false,
+  },
+  FLOWAID_PAGEINDEX_URL: {
+    group: "providers",
+    description:
+      "Base URL of the FlowAId PageIndex service (`apps/pageindex`), which indexes PDFs into section trees for PageIndex document sources and the `flowaid.pageindex.*` nodes. Set it together with `FLOWAID_PAGEINDEX_TOKEN`, or leave both unset to turn PageIndex off (the rest of FlowAId is unaffected). `pnpm start --pageindex` and the compose `pageindex` profile set both.",
+    required: false,
+    example: "http://127.0.0.1:8765",
+    secret: false,
+  },
+  FLOWAID_PAGEINDEX_TOKEN: {
+    group: "providers",
+    description:
+      "Shared bearer token between the api/worker and the PageIndex service (at least 32 characters; the service reads the same variable). Generate with `openssl rand -hex 32`.",
+    required: false,
+    example: "<64 hex characters from openssl rand -hex 32>",
+    secret: true,
   },
   FLOWAID_PROVIDER_FIXTURES: {
     group: "providers",
@@ -886,10 +878,11 @@ const docs = {
   },
   WEB_PORT: {
     group: "compose",
-    description: "Host port of the compose `web` service (the api uses `PORT`).",
-    default: "3001",
+    description:
+      "Host port of the compose `web` service, the address people open (the api uses `PORT`).",
+    default: "3000",
     required: false,
-    example: "3001",
+    example: "3000",
     secret: false,
     composeOnly: true,
   },

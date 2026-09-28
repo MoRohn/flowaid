@@ -1,19 +1,21 @@
-# FlowAId status — 2026-09-27
+# FlowAId status — 2026-09-28
 
-This file records where everything stands so work can restart from a known state. The
+This file records where everything stands so work can restart from a known state. **V2** (branch
+`v2.0`, not yet merged) adds insights, Ask FlowAId and the stabilisation work; its audit, with
+what was verified and what is open, is [FLOWAID_V2_FINAL_AUDIT.md](FLOWAID_V2_FINAL_AUDIT.md). The
 repository is published at [github.com/MoRohn/flowaid](https://github.com/MoRohn/flowaid); CI
 and E2E run on every push to `main`.
 
 ## Gates
 
-| gate                                               | result                                                                                              |
-| -------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| `pnpm check`                                       | pass: audit, boundaries, env/SDK/UI-inventory generators current, format, lint, types, build, tests |
-| PostgreSQL suites (database, runtime, api, worker) | pass (CI job `integration`, pgvector pg16 + Redis)                                                  |
-| Acceptance journey (`e2e/acceptance`)              | pass against the production builds with recorded provider replay and secret-canary log checks       |
-| UI accessibility gallery                           | pass (axe checks over the `@flowaid/ui` gallery and the web pages, CI job `ui-gallery`)             |
-| Docker images (`docker/Dockerfile`)                | api, worker and web build and boot; `docker compose up` reaches healthy on every service            |
-| Tests                                              | 5,471 (including the PostgreSQL and isolated-vm suites that run in CI) plus the browser journey     |
+| gate                                                           | result                                                                                              |
+| -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `pnpm check`                                                   | pass: audit, boundaries, env/SDK/UI-inventory generators current, format, lint, types, build, tests |
+| PostgreSQL suites (database, runtime, nodes-core, api, worker) | pass (CI job `integration`, pgvector pg16 + Redis)                                                  |
+| Acceptance journey (`e2e/acceptance`)                          | pass against the production builds with recorded provider replay and secret-canary log checks       |
+| UI accessibility gallery                                       | pass (axe checks over the `@flowaid/ui` gallery and the web pages, CI job `ui-gallery`)             |
+| Docker images (`docker/Dockerfile`)                            | api, worker and web build and boot; `docker compose up` reaches healthy on every service            |
+| Tests                                                          | 5,831 passing locally (14 more need CI's Node 24 isolated-vm or Docker) plus the browser journey    |
 
 ## Apps
 
@@ -31,10 +33,11 @@ and E2E run on every push to `main`.
 | `workflow-core`                                                      | contracts, FlowExpr, templates, schema checker (0.3.8, RFC-0021)                                   | 2,665 |
 | `workflow-compiler`                                                  | 8 passes, 94 diagnostics, diff, migrate                                                            | 177   |
 | `workflow-runtime`                                                   | scheduler, orchestrator, replay, run actions, drivers                                              | 89    |
-| `database`                                                           | 47 tables, migrations 0000–0008 with RLS, run store, queue, event bus                              | 56    |
+| `database`                                                           | 50 tables, migrations 0000–0010 with RLS, run store, queue, event bus                              | 56    |
 | `nodes-core`                                                         | 60 nodes and the templates                                                                         | 153   |
 | `providers`, `provider-typesafe`, `-openai`, `-anthropic`, `-ollama` | registry, pricing, failover, routing, rerank, record/replay; TypeSafe Jev and generation providers | 163   |
-| `advisor`                                                            | cost optimiser, AI builder, AI critic                                                              | 22    |
+| `advisor`                                                            | cost optimiser, AI builder, AI critic, Ask FlowAId loop and its evaluation set                     | 40    |
+| `insights`                                                           | change detection: Fisher, Mann–Whitney, Benjamini–Hochberg, version attribution                    | 20    |
 | `knowledge`                                                          | ingestion, chunking, pgvector hybrid search                                                        | 33    |
 | `mcp`, `openapi-tools`                                               | MCP client pool and exposure; OpenAPI tools                                                        | 75    |
 | `plugins`, `create-flowaid-node`                                     | registry discovery, install, plugin host; scaffold                                                 | 25    |
@@ -73,3 +76,6 @@ compiled API, worker and Docker images run plain `node` on `dist`.
 - AWS KMS and Secrets Manager need an AWS SDK client the apps do not wire yet; the other master key
   providers (`local`, `vault-transit`, `azure-keyvault`, `gcp-kms`) and external references
   (`env:`, `vault:`, `azure-kv:`, `gcp-sm:`) are configured from the environment.
+- V2's open items (live-model evaluation of Ask FlowAId, browser specs for the insights panels
+  and the assistant, dashboard filters in the URL, the P2-6 and P3 refactors, a manual
+  screen-reader pass) are listed in [FLOWAID_V2_FINAL_AUDIT.md](FLOWAID_V2_FINAL_AUDIT.md).

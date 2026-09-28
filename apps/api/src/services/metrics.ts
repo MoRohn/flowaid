@@ -2,10 +2,23 @@
  * Dashboard metrics (API.md §3, `DashboardMetrics`): SQL aggregates over `runs`, `node_runs`,
  * `human_tasks` and `run_events` for one workspace and time range (`percentile_cont`,
  * `date_trunc`). Runs are counted by `created_at` in `[from, to)`; latency and success rates are
- * over the runs that finished.
+ * over the runs that finished. By default only production traffic counts (`PRODUCTION_ORIGINS`):
+ * evaluation runs inflate volume, and replays, restarts and forks reuse recorded results, which
+ * drags latency and cost toward zero.
  */
 import { sql, type SQL } from "drizzle-orm";
 import type { Tx } from "@flowaid/database";
+import type { RunOrigin } from "@flowaid/workflow-core";
+
+/** Run origins that are real traffic; the rest are evaluations and re-executions of recorded runs. */
+export const PRODUCTION_ORIGINS: readonly RunOrigin[] = [
+  "api",
+  "ui",
+  "webhook",
+  "schedule",
+  "mcp",
+  "subflow",
+];
 
 export interface MetricsFilter {
   workspaceId: string;
@@ -16,6 +29,8 @@ export interface MetricsFilter {
   versionId?: string | undefined;
   /** API keys pinned to workflows see only those */
   workflowIds?: readonly string[] | null;
+  /** `production` (default) counts `PRODUCTION_ORIGINS` only; `all` counts every run */
+  origin?: "production" | "all" | undefined;
 }
 
 export interface DashboardMetrics {
@@ -65,6 +80,13 @@ function runFilter(f: MetricsFilter): SQL {
   if (f.workflowId) parts.push(sql`r.workflow_id = ${f.workflowId}`);
   if (f.environmentId) parts.push(sql`r.environment_id = ${f.environmentId}`);
   if (f.versionId) parts.push(sql`r.workflow_version_id = ${f.versionId}`);
+  if ((f.origin ?? "production") === "production")
+    parts.push(
+      sql`r.origin in (${sql.join(
+        PRODUCTION_ORIGINS.map((o) => sql`${o}`),
+        sql`, `,
+      )})`,
+    );
   if (f.workflowIds)
     parts.push(
       f.workflowIds.length

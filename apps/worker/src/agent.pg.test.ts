@@ -7,6 +7,7 @@ import { afterAll, beforeAll, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { agents, humanTasks, runs, tools } from "@flowaid/database";
 import { describeDb } from "@flowaid/database/testing";
+import { UNTRUSTED_NOTICE } from "@flowaid/nodes-core";
 import { uuidv7 } from "@flowaid/shared";
 import type { GenerationProvider, GenerationRequest, ToolDefinition } from "@flowaid/workflow-core";
 import { createHarness, fakeTypesafeRegistry, type Harness } from "./test/setup.js";
@@ -172,13 +173,18 @@ describeDb("the agent node on the worker (Postgres)", () => {
       tx.select().from(humanTasks).where(eq(humanTasks.runId, runId)),
     );
     expect(task?.request).toMatchObject({ title: "Approve lookup", mode: { type: "approval" } });
-    expect(requests[0]?.messages[0]?.content).toBe("You are the support agent.");
+    expect(requests[0]?.messages[0]?.content).toBe(
+      `You are the support agent.\n\n${UNTRUSTED_NOTICE}`,
+    );
 
     await h.store.respondHumanTask(task?.id as string, { action: "approve" }, "user:1");
     await h.queue.enqueue("run:general", { type: "run.resume", runId, reason: "human" });
     const run = await h.waitFor(runId, ["completed", "failed"], 30_000);
     expect(run.error).toBeNull();
-    expect(run.output).toEqual({ answer: 'Found: {"status":"order 1182 shipped"}' });
+    // the model saw the tool's result as delimited, untrusted data
+    const answer = (run.output as { answer: string }).answer;
+    expect(answer.startsWith('Found: <<<UNTRUSTED label="tool result: ')).toBe(true);
+    expect(answer).toContain('\n{"status":"order 1182 shipped"}\n');
 
     // the tool call ran the lookup workflow as its own run, labelled with the caller
     const children = await h.db.app.system((tx) =>

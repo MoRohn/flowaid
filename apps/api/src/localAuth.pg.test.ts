@@ -17,7 +17,7 @@ describeDb("local mode: no sign-in on this computer (Postgres)", () => {
     t.app.inject({ method: "POST", url: "/v1/auth/local", headers, remoteAddress });
 
   it("signs this computer in as the owner and reports the mode", async () => {
-    const res = await signIn(local, { "x-requested-with": "flowaid", host: "localhost:3000" });
+    const res = await signIn(local, { "x-requested-with": "flowaid", host: "localhost:3001" });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({
       user: { email: expect.any(String) },
@@ -44,6 +44,27 @@ describeDb("local mode: no sign-in on this computer (Postgres)", () => {
         .statusCode,
     ).toBe(403);
     expect((await signIn(local, { host: "localhost" })).statusCode).toBe(403);
+  });
+
+  it("refuses a LAN client posing as this computer through an exposed web app", async () => {
+    // Host: localhost and X-Forwarded-For: 127.0.0.1 are the client's; the proxy marks the chain
+    const res = await signIn(local, {
+      "x-requested-with": "flowaid",
+      host: "127.0.0.1:3001",
+      "x-forwarded-for": "127.0.0.1",
+      "x-forwarded-host": "localhost",
+      "x-flowaid-client-unverified": "1",
+    });
+    expect(res.statusCode).toBe(403);
+    expect(
+      (
+        await signIn(local, {
+          "x-requested-with": "flowaid",
+          host: "localhost",
+          "x-real-ip": "192.168.1.20",
+        })
+      ).statusCode,
+    ).toBe(403);
   });
 
   it("does not exist in password mode", async () => {

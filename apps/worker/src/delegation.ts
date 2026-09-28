@@ -8,13 +8,14 @@
  *    the sandbox host's `flowaid_code` role has no table access), executes it with its own
  *    registry and services, stores the outcome with `flowaid_delegated_complete` and enqueues
  *    `run.signal{delegated_result}` on `run:general`;
- * 3. the orchestrating worker reads the outcome back (`takeDelegatedResult`) and hands it to the
- *    run as a `delegated_result` trigger.
+ * 3. the orchestrating worker reads the outcome back (`readDelegatedResult`), hands it to the
+ *    run as a `delegated_result` trigger and removes the row once the run handled it
+ *    (`clearDelegatedResult`).
  *
  * A claim older than the stale window is claimable again, so a job redelivered after its worker
  * died re-executes; the queue's own retries cover a lost signal.
  */
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { delegatedNodes, type Database } from "@flowaid/database";
 import type { JsonObject, Job, QueueDriver, WorkerPool } from "@flowaid/workflow-core";
 import {
@@ -54,20 +55,31 @@ export function delegateNode(db: Database, queue: QueueDriver) {
   };
 }
 
-/** Reads (and removes) the outcome a pool's worker stored; null when there is none yet. */
-export async function takeDelegatedResult(
+/** Reads the outcome a pool's worker stored; null when there is none yet. */
+export async function readDelegatedResult(
   db: Database,
   nodeRunId: string,
 ): Promise<ExecutorOutcome | null> {
-  return db.system(async (tx) => {
-    const [row] = await tx
+  const [row] = await db.system((tx) =>
+    tx
       .select({ status: delegatedNodes.status, result: delegatedNodes.result })
       .from(delegatedNodes)
-      .where(eq(delegatedNodes.nodeRunId, nodeRunId));
-    if (row?.status !== "done" || !row.result) return null;
-    await tx.delete(delegatedNodes).where(eq(delegatedNodes.nodeRunId, nodeRunId));
-    return row.result as unknown as ExecutorOutcome;
-  });
+      .where(eq(delegatedNodes.nodeRunId, nodeRunId)),
+  );
+  if (row?.status !== "done" || !row.result) return null;
+  return row.result as unknown as ExecutorOutcome;
+}
+
+/**
+ * Removes a delegated node once the run handled its outcome. Only then: a result read while
+ * another worker held the run is read again when the signal is redelivered.
+ */
+export async function clearDelegatedResult(db: Database, nodeRunId: string): Promise<void> {
+  await db.system((tx) =>
+    tx
+      .delete(delegatedNodes)
+      .where(and(eq(delegatedNodes.nodeRunId, nodeRunId), eq(delegatedNodes.status, "done"))),
+  );
 }
 
 export interface PoolExecutorDeps {

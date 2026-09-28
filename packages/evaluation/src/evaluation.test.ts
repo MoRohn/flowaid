@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { booleanDecision, choiceDecision, scoreDecision } from "@flowaid/providers";
 import type { DecisionProvider, JsonValue } from "@flowaid/workflow-core";
-import { compare, flips, regressionWarnings } from "./compare.js";
+import { compare, flips, mcnemarExactP, regressionWarnings } from "./compare.js";
 import {
   ExpectationSchema,
   parseCase,
@@ -398,5 +398,52 @@ describe("compare and report", () => {
       expect.stringContaining("cost per case rose 50%"),
     ]);
     expect(flips(current, [])).toEqual([]);
+  });
+
+  it("computes the exact McNemar p-value from discordant pairs", () => {
+    expect(mcnemarExactP(0, 0)).toBe(1);
+    expect(mcnemarExactP(1, 0)).toBe(1);
+    // 2 · (1/2)^6
+    expect(mcnemarExactP(6, 0)).toBeCloseTo(0.03125, 12);
+    // 2 · (C(12,0) + C(12,1) + C(12,2)) / 2^12 = 2 · 79 / 4096
+    expect(mcnemarExactP(10, 2)).toBeCloseTo(158 / 4096, 12);
+    expect(mcnemarExactP(2, 10)).toBeCloseTo(158 / 4096, 12);
+  });
+
+  describe("pass-rate regressions over paired cases", () => {
+    const run = (n: number, regressed: number, improved = 0) => {
+      const base = Array.from({ length: n }, (_, i) =>
+        result(`k${i}`, i >= regressed + improved || i < regressed, "billing", 100),
+      );
+      const cur = base.map((r, i) => (i < regressed + improved ? { ...r, passed: !r.passed } : r));
+      return compare({
+        versionId: "v2",
+        results: cur,
+        summary: summarize(cur),
+        baseline: { versionId: "v1", results: base, summary: summarize(base) },
+      }).warnings.filter((w) => w.message.startsWith("pass rate"));
+    };
+
+    it("does not warn on one flip in 20 cases (5 pt drop, p = 1)", () => {
+      expect(run(20, 1)).toEqual([]);
+    });
+
+    it("warns when the drop is significant, with n and p", () => {
+      const w = run(20, 6);
+      expect(w).toHaveLength(1);
+      expect(w[0]?.message).toContain("pass rate dropped 30.0 pt");
+      expect(w[0]?.message).toContain("n = 20 paired cases");
+      expect(w[0]?.message).toContain("6 regressed, 0 improved");
+      expect(w[0]?.message).toContain("McNemar exact p = 0.031");
+    });
+
+    it("warns on a drop past the threshold once there are enough cases", () => {
+      // 150 cases, 4 regressions: 2.7 pt > 2 pt, p = 0.125 but n ≥ 100
+      const w = run(150, 4);
+      expect(w).toHaveLength(1);
+      expect(w[0]?.message).toContain("p = 0.125");
+      // the same drop on 40 cases is not significant and n is small
+      expect(run(40, 2)).toEqual([]);
+    });
   });
 });

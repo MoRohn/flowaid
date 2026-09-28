@@ -19,6 +19,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint src",
     "test": "vitest run",
+    "eval:assistant": "tsx --conditions=development src/evals/assistant.ts",
+    "eval:pageindex": "tsx --conditions=development src/evals/pageindex.ts",
     "clean": "rm -rf dist .turbo *.tsbuildinfo"
   },
   "dependencies": {
@@ -28,6 +30,7 @@
     "@fastify/rate-limit": "11.2.0",
     "@fastify/swagger": "9.9.0",
     "@flowaid/advisor": "workspace:*",
+    "@flowaid/insights": "workspace:*",
     "@flowaid/codegen": "workspace:*",
     "@flowaid/credentials": "workspace:*",
     "@flowaid/database": "workspace:*",
@@ -39,6 +42,7 @@
     "@flowaid/nodes-core": "workspace:*",
     "@flowaid/observability": "workspace:*",
     "@flowaid/openapi-tools": "workspace:*",
+    "@flowaid/pageindex": "workspace:*",
     "@flowaid/plugins": "workspace:*",
     "@flowaid/provider-anthropic": "workspace:*",
     "@flowaid/provider-ollama": "workspace:*",

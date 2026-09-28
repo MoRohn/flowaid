@@ -506,7 +506,6 @@ function optionalStdioCommands(
 // ── cross-field rules ─────────────────────────────────────────────────────────────
 
 const S3_VARS = ["S3_ENDPOINT", "S3_BUCKET", "S3_ACCESS_KEY", "S3_SECRET_KEY"] as const;
-const OIDC_VARS = ["OIDC_ISSUER", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET"] as const;
 
 /** One cross-variable problem. */
 export interface CrossFieldIssue {
@@ -585,7 +584,7 @@ export function siteOf(url: URL): string {
  * instead of only after those are fixed).
  *
  * The production rules (`NODE_ENV=production`) refuse configurations that are unsafe on a
- * public host: `CORS_ORIGINS=*`, `http:` public URLs, the documented admin password, generated
+ * public host: `http:` public URLs, the documented admin password, generated
  * JWT keys in an unnamed directory, an unnamed master key source and cross-site origins,
  * each with its documented override. A worker serving only the `code` pool is exempt from the
  * key requirements and must not hold a master key.
@@ -664,6 +663,20 @@ export function crossFieldIssues(vars: Partial<Record<EnvVarName, unknown>>): Cr
       message: "FLOWAID_JWT_PRIVATE_KEY and FLOWAID_JWT_PUBLIC_KEY must be set together",
     });
   }
+  // PageIndex needs both its URL and its token, and the token must be long enough to be a secret
+  if (has("FLOWAID_PAGEINDEX_URL") !== has("FLOWAID_PAGEINDEX_TOKEN")) {
+    issues.push({
+      path: has("FLOWAID_PAGEINDEX_URL") ? "FLOWAID_PAGEINDEX_TOKEN" : "FLOWAID_PAGEINDEX_URL",
+      message:
+        "FLOWAID_PAGEINDEX_URL and FLOWAID_PAGEINDEX_TOKEN must be set together (or neither, to turn PageIndex off)",
+    });
+  }
+  if (has("FLOWAID_PAGEINDEX_TOKEN") && str("FLOWAID_PAGEINDEX_TOKEN").length < 32) {
+    issues.push({
+      path: "FLOWAID_PAGEINDEX_TOKEN",
+      message: "must be at least 32 characters (generate one with `openssl rand -hex 32`)",
+    });
+  }
   const s3Set = S3_VARS.filter((key) => has(key));
   if (s3Set.length > 0 && s3Set.length < S3_VARS.length) {
     for (const key of S3_VARS) {
@@ -674,20 +687,6 @@ export function crossFieldIssues(vars: Partial<Record<EnvVarName, unknown>>): Cr
         });
       }
     }
-  }
-  const oidcSet = OIDC_VARS.filter((key) => has(key));
-  if (oidcSet.length > 0 && oidcSet.length < OIDC_VARS.length) {
-    for (const key of OIDC_VARS) {
-      if (!has(key)) {
-        issues.push({
-          path: key,
-          message: `is required when ${oidcSet.join(", ")} ${oidcSet.length === 1 ? "is" : "are"} set (OIDC needs all of ${OIDC_VARS.join(", ")})`,
-        });
-      }
-    }
-  }
-  if (has("OIDC_ROLE_CLAIM") && !has("OIDC_ISSUER")) {
-    issues.push({ path: "OIDC_ROLE_CLAIM", message: "has no effect without OIDC_ISSUER" });
   }
   issues.push(...masterKeyIssues(has, str, isDefault));
   if (has("FLOWAID_ADMIN_EMAIL") !== has("FLOWAID_ADMIN_PASSWORD")) {
@@ -712,6 +711,14 @@ export function crossFieldIssues(vars: Partial<Record<EnvVarName, unknown>>): Cr
   if (has("PROMETHEUS_PORT") && has("PORT") && str("PROMETHEUS_PORT") === str("PORT")) {
     issues.push({ path: "PROMETHEUS_PORT", message: "must differ from PORT" });
   }
+  // the api answers CORS with credentials: `*` would let every site make signed-in calls
+  if (has("CORS_ORIGINS") && listOf(vars.CORS_ORIGINS).includes("*")) {
+    issues.push({
+      path: "CORS_ORIGINS",
+      message:
+        "must not contain * (the api allows credentialed requests, so any site could act as the signed-in user); list the web app's origin instead, e.g. http://localhost:3000",
+    });
+  }
 
   const nodeEnv = has("NODE_ENV") ? str("NODE_ENV") : ENV_VAR_DOCS.NODE_ENV.default;
   if (nodeEnv !== "production") {
@@ -734,17 +741,8 @@ export function crossFieldIssues(vars: Partial<Record<EnvVarName, unknown>>): Cr
   );
 
   const origins = has("CORS_ORIGINS") ? listOf(vars.CORS_ORIGINS) : [];
-  if (origins.includes("*")) {
-    issues.push({
-      path: "CORS_ORIGINS",
-      message: "must not contain * in production (list the web app's origin instead)",
-    });
-  }
 
-  for (const name of ["FLOWAID_BASE_URL", "FLOWAID_WEB_URL", "OIDC_ISSUER"] as const) {
-    if (name === "OIDC_ISSUER" && !has(name)) {
-      continue;
-    }
+  for (const name of ["FLOWAID_BASE_URL", "FLOWAID_WEB_URL"] as const) {
     const url = urlOf(has(name) ? vars[name] : ENV_VAR_DOCS[name].default);
     if (url !== undefined && url.protocol === "http:" && !isLoopbackHost(url.hostname)) {
       if (!allowInsecureHttp) {
@@ -888,6 +886,7 @@ export const EnvSchema = z
     FLOWAID_ADMIN_EMAIL: optionalEmail("FLOWAID_ADMIN_EMAIL"),
     FLOWAID_ADMIN_PASSWORD: optionalPassword("FLOWAID_ADMIN_PASSWORD"),
     FLOWAID_ALLOW_INSECURE_HTTP: boolWithDefault("FLOWAID_ALLOW_INSECURE_HTTP"),
+    FLOWAID_ALLOW_PRIVATE_NETWORK: boolWithDefault("FLOWAID_ALLOW_PRIVATE_NETWORK"),
     FLOWAID_ALLOW_CROSS_SITE: boolWithDefault("FLOWAID_ALLOW_CROSS_SITE"),
     FLOWAID_MASTER_KEY_AUTOGENERATE: boolWithDefault("FLOWAID_MASTER_KEY_AUTOGENERATE"),
     FLOWAID_MASTER_KEY_PROVIDER: enumWithDefault(
@@ -903,11 +902,6 @@ export const EnvSchema = z
     AZURE_CLIENT_ID: optionalString("AZURE_CLIENT_ID"),
     AZURE_CLIENT_SECRET: optionalString("AZURE_CLIENT_SECRET"),
     GOOGLE_APPLICATION_CREDENTIALS: optionalString("GOOGLE_APPLICATION_CREDENTIALS"),
-
-    OIDC_ISSUER: optionalUrl("OIDC_ISSUER", /^https?$/, "http:// or https://"),
-    OIDC_CLIENT_ID: optionalString("OIDC_CLIENT_ID"),
-    OIDC_CLIENT_SECRET: optionalString("OIDC_CLIENT_SECRET"),
-    OIDC_ROLE_CLAIM: optionalString("OIDC_ROLE_CLAIM"),
 
     SANDBOX_MODE: enumWithDefault("SANDBOX_MODE", SANDBOX_MODES),
     MCP_STDIO_ENABLED: boolWithDefault("MCP_STDIO_ENABLED"),
@@ -939,6 +933,8 @@ export const EnvSchema = z
     OPENAI_API_KEY: optionalString("OPENAI_API_KEY"),
     ANTHROPIC_API_KEY: optionalString("ANTHROPIC_API_KEY"),
     OLLAMA_HOST: optionalUrl("OLLAMA_HOST", /^https?$/, "http:// or https://"),
+    FLOWAID_PAGEINDEX_URL: optionalUrl("FLOWAID_PAGEINDEX_URL", /^https?$/, "http:// or https://"),
+    FLOWAID_PAGEINDEX_TOKEN: optionalString("FLOWAID_PAGEINDEX_TOKEN"),
     FLOWAID_PROVIDER_FIXTURES: enumWithDefault("FLOWAID_PROVIDER_FIXTURES", PROVIDER_FIXTURE_MODES),
     FLOWAID_PROVIDER_FIXTURES_DIR: stringWithDefault("FLOWAID_PROVIDER_FIXTURES_DIR"),
 

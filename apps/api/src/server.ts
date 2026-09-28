@@ -29,9 +29,12 @@ import { ingressRoutes } from "./routes/ingress.js";
 import { notificationRoutes } from "./routes/notifications.js";
 import { triggerRoutes } from "./routes/triggers.js";
 import { knowledgeRoutes } from "./routes/knowledge.js";
+import { pageIndexRoutes } from "./routes/pageindex.js";
 import { evaluationRoutes } from "./routes/evaluations.js";
 import { agentRoutes } from "./routes/agents.js";
 import { metricsRoutes } from "./routes/metrics.js";
+import { insightRoutes } from "./routes/insights.js";
+import { assistantRoutes } from "./routes/assistant.js";
 import { aiRoutes } from "./routes/ai.js";
 import { optimizeRoutes } from "./routes/optimize.js";
 import { exportRoutes } from "./routes/export.js";
@@ -52,6 +55,10 @@ export async function buildServer(ctx: ApiContext, o: BuildOptions = {}): Promis
   const app = Fastify({
     logger: o.logger ?? false,
     bodyLimit: 2 * 1024 * 1024,
+    // Node's requestTimeout bounds receiving the request (headers and body), so a slow or
+    // stalled client cannot hold a connection by trickling bytes. It stops once the request
+    // is read: SSE run streams and MCP responses stay open as long as they need.
+    requestTimeout: 120_000,
     trustProxy: ctx.config.trustProxy,
     genReqId: (req) => {
       const given = req.headers["x-request-id"];
@@ -74,10 +81,9 @@ export async function buildServer(ctx: ApiContext, o: BuildOptions = {}): Promis
   await app.register(cors, {
     origin: (origin, cb) => {
       if (!origin) return cb(null, true);
-      const allowed = ctx.config.corsOrigins.includes("*")
-        ? !ctx.config.production
-        : ctx.config.corsOrigins.includes(origin);
-      cb(null, allowed);
+      // exact origins only: with credentials, `*` would let any site act as the signed-in user
+      // (the env schema refuses it; a hand-built config gets no wildcard either)
+      cb(null, origin !== "*" && ctx.config.corsOrigins.includes(origin));
     },
     credentials: true,
     allowedHeaders: [
@@ -117,7 +123,10 @@ export async function buildServer(ctx: ApiContext, o: BuildOptions = {}): Promis
   evaluationRoutes(app, ctx);
   agentRoutes(app, ctx);
   metricsRoutes(app, ctx);
+  insightRoutes(app, ctx);
+  assistantRoutes(app, ctx);
   knowledgeRoutes(app, ctx);
+  pageIndexRoutes(app, ctx);
   optimizeRoutes(app, ctx);
   aiRoutes(app, ctx);
   exportRoutes(app, ctx);

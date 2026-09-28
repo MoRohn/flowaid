@@ -91,6 +91,18 @@ describe("AppShell", () => {
     expect(screen.getByText("Canvas")).toBeInTheDocument();
   });
 
+  it("offers a skip link as the first Tab stop that focuses the main content", async () => {
+    const user = userEvent.setup();
+    render(<Shell />);
+    await user.tab();
+    const skip = screen.getByRole("link", { name: "Skip to content" });
+    expect(skip).toHaveFocus();
+    expect(skip).toHaveAttribute("href", "#main-content");
+    expect(skip.className).toContain("focus:not-sr-only");
+    await user.click(skip);
+    expect(screen.getByRole("main")).toHaveFocus();
+  });
+
   it("toggles the nav rail with mod+B and persists it", () => {
     render(<Shell storageKey="test:shell" />);
     const nav = screen.getByRole("navigation", { name: "Primary" });

@@ -1,8 +1,8 @@
 /**
  * `packageClosure(plan)` (CODE_EXPORT.md §1): the `@flowaid/*` packages an exported flow needs —
  * the embedded runtime, the `provider-*` packages of the plan's model refs, `mcp` /
- * `openapi-tools` / `sandbox` by node type, `langchain` / `nodes-langchain` for `langchain.*` nodes
- * or `langchain:*` providers, and `workflow-sdk` for `src/workflow.ts` and `src/client.ts` — closed
+ * `openapi-tools` / `sandbox` / `pageindex` by node type, `langchain` / `nodes-langchain` for
+ * `langchain.*` nodes or `langchain:*` providers, and `workflow-sdk` for `src/workflow.ts` and `src/client.ts` — closed
  * over their own `@flowaid` dependencies so a vendored install needs nothing from a registry.
  */
 import type { ExecutionPlan } from "@flowaid/workflow-core";
@@ -24,8 +24,17 @@ export const RUNTIME_DEPENDENCIES: Readonly<Record<string, readonly string[]>> =
     "workflow-core",
   ],
   "node-sdk": ["shared", "workflow-core"],
-  "nodes-core": ["knowledge", "mcp", "node-sdk", "providers", "shared", "workflow-core"],
+  "nodes-core": [
+    "knowledge",
+    "mcp",
+    "node-sdk",
+    "pageindex",
+    "providers",
+    "shared",
+    "workflow-core",
+  ],
   knowledge: ["shared", "workflow-core"],
+  pageindex: ["shared", "workflow-core"],
   providers: ["shared", "workflow-core"],
   credentials: ["env", "shared", "workflow-core"],
   observability: ["credentials", "shared", "workflow-core"],
@@ -45,12 +54,13 @@ export const RUNTIME_DEPENDENCIES: Readonly<Record<string, readonly string[]>> =
 export const PACKAGE_VERSIONS: Readonly<Record<string, string>> = {
   shared: "0.1.0",
   env: "0.1.0",
-  "workflow-core": "0.3.8",
+  "workflow-core": "0.3.9",
   "workflow-compiler": "0.1.0",
   "workflow-runtime": "0.1.0",
   "node-sdk": "0.1.0",
   "nodes-core": "0.1.0",
   knowledge: "0.1.0",
+  pageindex: "0.1.0",
   providers: "0.1.0",
   credentials: "0.1.0",
   observability: "0.1.0",
@@ -132,6 +142,7 @@ export function packageClosure(plan: ExecutionPlan): string[] {
     if (type.startsWith("flowaid.tools.mcp")) wanted.add("mcp");
     if (type === "flowaid.tools.openapi") wanted.add("openapi-tools");
     if (type === "flowaid.tools.code" || type === "flowaid.tools.shell") wanted.add("sandbox");
+    if (type.startsWith("flowaid.pageindex.")) wanted.add("pageindex");
     if (type.startsWith("langchain.")) {
       wanted.add("langchain");
       wanted.add("nodes-langchain");

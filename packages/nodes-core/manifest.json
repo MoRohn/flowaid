@@ -6,7 +6,9 @@
         "credentials",
         "tools",
         "suspend",
-        "streaming"
+        "streaming",
+        "documents",
+        "decision"
       ],
       "configSchema": {
         "additionalProperties": false,
@@ -17,6 +19,41 @@
             "type": "string",
             "x-ui": {
               "help": "An agent preset (Agents page); the node's own settings override it."
+            }
+          },
+          "documents": {
+            "additionalProperties": false,
+            "properties": {
+              "documentIds": {
+                "default": [],
+                "items": {
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                  "type": "string"
+                },
+                "maxItems": 20,
+                "type": "array",
+                "x-ui": {
+                  "help": "Individual documents that may be read."
+                }
+              },
+              "sourceIds": {
+                "default": [],
+                "items": {
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                  "type": "string"
+                },
+                "maxItems": 20,
+                "type": "array",
+                "x-ui": {
+                  "help": "Knowledge sources whose documents may be read (every ready document in them)."
+                }
+              }
+            },
+            "type": "object",
+            "x-ui": {
+              "help": "Documents the agent may read with read-only outline, page and search tools. Unset: no document tools."
             }
           },
           "maxCostUsd": {
@@ -185,6 +222,14 @@
             "openai.api_key",
             "anthropic.api_key",
             "ollama.none"
+          ]
+        },
+        {
+          "description": "TypeSafe API key for document_search's section choices (with `documents`).",
+          "name": "typesafe",
+          "required": false,
+          "types": [
+            "typesafe.api_key"
           ]
         }
       ],
@@ -5483,6 +5528,1151 @@
         },
         {
           "name": "at",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [
+        "decision",
+        "credentials"
+      ],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "decisionChain": {
+            "items": {
+              "oneOf": [
+                {
+                  "properties": {
+                    "model": {
+                      "default": "jev-latest",
+                      "type": "string"
+                    },
+                    "provider": {
+                      "const": "typesafe",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "provider"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "properties": {
+                    "model": {
+                      "properties": {
+                        "model": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "provider": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "provider",
+                        "model"
+                      ],
+                      "type": "object"
+                    },
+                    "provider": {
+                      "const": "llm",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "provider",
+                    "model"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "properties": {
+                    "provider": {
+                      "const": "rule",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "provider"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "properties": {
+                    "provider": {
+                      "const": "human",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "provider"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "properties": {
+                    "id": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "model": {
+                      "type": "string"
+                    },
+                    "provider": {
+                      "const": "custom",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "provider",
+                    "id"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "maxItems": 5,
+            "minItems": 1,
+            "type": "array",
+            "x-ui": {
+              "help": "Decision providers to ask, in failover order. Empty: the workspace's decision chain."
+            }
+          },
+          "judge": {
+            "default": "decision",
+            "enum": [
+              "decision",
+              "lexical"
+            ],
+            "type": "string",
+            "x-ui": {
+              "help": "decision: a TypeSafe yes/no per cited claim (at most 20). lexical: the claim's numbers and most of its words must appear in the excerpt."
+            }
+          }
+        },
+        "type": "object"
+      },
+      "controlPorts": [
+        {
+          "description": "Every citation is real and supported, and every factual sentence cites.",
+          "label": "Sufficient",
+          "name": "sufficient"
+        },
+        {
+          "description": "Some citations are unsupported, unknown or unchecked, or some claims cite nothing.",
+          "label": "Partial",
+          "name": "partial"
+        },
+        {
+          "description": "No supported citation, no evidence, or the answer says the evidence is not enough.",
+          "label": "Insufficient",
+          "name": "insufficient"
+        }
+      ],
+      "credentials": [
+        {
+          "description": "TypeSafe API key for the support checks (judge: decision).",
+          "name": "typesafe",
+          "required": false,
+          "types": [
+            "typesafe.api_key"
+          ]
+        }
+      ],
+      "defaultPolicy": {
+        "timeoutMs": 120000
+      },
+      "generation": false,
+      "id": "flowaid.pageindex.cite",
+      "idempotency": "safe",
+      "inputs": [
+        {
+          "name": "answer",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "description": "The evidence the answer was written from.",
+          "name": "evidence",
+          "required": true,
+          "schema": {
+            "items": {
+              "properties": {
+                "displayName": {
+                  "type": "string"
+                },
+                "documentId": {
+                  "type": "string"
+                },
+                "documentVersion": {
+                  "type": "integer"
+                },
+                "excerpt": {
+                  "type": "string"
+                },
+                "id": {
+                  "pattern": "^E\\d{1,3}$",
+                  "type": "string"
+                },
+                "indexId": {
+                  "type": "string"
+                },
+                "indexVersion": {
+                  "type": "integer"
+                },
+                "locator": {
+                  "properties": {
+                    "endPage": {
+                      "minimum": 1,
+                      "type": "integer"
+                    },
+                    "kind": {
+                      "const": "pdf_page",
+                      "type": "string"
+                    },
+                    "page": {
+                      "minimum": 1,
+                      "type": "integer"
+                    },
+                    "pageLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "page",
+                    "endPage",
+                    "pageLabel"
+                  ],
+                  "type": "object"
+                },
+                "nodeId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "provenance": {
+                  "properties": {
+                    "confidence": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "method": {
+                      "const": "tree_navigation",
+                      "type": "string"
+                    },
+                    "provider": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "method",
+                    "confidence",
+                    "provider"
+                  ],
+                  "type": "object"
+                },
+                "sectionPath": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "truncated": {
+                  "type": "boolean"
+                },
+                "versionId": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "indexId",
+                "documentId",
+                "versionId",
+                "documentVersion",
+                "indexVersion",
+                "displayName",
+                "nodeId",
+                "sectionPath",
+                "excerpt",
+                "truncated",
+                "locator",
+                "provenance"
+              ],
+              "type": "object"
+            },
+            "maxItems": 100,
+            "type": "array"
+          }
+        }
+      ],
+      "metadata": {
+        "category": "retrieval",
+        "description": "Checks that every [E1]-style citation in an answer names retrieved evidence and that the cited text supports the sentence citing it (a TypeSafe yes/no per claim, or a transparent lexical test). Routes sufficient, partial or insufficient.",
+        "icon": "quote",
+        "name": "PageIndex: Check citations",
+        "summary": "{{ config.judge }} judge",
+        "tags": [
+          "pageindex",
+          "documents",
+          "citations",
+          "grounding",
+          "typesafe"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "answer",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "citations",
+          "required": true,
+          "schema": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "documentId": {
+                  "type": "string"
+                },
+                "evidenceId": {
+                  "type": "string"
+                },
+                "marker": {
+                  "type": "string"
+                },
+                "page": {
+                  "type": "integer"
+                },
+                "support": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "method": {
+                          "enum": [
+                            "decision",
+                            "lexical"
+                          ],
+                          "type": "string"
+                        },
+                        "score": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "method",
+                        "score"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "supported": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "versionId": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "marker",
+                "evidenceId",
+                "documentId",
+                "versionId",
+                "page",
+                "supported",
+                "support"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "name": "status",
+          "required": true,
+          "schema": {
+            "enum": [
+              "sufficient",
+              "partial",
+              "insufficient"
+            ],
+            "type": "string"
+          }
+        },
+        {
+          "name": "limitations",
+          "required": true,
+          "schema": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "name": "run_id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [
+        "documents",
+        "suspend"
+      ],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "documentId": {
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "type": "string",
+            "x-ui": {
+              "help": "The document to index (from Knowledge)."
+            }
+          },
+          "timeoutMs": {
+            "default": 1800000,
+            "maximum": 86400000,
+            "minimum": 60000,
+            "type": "integer",
+            "x-ui": {
+              "help": "How long to wait for the build. On timeout the node fails; indexing continues in the background."
+            }
+          }
+        },
+        "required": [
+          "documentId"
+        ],
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [],
+      "defaultPolicy": {
+        "timeoutMs": 60000
+      },
+      "generation": false,
+      "id": "flowaid.pageindex.index",
+      "idempotency": "safe",
+      "inputs": [],
+      "metadata": {
+        "category": "retrieval",
+        "description": "Builds the hierarchical page index of a document's latest version (or reuses an equivalent one) and waits until it is ready; the run pauses durably while the index is built. Outputs only a ready index.",
+        "icon": "file-search",
+        "name": "PageIndex: Index document",
+        "summary": "index {{ config.documentId }}",
+        "tags": [
+          "pageindex",
+          "documents",
+          "pdf",
+          "index"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "description": "The ready index.",
+          "name": "index",
+          "required": true,
+          "schema": {
+            "additionalProperties": false,
+            "properties": {
+              "active": {
+                "type": "boolean"
+              },
+              "backend": {
+                "const": "pageindex",
+                "type": "string"
+              },
+              "backendVersion": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "capabilities": {
+                "additionalProperties": false,
+                "properties": {
+                  "blocks": {
+                    "type": "boolean"
+                  },
+                  "formats": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "ocr": {
+                    "type": "boolean"
+                  },
+                  "pageLabels": {
+                    "type": "boolean"
+                  },
+                  "pageLocators": {
+                    "const": "physical",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "formats",
+                  "pageLocators",
+                  "pageLabels",
+                  "blocks",
+                  "ocr"
+                ],
+                "type": "object"
+              },
+              "configHash": {
+                "type": "string"
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "displayName": {
+                "type": "string"
+              },
+              "documentId": {
+                "type": "string"
+              },
+              "documentVersion": {
+                "type": "integer"
+              },
+              "error": {
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "code": {
+                        "type": "string"
+                      },
+                      "message": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "code",
+                      "message"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "indexId": {
+                "type": "string"
+              },
+              "indexModel": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "indexVersion": {
+                "type": "integer"
+              },
+              "mode": {
+                "const": "local",
+                "type": "string"
+              },
+              "pageCount": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "readyAt": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "sourceId": {
+                "type": "string"
+              },
+              "stage": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "state": {
+                "enum": [
+                  "queued",
+                  "running",
+                  "ready",
+                  "failed",
+                  "cancel_requested",
+                  "canceled",
+                  "superseded",
+                  "deleted"
+                ],
+                "type": "string"
+              },
+              "versionId": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "indexId",
+              "documentId",
+              "sourceId",
+              "versionId",
+              "documentVersion",
+              "indexVersion",
+              "displayName",
+              "state",
+              "active",
+              "backend",
+              "mode",
+              "backendVersion",
+              "configHash",
+              "indexModel",
+              "pageCount",
+              "stage",
+              "error",
+              "createdAt",
+              "readyAt",
+              "capabilities"
+            ],
+            "type": "object"
+          }
+        },
+        {
+          "description": "An equivalent index already existed or was being built.",
+          "name": "reused",
+          "required": true,
+          "schema": {
+            "type": "boolean"
+          }
+        }
+      ],
+      "pool": "general",
+      "portRules": [],
+      "streams": false,
+      "version": "1.0.0"
+    },
+    {
+      "capabilities": [
+        "documents",
+        "decision",
+        "credentials"
+      ],
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "budget": {
+            "additionalProperties": false,
+            "default": {},
+            "properties": {
+              "maxDecisions": {
+                "maximum": 60,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "maxPages": {
+                "maximum": 40,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "maxSections": {
+                "maximum": 12,
+                "minimum": 1,
+                "type": "integer"
+              }
+            },
+            "type": "object",
+            "x-ui": {
+              "help": "Limits of one retrieval: evidence items (default 6), pages read (default 12) and section choices (default 24)."
+            }
+          },
+          "decisionChain": {
+            "items": {
+              "oneOf": [
+                {
+                  "properties": {
+                    "model": {
+                      "default": "jev-latest",
+                      "type": "string"
+                    },
+                    "provider": {
+                      "const": "typesafe",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "provider"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "properties": {
+                    "model": {
+                      "properties": {
+                        "model": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "provider": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "provider",
+                        "model"
+                      ],
+                      "type": "object"
+                    },
+                    "provider": {
+                      "const": "llm",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "provider",
+                    "model"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "properties": {
+                    "provider": {
+                      "const": "rule",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "provider"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "properties": {
+                    "provider": {
+                      "const": "human",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "provider"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "properties": {
+                    "id": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "model": {
+                      "type": "string"
+                    },
+                    "provider": {
+                      "const": "custom",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "provider",
+                    "id"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "maxItems": 5,
+            "minItems": 1,
+            "type": "array",
+            "x-ui": {
+              "help": "Decision providers to ask, in failover order. Empty: the workspace's decision chain."
+            }
+          },
+          "scope": {
+            "additionalProperties": false,
+            "properties": {
+              "documentIds": {
+                "default": [],
+                "items": {
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                  "type": "string"
+                },
+                "maxItems": 20,
+                "type": "array",
+                "x-ui": {
+                  "help": "Individual documents that may be read."
+                }
+              },
+              "sourceIds": {
+                "default": [],
+                "items": {
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                  "type": "string"
+                },
+                "maxItems": 20,
+                "type": "array",
+                "x-ui": {
+                  "help": "Knowledge sources whose documents may be read (every ready document in them)."
+                }
+              }
+            },
+            "type": "object",
+            "x-ui": {
+              "help": "The documents this node may read. At least one source or document; at most 20 ids."
+            }
+          }
+        },
+        "required": [
+          "scope"
+        ],
+        "type": "object"
+      },
+      "controlPorts": [],
+      "credentials": [
+        {
+          "description": "TypeSafe API key for the section choices (else the workspace's decision chain).",
+          "name": "typesafe",
+          "required": false,
+          "types": [
+            "typesafe.api_key"
+          ]
+        }
+      ],
+      "defaultPolicy": {
+        "timeoutMs": 180000
+      },
+      "generation": false,
+      "id": "flowaid.pageindex.retrieve",
+      "idempotency": "safe",
+      "inputs": [
+        {
+          "name": "query",
+          "required": true,
+          "schema": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        {
+          "description": "Pins exact index versions (e.g. a previous retrieval's index_ids); each must be in the scope.",
+          "name": "index_ids",
+          "required": false,
+          "schema": {
+            "items": {
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            },
+            "maxItems": 20,
+            "type": "array"
+          }
+        }
+      ],
+      "metadata": {
+        "category": "retrieval",
+        "description": "Finds the passages that answer a query by navigating the section trees of the documents in scope with TypeSafe choice decisions, then reads the chosen pages. Every excerpt is real page text with its document version and physical page; `prompt_context` numbers them [E1], [E2]… for an answer prompt.",
+        "icon": "book-open-text",
+        "name": "PageIndex: Retrieve evidence",
+        "tags": [
+          "pageindex",
+          "documents",
+          "retrieval",
+          "rag",
+          "typesafe",
+          "citations"
+        ]
+      },
+      "migrations": [],
+      "optionProviders": [],
+      "outputs": [
+        {
+          "name": "evidence",
+          "required": true,
+          "schema": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "displayName": {
+                  "type": "string"
+                },
+                "documentId": {
+                  "type": "string"
+                },
+                "documentVersion": {
+                  "type": "integer"
+                },
+                "excerpt": {
+                  "type": "string"
+                },
+                "id": {
+                  "pattern": "^E\\d{1,3}$",
+                  "type": "string"
+                },
+                "indexId": {
+                  "type": "string"
+                },
+                "indexVersion": {
+                  "type": "integer"
+                },
+                "locator": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "endPage": {
+                      "minimum": 1,
+                      "type": "integer"
+                    },
+                    "kind": {
+                      "const": "pdf_page",
+                      "type": "string"
+                    },
+                    "page": {
+                      "minimum": 1,
+                      "type": "integer"
+                    },
+                    "pageLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "page",
+                    "endPage",
+                    "pageLabel"
+                  ],
+                  "type": "object"
+                },
+                "nodeId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "provenance": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "confidence": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "method": {
+                      "const": "tree_navigation",
+                      "type": "string"
+                    },
+                    "provider": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "method",
+                    "confidence",
+                    "provider"
+                  ],
+                  "type": "object"
+                },
+                "sectionPath": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "truncated": {
+                  "type": "boolean"
+                },
+                "versionId": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "indexId",
+                "documentId",
+                "versionId",
+                "documentVersion",
+                "indexVersion",
+                "displayName",
+                "nodeId",
+                "sectionPath",
+                "excerpt",
+                "truncated",
+                "locator",
+                "provenance"
+              ],
+              "type": "object"
+            },
+            "maxItems": 12,
+            "type": "array"
+          }
+        },
+        {
+          "name": "status",
+          "required": true,
+          "schema": {
+            "enum": [
+              "complete",
+              "partial",
+              "empty"
+            ],
+            "type": "string"
+          }
+        },
+        {
+          "name": "warnings",
+          "required": true,
+          "schema": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "name": "activity",
+          "required": true,
+          "schema": {
+            "additionalProperties": false,
+            "properties": {
+              "decisions": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "documents": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "elapsedMs": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "pagesRead": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "sectionsInspected": {
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "documents",
+              "sectionsInspected",
+              "pagesRead",
+              "decisions",
+              "elapsedMs"
+            ],
+            "type": "object"
+          }
+        },
+        {
+          "name": "usage",
+          "required": true,
+          "schema": {
+            "anyOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "inputTokens": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "outputTokens": {
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "inputTokens",
+                  "outputTokens"
+                ],
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        {
+          "name": "cost_usd",
+          "required": true,
+          "schema": {
+            "minimum": 0,
+            "type": "number"
+          }
+        },
+        {
+          "description": "The indexes read; pin them to repeat on the same versions.",
+          "name": "index_ids",
+          "required": true,
+          "schema": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "description": "The evidence numbered [E1]… as delimited document text.",
+          "name": "prompt_context",
           "required": true,
           "schema": {
             "type": "string"

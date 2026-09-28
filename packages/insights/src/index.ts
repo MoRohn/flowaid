@@ -1,0 +1,25 @@
+export {
+  benjaminiHochberg,
+  erfc,
+  fisherExactGreater,
+  logChoose,
+  logGamma,
+  mannWhitney,
+  median,
+  normalCdf,
+  wilson,
+  type Alternative,
+  type MannWhitneyResult,
+} from "./stats.js";
+export {
+  attributeVersion,
+  detectChanges,
+  type DetectOptions,
+  type Insight,
+  type InsightEvidence,
+  type InsightKind,
+  type InsightSeverity,
+  type WindowData,
+  type WindowSummary,
+  type WorkflowWindows,
+} from "./detect.js";

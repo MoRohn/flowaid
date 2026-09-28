@@ -47,6 +47,7 @@ describeDb("observability: metrics, alerts and trace reviews (Postgres)", () => 
     h = await createHarness({
       extra: ({ db, credentials }) => ({
         instruments: telemetry.instruments,
+        metricsSampleMs: 50,
         webUrl: "https://flowaid.example",
         traceReview: { judge },
         alerts: createAlertDispatcher({
@@ -201,5 +202,28 @@ describeDb("observability: metrics, alerts and trace reviews (Postgres)", () => 
       data: { runId, nodeId: "approve" },
       url: expect.stringContaining("/human-tasks/"),
     });
+  });
+
+  it("samples queue depth and the runs the worker holds", async () => {
+    // a delayed job waits on the queue without being claimed
+    await h.queue.enqueue(
+      "ingest",
+      { type: "ingest.source", sourceId: "later" },
+      { delayMs: 60_000, jobId: "depth-probe" },
+    );
+    const handler = telemetry.prometheusHandler;
+    if (!handler) throw new Error("no prometheus handler");
+    const listener = await startMetricsListener({ port: 0, host: "127.0.0.1", handler });
+    try {
+      const scrape = async () => (await fetch(`http://127.0.0.1:${listener.port}/metrics`)).text();
+      await expect
+        .poll(scrape, { timeout: 5_000 })
+        .toMatch(/flowaid_queue_depth\{[^}]*queue="ingest"[^}]*\} 1/);
+      const text = await scrape();
+      expect(text).toMatch(/flowaid_queue_depth\{[^}]*queue="run:general"[^}]*\} 0/);
+      expect(text).toMatch(/flowaid_worker_active_runs\{[^}]*pool="general"[^}]*\} \d+/);
+    } finally {
+      await listener.close();
+    }
   });
 });

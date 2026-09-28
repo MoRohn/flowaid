@@ -14,7 +14,7 @@ const config: NextConfig = {
   // responses stream through the API proxy (SSE); compress at the edge instead
   compress: false,
   devIndicators: false,
-  // `pnpm start` opens the app at http://flowaid.localhost:3001 (any *.localhost name reaches
+  // `pnpm start` opens the app at http://flowaid.localhost:3000 (any *.localhost name reaches
   // this computer); the dev server serves its assets to those names too
   allowedDevOrigins: ["flowaid.localhost", "*.localhost"],
   // @flowaid/ui ships TypeScript source; the NodeNext libraries (whose sources import "./x.js")

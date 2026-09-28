@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { commandGroups, type CommandInput } from "./commandGroups";
+import { commandGroups, runIdQuery, type CommandInput } from "./commandGroups";
 
 const base: CommandInput = {
   ws: "default",
@@ -60,5 +60,84 @@ describe("command menu groups", () => {
   it("drops empty groups", () => {
     const { leading } = commandGroups({ ...base, workflows: [], runs: [], templates: [] });
     expect(leading.map((g) => g.heading)).toEqual(["Create"]);
+  });
+  it("recognises a run id or its first eight characters, and nothing shorter", () => {
+    const uuid = "01a0e530-5ea8-7143-8b2c-3d4e5f607182";
+    expect(runIdQuery(uuid)).toEqual({ kind: "id", value: uuid });
+    expect(runIdQuery(` ${uuid.toUpperCase()} `)).toEqual({ kind: "id", value: uuid });
+    expect(runIdQuery("01a0e530")).toEqual({ kind: "prefix", value: "01a0e530" });
+    expect(runIdQuery("01a0e53")).toBeNull();
+    expect(runIdQuery("refund desk")).toBeNull();
+  });
+
+  it("offers going to a typed run id first", () => {
+    const uuid = "01a0e530-5ea8-7143-8b2c-3d4e5f607182";
+    const full = commandGroups({ ...base, query: uuid }).leading[0];
+    expect(full?.heading).toBe("Go to");
+    expect(full?.items[0]).toMatchObject({
+      label: `Go to run ${uuid}`,
+      to: `/default/runs/${uuid}`,
+    });
+    expect(full?.items[0]?.keywords).toContain(uuid);
+    // a prefix one recent run matches goes straight to it; otherwise the list searches by it
+    expect(commandGroups({ ...base, query: "01a0e530" }).leading[0]?.items[0]?.to).toBe(
+      "/default/runs/01a0e530-5ea8-7143",
+    );
+    expect(commandGroups({ ...base, query: "ffffffff" }).leading[0]?.items[0]).toMatchObject({
+      label: "Find runs starting with ffffffff",
+      to: "/default/runs?q=ffffffff",
+    });
+    expect(commandGroups({ ...base, query: "triage" }).leading[0]?.heading).toBe("Create");
+    expect(ids(commandGroups({ ...base, query: uuid, can: () => false }).leading)).not.toContain(
+      "goto-run",
+    );
+  });
+
+  it("lists up to five pending approvals with a way to the rest", () => {
+    const task = (n: number) => ({
+      id: `t${n}`,
+      nodeId: "approve_refund",
+      ...(n === 1 ? { nodeName: "Finance approval" } : {}),
+      workflowId: "w1",
+      runId: `0${n}a0e530-5ea8`,
+    });
+    const two = commandGroups({ ...base, pending: [task(1), task(2)] }).leading;
+    const pending = two.find((g) => g.heading === "Pending approvals");
+    expect(pending?.items.map((i) => [i.label, i.description, i.to])).toEqual([
+      ["Finance approval", "Refund desk · run 01a0e530", "/default/human-tasks/t1"],
+      ["Approve refund", "Refund desk · run 02a0e530", "/default/human-tasks/t2"],
+    ]);
+    const seven = commandGroups({
+      ...base,
+      pending: [1, 2, 3, 4, 5, 6, 7].map(task),
+    }).leading.find((g) => g.heading === "Pending approvals");
+    expect(seven?.items).toHaveLength(6);
+    expect(seven?.items[5]).toMatchObject({
+      label: "All pending approvals (7)",
+      to: "/default/human-tasks",
+    });
+  });
+
+  it("offers Ask FlowAId with the typed question when the assistant is on", () => {
+    const on = { ...base, features: { ...base.features, assistant: true } };
+    const ask = (query?: string) =>
+      commandGroups({ ...on, ...(query !== undefined ? { query } : {}) }).leading.find(
+        (g) => g.id === "ask",
+      )?.items;
+    expect(ask()).toMatchObject([{ label: "Ask FlowAId…", action: "ask" }]);
+    expect(ask()?.[0]?.question).toBeUndefined();
+    expect(ask("why did triage fail?")).toMatchObject([
+      {
+        label: "Ask FlowAId: “why did triage fail?”",
+        action: "ask",
+        question: "why did triage fail?",
+      },
+    ]);
+    // a run id is not a question
+    expect(ask("01a0e530-5ea8")?.[0]?.question).toBeUndefined();
+    expect(commandGroups(base).leading.some((g) => g.id === "ask")).toBe(false);
+    expect(
+      commandGroups({ ...on, can: (s) => s !== "runs:read" }).leading.some((g) => g.id === "ask"),
+    ).toBe(false);
   });
 });

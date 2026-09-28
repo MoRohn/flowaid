@@ -25,4 +25,5 @@ export * from "./tools.js";
 export * from "./providers.js";
 export * from "./sandbox.js";
 export * from "./knowledge.js";
+export * from "./documentIndex.js";
 export * from "./store.js";

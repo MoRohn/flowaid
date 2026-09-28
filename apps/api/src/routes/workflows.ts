@@ -34,7 +34,7 @@ import {
   type JsonObject,
 } from "@flowaid/workflow-core";
 import type { ApiContext } from "../context.js";
-import { hasScope } from "../auth/principal.js";
+import { assertEnvironmentAllowed, hasScope } from "../auth/principal.js";
 import { IdParams, ListQuery, NoContent, decodeCursor, encodeCursor, page } from "../dto/common.js";
 import {
   CompileResponseSchema,
@@ -645,6 +645,7 @@ export function workflowRoutes(app: FastifyInstance, ctx: ApiContext): void {
     async (req, reply) => {
       const p = req.principal;
       if (!p) throw new ForbiddenError("no principal");
+      for (const envId of req.body.deployTo ?? []) assertEnvironmentAllowed(p, envId);
       const version = await ctx.db.tenant(p.workspaceId, async (tx) => {
         const w = await visibleWorkflow(tx, p, req.params.id);
         const result = await compileIn(tx, w.draft, {

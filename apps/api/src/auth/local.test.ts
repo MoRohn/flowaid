@@ -3,7 +3,7 @@ import { isLocalHostname, isLoopbackAddress, localSignInRefusal } from "../route
 
 const ok = {
   socketAddress: "127.0.0.1",
-  headers: { "x-requested-with": "flowaid", host: "localhost:3000" },
+  headers: { "x-requested-with": "flowaid", host: "localhost:3001" },
 };
 
 describe("local sign-in checks", () => {
@@ -26,8 +26,8 @@ describe("local sign-in checks", () => {
         headers: {
           ...ok.headers,
           "x-forwarded-for": "127.0.0.1",
-          "x-forwarded-host": "127.0.0.1:3001",
-          origin: "http://127.0.0.1:3001",
+          "x-forwarded-host": "127.0.0.1:3000",
+          origin: "http://127.0.0.1:3000",
         },
       }),
     ).toBeNull();
@@ -39,7 +39,7 @@ describe("local sign-in checks", () => {
       localSignInRefusal({ ...ok, headers: { ...ok.headers, "x-forwarded-for": "192.168.1.20" } }),
     ).toMatch(/another computer/);
     expect(
-      localSignInRefusal({ ...ok, headers: { ...ok.headers, host: "rebind.evil.example:3000" } }),
+      localSignInRefusal({ ...ok, headers: { ...ok.headers, host: "rebind.evil.example:3001" } }),
     ).toMatch(/host/);
     expect(
       localSignInRefusal({
@@ -53,5 +53,33 @@ describe("local sign-in checks", () => {
     expect(localSignInRefusal({ ...ok, headers: { host: "localhost" } })).toMatch(
       /X-Requested-With/,
     );
+  });
+
+  it("refuses a LAN client posing as this computer through an exposed web app", () => {
+    // POST /v1/auth/local with Host: localhost and X-Forwarded-For: 127.0.0.1 sent from the LAN;
+    // the proxy (on this computer, so the socket is loopback) marks the chain unverified
+    const attack = {
+      socketAddress: "127.0.0.1",
+      headers: {
+        "x-requested-with": "flowaid",
+        host: "127.0.0.1:3001",
+        "x-forwarded-for": "127.0.0.1",
+        "x-forwarded-host": "localhost",
+        "x-flowaid-client-unverified": "1",
+      },
+    };
+    expect(localSignInRefusal(attack)).toMatch(/other computers/);
+    const { "x-flowaid-client-unverified": _, ...unmarked } = attack.headers;
+    expect(localSignInRefusal({ ...attack, headers: unmarked })).toBeNull();
+    expect(
+      localSignInRefusal({ ...attack, headers: { ...unmarked, "x-real-ip": "192.168.1.20" } }),
+    ).toMatch(/another computer/);
+    expect(
+      localSignInRefusal({ ...attack, headers: { ...unmarked, forwarded: "for=192.168.1.20" } }),
+    ).toMatch(/another computer/);
+    // a rebinding Host is refused even when a forwarded host claims localhost
+    expect(
+      localSignInRefusal({ ...attack, headers: { ...unmarked, host: "rebind.evil.example" } }),
+    ).toMatch(/host/);
   });
 });

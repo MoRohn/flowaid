@@ -643,6 +643,10 @@ export interface CriticFindingView {
   /** Estimated saving when applied, if any. */
   savings?: { costUsd?: number; latencyMs?: number; calls?: number };
   fixAvailable?: boolean;
+  /** What the fix does, e.g. "Insert an approval gate before Ticket update". */
+  fixTitle?: string;
+  /** Who raised it: a deterministic rule, or the AI judge (a model's opinion). */
+  source?: "rule" | "judge";
 }
 
 /** Type-level exhaustiveness guard for switches over closed unions. */

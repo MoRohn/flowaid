@@ -18,22 +18,54 @@ const HOP_BY_HOP = new Set([
 ]);
 
 export function apiOrigin(): string {
-  return (process.env.FLOWAID_API_INTERNAL_URL ?? "http://localhost:3000").replace(/\/$/, "");
+  return (process.env.FLOWAID_API_INTERNAL_URL ?? "http://localhost:3001").replace(/\/$/, "");
+}
+
+/**
+ * Set on every request when the web server listens beyond this computer. Next keeps a
+ * client-supplied `x-forwarded-for` rather than replacing it with the socket address, and a
+ * route handler cannot see the socket, so the chain then proves nothing: the API refuses the
+ * local (password-less) sign-in on requests carrying it.
+ */
+export const UNVERIFIED_CLIENT_HEADER = "x-flowaid-client-unverified";
+
+/** Forwarding headers a client may send; this proxy sets its own instead. */
+const CLIENT_FORWARDING = new Set([
+  "forwarded",
+  "x-forwarded-host",
+  "x-forwarded-proto",
+  "x-forwarded-port",
+  "x-real-ip",
+  UNVERIFIED_CLIENT_HEADER,
+]);
+
+/**
+ * Whether only this computer can reach the web server: HOSTNAME is its bind address (the
+ * standalone server and `pnpm start` set it). Unset, `next dev`/`next start` bind the address
+ * the package scripts pass (127.0.0.1).
+ */
+export function webBindIsLoopback(hostname = process.env.HOSTNAME): boolean {
+  if (hostname === undefined || hostname === "") return true;
+  const h = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  return h === "localhost" || h === "::1" || /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h);
 }
 
 /**
  * The request's headers minus hop-by-hop ones. Next's server has already set `x-forwarded-for`
  * to the client's address (or kept an upstream proxy's), so the API sees the real client when
- * it trusts this hop (FLOWAID_TRUST_PROXY).
+ * it trusts this hop (FLOWAID_TRUST_PROXY). Every other forwarding header is this proxy's own:
+ * the host and scheme it was reached at, never what the client claimed.
  */
 export function forwardedRequestHeaders(req: Request): Headers {
   const out = new Headers();
   req.headers.forEach((value, key) => {
-    if (!HOP_BY_HOP.has(key.toLowerCase())) out.set(key, value);
+    const k = key.toLowerCase();
+    if (!HOP_BY_HOP.has(k) && !CLIENT_FORWARDING.has(k)) out.set(key, value);
   });
   const url = new URL(req.url);
   out.set("x-forwarded-proto", url.protocol.replace(":", ""));
   out.set("x-forwarded-host", req.headers.get("host") ?? url.host);
+  if (!webBindIsLoopback()) out.set(UNVERIFIED_CLIENT_HEADER, "1");
   return out;
 }
 

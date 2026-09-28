@@ -248,6 +248,17 @@ describeDb("PgRunStore", () => {
       expect(await store.acquireLease(run.id, "w3", 30_000)).not.toBeNull();
     });
 
+    it("judges expired leases by the database clock, not a skewed worker clock", async () => {
+      const store = new PgRunStore(t.app);
+      const { run, created } = newRun(tenant);
+      await store.createRun(run, created);
+      expect(await store.acquireLease(run.id, "w1", 60_000)).not.toBeNull();
+      // a worker whose clock runs two minutes ahead must not see the live lease as expired
+      const ahead = new Date(Date.now() + 120_000);
+      expect((await store.expiredLeases(ahead, 100)).map((l) => l.runId)).not.toContain(run.id);
+      await store.releaseLease(run.id, "w1");
+    });
+
     it("rolls the whole batch back when one event is too large", async () => {
       const store = new PgRunStore(t.app);
       const { run, created } = newRun(tenant);

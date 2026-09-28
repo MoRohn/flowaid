@@ -58,10 +58,10 @@ describe("EnvSchema", () => {
     expect(env.NODE_ENV).toBe("development");
     expect(env.LOG_LEVEL).toBe("info");
     expect(env.HOST).toBe("127.0.0.1");
-    expect(env.PORT).toBe(3000);
-    expect(env.FLOWAID_BASE_URL).toBe("http://localhost:3000");
-    expect(env.FLOWAID_WEB_URL).toBe("http://localhost:3001");
-    expect(env.CORS_ORIGINS).toEqual(["http://localhost:3001"]);
+    expect(env.PORT).toBe(3001);
+    expect(env.FLOWAID_BASE_URL).toBe("http://localhost:3001");
+    expect(env.FLOWAID_WEB_URL).toBe("http://localhost:3000");
+    expect(env.CORS_ORIGINS).toEqual(["http://localhost:3000"]);
     expect(env.RATE_LIMIT_MAX).toBe(600);
     expect(env.FLOWAID_API_INTERNAL_URL).toBeUndefined();
     expect(env.FLOWAID_TRUST_PROXY).toBe(false);
@@ -87,8 +87,8 @@ describe("EnvSchema", () => {
     expect(env.FLOWAID_JWT_KEYS_DIR).toBe(".flowaid/keys");
     expect(env.FLOWAID_ALLOW_INSECURE_HTTP).toBe(false);
     expect(env.FLOWAID_ALLOW_CROSS_SITE).toBe(false);
+    expect(env.FLOWAID_ALLOW_PRIVATE_NETWORK).toBe(false);
     expect(env.FLOWAID_MASTER_KEY_AUTOGENERATE).toBe(false);
-    expect(env.OIDC_ISSUER).toBeUndefined();
     expect(env.SANDBOX_MODE).toBe("isolated-vm");
     expect(env.MCP_STDIO_ENABLED).toBe(false);
     expect(env.FLOWAID_PLUGIN_DIR).toBe(".flowaid/plugins");
@@ -140,6 +140,10 @@ describe("EnvSchema", () => {
         if (name === "FLOWAID_ADMIN_PASSWORD") {
           input.FLOWAID_ADMIN_EMAIL = ENV_VAR_DOCS.FLOWAID_ADMIN_EMAIL.example;
         }
+        if (name === "FLOWAID_PAGEINDEX_URL" || name === "FLOWAID_PAGEINDEX_TOKEN") {
+          input.FLOWAID_PAGEINDEX_URL = ENV_VAR_DOCS.FLOWAID_PAGEINDEX_URL.example;
+          input.FLOWAID_PAGEINDEX_TOKEN = ENV_VAR_DOCS.FLOWAID_PAGEINDEX_TOKEN.example;
+        }
         if (name.startsWith("S3_") && !["S3_REGION", "S3_FORCE_PATH_STYLE"].includes(name)) {
           for (const key of [
             "S3_ENDPOINT",
@@ -147,11 +151,6 @@ describe("EnvSchema", () => {
             "S3_ACCESS_KEY",
             "S3_SECRET_KEY",
           ] as const) {
-            input[key] = ENV_VAR_DOCS[key].example;
-          }
-        }
-        if (name.startsWith("OIDC_")) {
-          for (const key of ["OIDC_ISSUER", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET"] as const) {
             input[key] = ENV_VAR_DOCS[key].example;
           }
         }
@@ -186,7 +185,7 @@ describe("EnvSchema", () => {
       S3_FORCE_PATH_STYLE: "off",
       LOG_LEVEL: "debug",
       WORKER_POOLS: "general, code ,retrieval",
-      CORS_ORIGINS: "https://app.example.com/, http://localhost:3001",
+      CORS_ORIGINS: "https://app.example.com/, http://localhost:3000",
       PROMETHEUS_PORT: "9464",
       FLOWAID_FEATURES_DISABLED: "agents, ai_builder",
       FLOWAID_BUNDLED_PLUGINS: "@flowaid/nodes-langchain,@acme/nodes-crm",
@@ -200,7 +199,7 @@ describe("EnvSchema", () => {
     expect(env.S3_FORCE_PATH_STYLE).toBe(false);
     expect(env.LOG_LEVEL).toBe("debug");
     expect(env.WORKER_POOLS).toEqual(["general", "code", "retrieval"]);
-    expect(env.CORS_ORIGINS).toEqual(["https://app.example.com", "http://localhost:3001"]);
+    expect(env.CORS_ORIGINS).toEqual(["https://app.example.com", "http://localhost:3000"]);
     expect(env.PROMETHEUS_PORT).toBe(9464);
     expect(env.FLOWAID_FEATURES_DISABLED).toEqual(["agents", "ai_builder"]);
     expect(env.FLOWAID_BUNDLED_PLUGINS).toEqual(["@flowaid/nodes-langchain", "@acme/nodes-crm"]);
@@ -354,16 +353,19 @@ describe("EnvSchema", () => {
     const admin = issuesFor({ ...MINIMAL, FLOWAID_ADMIN_EMAIL: "a@b.co" });
     expect(admin.get("FLOWAID_ADMIN_PASSWORD")?.[0]).toContain("must be set together");
 
+    const pageIndex = issuesFor({ ...MINIMAL, FLOWAID_PAGEINDEX_URL: "http://127.0.0.1:8765" });
+    expect(pageIndex.get("FLOWAID_PAGEINDEX_TOKEN")?.[0]).toContain("must be set together");
+    const shortToken = issuesFor({
+      ...MINIMAL,
+      FLOWAID_PAGEINDEX_URL: "http://127.0.0.1:8765",
+      FLOWAID_PAGEINDEX_TOKEN: "short",
+    });
+    expect(shortToken.get("FLOWAID_PAGEINDEX_TOKEN")?.[0]).toContain("at least 32 characters");
+
     const s3 = issuesFor({ ...MINIMAL, S3_ENDPOINT: "http://minio:9000", S3_BUCKET: "b" });
     expect(s3.get("S3_ACCESS_KEY")?.[0]).toContain("required when S3_ENDPOINT, S3_BUCKET are set");
     expect(s3.get("S3_SECRET_KEY")?.[0]).toContain("S3_SECRET_KEY");
     expect(s3.has("S3_ENDPOINT")).toBe(false);
-
-    const oidc = issuesFor({ ...MINIMAL, OIDC_ISSUER: "https://login.example.com" });
-    expect(oidc.get("OIDC_CLIENT_ID")?.[0]).toContain("required when OIDC_ISSUER is set");
-    expect(oidc.get("OIDC_CLIENT_SECRET")?.[0]).toContain("OIDC needs all of");
-    const claim = issuesFor({ ...MINIMAL, OIDC_ROLE_CLAIM: "roles" });
-    expect(claim.get("OIDC_ROLE_CLAIM")?.[0]).toContain("without OIDC_ISSUER");
 
     // Both master key sources may be set: the variable wins and the file path is ignored
     // (compose always sets the file path and passes FLOWAID_MASTER_KEY through when present).
@@ -394,7 +396,6 @@ describe("production rules", () => {
       const issues = issuesFor({
         ...MINIMAL,
         NODE_ENV,
-        CORS_ORIGINS: "*",
         FLOWAID_BASE_URL: "http://api.example.com",
         FLOWAID_ADMIN_EMAIL: "owner@example.com",
         FLOWAID_ADMIN_PASSWORD: ENV_VAR_DOCS.FLOWAID_ADMIN_PASSWORD.example,
@@ -413,13 +414,32 @@ describe("production rules", () => {
     expect(issues.has("CORS_ORIGINS")).toBe(false);
   });
 
-  it("reject CORS_ORIGINS=* with no override", () => {
+  it("reject CORS_ORIGINS=* with no override, in every NODE_ENV (credentials are allowed)", () => {
     expect(firstIssue({ ...PRODUCTION, CORS_ORIGINS: "*" }, "CORS_ORIGINS")).toContain(
       "must not contain *",
     );
+    for (const NODE_ENV of ["development", "test"])
+      expect(
+        issuesFor({ ...MINIMAL, NODE_ENV, CORS_ORIGINS: "*" }).get("CORS_ORIGINS")?.[0],
+      ).toContain("must not contain *");
     expect(
       firstIssue({ ...PRODUCTION, CORS_ORIGINS: "https://app.example.com,*" }, "CORS_ORIGINS"),
     ).toContain("must not contain *");
+  });
+
+  it("parses FLOWAID_ALLOW_PRIVATE_NETWORK as a boolean, in production too", () => {
+    expect(EnvSchema.parse({ ...MINIMAL, FLOWAID_ALLOW_PRIVATE_NETWORK: "true" })).toMatchObject({
+      FLOWAID_ALLOW_PRIVATE_NETWORK: true,
+    });
+    expect(EnvSchema.parse({ ...MINIMAL, FLOWAID_ALLOW_PRIVATE_NETWORK: "0" })).toMatchObject({
+      FLOWAID_ALLOW_PRIVATE_NETWORK: false,
+    });
+    expect(
+      issuesFor({ ...MINIMAL, FLOWAID_ALLOW_PRIVATE_NETWORK: "sometimes" }).has(
+        "FLOWAID_ALLOW_PRIVATE_NETWORK",
+      ),
+    ).toBe(true);
+    expect(issuesFor({ ...PRODUCTION, FLOWAID_ALLOW_PRIVATE_NETWORK: "true" }).size).toBe(0);
   });
 
   it("require https public URLs unless loopback or FLOWAID_ALLOW_INSECURE_HTTP", () => {
@@ -438,14 +458,6 @@ describe("production rules", () => {
         );
       }
     }
-    const oidc = {
-      ...PRODUCTION,
-      OIDC_ISSUER: "http://login.example.com",
-      OIDC_CLIENT_ID: "flowaid",
-      OIDC_CLIENT_SECRET: "s3cret",
-    };
-    expect(firstIssue(oidc, "OIDC_ISSUER")).toContain("must be https://");
-    expect(issuesFor({ ...oidc, FLOWAID_ALLOW_INSECURE_HTTP: "1" }).size).toBe(0);
   });
 
   it("reject the documented, quick-start and commonly guessed admin passwords", () => {

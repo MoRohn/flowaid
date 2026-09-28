@@ -2,7 +2,9 @@
  * The MCP half of `ctx.tools.call` for the worker: `mcp` sources call tools through the pool, and
  * two builtins serve the resource and prompt nodes (`mcp_resource_read`, `mcp_prompt_get`). Every
  * call applies the server's toolPolicy (to tool names and resource URIs) and returns a `ToolResult`.
+ * Results are capped at MCP_RESULT_MAX_BYTES of text (a cut result carries no parsed structure).
  */
+import { capText, stableStringify } from "@flowaid/shared";
 import {
   BadRequestError,
   ForbiddenError,
@@ -22,6 +24,9 @@ import type { McpContent, McpPromptMessage } from "./session.js";
 
 export const MCP_RESOURCE_BUILTIN = "mcp_resource_read";
 export const MCP_PROMPT_BUILTIN = "mcp_prompt_get";
+
+/** UTF-8 bytes of text (and of structured content) one MCP result may carry. */
+export const MCP_RESULT_MAX_BYTES = 262_144;
 
 export interface McpServerLookup {
   server(
@@ -47,6 +52,12 @@ export function contentToText(content: readonly McpContent[]): string {
       return `[${c.type}${c.mimeType ? ` ${c.mimeType}` : ""}]`;
     })
     .join("\n");
+}
+
+/** `value` when its JSON fits MCP_RESULT_MAX_BYTES, else undefined. */
+function withinCap(value: JsonValue | undefined): JsonValue | undefined {
+  if (value === undefined) return undefined;
+  return stableStringify(value).length <= MCP_RESULT_MAX_BYTES ? value : undefined;
 }
 
 function parseJson(text: string): JsonValue | undefined {
@@ -101,12 +112,14 @@ export function createMcpToolCaller(pool: McpSessionPool, lookup: McpServerLooku
           (s) => s.callTool(original, args ?? {}, callOpts),
           o.signal,
         );
-        const content = contentToText(r.content);
-        const structured =
-          r.structuredContent ??
-          (r.content.length === 1 && r.content[0]?.type === "text"
-            ? parseJson(content)
-            : undefined);
+        const capped = capText(contentToText(r.content), { maxBytes: MCP_RESULT_MAX_BYTES });
+        const content = capped.text;
+        const structured = capped.truncated
+          ? undefined
+          : (withinCap(r.structuredContent) ??
+            (r.content.length === 1 && r.content[0]?.type === "text"
+              ? parseJson(content)
+              : undefined));
         if (r.isError) {
           const error = new ToolExecutionError(
             content.slice(0, 2000) || `${name} failed`,
@@ -131,10 +144,14 @@ export function createMcpToolCaller(pool: McpSessionPool, lookup: McpServerLooku
           (s) => s.readResource(uri, callOpts),
           o.signal,
         );
+        const text = capText(
+          contents.map((c) => c.text ?? `[${c.mimeType ?? "binary"} ${c.uri}]`).join("\n"),
+          { maxBytes: MCP_RESULT_MAX_BYTES },
+        );
         return done({
           ok: true,
-          content: contents.map((c) => c.text ?? `[${c.mimeType ?? "binary"} ${c.uri}]`).join("\n"),
-          structured: { contents: contents as unknown as JsonValue },
+          content: text.text,
+          ...(text.truncated ? {} : { structured: { contents: contents as unknown as JsonValue } }),
         });
       }
       if (source.kind === "builtin" && source.id === MCP_PROMPT_BUILTIN) {

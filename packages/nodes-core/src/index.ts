@@ -51,6 +51,11 @@ import {
   retrievalRerankNode,
   retrieverNode,
 } from "./retrieval/search.js";
+import {
+  pageindexCiteNode,
+  pageindexIndexNode,
+  pageindexRetrieveNode,
+} from "./retrieval/pageindex.js";
 import { visionNode } from "./ai/vision.js";
 import { speechNode } from "./ai/speech.js";
 import { imageNode } from "./ai/image.js";
@@ -117,15 +122,21 @@ export {
   traceNode,
   sessionNode,
   checkpointNode,
+  pageindexIndexNode,
+  pageindexRetrieveNode,
+  pageindexCiteNode,
 };
+export { dbQueryConnector, type DbQueryNetwork } from "./tools/db_query.js";
 export { gateOutcome, type GateOutcome } from "./decision/confidence_gate.js";
 export { combine } from "./decision/consensus.js";
 export { splitText } from "./data/split.js";
 export { detectPii, redactPii, PII_KINDS, type PiiFinding, type PiiKind } from "./safety/pii.js";
 export { extractJson } from "./ai/structured_generate.js";
 export {
+  AGENT_LIMITS,
   AGENT_PRESET_BUILTIN,
   APPROVAL_MODES,
+  UNTRUSTED_NOTICE,
   agentSettingsSchema,
   effectiveAgent,
   needsApproval,
@@ -133,6 +144,8 @@ export {
   type AgentState,
   type ApprovalMode,
 } from "./ai/agent.js";
+export { DOCUMENT_TOOL_NAMES } from "./ai/agentDocuments.js";
+export { indexEventName } from "./retrieval/pageindex.js";
 
 /** Every core node, in palette order. */
 export const CORE_NODES: readonly AnyNodeDefinition[] = [
@@ -161,6 +174,9 @@ export const CORE_NODES: readonly AnyNodeDefinition[] = [
   hybridSearchNode,
   retrievalRerankNode,
   knowledgeBaseNode,
+  pageindexIndexNode,
+  pageindexRetrieveNode,
+  pageindexCiteNode,
   httpNode,
   mcpNode,
   mcpResourceNode,

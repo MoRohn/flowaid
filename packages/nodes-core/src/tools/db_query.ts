@@ -1,5 +1,12 @@
+import { connect, type Socket } from "node:net";
 import { z } from "zod";
 import { defineNode, ok } from "@flowaid/node-sdk";
+import {
+  SsrfBlockedError,
+  createGuardedLookup,
+  type ConnectLookup,
+  type LookupFn,
+} from "@flowaid/providers";
 import {
   BadRequestError,
   ToolExecutionError,
@@ -43,16 +50,85 @@ export interface DbQueryClient {
   close(): Promise<void>;
 }
 
+/** Where the node may connect: the safe fetch address policy (ARCHITECTURE.md §10.6). */
+export interface DbQueryNetwork {
+  /**
+   * Permit loopback, private and reserved database hosts (and unix sockets): the worker sets it
+   * from FLOWAID_ALLOW_PRIVATE_NETWORK; tests set it to reach the test database.
+   */
+  allowPrivate?: boolean;
+  /** Injectable DNS (tests). */
+  lookup?: LookupFn;
+}
+
+/**
+ * Connects a TCP socket through the guarded lookup, trying a multi-host DSN's hosts in order;
+ * the driver speaks (and upgrades to TLS) on it.
+ */
+async function guardedSocket(
+  hosts: readonly string[],
+  ports: readonly number[],
+  lookup: ConnectLookup,
+): Promise<Socket> {
+  let last: unknown = new Error("no database host");
+  for (const [i, host] of hosts.entries()) {
+    try {
+      return await new Promise<Socket>((resolve, reject) => {
+        const socket = connect({ host, port: ports[i] ?? ports[0] ?? 5432, lookup });
+        socket.once("error", reject);
+        socket.once("connect", () => {
+          socket.off("error", reject);
+          // the driver reads `host` for the TLS server name
+          resolve(Object.assign(socket, { host }));
+        });
+      });
+    } catch (error) {
+      last = error;
+    }
+  }
+  throw last;
+}
+
+/** Refuses a DSN whose hosts resolve to a blocked address, or that names a unix socket. */
+async function assertAllowedHosts(
+  hosts: readonly string[],
+  path: string | false | undefined,
+  network: DbQueryNetwork,
+): Promise<void> {
+  if (network.allowPrivate) return;
+  if (path) throw new SsrfBlockedError("refused to connect to a local database socket");
+  const lookup = createGuardedLookup(network);
+  for (const host of hosts)
+    await new Promise<void>((resolve, reject) =>
+      lookup(host, { all: true }, (err) => (err ? reject(err) : resolve())),
+    );
+}
+
 /** The default client over the `postgres` driver: one connection per execution, no prepared statements. */
-export async function connectPostgres(dsn: string, signal: AbortSignal): Promise<DbQueryClient> {
+export async function connectPostgres(
+  dsn: string,
+  signal: AbortSignal,
+  network: DbQueryNetwork = {},
+): Promise<DbQueryClient> {
   const { default: postgres } = await import("postgres");
-  const sql = postgres(dsn, {
+  const lookup = createGuardedLookup(network);
+  const options = {
     max: 1,
     prepare: false,
     connect_timeout: 10,
     idle_timeout: 5,
     onnotice: () => undefined,
-  });
+    // every connection resolves through the guarded lookup, so DNS rebinding after the check
+    // below cannot reach a private address either
+    socket: (o: { host: string[]; port: number[] }) => guardedSocket(o.host, o.port, lookup),
+  };
+  const sql = postgres(dsn, options);
+  try {
+    await assertAllowedHosts(sql.options.host, sql.options.path, network);
+  } catch (error) {
+    await sql.end({ timeout: 0 });
+    throw error;
+  }
   const close = () => sql.end({ timeout: 2 });
   signal.addEventListener("abort", () => void close(), { once: true });
   return {
@@ -159,7 +235,8 @@ export const dbQueryNode = defineNode({
       const out = rows.map((r) => toJsonValue(r) as JsonObject);
       return ok({ rows: out, row_count: out.length, truncated });
     } catch (error) {
-      if (error instanceof BadRequestError || ctx.signal.aborted) throw error;
+      if (error instanceof BadRequestError || error instanceof SsrfBlockedError) throw error;
+      if (ctx.signal.aborted) throw error;
       const e = error as { code?: unknown; message?: unknown };
       const code = typeof e.code === "string" ? e.code : undefined;
       // 57014 query_canceled (timeout), 40001/40P01 serialization/deadlock, 08* connection
@@ -176,7 +253,14 @@ export const dbQueryNode = defineNode({
   },
 });
 
-/** Replaceable in tests. */
+/**
+ * Replaceable in tests. `network` is process-wide: the worker sets `allowPrivate` at boot from
+ * FLOWAID_ALLOW_PRIVATE_NETWORK.
+ */
 export const dbQueryConnector: {
   connect: (dsn: string, signal: AbortSignal) => Promise<DbQueryClient>;
-} = { connect: connectPostgres };
+  network: DbQueryNetwork;
+} = {
+  connect: (dsn, signal) => connectPostgres(dsn, signal, dbQueryConnector.network),
+  network: {},
+};

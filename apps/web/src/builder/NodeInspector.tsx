@@ -32,6 +32,8 @@ import {
   Switch,
   Textarea,
 } from "@flowaid/ui/primitives";
+// registers the PageIndex source and document pickers (`x-ui-ext.widget`)
+import "~/knowledge/pageindex/widgets";
 import type { BuilderStore } from "./store";
 import type { Projection } from "./model";
 import { useModelViews } from "./models";

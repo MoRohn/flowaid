@@ -35,6 +35,7 @@
     "lint": "eslint src scripts",
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
+    "migrate": "tsx --conditions=development scripts/migrate.ts",
     "clean": "rm -rf dist .turbo *.tsbuildinfo",
     "seed:templates": "tsx --conditions=development scripts/seed-templates.ts",
     "seed:environments": "tsx --conditions=development scripts/seed-environments.ts"

@@ -1,4 +1,4 @@
-import { forwardRef, useState, type HTMLAttributes } from "react";
+import { forwardRef, useState, type HTMLAttributes, type ReactNode } from "react";
 import {
   ChevronRight,
   CircleAlert,
@@ -95,6 +95,11 @@ export interface WorkflowCriticPanelProps extends HTMLAttributes<HTMLDivElement>
   nodeName?: (nodeId: string) => string;
   onFocusNode?: (nodeId: string) => void;
   onApplyFix?: (finding: CriticFindingView) => void;
+  /**
+   * What applying the fix would change (a diff, the patch operations). When given, "Apply fix"
+   * first opens this preview and the fix applies from there.
+   */
+  renderFixPreview?: (finding: CriticFindingView) => ReactNode;
   onRerun?: () => void;
   reviewing?: boolean;
   /** When the review last ran, e.g. "2 min ago". */
@@ -124,13 +129,16 @@ function FindingRow({
   nodeName,
   onFocusNode,
   onApplyFix,
+  renderFixPreview,
 }: {
   finding: CriticFindingView;
   nodeName: (id: string) => string;
   onFocusNode?: (id: string) => void;
   onApplyFix?: (f: CriticFindingView) => void;
+  renderFixPreview?: (f: CriticFindingView) => ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
   const savings = formatSavings(finding.savings);
   return (
     <CollapsibleRoot open={open} onOpenChange={setOpen} asChild>
@@ -156,6 +164,15 @@ function FindingRow({
                 aria-hidden="true"
               />
             </button>
+            {finding.source ? (
+              <Badge
+                size="sm"
+                tone={finding.source === "judge" ? "info" : "outline"}
+                className="self-start"
+              >
+                {finding.source === "judge" ? "AI judge" : "Rule"}
+              </Badge>
+            ) : null}
             {finding.nodeIds && finding.nodeIds.length > 0 ? (
               <div className="flex flex-wrap gap-1">
                 {finding.nodeIds.map((id) => (
@@ -181,19 +198,62 @@ function FindingRow({
           </span>
           <div className="col-start-3 justify-self-end sm:col-start-4">
             {finding.fixAvailable ? (
-              <Button
-                size="sm"
-                onClick={() => onApplyFix?.(finding)}
-                leadingIcon={<Wrench strokeWidth={1.75} aria-hidden="true" />}
-              >
-                Apply fix
-              </Button>
+              renderFixPreview ? (
+                <Button
+                  size="sm"
+                  aria-expanded={previewing}
+                  onClick={() => setPreviewing((v) => !v)}
+                  leadingIcon={<Wrench strokeWidth={1.75} aria-hidden="true" />}
+                >
+                  Preview fix
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  onClick={() => onApplyFix?.(finding)}
+                  leadingIcon={<Wrench strokeWidth={1.75} aria-hidden="true" />}
+                >
+                  Apply fix
+                </Button>
+              )
             ) : null}
           </div>
         </div>
         <CollapsibleContent className="pb-2.5 pl-9 pr-3 pt-0">
           <p className="text-xs leading-normal text-ink-2">{finding.detail}</p>
+          {finding.fixTitle && !previewing ? (
+            <p className="mt-1 text-xs text-ink-3">
+              Fix: <span className="text-ink-2">{finding.fixTitle}</span>
+            </p>
+          ) : null}
         </CollapsibleContent>
+        {previewing && renderFixPreview ? (
+          <div
+            role="group"
+            aria-label={`Fix preview: ${finding.title}`}
+            className="mx-3 mb-2.5 ml-9 flex flex-col gap-2 rounded-md border border-border bg-surface-2 p-2.5"
+          >
+            {finding.fixTitle ? (
+              <p className="text-xs font-medium text-ink">{finding.fixTitle}</p>
+            ) : null}
+            {renderFixPreview(finding)}
+            <div className="flex gap-1.5">
+              <Button
+                size="sm"
+                variant="primary"
+                onClick={() => {
+                  setPreviewing(false);
+                  onApplyFix?.(finding);
+                }}
+              >
+                Apply fix
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setPreviewing(false)}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        ) : null}
       </li>
     </CollapsibleRoot>
   );
@@ -212,6 +272,7 @@ export const WorkflowCriticPanel = forwardRef<HTMLDivElement, WorkflowCriticPane
       nodeName = (id) => id,
       onFocusNode,
       onApplyFix,
+      renderFixPreview,
       onRerun,
       reviewing = false,
       reviewedAt,
@@ -304,6 +365,7 @@ export const WorkflowCriticPanel = forwardRef<HTMLDivElement, WorkflowCriticPane
                         nodeName={nodeName}
                         onFocusNode={onFocusNode}
                         onApplyFix={onApplyFix}
+                        renderFixPreview={renderFixPreview}
                       />
                     ))}
                   </ul>

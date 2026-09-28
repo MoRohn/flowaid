@@ -8,11 +8,19 @@ needs. The root `docker-compose.yml` only includes the files in this directory.
 | Service                 | Image                                     | Port (host, loopback by default) | Role                                                                                                                                                                                                                                                             |
 | ----------------------- | ----------------------------------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `postgres`              | `pgvector/pgvector:0.8.6-pg16@sha256:…`   | 5432                             | The only source of truth: run event log, projections, queue (`queue_jobs`), timers, credentials, pgvector. `postgres-init/01-roles.sql` creates the login roles.                                                                                                 |
-| `api`                   | `flowaid/api` (`Dockerfile` target `api`) | 3000                             | Fastify 5: HTTP, SSE, webhooks, MCP server endpoint. Applies migrations at start (as the owner), creates the first owner from `FLOWAID_ADMIN_EMAIL/PASSWORD`. Never executes nodes.                                                                              |
+| `api`                   | `flowaid/api` (`Dockerfile` target `api`) | 3001                             | Fastify 5: HTTP, SSE, webhooks, MCP server endpoint. Applies migrations at start (as the owner), creates the first owner from `FLOWAID_ADMIN_EMAIL/PASSWORD`. Never executes nodes.                                                                              |
 | `worker`                | `flowaid/worker` (target `worker`)        | —                                | Orchestrator and node executors for `general,retrieval,browser,high_memory`, the plugin host process (the bundled LangChain package), the scheduler and the export job. The trusted tier: holds the master key file and every provider key.                      |
 | `worker-code`           | same image                                | —                                | Sandbox host for the `code` pool: claims code-node executions the worker delegates and runs them in isolated-vm isolates. No `.env`, no `/data`, no master key, restricted database role `flowaid_code`, read-only root, no capabilities, pid and memory limits. |
-| `web`                   | `flowaid/web` (target `web`)              | 3001                             | Next.js 16 app (standalone server). Browsers talk only to it; it forwards `/v1`, `/hooks` and `/mcp` to the api at request time. On the `edge` network alone, it reaches nothing but `api`.                                                                      |
+| `web`                   | `flowaid/web` (target `web`)              | 3000                             | Next.js 16 app (standalone server). Browsers talk only to it; it forwards `/v1`, `/hooks` and `/mcp` to the api at request time. On the `edge` network alone, it reaches nothing but `api`.                                                                      |
 | `rustfs`, `rustfs-init` | `rustfs/rustfs:1.0.0@sha256:…`            | 9000 (`--profile s3`)            | Optional S3-compatible artifact store and a one-shot that creates the bucket. See [Object storage](#object-storage-profile-s3).                                                                                                                                  |
+
+The web app is the address people open, http://localhost:3000 (the same port `pnpm start`
+uses); the api is published beside it on 3001. Both containers listen on those same ports
+inside (the web container on 3000, the api on 3001, reached as `http://api:3001`), so the
+published and in-container numbers agree. `WEB_PORT` and `PORT` in `.env` move only the host
+side of each mapping; compose pins the api's in-container `PORT` to 3001. Unlike `pnpm start`,
+compose does not move to another port when one is taken: `docker compose up` stops with an
+"address already in use" error, and you set `WEB_PORT` or `PORT` in `.env`.
 
 Every image is pinned to a release tag **and** its `sha256` digest (`docker/compose.test.ts`
 fails on a floating tag); Dependabot proposes bumps.
@@ -34,6 +42,9 @@ the generated master key file (`/data/master.key`), the auto-generated JWT key p
 (`/data/keys`), run artifacts and code-export packages (`/data/artifacts`) and installed
 plugins (`/data/plugins`), and is mounted by `api` and `worker` only. Back up `flowaid-data`
 and `postgres-data`: without the master key stored credentials cannot be decrypted.
+[docs/operations/BACKUP_AND_RESTORE.md](../docs/operations/BACKUP_AND_RESTORE.md) gives the
+commands and the restore order; [UPGRADES.md](../docs/operations/UPGRADES.md) and the
+[RUNBOOK.md](../docs/operations/RUNBOOK.md) cover upgrades and day-to-day operation.
 
 ## Configuration
 
@@ -183,4 +194,5 @@ docker compose -f docker/compose.yml -f docker/compose.scale.yml -f docker/compo
 
 `docker/compose.test.ts` checks that the overlay touches nothing but `image` and `pull_policy`.
 Upgrading is a new `FLOWAID_IMAGE_TAG` and `up -d`: the api applies pending migrations before
-it listens.
+it listens. Back up first and stop the workers; [UPGRADES.md](../docs/operations/UPGRADES.md)
+has the steps and the rollback.

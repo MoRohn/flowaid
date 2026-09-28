@@ -33,7 +33,7 @@ import { NodeRegistry, type NodeServices } from "./executor.js";
 import { Orchestrator } from "./orchestrator.js";
 import { registryProviderAccess } from "./providers.js";
 import type { RecordedOutput } from "./step.js";
-import { MemoryEventBus, MemoryQueueDriver, MemoryRunStore } from "./testing/memory.js";
+import { MemoryQueueDriver, MemoryRunStore } from "./testing/memory.js";
 
 export interface LocalRunOptions {
   input: JsonValue;
@@ -122,7 +122,6 @@ export async function runLocally(
   const registry = new NodeRegistry(opts.nodes);
   const store = new MemoryRunStore();
   const queue = new MemoryQueueDriver();
-  const bus = new MemoryEventBus();
   const secrets = opts.secrets ?? {};
   const http: SafeFetch = opts.http ?? ((url, init) => fetch(url, init));
   const plans = new Map<string, ExecutionPlan>();
@@ -174,7 +173,6 @@ export async function runLocally(
   const orchestrator = new Orchestrator({
     store,
     queue,
-    bus,
     registry,
     services,
     workerId: "local",

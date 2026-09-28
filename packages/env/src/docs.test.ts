@@ -128,6 +128,7 @@ describe("environment variable documentation", () => {
       "FLOWAID_API_INTERNAL_URL",
       "FLOWAID_ALLOW_INSECURE_HTTP",
       "FLOWAID_ALLOW_CROSS_SITE",
+      "FLOWAID_ALLOW_PRIVATE_NETWORK",
       "FLOWAID_TRUST_PROXY",
       "FLOWAID_SSE_MAX_STREAMS_PER_PRINCIPAL",
       "FLOWAID_EXPORT_MODE",
@@ -143,10 +144,6 @@ describe("environment variable documentation", () => {
       "FLOWAID_PROVIDER_FIXTURES",
       "FLOWAID_PROVIDER_FIXTURES_DIR",
       "RETENTION_SWEEP_CRON",
-      "OIDC_ISSUER",
-      "OIDC_CLIENT_ID",
-      "OIDC_CLIENT_SECRET",
-      "OIDC_ROLE_CLAIM",
       "FLOWAID_SECRET_<NAME>",
       "PORT",
       "HOST",
@@ -168,6 +165,8 @@ describe("environment variable documentation", () => {
       "OPENAI_API_KEY",
       "ANTHROPIC_API_KEY",
       "OLLAMA_HOST",
+      "FLOWAID_PAGEINDEX_URL",
+      "FLOWAID_PAGEINDEX_TOKEN",
       "OTEL_EXPORTER_OTLP_ENDPOINT",
       "PROMETHEUS_PORT",
       "SMTP_URL",
@@ -199,7 +198,7 @@ describe("environment variable documentation", () => {
   it("renders required variables set, defaults set, quick-start values set and optionals commented", () => {
     const text = renderEnvExample();
     expect(text).toContain("\nDATABASE_URL=postgres://flowaid:flowaid@localhost:5432/flowaid\n");
-    expect(text).toContain("\nPORT=3000\n");
+    expect(text).toContain("\nPORT=3001\n");
     expect(text).toContain("\n# REDIS_URL=redis://localhost:6379\n");
     expect(text).toContain("# Values: development | test | production");
     expect(text).toContain("\nFLOWAID_ADMIN_EMAIL=admin@flowaid.local\n");

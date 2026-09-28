@@ -11,22 +11,29 @@ import { ollamaEmbeddingFactory, ollamaFactory } from "@flowaid/provider-ollama"
 import { openaiFactories } from "@flowaid/provider-openai";
 import { typesafeFactory } from "@flowaid/provider-typesafe";
 import { DefaultModelCatalog, ProviderRegistry, type ResolveContext } from "@flowaid/providers";
-import type { JsonObject, ModelRef, WorkflowDefinition } from "@flowaid/workflow-core";
+import { z } from "zod";
+import {
+  ProviderHopSchema,
+  type JsonObject,
+  type ModelRef,
+  type ProviderHop,
+  type WorkflowDefinition,
+} from "@flowaid/workflow-core";
 import type { ApiContext } from "../context.js";
 
 /** The server's provider factories (the same set the worker registers). */
-export function defaultProviderRegistry(): ProviderRegistry {
+export function defaultProviderRegistry(ollamaHost?: string): ProviderRegistry {
   const registry = new ProviderRegistry({ catalog: new DefaultModelCatalog() });
   registry.register(typesafeFactory());
   for (const f of openaiFactories()) registry.register(f);
   registry.register(anthropicFactory());
-  registry.register(ollamaFactory());
-  registry.register(ollamaEmbeddingFactory());
+  registry.register(ollamaFactory({ host: ollamaHost }));
+  registry.register(ollamaEmbeddingFactory({ host: ollamaHost }));
   return registry;
 }
 
 export function registryOf(ctx: ApiContext): ProviderRegistry {
-  ctx.providers ??= defaultProviderRegistry();
+  ctx.providers ??= defaultProviderRegistry(serverKey(ctx, "ollama.host")?.host);
   return ctx.providers;
 }
 
@@ -299,4 +306,20 @@ export async function judgeHop(tx: Tx, workspaceId: string, definition: Workflow
 export async function workspaceFailover(tx: Tx, workspaceId: string): Promise<unknown[]> {
   const chain = (await settingsOf(tx, workspaceId)).defaultDecisionChain;
   return Array.isArray(chain) ? chain.slice(1) : [];
+}
+
+/**
+ * The workspace's decision chain with no workflow to fall back on (the PageIndex playground):
+ * `settings.defaultDecisionChain` when it parses, else TypeSafe's default hop. Human and rule
+ * hops are dropped: nothing here can suspend for a reviewer or carries rules.
+ */
+export async function workspaceDecisionHops(tx: Tx, workspaceId: string): Promise<ProviderHop[]> {
+  const parsed = z
+    .array(ProviderHopSchema)
+    .min(1)
+    .safeParse((await settingsOf(tx, workspaceId)).defaultDecisionChain);
+  const hops = parsed.success
+    ? parsed.data
+    : [ProviderHopSchema.parse({ provider: "typesafe", model: "jev-latest" })];
+  return hops.filter((h) => h.provider !== "human" && h.provider !== "rule");
 }

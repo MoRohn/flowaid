@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { GenerationRequest, GenerationResult } from "@flowaid/workflow-core";
-import { compactDefinitionSchema, generateWorkflow, systemPrompt } from "./builder.js";
-import { allManifests, compileDef, triage } from "./test/fixtures.js";
+import {
+  builderPromptHash,
+  compactDefinitionSchema,
+  generateWorkflow,
+  systemPrompt,
+} from "./builder.js";
+import { allManifests, compileDef, refundPayout, triage } from "./test/fixtures.js";
 
 const NEW_ID = "01a0e3aa-0000-7000-8000-000000000001";
 
@@ -38,6 +43,11 @@ const valid = (() => {
   const { id: _id, $schema: _s, ...rest } = triage() as unknown as Record<string, unknown>;
   return rest;
 })();
+/** A definition without the id and $schema the builder sets itself. */
+const bodyOf = (def: unknown) => {
+  const { id: _id, $schema: _s, ...rest } = def as Record<string, unknown>;
+  return rest;
+};
 const invalid = {
   ...valid,
   nodes: (valid.nodes as { kind: string }[]).filter((n) => n.kind !== "output"),
@@ -107,6 +117,79 @@ describe("generateWorkflow", () => {
     expect(out.iterations).toBe(3);
     expect(out.definition).not.toBeNull();
     expect(out.diagnostics.some((d) => d.code === "E_NO_OUTPUT_NODE")).toBe(true);
+  });
+
+  it("feeds error-severity safety findings of the rubric back as repair input", async () => {
+    const model = fake([
+      result({ rationale: "pays out", definition: bodyOf(refundPayout(false)) }),
+      result({ rationale: "approval first", definition: bodyOf(refundPayout(true)) }),
+    ]);
+    const out = await generateWorkflow({
+      prompt: "Refund customers who ask for it",
+      manifests: allManifests,
+      generate: model.generate,
+      compile: compileDef,
+      jsonSchema: true,
+      newId: () => NEW_ID,
+    });
+    // the first attempt compiled cleanly but acted on a decision with no check
+    expect(
+      compileDef(refundPayout(false)).diagnostics.filter((d) => d.severity === "error"),
+    ).toEqual([]);
+    expect(out.iterations).toBe(2);
+    expect(out.rationale).toBe("approval first");
+    expect(out.safety).toEqual([]);
+    const repair = model.requests[1]?.messages.at(-1)?.content as string;
+    expect(repair).toMatch(/irreversible_after_decision/);
+  });
+
+  it("returns the remaining safety findings when the repair budget runs out", async () => {
+    const unsafe = bodyOf(refundPayout(false));
+    const model = fake([result({ definition: unsafe }), result({ definition: unsafe })]);
+    const out = await generateWorkflow({
+      prompt: "x",
+      manifests: allManifests,
+      generate: model.generate,
+      compile: compileDef,
+      jsonSchema: true,
+      newId: () => NEW_ID,
+      maxRepairs: 1,
+    });
+    expect(out.iterations).toBe(2);
+    expect(out.definition).not.toBeNull();
+    expect(out.safety.map((a) => a.rule)).toEqual(["irreversible_after_decision"]);
+  });
+
+  it("does not take an answer without `definition` as the definition", async () => {
+    const model = fake([result(valid), result({ rationale: "ok", definition: valid })]);
+    const out = await generateWorkflow({
+      prompt: "x",
+      manifests: allManifests,
+      generate: model.generate,
+      compile: compileDef,
+      jsonSchema: true,
+      newId: () => NEW_ID,
+    });
+    expect(out.iterations).toBe(2);
+    const repair = model.requests[1]?.messages.at(-1)?.content as string;
+    expect(repair).toMatch(/E_SCHEMA/);
+  });
+
+  it("stamps a stable hash of the prompt template and schema version", async () => {
+    const hash = builderPromptHash();
+    expect(hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(builderPromptHash()).toBe(hash);
+    const model = fake([result({ rationale: "r", definition: valid })]);
+    const out = await generateWorkflow({
+      prompt: "x",
+      manifests: allManifests.slice(0, 5),
+      generate: model.generate,
+      compile: compileDef,
+      jsonSchema: true,
+      newId: () => NEW_ID,
+    });
+    // the workspace's catalog is not part of the template: the hash does not move with it
+    expect(out.promptHash).toBe(hash);
   });
 
   it("keeps the base definition's id when refining", async () => {

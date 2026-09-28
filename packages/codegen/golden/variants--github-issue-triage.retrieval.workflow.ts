@@ -148,7 +148,7 @@ export const workflow = defineWorkflow({
       typeVersion: "1.0.0",
       name: "Similar issues",
       config: {
-        sourceIds: ["$template.knowledge.github_issues"],
+        sourceIds: ["00000000-0000-4000-8000-676974687562"],
         mode: "hybrid",
         k: 5,
         filter: { state: "open" },
@@ -222,7 +222,7 @@ export const workflow = defineWorkflow({
     remember: task("flowaid.retrieval.upsert", {
       typeVersion: "1.0.0",
       name: "Index the issue",
-      config: { sourceId: "$template.knowledge.github_issues" },
+      config: { sourceId: "00000000-0000-4000-8000-676974687562" },
       inputs: {
         documents: arr([
           obj({

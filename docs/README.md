@@ -10,6 +10,41 @@
 | [design/SPEC.md](design/SPEC.md)                 | The product specification                                                                                                             |
 | [design/ARCHITECTURE.md](design/ARCHITECTURE.md) | The authoritative architecture                                                                                                        |
 
+## Operations (`operations/`)
+
+| Document                                                  | What it covers                                                                                          |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| [BACKUP_AND_RESTORE.md](operations/BACKUP_AND_RESTORE.md) | Backing up the database and the master key together, restoring them, and checking the key after restore |
+| [UPGRADES.md](operations/UPGRADES.md)                     | Pinning image tags, upgrading, how migrations run, and rolling back by restoring                        |
+| [RUNBOOK.md](operations/RUNBOOK.md)                       | Health checks, logs, metrics, stuck runs, the queue, scaling workers and key rotation                   |
+
+## V2 (`FLOWAID_V2_*`, `architecture/`, `ai/`, `data/`, `security/`, `operations/`)
+
+| Document                                                         | What it is                                                                    |
+| ---------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| [FLOWAID_V2_CODE_REVIEW.md](FLOWAID_V2_CODE_REVIEW.md)           | The assessment that opened V2: findings with evidence, severity and priority  |
+| [FLOWAID_V2_REFACTOR_PLAN.md](FLOWAID_V2_REFACTOR_PLAN.md)       | P0–P3 stabilisation work                                                      |
+| [FLOWAID_V2_PRODUCT_STRATEGY.md](FLOWAID_V2_PRODUCT_STRATEGY.md) | Vision, users, journeys, principles, and what V2 does not do                  |
+| [FLOWAID_V2_ROADMAP.md](FLOWAID_V2_ROADMAP.md)                   | The phases, initiative by initiative                                          |
+| [FLOWAID_AI_EVALUATION.md](FLOWAID_AI_EVALUATION.md)             | How the assistant, change detection and AI builder are measured, with results |
+| [FLOWAID_V2_FINAL_AUDIT.md](FLOWAID_V2_FINAL_AUDIT.md)           | What V2 delivered, what was verified, and what is deferred                    |
+| [architecture/V2_OVERVIEW.md](architecture/V2_OVERVIEW.md)       | Where the V2 modules sit                                                      |
+| [ai/ASSISTANT.md](ai/ASSISTANT.md)                               | Ask FlowAId: tools, grounding, guardrails, model strategy                     |
+| [data/INSIGHTS.md](data/INSIGHTS.md)                             | "Needs attention" and "What changed": data, tests, lifecycle                  |
+| [security/THREAT_MODEL.md](security/THREAT_MODEL.md)             | Assets, boundaries, threats and controls                                      |
+| [operations/](operations/RUNBOOK.md)                             | Backup and restore, upgrades, the runbook                                     |
+
+## PageIndex document intelligence (`pageindex/`)
+
+| Document                                               | What it is                                                                   |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------- |
+| [pageindex/SETUP.md](pageindex/SETUP.md)               | Install, configure, first document and answer, verification, troubleshooting |
+| [pageindex/ADR.md](pageindex/ADR.md)                   | The verified upstream contract and the architecture decisions                |
+| [pageindex/CAPABILITIES.md](pageindex/CAPABILITIES.md) | Local and cloud capability matrix for the pinned release                     |
+| [pageindex/API.md](pageindex/API.md)                   | The HTTP routes                                                              |
+| [pageindex/EVALUATION.md](pageindex/EVALUATION.md)     | The evaluation set, thresholds and measured results                          |
+| [pageindex/EXTENDING.md](pageindex/EXTENDING.md)       | Where each part lives and the rules for changing it                          |
+
 ## Design (`design/`)
 
 The design is authoritative. Where documents disagree, `CONTRACTS.ts` wins, then ARCHITECTURE.

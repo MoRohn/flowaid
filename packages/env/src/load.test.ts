@@ -26,9 +26,6 @@ const CANARIES: Record<string, string> = {
   FLOWAID_JWT_PUBLIC_KEY: "-----BEGIN PUBLIC KEY-----\npublic-part\n-----END PUBLIC KEY-----",
   FLOWAID_ADMIN_EMAIL: "owner@example.com",
   FLOWAID_ADMIN_PASSWORD: "canary-admin-password",
-  OIDC_ISSUER: "https://login.example.com",
-  OIDC_CLIENT_ID: "flowaid",
-  OIDC_CLIENT_SECRET: "canary-oidc-secret",
   S3_ENDPOINT: "http://minio:9000",
   S3_BUCKET: "flowaid",
   S3_ACCESS_KEY: "canary-s3-access",
@@ -47,7 +44,6 @@ const CANARY_VALUES = [
   MASTER_KEY,
   "canary-jwt-private",
   "canary-admin-password",
-  "canary-oidc-secret",
   "canary-s3-access",
   "canary-s3-secret",
   "canary-typesafe",
@@ -61,7 +57,7 @@ describe("loadEnv", () => {
   it("returns a frozen Env with flags from a minimal source", () => {
     const env = loadEnv(MINIMAL);
     expect(env.DATABASE_URL).toBe(MINIMAL.DATABASE_URL);
-    expect(env.PORT).toBe(3000);
+    expect(env.PORT).toBe(3001);
     expect(Object.isFrozen(env)).toBe(true);
     expect(Object.isFrozen(env.flags)).toBe(true);
     expect(Object.isFrozen(env.secretRefs)).toBe(true);
@@ -76,6 +72,7 @@ describe("loadEnv", () => {
       hasOpenAI: false,
       hasAnthropic: false,
       hasOllama: false,
+      hasPageIndex: false,
       hasGenerationProvider: false,
       hasOtel: false,
       hasPrometheus: false,
@@ -83,7 +80,6 @@ describe("loadEnv", () => {
       hasMasterKeyInEnv: false,
       masterKeyAutogenerate: true,
       hasAdminBootstrap: false,
-      hasOidc: false,
       hasDatabaseAdminUrl: false,
       providerFixturesEnabled: false,
       mcpStdioEnabled: false,
@@ -99,7 +95,7 @@ describe("loadEnv", () => {
   it("treats empty and whitespace-only strings as unset", () => {
     const env = loadEnv({ ...MINIMAL, REDIS_URL: "", PORT: "   ", OPENAI_API_KEY: " " });
     expect(env.REDIS_URL).toBeUndefined();
-    expect(env.PORT).toBe(3000);
+    expect(env.PORT).toBe(3001);
     expect(env.flags.hasOpenAI).toBe(false);
   });
 
@@ -192,9 +188,6 @@ describe("loadEnv", () => {
       FLOWAID_MASTER_KEY: MASTER_KEY,
       FLOWAID_ADMIN_EMAIL: "owner@example.com",
       FLOWAID_ADMIN_PASSWORD: "correct-horse-battery",
-      OIDC_ISSUER: "https://login.example.com",
-      OIDC_CLIENT_ID: "flowaid",
-      OIDC_CLIENT_SECRET: "s3cret",
       DATABASE_ADMIN_URL: "postgres://postgres:pw@localhost:5432/flowaid",
       FLOWAID_PROVIDER_FIXTURES: "replay",
       MCP_STDIO_ENABLED: "true",
@@ -210,6 +203,7 @@ describe("loadEnv", () => {
       hasOpenAI: false,
       hasAnthropic: true,
       hasOllama: false,
+      hasPageIndex: false,
       hasGenerationProvider: true,
       hasOtel: true,
       hasPrometheus: true,
@@ -217,7 +211,6 @@ describe("loadEnv", () => {
       hasMasterKeyInEnv: true,
       masterKeyAutogenerate: false,
       hasAdminBootstrap: true,
-      hasOidc: true,
       hasDatabaseAdminUrl: true,
       providerFixturesEnabled: true,
       mcpStdioEnabled: true,
@@ -328,7 +321,6 @@ describe("secret-safe serialisation", () => {
         "FLOWAID_MASTER_KEY",
         "FLOWAID_JWT_PRIVATE_KEY",
         "FLOWAID_ADMIN_PASSWORD",
-        "OIDC_CLIENT_SECRET",
         "S3_ACCESS_KEY",
         "S3_SECRET_KEY",
         "TYPESAFE_API_KEY",
@@ -337,6 +329,7 @@ describe("secret-safe serialisation", () => {
         "SMTP_URL",
         "VAULT_TOKEN",
         "AZURE_CLIENT_SECRET",
+        "FLOWAID_PAGEINDEX_TOKEN",
       ].sort(),
     );
   });
@@ -354,8 +347,8 @@ describe("secret-safe serialisation", () => {
       FLOWAID_MASTER_KEY: REDACTED_PLACEHOLDER,
       FLOWAID_SECRET_SLACK_TOKEN: REDACTED_PLACEHOLDER,
       FLOWAID_ADMIN_EMAIL: "owner@example.com",
-      PORT: "3000",
-      CORS_ORIGINS: "http://localhost:3001",
+      PORT: "3001",
+      CORS_ORIGINS: "http://localhost:3000",
     });
     expect(JSON.stringify({ env })).not.toContain("canary");
     expect(JSON.stringify([env])).not.toContain("canary");

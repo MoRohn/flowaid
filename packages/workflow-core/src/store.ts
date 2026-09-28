@@ -155,6 +155,10 @@ export type Job =
   | { type: "timer.fire"; runId: string; timerId: string }
   | { type: "schedule.tick"; scheduleId: string; at: string }
   | { type: "ingest.source"; sourceId: string }
+  /** RFC-0022: build one document index through the PageIndex service */
+  | { type: "pageindex.index"; workspaceId: string; indexId: string }
+  /** RFC-0022: remove a deleted document's upstream indexes and stored file */
+  | { type: "pageindex.cleanup"; workspaceId: string; documentId: string }
   | { type: "evaluation.run"; evaluationRunId: string }
   | { type: "trace_review.run"; runId: string }
   /** RFC-0001: build a code-export zip for a version (or a draft revision) of a workflow. */

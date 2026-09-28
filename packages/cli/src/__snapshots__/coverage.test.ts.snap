@@ -16,6 +16,8 @@ api-key revoke <id> {--out}
 api-key rotate <id> {--grace-minutes --body --out}
 artifact
 artifact download <id> {--inline --out}
+assistant
+assistant ask {--question --history --body --out}
 audit
 audit list {--limit --cursor --order --actor --action --resource-type --resource-id --from --to --out}
 auth
@@ -64,6 +66,8 @@ event
 event publish <eventName> {--payload --correlation-key --environment-id --body --out}
 import
 import external <file> {--name --dry-run --local --out}
+insights
+insights get {--window --workflow-id --environment-id --out}
 job
 job get <id> {--out}
 knowledge
@@ -110,8 +114,8 @@ member list <id> {--out}
 member remove <id> <userId> {--out}
 member update <id> <userId> {--role --body --out}
 metrics
-metrics overview {--workflow-id --environment-id --version-id --from --to --out}
-metrics timeseries {--workflow-id --environment-id --version-id --from --to --bucket --out}
+metrics overview {--workflow-id --environment-id --version-id --from --to --origin --out}
+metrics timeseries {--workflow-id --environment-id --version-id --from --to --origin --bucket --out}
 model
 model list {--provider --kind --out}
 node
@@ -125,6 +129,18 @@ notification list {--out}
 notification rotate-secret <id> {--out}
 notification test <id> {--out}
 notification update <id> {--name --config --events --enabled --slack-webhook-url --body --out}
+pageindex
+pageindex cancel <indexId> {--out}
+pageindex delete <documentId> {--out}
+pageindex document <documentId> {--out}
+pageindex documents <sourceId> {--out}
+pageindex file <documentId> <versionId> {--out}
+pageindex get-index <indexId> {--out}
+pageindex index <documentId> {--out}
+pageindex outline <indexId> {--out}
+pageindex query {--query --scope --answer --budget --body --out}
+pageindex status {--out}
+pageindex upload <sourceId> {--document-id --out}
 plugin
 plugin add <spec> {--frozen --local}
 plugin disable <plugin>
@@ -240,7 +256,7 @@ FlowAId command line: every API operation, plus local runs and the dev stack
 
 Options:
   -V, --cli-version                 print the CLI version
-  --api-url <url>                   API origin (env FLOWAID_API_URL; default http://localhost:3000)
+  --api-url <url>                   API origin (env FLOWAID_API_URL; default http://localhost:3001)
   --api-key <key>                   API key (env FLOWAID_API_KEY, or the key saved by login)
   --workspace <slug>                workspace slug or id (env FLOWAID_WORKSPACE)
   -o, --output <format>             json | yaml
@@ -259,6 +275,7 @@ Commands:
   alerts                            alerts operations
   api-key|api-keys                  api-key operations
   artifact|artifacts                artifact operations
+  assistant|assistants              assistant operations
   audit|audits                      audit operations
   auth|auths                        auth operations
   credential-type|credential-types  credential-type operations
@@ -268,6 +285,7 @@ Commands:
   environment|environments          environment operations
   evaluation|evaluations            evaluation operations
   event|events                      event operations
+  insights                          insights operations
   job|jobs                          job operations
   knowledge|knowledges              knowledge operations
   mcp-exposure|mcp-exposures        mcp-exposure operations
@@ -279,6 +297,7 @@ Commands:
   model|models                      model operations
   node|nodes                        node operations
   notification|notifications        notification operations
+  pageindex|pageindexs              pageindex operations
   plugin|plugins                    plugin operations
   provider|providers                provider operations
   review|reviews                    review operations

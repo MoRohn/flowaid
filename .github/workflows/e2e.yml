@@ -62,7 +62,8 @@ jobs:
           FLOWAID_PROVIDER_FIXTURES: replay
           LOG_LEVEL: info
         run: |
-          nohup node scripts/start.ts --prod --skip-install \
+          # explicit ports: a busy one fails the job instead of moving the app elsewhere
+          nohup node scripts/start.ts --prod --skip-install --port 3000 --api-port 3001 \
             --database-url postgres://postgres:postgres@localhost:5432/postgres > stack.log 2>&1 &
           for i in $(seq 1 300); do
             if grep -q "Ctrl+C to stop" stack.log; then exit 0; fi
@@ -75,7 +76,7 @@ jobs:
       - name: Acceptance journey
         run: pnpm test:acceptance
         env:
-          E2E_BASE_URL: http://127.0.0.1:3001
+          E2E_BASE_URL: http://127.0.0.1:3000
           E2E_STACK_LOG: stack.log
 
       - name: No secret canary reached the logs

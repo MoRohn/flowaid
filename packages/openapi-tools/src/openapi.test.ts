@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import type { JsonSchema, JsonValue, ToolDefinition } from "@flowaid/workflow-core";
 import type { OperationSpec } from "./operations.js";
 import { coerceArgs } from "./coerce.js";
-import { executeOperation, type ExecuteOptions } from "./execute.js";
+import { executeOperation, OPENAPI_RESPONSE_MAX_BYTES, type ExecuteOptions } from "./execute.js";
 import { isPrivateAddress } from "./network.js";
 import { operationsToTools } from "./operations.js";
 import { parseOpenApi } from "./parse.js";
@@ -349,6 +349,31 @@ describe("executeOperation", () => {
     await executeOperation(...pick(set, "createPet"), { body: { name: "Rex" } }, { fetch });
     expect(calls[2]).toMatchObject({ method: "POST", body: '{"name":"Rex"}' });
     expect(calls[2]?.headers.get("content-type")).toBe("application/json");
+  });
+
+  it("stops reading a response body at the cap and marks the result truncated", async () => {
+    const set = await petstore();
+    let pulled = 0;
+    const chunk = new TextEncoder().encode("x".repeat(65_536));
+    const endless = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulled += 1;
+        controller.enqueue(chunk);
+      },
+    });
+    const { fetch } = recorder(
+      () => new Response(endless, { headers: { "content-type": "application/json" } }),
+    );
+    const r = await executeOperation(...pick(set, "listPets"), {}, { fetch });
+    expect(r.ok).toBe(true);
+    expect(pulled * chunk.length).toBeLessThanOrEqual(
+      OPENAPI_RESPONSE_MAX_BYTES + 2 * chunk.length,
+    );
+    expect(new TextEncoder().encode(r.content).length).toBeLessThanOrEqual(
+      OPENAPI_RESPONSE_MAX_BYTES + 100,
+    );
+    expect(r.content).toMatch(/\[truncated: the response exceeded \d+ bytes\]$/);
+    expect(r.structured).toMatchObject({ status: 200, truncated: true });
   });
 
   it("forwards Idempotency-Key only for keyed operations and encodes forms", async () => {

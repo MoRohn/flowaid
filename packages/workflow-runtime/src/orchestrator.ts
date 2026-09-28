@@ -7,10 +7,10 @@
  *    recovers the state from the latest checkpoint plus the log after it; node runs that were
  *    running under a lost worker are reported with a `recovered` trigger first;
  * 3. runs `step()`, then appends its events in one fenced transaction — `WorkerLostError` means
- *    another worker owns the run, so this one drops it and aborts its executions;
- * 4. publishes `{ runId, fromSeq, toSeq }`, checkpoints every 200 events and before the lease is
- *    released, then performs the effects (executions are tracked; an execution finishing calls
- *    `handle` with its result).
+ *    another worker owns the run, so this one drops it and aborts its executions (the store
+ *    sends the commit notice `{ runId, fromSeq, toSeq }` with that transaction);
+ * 4. checkpoints every 200 events and before the lease is released, then performs the effects
+ *    (executions are tracked; an execution finishing calls `handle` with its result).
  *
  * `startMaintenance()` fires due timers (compare-and-set, so a timer fires once however many
  * workers poll), renews leases, takes over expired ones and picks up cancel requests.
@@ -19,7 +19,6 @@ import {
   CancelledError,
   WorkerLostError,
   type DurableRunEvent,
-  type EventBus,
   type ExecutionPlan,
   type JsonObject,
   type JsonValue,
@@ -58,7 +57,6 @@ export type HandleResult = "ok" | "busy" | "lost" | "terminal" | "missing";
 export interface OrchestratorOptions {
   store: RunStore & { cancelTimer?(timerId: string): Promise<boolean> };
   queue: QueueDriver;
-  bus?: EventBus;
   registry: NodeRegistry;
   services?: NodeServices;
   workerId?: string;
@@ -174,6 +172,11 @@ export class Orchestrator {
       if (this.locks.get(runId) === tail) this.locks.delete(runId);
     });
     return next;
+  }
+
+  /** Runs this worker holds right now (leased and in memory): the active-runs gauge. */
+  get activeRuns(): number {
+    return this.held.size;
   }
 
   handle(runId: string, trigger: Trigger): Promise<HandleResult> {
@@ -342,11 +345,6 @@ export class Orchestrator {
       } catch (e) {
         this.error(e, "onEvents", runId);
       }
-    }
-    if (result.events.length > 0) {
-      await this.o.bus
-        ?.publish(`run:${runId}`, { runId, fromSeq: before + 1, toSeq: lastSeq })
-        .catch((e: unknown) => this.error(e, "publish", runId));
     }
     const terminal = TERMINAL.has(held.state.run.status);
     const releasing = result.effects.some((e) => e.type === "release_lease");
@@ -531,16 +529,25 @@ export class Orchestrator {
 
   /* ─── maintenance ─── */
 
-  /** Fires due timers once (compare-and-set). */
+  /**
+   * Fires due timers. The row is marked fired only after the run handled the trigger (its
+   * TIMER_FIRED event is durable; the projection marks the row in the same transaction), so a
+   * timer whose run another worker holds stays due and fires on a later poll. A timer handled
+   * twice is harmless: the run's state no longer has it and `step()` ignores it.
+   */
   async fireDueTimers(limit = 50): Promise<number> {
     const due = await this.o.store.dueTimers(this.now(), limit);
     let fired = 0;
     for (const timer of due) {
-      if (!(await this.o.store.markTimerFired(timer.id))) continue;
-      fired += 1;
-      await this.handle(timer.runId, { type: "timer", timerId: timer.id }).catch((e: unknown) =>
-        this.error(e, "timer", timer.runId),
+      const result = await this.handle(timer.runId, { type: "timer", timerId: timer.id }).catch(
+        (e: unknown) => {
+          this.error(e, "timer", timer.runId);
+          return "busy" as const;
+        },
       );
+      if (result === "busy" || result === "lost") continue;
+      await this.o.store.markTimerFired(timer.id);
+      if (result === "ok") fired += 1;
     }
     return fired;
   }
@@ -626,13 +633,33 @@ export class Orchestrator {
     for (const fn of set) fn();
   }
 
-  /** Aborts executions and stops maintenance (SIGTERM). Held leases expire and are reaped elsewhere. */
-  async close(): Promise<void> {
+  /**
+   * Aborts executions, stops maintenance and hands on the runs this worker holds (SIGTERM): each
+   * lease is released and a `run.resume` job queued, so another worker (or this one after a
+   * restart) takes the run over now instead of after the lease TTL. `releaseLeases: false`
+   * leaves the leases to lapse, as a crash would (tests).
+   */
+  async close(opts: { releaseLeases?: boolean } = {}): Promise<void> {
     this.stopMaintenance();
     for (const a of this.active.values())
       a.controller.abort(new CancelledError("Worker shutting down"));
     await Promise.allSettled([...this.active.values()].map((a) => a.done));
     this.active.clear();
+    await Promise.allSettled([...this.locks.values()]);
+    const held = [...this.held.keys()];
     this.held.clear();
+    if (opts.releaseLeases === false) return;
+    for (const runId of held) {
+      try {
+        await this.o.store.releaseLease(runId, this.workerId);
+        await this.o.queue.enqueue("run:general", {
+          type: "run.resume",
+          runId,
+          reason: "recovery",
+        });
+      } catch (error) {
+        this.error(error, "release", runId);
+      }
+    }
   }
 }

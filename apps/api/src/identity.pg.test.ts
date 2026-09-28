@@ -35,11 +35,27 @@ describeDb("identity and access (Postgres)", () => {
     expect(tpl.map((x) => x.slug)).toEqual([
       "github-issue-triage",
       "github-issue-triage.retrieval",
+      "pageindex-agent",
+      "pageindex-compare",
+      "pageindex-document-qa",
       "research-agent",
       "support-triage",
     ]);
     void templates;
     void users;
+  });
+
+  it("a later boot restores missing built-in templates (upgrades get new ones) without duplicates", async () => {
+    await t.db
+      .admin`delete from templates where slug = 'pageindex-document-qa' and workspace_id is null`;
+    expect((await firstBoot(t.ctx.db, {})).created).toBe(false);
+    const rows = await t.db
+      .admin`select slug from templates where workspace_id is null and slug like 'pageindex-%' order by slug`;
+    expect(rows.map((r) => r.slug)).toEqual([
+      "pageindex-agent",
+      "pageindex-compare",
+      "pageindex-document-qa",
+    ]);
   });
 
   it("login sets hardened cookies and returns the session; me reports the principal", async () => {
@@ -74,7 +90,8 @@ describeDb("identity and access (Postgres)", () => {
     const me = (await call(t.app, jar, "GET", "/v1/me")).json();
     expect(me.principal).toMatchObject({ type: "user", workspaceSlug: "default", role: "owner" });
     expect(me.principal.scopes).toContain("admin");
-    expect(me.features).toMatchObject({ workflows: true, knowledge: true, oidc: false });
+    expect(me.features).toMatchObject({ workflows: true, knowledge: true });
+    expect(me.features).not.toHaveProperty("oidc");
     expect(await audit("auth.login")).toBeGreaterThan(0);
   });
 

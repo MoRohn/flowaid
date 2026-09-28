@@ -347,6 +347,7 @@ export type WorkerPool = z.infer<typeof WorkerPoolSchema>;
 export const NodeCapabilitySchema = z.enum([
   'network', 'credentials', 'tools', 'state', 'artifacts', 'streaming', 'decision', 'generation', 'sandbox', 'suspend',
   'knowledge', // RFC-0021
+  'documents', // RFC-0022
 ]);
 export type NodeCapability = z.infer<typeof NodeCapabilitySchema>;
 
@@ -1915,6 +1916,21 @@ export interface KnowledgeChunkInput { content: string; tokens?: number; metadat
 export interface KnowledgeDocumentInput { sourceId: string; externalId: string; title?: string; uri?: string; mimeType?: string; metadata?: JsonObject; text?: string; chunks?: KnowledgeChunkInput[] }
 export interface KnowledgeUpsertResult { documentId: string; chunks: number; unchanged: boolean; usage: TokenUsage | null; costUsd: number }
 export interface KnowledgeSourceSummary { id: string; name: string; kind: string; status: 'new' | 'syncing' | 'ready' | 'stale' | 'error'; embedding: { provider: string; model: string } | null; documents: number; chunks: number }
+
+/* Document indexes (RFC-0022; workflow-core/src/documentIndex.ts). Hierarchical, page-addressed indexes of workspace documents (PageIndex first); the runtime binds a workspace-scoped DocumentIndexAccess into ExecutionContext.documents. */
+export type DocumentIndexState = 'queued' | 'running' | 'ready' | 'failed' | 'cancel_requested' | 'canceled' | 'superseded' | 'deleted';
+export interface DocumentIndexCapabilities { formats: string[]; pageLocators: 'physical'; pageLabels: boolean; blocks: boolean; ocr: boolean }
+export interface DocumentReference { documentId: string; sourceId: string; versionId: string; version: number; contentSha256: string; displayName: string; mediaType: string; bytes: number; pageCount: number | null }
+export interface IndexReference { indexId: string; documentId: string; sourceId: string; versionId: string; documentVersion: number; indexVersion: number; displayName: string; state: DocumentIndexState; active: boolean; backend: 'pageindex'; mode: 'local'; backendVersion: string | null; configHash: string; indexModel: string | null; pageCount: number | null; stage: string | null; error: { code: string; message: string } | null; createdAt: string; readyAt: string | null; capabilities: DocumentIndexCapabilities }
+export interface OutlineNode { nodeId: string; title: string; startPage: number; endPage: number; summary?: string; children?: OutlineNode[] }
+export interface DocumentScope { sourceIds?: string[]; documentIds?: string[]; indexIds?: string[] }
+export interface SourceLocator { kind: 'pdf_page'; page: number; endPage: number; pageLabel: string | null } // physical, 1-based
+export interface Evidence { id: string; indexId: string; documentId: string; versionId: string; documentVersion: number; indexVersion: number; displayName: string; nodeId: string | null; sectionPath: string[]; excerpt: string; truncated: boolean; locator: SourceLocator; provenance: { method: 'tree_navigation'; confidence: number | null; provider: string | null } }
+export interface RetrievalActivity { documents: number; sectionsInspected: number; pagesRead: number; decisions: number; elapsedMs: number }
+export interface RetrievalResult { evidence: Evidence[]; status: 'complete' | 'partial' | 'empty'; warnings: string[]; activity: RetrievalActivity; usage: TokenUsage | null; costUsd: number }
+export interface Citation { marker: string; evidenceId: string; documentId: string; versionId: string; page: number; supported: boolean | null; support: { method: 'decision' | 'lexical'; score: number } | null }
+export interface GroundedAnswer { answer: string; citations: Citation[]; status: 'sufficient' | 'partial' | 'insufficient'; limitations: string[]; runId: string }
+export interface IndexRequestResult { index: IndexReference; created: boolean }
 export interface ChunkerConfig { strategy: 'recursive' | 'markdown' | 'fixed'; chunkTokens: number; overlapTokens: number }
 
 /* ────────────────────────────────────────────────────────────────────────────
@@ -2007,6 +2023,8 @@ export interface ExecutionContext<TConfig = JsonObject> {
   readonly sandbox?: SandboxAccess;
   /** RFC-0021: present for nodes declaring 'knowledge' when the host has a knowledge base */
   readonly knowledge?: KnowledgeAccess;
+  /** RFC-0022: present for nodes declaring 'documents' when the host has document indexes */
+  readonly documents?: DocumentIndexAccess;
 }
 /** RFC-0019: the sandbox bound to the calling node (bridges already scoped). Without an executor: SandboxError SANDBOX_UNAVAILABLE. */
 export interface SandboxAccess {
@@ -2019,6 +2037,14 @@ export interface KnowledgeAccess {
   search(req: KnowledgeSearchRequest): Promise<KnowledgeSearchResult>;
   upsertDocument(doc: KnowledgeDocumentInput): Promise<KnowledgeUpsertResult>;
   deleteDocument(sourceId: string, externalId: string): Promise<boolean>;
+}
+/** RFC-0022: the workspace's document indexes, bound to the calling node's run and signal. Ids outside the workspace are refused (NOT_FOUND). */
+export interface DocumentIndexAccess {
+  resolve(scope: DocumentScope): Promise<IndexReference[]>;
+  getIndex(indexId: string): Promise<IndexReference>;
+  outline(indexId: string): Promise<OutlineNode[]>;
+  readPages(indexId: string, pages: number[]): Promise<{ page: number; text: string }[]>;
+  requestIndex(documentId: string): Promise<IndexRequestResult>;
 }
 
 export type NodeResult<TOutput> =
@@ -2187,6 +2213,8 @@ export type Job =
   | { type: 'timer.fire'; runId: string; timerId: string }
   | { type: 'schedule.tick'; scheduleId: string; at: string }
   | { type: 'ingest.source'; sourceId: string }
+  | { type: 'pageindex.index'; workspaceId: string; indexId: string } // RFC-0022
+  | { type: 'pageindex.cleanup'; workspaceId: string; documentId: string } // RFC-0022
   | { type: 'evaluation.run'; evaluationRunId: string }
   | { type: 'trace_review.run'; runId: string }
   // RFC-0001: API-initiated background jobs (queue 'jobs') and maintenance (queue 'maintenance')

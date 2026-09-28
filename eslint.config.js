@@ -26,7 +26,7 @@ export default [
   ...boundaryConfigs(),
   // Only @flowaid/env reads process.env; @flowaid/cli and the `pnpm start` launcher build the env
   // for local runs (ARCHITECTURE.md §1.1, "Environment boundary"), and the `prepare` hook installer
-  // checks CI. Mirrors their eslint.config.js.
+  // and the Python test runner check CI. Mirrors their eslint.config.js.
   {
     ...allowProcessEnv,
     files: [
@@ -34,6 +34,7 @@ export default [
       "packages/cli/**",
       "scripts/start.ts",
       "scripts/install-hooks.ts",
+      "scripts/python-test.ts",
       "e2e/**",
     ],
   },

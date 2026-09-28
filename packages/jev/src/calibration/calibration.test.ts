@@ -3,7 +3,9 @@ import {
   aceOf,
   calibrationMetrics,
   eceOf,
+  kishEffectiveSize,
   mceOf,
+  normalQuantile,
   psi,
   rankedProbabilityScore,
   reliabilityBins,
@@ -357,9 +359,9 @@ describe("drift alarms", () => {
 
 describe("threshold recommendation", () => {
   function segment(): CalibrationObservation[] {
-    // 300 labeled at 0.97 (99 % correct), 300 at 0.8 (80 % correct), 200 at 0.55 (50 % correct).
+    // 600 labeled at 0.97 (99.5 % correct), 300 at 0.8 (80 % correct), 200 at 0.55 (50 % correct).
     const out: CalibrationObservation[] = [];
-    for (let i = 0; i < 300; i += 1) out.push(choice(0.97, "a", i < 297 ? "a" : "b"));
+    for (let i = 0; i < 600; i += 1) out.push(choice(0.97, "a", i < 597 ? "a" : "b"));
     for (let i = 0; i < 300; i += 1) out.push(choice(0.8, "a", i < 240 ? "a" : "b"));
     for (let i = 0; i < 200; i += 1) out.push(choice(0.55, "a", i < 110 ? "a" : "b"));
     return out;
@@ -386,8 +388,77 @@ describe("threshold recommendation", () => {
     });
     expect(r.recommended.autoAt).toBe(0.81);
     expect(r.achieved?.lower95).toBeGreaterThanOrEqual(0.95);
-    expect(r.achieved?.n).toBe(300);
+    expect(r.achieved?.n).toBe(600);
     expect(r.recommended.improveAt).not.toBeNull();
+  });
+
+  it("computes Kish's effective sample size and the Bonferroni-corrected z", () => {
+    expect(kishEffectiveSize([1, 1, 1, 1])).toBe(4);
+    // (1 + 3)² / (1 + 9) = 1.6
+    expect(kishEffectiveSize([1, 3])).toBeCloseTo(1.6, 12);
+    expect(kishEffectiveSize([])).toBe(0);
+    expect(normalQuantile(0.975)).toBeCloseTo(1.959964, 5);
+    // one-sided 0.025 split over 50 thresholds: Φ⁻¹(1 − 0.0005)
+    expect(normalQuantile(1 - 0.025 / 50)).toBeCloseTo(3.290527, 5);
+    expect(normalQuantile(0.5)).toBeCloseTo(0, 12);
+  });
+
+  it("uses the effective sample size of 1/π-weighted labels in the Wilson bound", () => {
+    // 400 labeled decisions at 0.97, all correct: 350 drawn with π = 1 and 50 with π = 0.01.
+    // Kish: n_eff = (350 + 50·100)² / (350 + 50·100²) = 5350² / 500350 ≈ 57.205.
+    // One candidate region (every threshold 0.50–0.97 selects the same 400), so z = 1.95996 and
+    // the Wilson lower bound at p = 1 is 1 / (1 + z²/n): ≈ 0.9371 with n_eff (below 0.95), where
+    // the raw n = 400 would have given ≈ 0.9905 and automation at 0.5.
+    const weighted = Array.from({ length: 400 }, (_, i) =>
+      choice(0.97, "a", "a", { inclusionProbability: i < 350 ? 1 : 0.01 }),
+    );
+    const r = recommendThresholds({
+      observations: weighted,
+      consequenceClass: "low",
+      current: { autoAt: null, improveAt: null },
+      hasImproveActions: false,
+    });
+    expect(r.recommended.autoAt).toBeNull();
+    const nEff = 5350 ** 2 / 500350;
+    expect(nEff).toBeCloseTo(57.205, 3);
+    expect(1 / (1 + 1.959964 ** 2 / nEff)).toBeCloseTo(0.9371, 4);
+
+    const uniform = recommendThresholds({
+      observations: weighted.map((o) => ({ ...o, inclusionProbability: 1 })),
+      consequenceClass: "low",
+      current: { autoAt: null, improveAt: null },
+      hasImproveActions: false,
+    });
+    expect(uniform.recommended.autoAt).toBe(0.5);
+    expect(uniform.achieved?.lower95).toBeCloseTo(1 / (1 + 1.959964 ** 2 / 400), 5);
+  });
+
+  it("corrects the confidence level for the number of thresholds scanned", () => {
+    // Regions with ≥ 300 labels: t ≤ 0.80 → 500 (p = 0.982), 0.81–0.90 → 400 (p = 0.985),
+    // 0.91–0.97 → 300 (p = 0.99): three distinct candidate regions, so z = Φ⁻¹(1 − 0.025/3)
+    // = 2.3940. Wilson lower bounds, plain (z = 1.96) → corrected: 0.9661 → 0.9614,
+    // 0.9677 → 0.9622, 0.9710 → 0.9644. A 0.965 target passes uncorrected at t = 0.50 but at
+    // no threshold once corrected; a 0.96 target still passes at t = 0.50.
+    const obs: CalibrationObservation[] = [];
+    for (let i = 0; i < 300; i += 1) obs.push(choice(0.97, "a", i < 297 ? "a" : "b"));
+    for (let i = 0; i < 100; i += 1) obs.push(choice(0.9, "a", i < 97 ? "a" : "b"));
+    for (let i = 0; i < 100; i += 1) obs.push(choice(0.8, "a", i < 97 ? "a" : "b"));
+    const at = (precision: number) =>
+      recommendThresholds({
+        observations: obs,
+        consequenceClass: "low",
+        current: { autoAt: null, improveAt: null },
+        hasImproveActions: false,
+        target: { precision, minLabeled: 300, maxEce: 1 },
+      });
+    const z = normalQuantile(1 - 0.025 / 3);
+    expect(z).toBeCloseTo(2.394, 3);
+    expect(wilsonLower(0.982, 500)).toBeCloseTo(0.9661, 4);
+    expect(wilsonLower(0.982, 500, z)).toBeCloseTo(0.9614, 4);
+    expect(wilsonLower(0.99, 300, z)).toBeCloseTo(0.9644, 4);
+    expect(at(0.965).recommended.autoAt).toBeNull();
+    expect(at(0.96).recommended.autoAt).toBe(0.5);
+    expect(at(0.96).achieved?.lower95).toBeCloseTo(0.9614, 4);
   });
 
   it("refuses when calibration is too poor or labels too few", () => {

@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { Flowaid } from "@flowaid/workflow-sdk";
 import type { CliIO } from "./io.js";
 
-export const DEFAULT_API_URL = "http://localhost:3000";
+export const DEFAULT_API_URL = "http://localhost:3001";
 
 export interface Profile {
   apiUrl?: string;

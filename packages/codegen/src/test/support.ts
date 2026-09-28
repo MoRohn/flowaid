@@ -1,5 +1,5 @@
 /**
- * Test helpers: the workflow-core fixtures (MCP sentinels resolved to stable ids), a catalog over
+ * Test helpers: the workflow-core fixtures (MCP and knowledge sentinels resolved to stable ids), a catalog over
  * the real core node manifests (read as data), and compiled plans.
  */
 import { readFileSync } from "node:fs";
@@ -26,6 +26,9 @@ export const FIXTURE_NAMES = [
   "github-issue-triage",
   "research-agent",
   "variants/github-issue-triage.retrieval",
+  "variants/pageindex-document-qa",
+  "variants/pageindex-compare",
+  "variants/pageindex-agent",
 ] as const;
 
 const read = (path: string): unknown => JSON.parse(readFileSync(path, "utf8"));
@@ -46,11 +49,11 @@ function resourcesOf(name: string): Resources {
   }
 }
 
-/** A fixture definition with `$template.mcp.<key>` sentinels replaced by stable server ids. */
+/** A fixture definition with `$template.<mcp|knowledge>.<key>` sentinels replaced by stable ids. */
 export function fixture(name: string): unknown {
   return JSON.parse(
     readFileSync(join(FIXTURES, `${name}.json`), "utf8").replace(
-      /"\$template\.mcp\.([a-z0-9_]+)"/g,
+      /"\$template\.(?:mcp|knowledge)\.([a-z0-9_]+)"/g,
       (_m, key: string) => `"${idFor(key)}"`,
     ),
   );

@@ -3,7 +3,7 @@ import { applyJsonPatch, type JsonValue } from "@flowaid/shared";
 import type { BooleanDecision, WorkflowDefinition } from "@flowaid/workflow-core";
 import { CRITIC_CHECKS, critique, workflowSummary } from "./critic.js";
 import { RUBRIC, piiInputs, type CritiqueInput } from "./rubric.js";
-import { compileDef, define, manifests, ref, task, triage } from "./test/fixtures.js";
+import { compileDef, define, manifests, ref, refundPayout, task, triage } from "./test/fixtures.js";
 
 function inputFor(def: WorkflowDefinition, over: Partial<CritiqueInput> = {}): CritiqueInput {
   const compiled = compileDef(def);
@@ -25,55 +25,6 @@ const rule = (id: string) => {
 const apply = (def: WorkflowDefinition, patch: readonly unknown[]) =>
   applyJsonPatch(def as unknown as JsonValue, patch as never) as unknown as WorkflowDefinition;
 const errors = (def: unknown) => compileDef(def).diagnostics.filter((d) => d.severity === "error");
-
-const state = { kind: "object" as const, fields: { message: ref("ticket", "message") } };
-
-/** A refund decision that drives an irreversible HTTP POST. */
-function refundPayout(gated: boolean): WorkflowDefinition {
-  const nodes: unknown[] = [
-    { id: "ticket", kind: "input", name: "Ticket" },
-    task(
-      "is_refund",
-      "flowaid.decision.boolean",
-      { instructions: "Refund?" },
-      { state },
-      { typesafe: "TYPESAFE_API_KEY" },
-    ),
-    task(
-      "payout",
-      "flowaid.tools.http",
-      { method: "POST", url: "https://payments.example.com/refunds" },
-      {},
-      {},
-    ),
-    { id: "done", kind: "output", name: "Done", value: { kind: "literal", value: {} } },
-  ];
-  const edges = [
-    { id: "e1", from: { node: "ticket", port: "done" }, to: { node: "is_refund" } },
-    ...(gated
-      ? [
-          { id: "e2", from: { node: "is_refund", port: "done" }, to: { node: "approve" } },
-          { id: "e3", from: { node: "approve", port: "approved" }, to: { node: "payout" } },
-          { id: "e5", from: { node: "approve", port: "rejected" }, to: { node: "done" } },
-        ]
-      : [{ id: "e2", from: { node: "is_refund", port: "done" }, to: { node: "payout" } }]),
-    { id: "e4", from: { node: "payout", port: "done" }, to: { node: "done" } },
-  ];
-  if (gated)
-    nodes.splice(2, 0, {
-      id: "approve",
-      kind: "human",
-      name: "Approve",
-      mode: { type: "approval" },
-      title: { kind: "literal", value: "Pay out?" },
-    });
-  return define({
-    secrets: [{ name: "TYPESAFE_API_KEY", credentialType: "typesafe.api_key" }],
-    execution: { maxCostUsd: 0.1, decisions: { failover: [{ provider: "human" }] } },
-    nodes,
-    edges,
-  });
-}
 
 describe("rubric", () => {
   it("lists one checklist line per rule", () => {

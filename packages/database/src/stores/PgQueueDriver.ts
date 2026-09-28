@@ -9,6 +9,8 @@
  *   while the handler runs; a crashed consumer's job becomes claimable again when it lapses.
  * - Completion sets `done_at`; a failure records `last_error` and retries with exponential
  *   backoff until `max_attempts`, after which the job is finished with its error (dead letter).
+ *   A job whose attempts ran out because its consumers died mid-job is dead-lettered at the
+ *   next claim (reported to `onError`) instead of being redelivered forever.
  * - Timers: `run_timers` rows are authoritative and polled by the runtime, so `scheduleTimer`
  *   and `cancelTimer` are no-ops here (the contract allows it).
  */
@@ -75,8 +77,35 @@ export class PgQueueDriver implements QueueDriver {
     await this.sql`select pg_notify(${QUEUE_CHANNEL}, ${queue})`;
   }
 
+  /**
+   * Finishes jobs whose attempts are spent although no handler failed them: every consumer that
+   * claimed them died (or stalled past the visibility lease) mid-job. Without this, a job that
+   * crashes the process would be redelivered forever.
+   */
+  private async deadLetterAbandoned(queue: QueueName): Promise<void> {
+    const rows = await this.sql<{ id: string; payload: Job; attempts: number }[]>`
+      update queue_jobs set
+        done_at = now(), locked_by = null, locked_until = null,
+        last_error = ${"abandoned: its consumer stopped during each of "} || attempts || ' attempts'
+          || coalesce(' (last error: ' || left(last_error, 1800) || ')', '')
+      where id in (
+        select id from queue_jobs
+        where queue = ${queue} and done_at is null and attempts >= max_attempts
+          and (locked_until is null or locked_until < now())
+        limit 100
+        for update skip locked
+      )
+      returning id, payload, attempts`;
+    for (const row of rows)
+      this.options.onError?.(
+        new Error(`Job ${row.id} was dead-lettered after ${row.attempts} abandoned attempts`),
+        row.payload,
+      );
+  }
+
   /** Claims the next ready job of a queue, or null. */
   private async claim(queue: QueueName): Promise<Claimed | null> {
+    await this.deadLetterAbandoned(queue);
     const rows = await this.sql<Claimed[]>`
       update queue_jobs set
         locked_by = ${this.workerId},
@@ -85,6 +114,7 @@ export class PgQueueDriver implements QueueDriver {
       where id = (
         select id from queue_jobs
         where queue = ${queue} and done_at is null and run_at <= now()
+          and attempts < max_attempts
           and (locked_until is null or locked_until < now())
         order by priority, run_at
         limit 1
@@ -92,6 +122,15 @@ export class PgQueueDriver implements QueueDriver {
       )
       returning id, payload, attempts, max_attempts`;
     return rows[0] ?? null;
+  }
+
+  /** Jobs of a queue that wait for a consumer (ready or delayed, not claimed): the queue-depth gauge. */
+  async depth(queue: QueueName): Promise<number> {
+    const [row] = await this.sql<{ n: number }[]>`
+      select count(*)::int as n from queue_jobs
+      where queue = ${queue} and done_at is null and attempts < max_attempts
+        and (locked_until is null or locked_until < now())`;
+    return row?.n ?? 0;
   }
 
   private async complete(id: string): Promise<void> {

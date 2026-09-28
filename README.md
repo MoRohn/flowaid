@@ -15,7 +15,7 @@
   <img alt="Local-first" src="https://img.shields.io/badge/local--first-no%20sign--in-2f5be8">
   <img alt="TypeScript 5.9 strict" src="https://img.shields.io/badge/TypeScript-5.9%20strict-17171c">
   <img alt="Node.js 24+" src="https://img.shields.io/badge/node-%E2%89%A524-17171c">
-  <img alt="Tests: 5,471 passing" src="https://img.shields.io/badge/tests-5%2C471%20passing-1f9d64">
+  <img alt="Tests: 5,831 passing" src="https://img.shields.io/badge/tests-5%2C831%20passing-1f9d64">
 </p>
 
 <p align="center">
@@ -44,26 +44,48 @@ decides what happens next: act automatically, gather more evidence, or ask a per
 
 > [!NOTE]
 > **FlowAId is in public beta.** Everything described here runs today and every change is gated
-> by 5,471 tests, the PostgreSQL suites, an accessibility gallery and a browser acceptance
+> by 5,831 tests, the PostgreSQL suites, an accessibility gallery and a browser acceptance
 > journey against the production builds. Interfaces may still change before 1.0; the first
 > tagged release (0.4.0, with published container images) is being prepared.
 
 ## What's new
 
-- **Local-first.** `pnpm start` opens FlowAId without a sign-in on your own computer; only this
-  computer can use that automatic session. Behind public URLs it switches to password sign-in.
-- **A guided first run.** The Overview walks you from an empty install to a workflow your code
-  can call: connect TypeSafe, create a workflow, run it, answer a human task, publish, call it.
-- **Faster everyday work.** ⌘K searches workflows, runs and templates and creates anything;
-  lists open on a click; webhooks and schedules are added from the app with a ready-to-paste
-  request; failed runs offer _Retry node_; forks can target any published version.
-- **Clearer graphs.** Imported and template flows lay out without edges running behind nodes and
-  open at a readable zoom.
-- **Knowledge, evaluations and credentials that guide you.** Embedding models show whether a key
-  is ready, evaluation cases are entered as forms, and each provider key links to where to get
-  one and is tested when saved.
-- **Releases.** Versioned with changesets; each release publishes multi-arch images with SBOMs
-  and provenance to `ghcr.io/morohn/flowaid-{api,worker,web}`.
+**V2: FlowAId tells you what needs you, what changed, and why, with evidence.**
+
+- **Needs attention.** The Overview opens with what waits for a person (open approvals, the
+  oldest one, what expires today) and the workflows whose runs failed, each a link to act.
+- **What changed.** Per workflow, FlowAId compares the recent window with the four before it and
+  reports only changes that are statistically significant _and_ large enough to matter: failure
+  rate (Fisher's exact test), latency, cost and decision confidence (Mann–Whitney), and new error
+  codes, with Benjamini–Hochberg across every test. Each finding shows its evidence and the
+  version it coincides with.
+- **Ask FlowAId.** Ask in plain words ("why did support triage start failing?") from the top bar
+  or ⌘K. The answer comes from read-only lookups of your runs, metrics, insights and approvals;
+  each statement says whether it is a fact, a calculation, a suggestion or unconfirmed, and links
+  to the records it rests on. It changes nothing on its own. Measured with an evaluation set
+  (`pnpm eval:assistant`, see [AI evaluation](docs/FLOWAID_AI_EVALUATION.md)).
+- **PageIndex document intelligence.** Upload PDFs to a PageIndex knowledge source and FlowAId
+  indexes each one into its section tree once (pinned PageIndex SDK, on your machine). TypeSafe
+  Jev then navigates the tree to the pages that answer a question. Answers cite physical pages of
+  the exact file version, every citation is checked against the page text, and the viewer opens
+  the cited page. Three templates (Q&A, comparison, agent), `./flowaid --pageindex`, and a
+  measured evaluation. See [docs/pageindex/SETUP.md](docs/pageindex/SETUP.md).
+- **Honest numbers.** Streamed generations are priced (they were counted at $0), dashboards count
+  production traffic only, and agents check their budget before each turn.
+- **Sturdier runtime.** Retention runs, runs no longer hang in scale mode, crash-looping jobs are
+  dead-lettered, and restarts resume runs without waiting out their leases.
+- **Safer by default.** Binding to your network switches to password sign-in; credentials never
+  follow cross-origin redirects; the database node and every outbound call share one address
+  guard, with `FLOWAID_ALLOW_PRIVATE_NETWORK` to reach services on your own machine.
+- **Trust and orientation.** AI-built workflows show the model, tokens, cost and remaining
+  diagnostics; critic findings say whether a rule or the AI judge raised them and preview their
+  fix; the navigation counts pending approvals; every page has its own title; run detail works on
+  phones and tablets.
+- **Operations.** [Backup and restore](docs/operations/BACKUP_AND_RESTORE.md) (including the
+  master key), [upgrades](docs/operations/UPGRADES.md) and a [runbook](docs/operations/RUNBOOK.md);
+  releases wait for CI and E2E to pass.
+
+The review, plan and audit behind V2 are in [docs/FLOWAID_V2_FINAL_AUDIT.md](docs/FLOWAID_V2_FINAL_AUDIT.md).
 
 The full history is in [CHANGELOG.md](CHANGELOG.md); the live snapshot is
 [docs/STATUS.md](docs/STATUS.md).
@@ -244,33 +266,34 @@ local Ollama enable generation. Everything else runs without any key.
 ### 2. Start FlowAId
 
 ```sh
-git clone https://github.com/MoRohn/flowaid.git
-cd flowaid
-echo "TYPESAFE_API_KEY=ts_…" >> .env.local   # optional: enables decision nodes
-pnpm start
+git clone https://github.com/MoRohn/flowaid.git && cd flowaid
+./flowaid
 ```
 
-`pnpm start` takes a fresh clone to a running platform in one command. It checks your machine
-(Node.js, pnpm, free ports, Docker) and prints the fix for anything missing, installs
-dependencies, generates local secrets into `.flowaid/dev.env`, starts PostgreSQL 16 with
-pgvector in Docker (or uses `--database-url`), builds what the apps need, and starts the API,
-the worker and the web app:
+Then open **<http://flowaid.localhost:3000>**. There is no account to create: on your own
+computer FlowAId signs you in by itself.
+
+That is the whole setup. `./flowaid` checks Node.js and pnpm, and hands over to `pnpm start`
+(the same command, if you prefer it). It installs dependencies, generates local secrets into
+`.flowaid/dev.env`, and starts PostgreSQL 16 with pgvector in Docker. Then it builds and starts
+the API, the worker and the web app:
 
 ```text
-[6/6] Start
-✓ API ready on http://flowaid.localhost:3000
+✓ API ready on http://flowaid.localhost:3001
 
-→ http://flowaid.localhost:3001   (Ctrl+C to stop)
+→ http://flowaid.localhost:3000   (Ctrl+C to stop)
   opens without a sign-in on this computer
-  API http://flowaid.localhost:3000 · docs http://flowaid.localhost:3000/docs
 ```
 
-Open <http://flowaid.localhost:3001>. Any `*.localhost` name reaches your own computer, so the
-address needs no setup (`http://127.0.0.1:3001` works too, and `--domain` picks another name).
-There is no account to create: FlowAId signs this computer in by
-itself (the API checks for a loopback address, a local host name and a CSRF header on every such
-session, so other computers and web pages cannot use it). The API reference (OpenAPI 3.1) is at
-<http://flowaid.localhost:3000/docs>.
+- **Keys (optional).** Put provider keys in `.env.local`: `TYPESAFE_API_KEY=ts_…` for decision
+  nodes, and `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` or `OLLAMA_HOST` for generation.
+- **PDF documents.** `./flowaid --pageindex` also runs the PageIndex service, which needs
+  Python 3.10+ (see [docs/pageindex/SETUP.md](docs/pageindex/SETUP.md)).
+- **The address.** Any `*.localhost` name reaches your own computer, so it needs no setup;
+  `http://127.0.0.1:3000` works too. The API is on port 3001, and its reference is at
+  <http://flowaid.localhost:3001/docs>.
+- **A busy port.** If another app already uses 3000, FlowAId moves to the next free port and
+  prints the address.
 
 ### 3. Your first workflow
 
@@ -300,7 +323,7 @@ you go:
 Create an API key under _Settings → API keys_ (pin it to an environment), then:
 
 ```sh
-curl -X POST http://flowaid.localhost:3000/v1/workflows/<workflow-id>/run \
+curl -X POST http://flowaid.localhost:3001/v1/workflows/<workflow-id>/run \
   -H "Authorization: Bearer fa_live_…" -H "Content-Type: application/json" \
   -d '{"input": {"message": "I was charged twice for order 1182"}, "mode": "sync"}'
 ```
@@ -312,7 +335,7 @@ answers `202` with the human task. From TypeScript, with `@flowaid/workflow-sdk`
 import { Flowaid } from "@flowaid/workflow-sdk";
 
 const fa = new Flowaid({
-  baseUrl: "http://flowaid.localhost:3000",
+  baseUrl: "http://flowaid.localhost:3001",
   apiKey: process.env.FLOWAID_API_KEY,
 });
 const run = await fa.workflows.run(workflowId, { message: "Refund please" });
@@ -326,14 +349,14 @@ From a terminal, with the `flowaid` CLI (`packages/cli`; every API operation is 
 `pnpm flowaid` runs it from a checkout):
 
 ```sh
-pnpm flowaid login --api-url http://flowaid.localhost:3000 --api-key fa_live_…
+pnpm flowaid login --api-url http://flowaid.localhost:3001 --api-key fa_live_…
 pnpm flowaid workflow run <workflow-id> --input '{"message":"Refund please"}' --watch
 pnpm flowaid workflow package <workflow-id> --version 1 --out refund-triage.zip   # runnable code
 pnpm flowaid validate ./my-flow.json                                               # no server
 ```
 
 **As MCP tools.** Under _Integrations → Workflows as MCP tools_, expose a workflow and mint an
-MCP token; any MCP client can then list and call it at `http://flowaid.localhost:3000/mcp/<workspace>`
+MCP token; any MCP client can then list and call it at `http://flowaid.localhost:3001/mcp/<workspace>`
 (streamable HTTP, `Authorization: Bearer <token>`).
 
 **From webhooks, schedules and events.** Triggers in a workflow's definition become live URLs,
@@ -341,31 +364,37 @@ cron schedules and event subscriptions when a version is deployed to an environm
 
 ### 5. Options
 
-| Command                                    | What it does                                                                         |
-| ------------------------------------------ | ------------------------------------------------------------------------------------ |
-| `pnpm start --open`                        | Also opens the browser                                                               |
-| `pnpm start --port 3101 --api-port 3100`   | Serves the web app and the API on other ports                                        |
-| `pnpm start --database-url postgres://…`   | Uses your PostgreSQL 16 (with pgvector) instead of the Docker container              |
-| `pnpm start --prod`                        | Runs the production builds (Next's standalone server, compiled API and worker)       |
-| `pnpm start --domain my.flowaid.localhost` | Opens the app under another name (any `*.localhost` name reaches this computer)      |
-| `pnpm start --host 0.0.0.0`                | Listens on every interface (put a TLS proxy in front before exposing it)             |
-| `pnpm start --verify`                      | Runs every CI gate first (`pnpm check`), then starts                                 |
-| `pnpm start --playground`                  | Serves the `@flowaid/ui` component playground instead                                |
-| `pnpm start -- --help`                     | Lists every option                                                                   |
-| `pnpm preflight`                           | Only the machine checks                                                              |
-| `pnpm check`                               | Every CI gate: audit, boundaries, generated files, format, lint, types, build, tests |
-| `pnpm test:acceptance`                     | The browser acceptance journey against a running stack                               |
+| Command                                   | What it does                                                                         |
+| ----------------------------------------- | ------------------------------------------------------------------------------------ |
+| `./flowaid --open`                        | Also opens the browser                                                               |
+| `./flowaid --pageindex`                   | Also runs the PageIndex service for PDF documents (Python 3.10+)                     |
+| `./flowaid --port 3100 --api-port 3101`   | Serves the web app and the API on these ports (and stops if either is taken)         |
+| `./flowaid --database-url postgres://…`   | Uses your PostgreSQL 16 (with pgvector) instead of the Docker container              |
+| `./flowaid --prod`                        | Runs the production builds (Next's standalone server, compiled API and worker)       |
+| `./flowaid --domain my.flowaid.localhost` | Opens the app under another name (any `*.localhost` name reaches this computer)      |
+| `./flowaid --host 0.0.0.0`                | Listens on every interface (put a TLS proxy in front before exposing it)             |
+| `./flowaid --verify`                      | Runs every CI gate first (`pnpm check`), then starts                                 |
+| `./flowaid --playground`                  | Serves the `@flowaid/ui` component playground instead                                |
+| `./flowaid --help`                        | Lists every option                                                                   |
+| `pnpm preflight`                          | Only the machine checks                                                              |
+| `pnpm check`                              | Every CI gate: audit, boundaries, generated files, format, lint, types, build, tests |
+| `pnpm test:acceptance`                    | The browser acceptance journey against a running stack                               |
 
 ### 6. Troubleshooting
 
 - **`Node.js … is older than the required >=24.0.0`**: run `nvm install` (it reads `.nvmrc`),
   then open a new terminal.
-- **`Web port …` or `API port … is already in use`**: stop the other process, or pass `--port`
-  and `--api-port`.
+- **`Web port …` or `API port … is already in use`**: a port you passed with `--port` or
+  `--api-port` is taken; stop the other app or pass another port. (Busy default ports are not an
+  error: `pnpm start` moves to the next free one.)
 - **`no DATABASE_URL and the Docker daemon is not running`**: start Docker Desktop, or pass
   `--database-url`.
 - **`secret TYPESAFE_API_KEY is not bound in this environment`** when running: bind the
   workflow's secret to a credential in the workflow's _Settings → Secrets_.
+- **`refused to connect to 127.0.0.1: private or reserved address`** (or `FORBIDDEN` from a
+  database query node): workflows may not reach this computer or your network by default. To
+  call your own local services, add `FLOWAID_ALLOW_PRIVATE_NETWORK=true` to `.env` and restart
+  (see [SECURITY.md](SECURITY.md#private-network-access) for the trade-off).
 - **A reset**: stop FlowAId, then `docker rm -f flowaid-dev-db && docker volume rm flowaid-dev-db`
   and delete `.flowaid/` (this deletes every workflow, run and credential).
 
@@ -427,7 +456,7 @@ networks and secret scoping in [`docker/README.md`](docker/README.md).
 | Gate                     | Where                                                                                             |
 | ------------------------ | ------------------------------------------------------------------------------------------------- |
 | Audit, boundaries, types | `pnpm check` and CI `check`: dependency audit, the package boundary graph, generated files, lint  |
-| 5,471 tests              | CI `test` and `integration` (PostgreSQL with pgvector, Redis, isolated-vm)                        |
+| 5,831 tests              | CI `test` and `integration` (PostgreSQL with pgvector, Redis, isolated-vm)                        |
 | Accessibility            | CI `ui gallery`: axe (WCAG 2.x A and AA) and console checks over every component, both themes     |
 | Acceptance journey       | E2E against the production builds with recorded provider replay and secret-canary log checks      |
 | Releases                 | Changesets, multi-arch images with SBOMs and provenance, Dependabot for patches and minor updates |
@@ -599,26 +628,33 @@ boundaries.json         The allowed dependency graph between packages
 
 ## Documentation
 
-|                                                                                     |                                                                          |
-| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| [Documentation index](docs/README.md)                                               | Every design document, guide and research source                         |
-| [Product specification](docs/design/SPEC.md)                                        | What FlowAId is meant to be                                              |
-| [Architecture](docs/design/ARCHITECTURE.md) · [API](docs/design/API.md)             | How it is built, and the REST, SSE, SDK and CLI surface                  |
-| [Jev engineering](docs/jev/overview.md)                                             | Decision contracts, packets, routing, calibration, shadow mode, receipts |
-| [Download code](docs/design/CODE_EXPORT.md) · [LangChain](docs/design/LANGCHAIN.md) | Code export and the LangChain boundary                                   |
-| [Importing](apps/docs/content/importing.md)                                         | Bringing external flow exports into FlowAId                              |
-| [Environment](packages/env/README.md) · [Docker](docker/README.md)                  | Every setting, and the production stack                                  |
-| [Upgrade plan](docs/UPGRADE_PLAN.md) · [Status](docs/STATUS.md)                     | What is next, and where things stand                                     |
-| [Changelog](CHANGELOG.md) · [Releasing](docs/RELEASING.md)                          | Release notes, versions and published images                             |
+|                                                                                              |                                                                          |
+| -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| [Documentation index](docs/README.md)                                                        | Every design document, guide and research source                         |
+| [Product specification](docs/design/SPEC.md)                                                 | What FlowAId is meant to be                                              |
+| [Architecture](docs/design/ARCHITECTURE.md) · [API](docs/design/API.md)                      | How it is built, and the REST, SSE, SDK and CLI surface                  |
+| [Jev engineering](docs/jev/overview.md)                                                      | Decision contracts, packets, routing, calibration, shadow mode, receipts |
+| [Download code](docs/design/CODE_EXPORT.md) · [LangChain](docs/design/LANGCHAIN.md)          | Code export and the LangChain boundary                                   |
+| [Importing](apps/docs/content/importing.md)                                                  | Bringing external flow exports into FlowAId                              |
+| [Environment](packages/env/README.md) · [Docker](docker/README.md)                           | Every setting, and the production stack                                  |
+| [Upgrade plan](docs/UPGRADE_PLAN.md) · [Status](docs/STATUS.md)                              | What is next, and where things stand                                     |
+| [Changelog](CHANGELOG.md) · [Releasing](docs/RELEASING.md)                                   | Release notes, versions and published images                             |
+| [V2 overview](docs/architecture/V2_OVERVIEW.md) · [V2 audit](docs/FLOWAID_V2_FINAL_AUDIT.md) | The V2 intelligence layer, and what was verified                         |
+| [Ask FlowAId](docs/ai/ASSISTANT.md) · [AI evaluation](docs/FLOWAID_AI_EVALUATION.md)         | The workspace assistant, and how FlowAId measures its AI                 |
+| [Insights](docs/data/INSIGHTS.md) · [Threat model](docs/security/THREAT_MODEL.md)            | Change detection and its statistics; the security model                  |
+| [Operations](docs/operations/RUNBOOK.md)                                                     | Backup and restore, upgrades, day-to-day running                         |
 
 ## Roadmap
 
 FlowAId is local-first by design: it runs for one person on their own computer without accounts,
 so team identity (single sign-on, invitations, MFA) is deliberately not planned. Next:
 
-1. **0.4.0**, the first tagged release, with its published images.
-2. **Track J:** Jev decision contracts across the platform.
-3. **Track L:** a Lean 4 checker that certifies run and evaluation results (see
+1. **The first tagged release** of V2, with its published images.
+2. **Beyond V2** ([roadmap](docs/FLOWAID_V2_ROADMAP.md)): Ask FlowAId actions with preview and
+   confirmation, an evaluation set for the AI builder, Jev calibration in the product, spend
+   forecasting on daily rollups.
+3. **Track J:** Jev decision contracts across the platform.
+4. **Track L:** a Lean 4 checker that certifies run and evaluation results (see
    [LEAN_VERIFICATION.md](docs/design/LEAN_VERIFICATION.md)).
 
 ## Contributing

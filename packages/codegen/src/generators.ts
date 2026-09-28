@@ -318,6 +318,16 @@ export function generateReadme(o: ReadmeOptions): string {
     caveats.push(
       "- MCP nodes call servers that a FlowAId workspace connects. Locally, pass `services.tools` to `runWorkflow` (see `src/flow.ts`) or run the flow on the server with `pnpm remote`.",
     );
+  const readsDocuments = Object.values(o.plan.nodes).some(
+    (n) =>
+      n.op.kind === "task" &&
+      (n.op.type.startsWith("flowaid.pageindex.") ||
+        (n.op.type === "flowaid.ai.agent" && n.op.config.documents !== undefined)),
+  );
+  if (readsDocuments)
+    caveats.push(
+      "- PageIndex nodes (and agents with `documents`) read document indexes that a FlowAId server builds and serves. Locally there is no `ctx.documents` unless you pass `services.documents` to `runWorkflow` (see `src/flow.ts`); without it they fail with BAD_REQUEST. Or run the flow on the server with `pnpm remote`.",
+    );
   if (o.plan.subflows.length > 0)
     caveats.push(
       "- Subflow nodes run other workflows; export those too and pass them through `subflows` to `runWorkflow`, or use `pnpm remote`.",

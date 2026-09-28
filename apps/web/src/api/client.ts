@@ -52,6 +52,8 @@ async function refreshSession(): Promise<boolean> {
 
 export interface RequestOptions {
   body?: unknown;
+  /** a raw body (an uploaded file) sent as is; its content type goes in `headers` */
+  file?: Blob;
   headers?: Record<string, string>;
   signal?: AbortSignal;
   /** return the raw Response (downloads, streams) */
@@ -97,10 +99,16 @@ export async function api<T = unknown>(
       method,
       credentials: "same-origin",
       headers: requestHeaders({
-        ...(o.body !== undefined ? { "content-type": "application/json" } : {}),
+        ...(o.body !== undefined && o.file === undefined
+          ? { "content-type": "application/json" }
+          : {}),
         ...o.headers,
       }),
-      ...(o.body !== undefined ? { body: JSON.stringify(o.body) } : {}),
+      ...(o.file !== undefined
+        ? { body: o.file }
+        : o.body !== undefined
+          ? { body: JSON.stringify(o.body) }
+          : {}),
       ...(o.signal ? { signal: o.signal } : {}),
     });
   let res = await send();
@@ -119,6 +127,20 @@ export const put = <T>(path: string, body?: unknown, o?: RequestOptions) =>
   api<T>("PUT", path, { ...o, body: body ?? {} });
 export const patch = <T>(path: string, body?: unknown, o?: RequestOptions) =>
   api<T>("PATCH", path, { ...o, body: body ?? {} });
+/**
+ * POSTs a file as the raw request body (`Content-Type` from `contentType`, the name URL-encoded in
+ * `X-File-Name`), with the same session, CSRF, workspace and refresh handling as `post`.
+ */
+export const upload = <T>(
+  path: string,
+  file: Blob,
+  o: { contentType: string; fileName: string; signal?: AbortSignal },
+) =>
+  api<T>("POST", path, {
+    file,
+    headers: { "content-type": o.contentType, "x-file-name": encodeURIComponent(o.fileName) },
+    ...(o.signal ? { signal: o.signal } : {}),
+  });
 export const del = <T>(path: string, o?: RequestOptions) => api<T>("DELETE", path, o);
 
 /** `?a=1&b=2` from defined values only. */

@@ -5,17 +5,41 @@
  */
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, statSync } from "node:fs";
-import { createServer } from "node:net";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { choosePort, portIsFree, type PortChoice } from "./ports.ts";
+
 export const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 
-/** Where the UI playground listens unless told otherwise (packages/ui/playground/vite.config.ts). */
+/** The interface `pnpm start` binds unless told otherwise: this computer only. */
 export const DEFAULT_HOST = "127.0.0.1";
 /** The name the local app is opened at: *.localhost always reaches this computer (RFC 6761). */
 export const DEFAULT_DOMAIN = "flowaid.localhost";
+/** Where the UI playground listens unless told otherwise (packages/ui/playground/vite.config.ts). */
 export const DEFAULT_PORT = 5178;
+
+/** 127.x, ::1 and localhost: a bind address only this computer can connect to. */
+export function isLoopbackBind(host: string): boolean {
+  return host === "localhost" || host === "::1" || /^127\./.test(host);
+}
+
+/**
+ * The auth mode `pnpm start` runs with on this bind address. Local mode (no sign-in) is only
+ * safe while nothing but this computer can connect: bound to another interface it is forced to
+ * `password`, and asking for `local` explicitly is refused.
+ */
+export function authModeForBind(
+  host: string,
+  requested: string | undefined,
+): { mode: string | undefined; forced: boolean } | { error: string } {
+  if (isLoopbackBind(host)) return { mode: requested, forced: false };
+  if (requested === "local")
+    return {
+      error: `FLOWAID_AUTH_MODE=local opens the app without signing in, so it only runs bound to this computer; --host ${host} exposes it to your network. Drop FLOWAID_AUTH_MODE (or set it to password), or bind to 127.0.0.1.`,
+    };
+  return { mode: "password", forced: requested !== "password" };
+}
 
 /** `info` never blocks; `warn` is fixable later or automatically; `fail` stops `pnpm start`. */
 export type CheckStatus = "ok" | "info" | "warn" | "fail";
@@ -144,28 +168,55 @@ export function checkDependencies(root: string = ROOT): CheckResult {
   return { name, status: "ok", detail: "installed and in sync with pnpm-lock.yaml" };
 }
 
-/** Resolves true when nothing is listening on host:port. */
-export function portIsFree(host: string, port: number): Promise<boolean> {
-  return new Promise((resolve) => {
-    const server = createServer();
-    server.once("error", () => resolve(false));
-    server.listen({ host, port, exclusive: true }, () => {
-      server.close(() => resolve(true));
-    });
-  });
+export { portIsFree };
+
+export interface PortCheckOptions {
+  /** Row name in the report. */
+  name?: string;
+  /** The flag that sets this port, for the fix line. */
+  flag?: string;
+  /** Passed by the user: a busy port fails instead of falling back to the next free one. */
+  explicit?: boolean;
+  /** Ports a fallback must skip. */
+  avoid?: readonly number[];
 }
 
-export async function checkPort(host: string, port: number): Promise<CheckResult> {
-  const name = "Playground port";
-  if (await portIsFree(host, port)) {
-    return { name, status: "ok", detail: `${host}:${port} is free` };
-  }
+/** The report row for a port choice (see choosePort in ports.ts). */
+export function portCheckResult(
+  host: string,
+  choice: PortChoice,
+  { name = "Web port", flag = "--port" }: Pick<PortCheckOptions, "name" | "flag"> = {},
+): CheckResult {
+  if (choice.ok && !choice.fallback)
+    return { name, status: "ok", detail: `${host}:${choice.port} is free` };
+  if (choice.ok)
+    return {
+      name,
+      status: "info",
+      detail: `${host}:${choice.requested} is in use (another app); using ${choice.port} instead`,
+    };
   return {
     name,
     status: "fail",
-    detail: `${host}:${port} is already in use`,
-    fix: `stop the process using it, or run pnpm start --port ${port + 1}`,
+    detail:
+      choice.reason === "in-use"
+        ? `${host}:${choice.requested} is already in use`
+        : `${host}:${choice.requested} and the ports after it are in use`,
+    fix: `stop the app using it, or pass another ${flag}`,
   };
+}
+
+/** Whether host:port can be listened on; a busy default falls back to the next free port. */
+export async function checkPort(
+  host: string,
+  port: number,
+  options: PortCheckOptions = {},
+): Promise<CheckResult & { port: number }> {
+  const choice = await choosePort(
+    { port, explicit: options.explicit ?? true, avoid: options.avoid ?? [] },
+    (p) => portIsFree(host, p),
+  );
+  return { ...portCheckResult(host, choice, options), port: choice.ok ? choice.port : port };
 }
 
 /** Runs a command and returns its trimmed stdout, or null when it is missing or fails. */
@@ -199,22 +250,18 @@ export function checkDocker(compose: string | null, daemonUp: boolean): CheckRes
 }
 
 export interface PreflightOptions {
-  host?: string;
-  port?: number;
-  /** Skip the port check (for example when only building). */
-  checkPortFree?: boolean;
+  /** Port rows already checked (checkPort), listed after the dependencies. */
+  ports?: readonly CheckResult[];
 }
 
-export async function runPreflight(options: PreflightOptions = {}): Promise<CheckResult[]> {
+export function runPreflight(options: PreflightOptions = {}): CheckResult[] {
   const manifest = readManifest();
   const results: CheckResult[] = [
     checkNode(process.versions.node, manifest.engines?.node),
     checkPnpm(probe("pnpm", ["--version"]), manifest.packageManager),
     checkDependencies(),
   ];
-  if (options.checkPortFree !== false) {
-    results.push(await checkPort(options.host ?? DEFAULT_HOST, options.port ?? DEFAULT_PORT));
-  }
+  results.push(...(options.ports ?? []));
   if (!existsSync(join(ROOT, ".git"))) {
     results.push({ name: "Git", status: "info", detail: "not a git checkout" });
   }

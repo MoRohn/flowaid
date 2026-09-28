@@ -1,0 +1,35 @@
+#!/usr/bin/env sh
+# FlowAId: one command to run it on your own computer.
+#
+#   ./flowaid                 start FlowAId, then open http://flowaid.localhost:3000
+#   ./flowaid --pageindex     also run PageIndex (PDF document indexes; needs Python 3.10+)
+#   ./flowaid --help          every option (they are `pnpm start` options)
+#
+# It checks Node.js and pnpm, then hands over to `pnpm start`, which installs dependencies,
+# starts Postgres in Docker (or uses DATABASE_URL), builds and runs the api, worker and web app.
+set -eu
+
+cd "$(dirname "$0")"
+
+say() { printf '%s\n' "$*"; }
+fail() {
+  say "flowaid: $*" >&2
+  exit 1
+}
+
+# Node.js 24 or newer (.nvmrc)
+command -v node >/dev/null 2>&1 ||
+  fail "Node.js 24+ is required: install it from https://nodejs.org (or run \`nvm install\` here)."
+major=$(node -p 'process.versions.node.split(".")[0]')
+[ "$major" -ge 24 ] ||
+  fail "Node.js $(node -v) is too old: FlowAId needs 24 or newer (\`nvm install\` reads .nvmrc)."
+
+# pnpm, at the version package.json pins (Corepack ships with Node.js)
+if ! command -v pnpm >/dev/null 2>&1; then
+  say "Enabling pnpm through Corepack…"
+  corepack enable >/dev/null 2>&1 ||
+    fail "pnpm is required: run \`npm install -g pnpm\` (or \`corepack enable\`) and try again."
+fi
+
+# the same entry point as `pnpm start`
+exec node --disable-warning=ExperimentalWarning scripts/start.ts "$@"

@@ -209,4 +209,29 @@ describe("OllamaClient", () => {
       ollamaEmbeddingFactory().create({ model: "m", credential: undefined, http, catalog }).id,
     ).toBe("ollama");
   });
+
+  it("uses the credential's host, then the node's, then the server default, then localhost", async () => {
+    const hostOf = async (
+      factoryHost: string | undefined,
+      credential: Record<string, string> | undefined,
+      options?: { host: string },
+    ) => {
+      const { http, calls } = serve(fixture("chat-stream").ndjson ?? "");
+      const p = ollamaFactory({ host: factoryHost }).create({
+        model: "m",
+        credential,
+        http,
+        catalog,
+        ...(options ? { options } : {}),
+      });
+      await collect(p as OllamaClient);
+      return new URL(calls[0]?.url ?? "").origin;
+    };
+    expect(await hostOf("http://srv:2", { host: "http://cred:1" })).toBe("http://cred:1");
+    expect(await hostOf("http://srv:2", undefined, { host: "http://node:3" })).toBe(
+      "http://node:3",
+    );
+    expect(await hostOf("http://srv:2", undefined)).toBe("http://srv:2");
+    expect(await hostOf(undefined, undefined)).toBe("http://localhost:11434");
+  });
 });

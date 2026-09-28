@@ -37,13 +37,16 @@ export function featuresFor(
   const disabled = new Set(config.featuresDisabled);
   const out = {} as Record<FeatureKey, boolean>;
   for (const key of FEATURE_KEYS) out[key] = FEATURES_SHIPPED.has(key) && !disabled.has(key);
-  out.oidc = config.hasOidc && !disabled.has("oidc");
   // LangChain nodes exist when the worker has registered its bundled package and it is enabled
   out.langchain =
     !disabled.has("langchain") &&
     plugins.packages.some((p) => p.name === "@flowaid/nodes-langchain");
   // The critic and optimizer are deterministic; the AI builder needs a generation model.
   out.ai_builder = runtime.aiBuilder && !disabled.has("ai_builder");
+  // PageIndex documents need the PageIndex service to be configured.
+  out.pageindex = config.pageIndex !== null && !disabled.has("pageindex");
+  // Ask FlowAId answers with the same generation model.
+  out.assistant = runtime.aiBuilder && !disabled.has("assistant");
   // Code export works in npm mode, or vendored with the packed runtime packages present.
   out.code_export =
     (config.exportMode === "npm" || config.vendorAvailable) && !disabled.has("code_export");

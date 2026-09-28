@@ -59,7 +59,7 @@ import type {
 
 /* ───────────────────────── custom types ───────────────────────── */
 // Unsized: sources choose their embedding model, so vectors of different dimensions share the
-// table; migration 0005 adds a partial HNSW index per common dimension (see DATABASE.md).
+// table; migration 0007 adds a partial HNSW index per common dimension (see DATABASE.md).
 const vector = customType<{ data: number[]; driverData: string }>({
   dataType() {
     return "vector";
@@ -585,7 +585,7 @@ export const runEvents = pgTable(
     check("run_events_payload_size", sql`pg_column_size(${t.payload}) < 262144`),
   ],
 );
-// RUN_EVENTS_PARTITIONED=true: migration 0003 converts to PARTITION BY RANGE (at), monthly partitions created 3 months ahead by the sweep job.
+// RUN_EVENTS_PARTITIONED=true: migration 0002 converts to PARTITION BY RANGE (at), monthly partitions created 3 months ahead by the sweep job.
 
 export const nodeRuns = pgTable(
   "node_runs",
@@ -1060,7 +1060,7 @@ export const documents = pgTable(
     status: text("status", { enum: ["pending", "indexed", "error", "deleted"] })
       .notNull()
       .default("pending"),
-    // v1.2 (0005): the normalised text of inline documents (uploads), so a source can be
+    // v1.2 (0007): the normalised text of inline documents (uploads), so a source can be
     // re-indexed after its pipeline changes; null for documents a loader can fetch again
     content: text("content"),
     error: text("error"),
@@ -1091,9 +1091,116 @@ export const chunks = pgTable(
   (t) => [
     index("chunks_doc_idx").on(t.documentId, t.ordinal),
     index("chunks_source_idx").on(t.sourceId),
-    // HNSW needs a fixed dimension: partial expression indexes per dimension live in 0005
+    // HNSW needs a fixed dimension: partial expression indexes per dimension live in 0007
     index("chunks_tsv_gin").using("gin", t.tsv),
     index("chunks_meta_gin").using("gin", t.metadata),
+  ],
+);
+
+// ── Document indexes (RFC-0022; migration 0010) ─────────────────────────────────────────────
+// PageIndex sources keep the uploaded file itself: each distinct upload of a document is an
+// immutable version (bytes in artifact storage, keyed by sha256), and each version is indexed
+// into one or more index versions. Exactly one ready index per document is `active`; building a
+// new one leaves the old readable until the new one is promoted, and runs that resolved an
+// index keep reading it.
+
+export const documentIndexStateEnum = pgEnum("document_index_state", [
+  "queued",
+  "running",
+  "ready",
+  "failed",
+  "cancel_requested",
+  "canceled",
+  "superseded",
+  "deleted",
+]);
+
+export const documentVersions = pgTable(
+  "document_versions",
+  {
+    id: uuid("id").primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    documentId: uuid("document_id")
+      .notNull()
+      .references(() => documents.id, { onDelete: "cascade" }),
+    version: integer("version").notNull(),
+    sha256: text("sha256").notNull(),
+    bytes: integer("bytes").notNull(),
+    mediaType: text("media_type").notNull(),
+    fileName: text("file_name").notNull(),
+    /** the original file, in artifact storage (never served without a workspace check) */
+    artifactId: uuid("artifact_id").references(() => artifacts.id, { onDelete: "set null" }),
+    pageCount: integer("page_count"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("document_versions_ws_idx").on(t.workspaceId, t.documentId),
+    uniqueIndex("document_versions_doc_version_uq").on(t.documentId, t.version),
+    uniqueIndex("document_versions_doc_sha_uq").on(t.documentId, t.sha256),
+  ],
+);
+
+export const documentIndexes = pgTable(
+  "document_indexes",
+  {
+    id: uuid("id").primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    sourceId: uuid("source_id")
+      .notNull()
+      .references(() => knowledgeSources.id, { onDelete: "cascade" }),
+    documentId: uuid("document_id")
+      .notNull()
+      .references(() => documents.id, { onDelete: "cascade" }),
+    versionId: uuid("version_id")
+      .notNull()
+      .references(() => documentVersions.id, { onDelete: "cascade" }),
+    indexVersion: integer("index_version").notNull(),
+    state: documentIndexStateEnum("state").notNull().default("queued"),
+    active: boolean("active").notNull().default(false),
+    backend: text("backend").notNull().default("pageindex"),
+    mode: text("mode").notNull().default("local"),
+    /** hash of the settings that make two indexes of the same bytes interchangeable */
+    configHash: text("config_hash").notNull(),
+    /** { model: ModelRef, mode, optimize, credentialId } at request time */
+    settings: jsonb("settings").$type<JsonObject>().notNull(),
+    indexModel: text("index_model"),
+    backendVersion: text("backend_version"),
+    /** the service's job id (idempotent submission) */
+    jobId: uuid("job_id").notNull(),
+    /** the PageIndex document id in the workspace's store once ready */
+    upstreamDocId: text("upstream_doc_id"),
+    pageCount: integer("page_count"),
+    description: text("description"),
+    /** the section tree (titles, page spans, summaries; no page text) */
+    outline: jsonb("outline").$type<JsonValue>(),
+    stage: text("stage"),
+    attempts: integer("attempts").notNull().default(0),
+    error: jsonb("error").$type<{ code: string; message: string }>(),
+    createdAt: createdAt(),
+    startedAt: ts("started_at"),
+    readyAt: ts("ready_at"),
+    endedAt: ts("ended_at"),
+    cancelRequestedAt: ts("cancel_requested_at"),
+    /** the upstream document was removed from the service's store */
+    remoteDeletedAt: ts("remote_deleted_at"),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("document_indexes_ws_state_idx").on(t.workspaceId, t.state),
+    uniqueIndex("document_indexes_doc_version_uq").on(t.documentId, t.indexVersion),
+    // one active index per document
+    uniqueIndex("document_indexes_active_uq")
+      .on(t.documentId)
+      .where(sql`${t.active}`),
+    // one live build (or ready index) per version and configuration: repeated requests join it
+    uniqueIndex("document_indexes_live_uq")
+      .on(t.versionId, t.configHash)
+      .where(sql`${t.state} IN ('queued','running','ready','cancel_requested')`),
+    uniqueIndex("document_indexes_job_uq").on(t.jobId),
   ],
 );
 
@@ -1511,4 +1618,4 @@ Workspace deletion cascades everything through foreign keys; S3 objects are remo
 
 ## Migration set for the first slice
 
-`0000_init.sql` (the pgvector extension, all tables, enums, indexes), `0001_rls.sql` (`ENABLE` + `FORCE` RLS policies, roles and grants; policies active when `DB_RLS=true`, the compose default), `0002_partition_run_events.sql` (conditional on `RUN_EVENTS_PARTITIONED`, plus `flowaid_ensure_run_events_partitions()`), `0003_chunks_generated_tsv.sql` (generated `tsv` column), `0004_run_replay.sql`, `0005_knowledge_dims.sql` (unsized `chunks.embedding` with a partial HNSW index per common dimension, `documents.content` and `documents.error`); numbered by drizzle-kit's journal, seeds: `seed_environments.sql` is applied per workspace by the API on workspace creation (`dev`, `staging`, `prod` with `prod.protected = true`), `seed_templates.ts` loads the three demo templates with their `required_resources`. First boot (`apps/api` bootstrap): owner user, default workspace `default`, environments, templates (ARCHITECTURE.md §8).
+`0000_init.sql` (the pgvector extension, all tables, enums, indexes), `0001_rls.sql` (`ENABLE` + `FORCE` RLS policies, roles and grants; policies active when `DB_RLS=true`, the compose default), `0002_partition_run_events.sql` (conditional on `RUN_EVENTS_PARTITIONED`, plus `flowaid_ensure_run_events_partitions()`), `0003_chunks_generated_tsv.sql` (generated `tsv` column), `0004_run_replay.sql`, `0005_delegated_nodes.sql`, `0006_alert_deliveries.sql`, `0007_knowledge_dims.sql` (unsized `chunks.embedding` with a partial HNSW index per common dimension, `documents.content` and `documents.error`), `0008_plugin_location.sql`, `0009_saved_views.sql`; numbered by drizzle-kit's journal, seeds: `seed_environments.sql` is applied per workspace by the API on workspace creation (`dev`, `staging`, `prod` with `prod.protected = true`), `seed_templates.ts` loads the three demo templates with their `required_resources`. First boot (`apps/api` bootstrap): owner user, default workspace `default`, environments, templates (ARCHITECTURE.md §8).

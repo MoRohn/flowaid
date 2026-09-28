@@ -1,15 +1,17 @@
 "use client";
 /**
  * The workspace frame every page renders: `AppShell` with the feature-keyed `SideNav`, a `TopBar`
- * (breadcrumbs plus page actions), the workspace command menu, the help menu and, where people
- * sign in, the user menu. Pages pass their own inspector and bottom panel (the builder does).
+ * (breadcrumbs plus page actions), the workspace command menu, Ask FlowAId, the help menu and,
+ * where people sign in, the user menu. Pages pass their own inspector and bottom panel (the builder does).
  */
 import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
-import { Plus } from "lucide-react";
+import { MessageSquareText, Plus } from "lucide-react";
 import { AppShell, SideNav, TopBar, UserMenu, type TopBarProps } from "@flowaid/ui/shell";
 import { Button, IconButton } from "@flowaid/ui/primitives";
+import { useAssistant } from "~/assistant/AssistantProvider";
 import { useSession } from "~/session";
+import { documentTitle, useDocumentTitle, usePendingTasks } from "./frame";
 import { HelpMenu } from "./HelpMenu";
 import { NAV, NAV_SECONDARY, visibleNav } from "./nav";
 import { WorkspaceCommandMenu } from "./WorkspaceCommandMenu";
@@ -47,28 +49,46 @@ export function AppFrame({
   const items = visibleNav(NAV, s.features);
   const secondary = visibleNav(NAV_SECONDARY, s.features);
   const active = [...items, ...secondary].find((e) => section === e.path)?.id ?? section;
+  const assistant = useAssistant();
+  const pending = usePendingTasks(s);
+  const pendingCount = pending.data?.items.length ?? 0;
   const toItem = (e: (typeof items)[number]) => ({
     id: e.id,
     label: e.label,
     icon: e.icon,
     href: e.path ? `/${s.ws}/${e.path}` : `/${s.ws}`,
     shortcut: e.shortcut,
+    ...(e.id === "human-tasks" && pendingCount > 0
+      ? { count: pendingCount, countTone: "warn" as const, countLabel: "pending" }
+      : {}),
   });
+  useDocumentTitle(documentTitle(crumbs, s.workspaceName));
+  // the workspace crumb leads home; every crumb with a path is a real link that routes client-side
+  const links = crumbs.map((c, i) =>
+    !c.href && i === 0 && i < crumbs.length - 1 && c.label === s.workspaceName
+      ? { ...c, href: `/${s.ws}` }
+      : c,
+  );
 
   return (
     <AppShell
       storageKey={storageKey}
       topbar={
         <TopBar
-          breadcrumbs={crumbs.map((c, i) => ({
+          breadcrumbs={links.map((c, i) => ({
             id: String(i),
             label: c.label,
-            ...(c.href ? { onClick: () => router.push(c.href as string) } : {}),
+            ...(c.href ? { href: c.href, onClick: () => router.push(c.href as string) } : {}),
           }))}
           onLogoClick={() => go("")}
           layoutToggles={Boolean(inspector || bottomPanel)}
           trailing={
             <span className="flex items-center gap-1">
+              {assistant?.available ? (
+                <IconButton label="Ask FlowAId" onClick={() => assistant.setOpen(true)}>
+                  <MessageSquareText strokeWidth={1.75} />
+                </IconButton>
+              ) : null}
               <HelpMenu ws={s.ws} dashboard={s.features.dashboard === true} />
               {/* one person on this computer has no account to show, sign out of or switch */}
               {s.me.user && !s.local ? (
@@ -141,6 +161,8 @@ export function AppFrame({
             onSelect: () => go(e.path),
           }))}
           actions={commands}
+          pending={pending.data?.items ?? []}
+          {...(assistant?.available ? { onAsk: assistant.ask } : {})}
         />
       }
     >

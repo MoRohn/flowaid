@@ -9,7 +9,7 @@ import { z } from "zod";
 import { and, desc, eq, lt } from "drizzle-orm";
 import { alertDeliveries } from "@flowaid/database";
 import { BadRequestError, ForbiddenError } from "@flowaid/workflow-core";
-import type { Principal } from "../auth/principal.js";
+import { assertEnvironmentAllowed, type Principal } from "../auth/principal.js";
 import type { ApiContext } from "../context.js";
 import { BUCKETS, dashboardMetrics, metricsTimeseries, type Bucket } from "../services/metrics.js";
 
@@ -22,6 +22,8 @@ const Filters = z.object({
   versionId: z.uuid().optional(),
   from: z.iso.datetime({ offset: true }).optional(),
   to: z.iso.datetime({ offset: true }).optional(),
+  /** `production` (default): API, UI, webhook, schedule, MCP and subflow runs; `all` adds evaluations, replays, restarts and forks */
+  origin: z.enum(["production", "all"]).default("production"),
 });
 
 const Nullable = z.number().nullable();
@@ -71,13 +73,18 @@ export function metricsRoutes(app: FastifyInstance, ctx: ApiContext): void {
     if (!p) throw new ForbiddenError("no principal");
     return p;
   };
-  const filterOf = (p: Principal, q: z.infer<typeof Filters>, defaultMs: number) => ({
+  const filterOf = (p: Principal, q: z.infer<typeof Filters>, defaultMs: number) => {
+    if (q.environmentId) assertEnvironmentAllowed(p, q.environmentId);
+    return filterFields(p, q, defaultMs);
+  };
+  const filterFields = (p: Principal, q: z.infer<typeof Filters>, defaultMs: number) => ({
     workspaceId: p.workspaceId,
     ...range(q, ctx.clock.now(), defaultMs),
     workflowId: q.workflowId,
     environmentId: q.environmentId ?? p.environmentId ?? undefined,
     versionId: q.versionId,
     workflowIds: p.workflowIds ? [...p.workflowIds] : null,
+    origin: q.origin,
   });
 
   r.get(

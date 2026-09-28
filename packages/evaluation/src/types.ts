@@ -140,6 +140,6 @@ export interface RegressionReport {
   flips: { caseId: string; field: string; before: JsonValue; after: JsonValue }[];
   verdict: "pass" | "fail";
   gate: { minPassRate: number } | null;
-  /** `W_REGRESSION` when pass rate drops > 2 pt, p95 latency +30 %, or cost +20 % */
+  /** `W_REGRESSION` when the pass rate drops significantly (McNemar, see compare.ts), p95 latency +30 %, or cost +20 % */
   warnings: { code: "W_REGRESSION"; message: string }[];
 }

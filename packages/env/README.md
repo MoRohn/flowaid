@@ -47,7 +47,6 @@ env.flags.hasRedis; // boolean
 | `hasMasterKeyInEnv` | `FLOWAID_MASTER_KEY` is set (otherwise the key file is used). |
 | `masterKeyAutogenerate` | The file provider may create a missing `FLOWAID_MASTER_KEY_FILE`: always outside production, in production only with `FLOWAID_MASTER_KEY_AUTOGENERATE=true`. |
 | `hasAdminBootstrap` | `FLOWAID_ADMIN_EMAIL` and `FLOWAID_ADMIN_PASSWORD` are set. |
-| `hasOidc` | `OIDC_ISSUER`, `OIDC_CLIENT_ID` and `OIDC_CLIENT_SECRET` are set (`features.oidc`). |
 | `hasDatabaseAdminUrl` | `DATABASE_ADMIN_URL` is set: migrations use the owner connection. |
 | `providerFixturesEnabled` | `FLOWAID_PROVIDER_FIXTURES` is `record` or `replay`. |
 | `mcpStdioEnabled` | `MCP_STDIO_ENABLED` is true. |
@@ -59,7 +58,6 @@ env.flags.hasRedis; // boolean
 * `FLOWAID_ADMIN_EMAIL` and `FLOWAID_ADMIN_PASSWORD` must be set together.
 * The four `S3_*` connection variables are all-or-nothing.
 * `FLOWAID_MASTER_KEY` takes precedence over `FLOWAID_MASTER_KEY_FILE`; both may be set (the compose stack always sets the file path and passes the variable through when present) and the file is then ignored.
-* `OIDC_ISSUER`, `OIDC_CLIENT_ID` and `OIDC_CLIENT_SECRET` are all-or-nothing; `OIDC_ROLE_CLAIM` needs them.
 * `PROMETHEUS_PORT` must differ from `PORT`.
 * `FLOWAID_ADMIN_PASSWORD` is 12 to 256 characters.
 
@@ -71,7 +69,7 @@ its documented override, so a first deploy cannot run an unsafe configuration by
 | Refused | Override |
 |---|---|
 | `CORS_ORIGINS` containing `*` | none: list the web app's origin |
-| `http:` `FLOWAID_BASE_URL`, `FLOWAID_WEB_URL` or `OIDC_ISSUER` on a non-loopback host | `FLOWAID_ALLOW_INSECURE_HTTP=true` |
+| `http:` `FLOWAID_BASE_URL` or `FLOWAID_WEB_URL` on a non-loopback host | `FLOWAID_ALLOW_INSECURE_HTTP=true` |
 | `FLOWAID_ADMIN_PASSWORD` equal to its documented example or quick-start value, or in `ADMIN_PASSWORD_DENY_LIST` | none: choose a real password |
 | No `FLOWAID_JWT_PRIVATE_KEY`/`FLOWAID_JWT_PUBLIC_KEY` | `FLOWAID_JWT_KEYS_DIR` set explicitly (a persistent directory shared by every api replica) |
 | No `FLOWAID_MASTER_KEY` and `FLOWAID_MASTER_KEY_FILE` at its default | `FLOWAID_MASTER_KEY_FILE` set explicitly, or `FLOWAID_MASTER_KEY_AUTOGENERATE=true` to create it on first boot |
@@ -126,15 +124,15 @@ lists them empty for you to generate (`openssl rand -hex 16`).
 | `NODE_ENV` | no | `development` | Runtime mode. `production` disables development conveniences such as auto-generated dev keys and verbose errors. Values: `development`, `test`, `production`. |
 | `LOG_LEVEL` | no | `info` | Minimum pino log level emitted by the api and worker processes. Values: `fatal`, `error`, `warn`, `info`, `debug`, `trace`, `silent`. |
 | `HOST` | no | `127.0.0.1` | Interface the api listens on. The default binds loopback only; the api image and the compose stack set `0.0.0.0` so the container port can be published. |
-| `PORT` | no | `3000` | TCP port of the api (HTTP, SSE, webhooks, MCP endpoint). |
-| `FLOWAID_BASE_URL` | no | `http://localhost:3000` | Public URL of the api as seen by browsers, webhook callers and MCP clients. Used to build external review links, webhook URLs and the OpenAPI `servers` entry. In production it must be `https:` unless the host is loopback or `FLOWAID_ALLOW_INSECURE_HTTP=true`. |
-| `FLOWAID_WEB_URL` | no | `http://localhost:3001` | Public URL of the web app. Used for deep links in notifications and as the default CORS origin. Same production rule as `FLOWAID_BASE_URL`. |
-| `CORS_ORIGINS` | no | `http://localhost:3001` | Comma-separated list of browser origins allowed to call the api with credentials. `*` reflects every request origin and is rejected in production, as is an origin cross-site with `FLOWAID_BASE_URL` unless `FLOWAID_ALLOW_CROSS_SITE=true`. |
+| `PORT` | no | `3001` | TCP port of the api (HTTP, SSE, webhooks, MCP endpoint). The web app, the address people open, is on 3000 beside it. Under compose it is the host port the api is published on (the container always listens on 3001). |
+| `FLOWAID_BASE_URL` | no | `http://localhost:3001` | Public URL of the api as seen by browsers, webhook callers and MCP clients. Used to build external review links, webhook URLs and the OpenAPI `servers` entry. In production it must be `https:` unless the host is loopback or `FLOWAID_ALLOW_INSECURE_HTTP=true`. |
+| `FLOWAID_WEB_URL` | no | `http://localhost:3000` | Public URL of the web app. Used for deep links in notifications and as the default CORS origin. Same production rule as `FLOWAID_BASE_URL`. |
+| `CORS_ORIGINS` | no | `http://localhost:3000` | Comma-separated list of browser origins allowed to call the api with credentials. `*` is always rejected (the api allows credentialed requests); in production so is an origin cross-site with `FLOWAID_BASE_URL` unless `FLOWAID_ALLOW_CROSS_SITE=true`. |
 | `RATE_LIMIT_MAX` | no | `600` | Requests per minute allowed per session principal (api keys get double, webhooks half; API.md §1). Stored in Redis when `REDIS_URL` is set, otherwise in memory per api replica. |
-| `FLOWAID_API_INTERNAL_URL` | no | — | URL the web app's server side uses to reach the api over the deployment's private network (compose: `http://api:3000`). Unset means `FLOWAID_BASE_URL`. Example: `http://api:3000`. |
+| `FLOWAID_API_INTERNAL_URL` | no | — | URL the web app's server side uses to reach the api over the deployment's private network (compose: `http://api:3001`). Unset means `FLOWAID_BASE_URL`. Example: `http://api:3001`. |
 | `FLOWAID_TRUST_PROXY` | no | `false` | Reverse proxies whose `X-Forwarded-*` headers are trusted (Fastify `trustProxy`): `false` trusts none, `true` trusts every hop (only when the api is not reachable directly), or a comma-separated list of IPs, CIDRs or the names `loopback`, `linklocal`, `uniquelocal`. Client IPs feed rate limits and audit logs. |
 | `FLOWAID_SSE_MAX_STREAMS_PER_PRINCIPAL` | no | `20` | Maximum concurrent SSE streams (run events, evaluations) one principal may hold open; the next one is refused with 429 `RATE_LIMIT_ERROR`. The per-workspace cap is ten times this value. |
-| `FLOWAID_FEATURES_DISABLED` | no | — | Comma-separated feature keys (`FeatureKey`, API.md §7) the operator turns off: `GET /v1/me` reports them as false and the web app hides their navigation. Unset disables nothing. Values: `workflows`, `runs`, `human_tasks`, `templates`, `integrations_mcp`, `integrations_openapi`, `integrations_providers`, `integrations_plugins`, `knowledge`, `evaluations`, `credentials`, `settings_audit`, `settings_notifications`, `agents`, `ai_builder`, `advisor`, `code_export`, `langchain`, `oidc`, `schedules`, `mcp_exposures`, `dashboard`. Example: `agents,ai_builder`. |
+| `FLOWAID_FEATURES_DISABLED` | no | — | Comma-separated feature keys (`FeatureKey`, API.md §7) the operator turns off: `GET /v1/me` reports them as false and the web app hides their navigation. Unset disables nothing. Values: `workflows`, `runs`, `human_tasks`, `templates`, `integrations_mcp`, `integrations_openapi`, `integrations_providers`, `integrations_plugins`, `knowledge`, `evaluations`, `credentials`, `settings_audit`, `settings_notifications`, `agents`, `ai_builder`, `assistant`, `pageindex`, `advisor`, `code_export`, `langchain`, `schedules`, `mcp_exposures`, `dashboard`. Example: `agents,ai_builder`. |
 
 ### Database (PostgreSQL 16 + pgvector)
 
@@ -168,6 +166,7 @@ lists them empty for you to generate (`openssl rand -hex 16`).
 | `FLOWAID_ADMIN_EMAIL` | no | — | Email of the owner account created on first boot together with the default workspace and the `dev`/`staging`/`prod` environments. Ignored once any user exists. Must be set together with `FLOWAID_ADMIN_PASSWORD`. Example: `admin@example.com`. Quick start: `admin@flowaid.local`. |
 | `FLOWAID_ADMIN_PASSWORD` | no | — | Password of the first-boot owner account (12 to 256 characters). Change it after the first login. Production rejects the documented values and a short list of common passwords. Example: `change-me-please`. Quick start: `flowaid-local-admin`. Secret. |
 | `FLOWAID_ALLOW_INSECURE_HTTP` | no | `false` | Allow `http:` values of `FLOWAID_BASE_URL`/`FLOWAID_WEB_URL` on non-loopback hosts in production and drop the `Secure` flag from session cookies. Only for isolated lab deployments without TLS. |
+| `FLOWAID_ALLOW_PRIVATE_NETWORK` | no | `false` | Let workflows reach loopback, private-network and link-local addresses: the HTTP, GraphQL and database query nodes, knowledge loaders, OpenAPI tools (import and calls), HTTP MCP servers and notification webhooks. Off by default, so a workflow cannot probe the machine or network it runs on. Turn it on when you run FlowAId for yourself and want flows to call your own `localhost` services or local databases; every workflow author can then reach them. Set it for both the api and the worker. |
 | `FLOWAID_ALLOW_CROSS_SITE` | no | `false` | Accept `CORS_ORIGINS` entries that are cross-site with `FLOWAID_BASE_URL` in production. Session cookies are `SameSite`, so a cross-site web app cannot log in; enable only for browser clients that authenticate with api keys. |
 | `FLOWAID_MASTER_KEY_AUTOGENERATE` | no | `false` | Let a production api create a missing `FLOWAID_MASTER_KEY_FILE` on first boot (with a loud warning). Outside production the file is always created. Prefer setting `FLOWAID_MASTER_KEY` or pointing `FLOWAID_MASTER_KEY_FILE` at a backed-up key. |
 | `FLOWAID_MASTER_KEY_PROVIDER` | no | `local` | Where the master key that wraps the key-encryption keys lives. `local`: `FLOWAID_MASTER_KEY` or `FLOWAID_MASTER_KEY_FILE`. `vault-transit`: a HashiCorp Vault Transit key (`VAULT_ADDR`, `VAULT_TOKEN`). `azure-keyvault`: an Azure Key Vault or Managed HSM RSA key (managed identity, or `AZURE_TENANT_ID`/`AZURE_CLIENT_ID`/`AZURE_CLIENT_SECRET`). `gcp-kms`: a Cloud KMS symmetric key (the metadata server's service account, or `GOOGLE_APPLICATION_CREDENTIALS`). With a key service the master never leaves it; `FLOWAID_MASTER_KEY_ID` names the key. Changing providers needs a master rotation, not an edit: KEKs wrapped by one provider do not unwrap with another. Values: `local`, `vault-transit`, `azure-keyvault`, `gcp-kms`. |
@@ -181,15 +180,6 @@ lists them empty for you to generate (`openssl rand -hex 16`).
 | `AZURE_CLIENT_SECRET` | no | — | Client secret of the service principal; requires `AZURE_TENANT_ID` and `AZURE_CLIENT_ID`. Example: `Q~abc...`. Secret. |
 | `GOOGLE_APPLICATION_CREDENTIALS` | no | — | Path of a service-account key file for Cloud KMS (the `gcp-kms` master key) and Secret Manager (`gcp-sm:` references). Unset uses the metadata server's service account (GCE, GKE, Cloud Run). Example: `/var/run/secrets/gcp/flowaid.json`. |
 | `FLOWAID_SECRET_<NAME>` | no | — | Family of variables, not a setting: credentials with `storage: external` and `externalRef` `env:FLOWAID_SECRET_<NAME>` resolve their value from the matching variable at use time (ARCHITECTURE.md §10.6). Every variable whose name matches `FLOWAID_SECRET_[A-Z0-9_]+` is collected into `env.secretRefs`; no other variable is ever resolvable this way. Example: `<value>`. Secret. A family of variables, not a setting. |
-
-### Single sign-on (OIDC)
-
-| Variable | Required | Default | Description |
-|---|---|---|---|
-| `OIDC_ISSUER` | no | — | Issuer URL of the OpenID Connect provider (`/.well-known/openid-configuration` is discovered from it). Setting it enables `features.oidc` and the `/v1/auth/oidc/*` routes; `OIDC_CLIENT_ID` and `OIDC_CLIENT_SECRET` are then required. Must be `https:` in production unless `FLOWAID_ALLOW_INSECURE_HTTP=true`. Example: `https://login.example.com/realms/flowaid`. |
-| `OIDC_CLIENT_ID` | no | — | Client id registered with the OIDC provider for the flowaid web app. Example: `flowaid`. |
-| `OIDC_CLIENT_SECRET` | no | — | Client secret matching `OIDC_CLIENT_ID`, used for the authorization-code exchange (with PKCE). Example: `<client secret>`. Secret. |
-| `OIDC_ROLE_CLAIM` | no | — | ID-token claim whose value (`owner`, `admin`, `editor` or `viewer`, or a list containing one) sets the workspace role on every OIDC login. Unset keeps roles managed in flowaid; new SSO users join as `viewer`. Example: `flowaid_role`. |
 
 ### Execution, sandbox and plugins
 
@@ -225,7 +215,9 @@ lists them empty for you to generate (`openssl rand -hex 16`).
 | `TYPESAFE_API_KEY` | no | — | TypeSafe AI System One API key (https://api.typesafe.ai). Enables the `TypeSafeDecisionProvider`; without it decisions fall back to the LLM adapter over a configured generation provider. Example: `ts_...`. Secret. |
 | `OPENAI_API_KEY` | no | — | OpenAI API key for generation and embeddings (`@flowaid/provider-openai`). Example: `sk-...`. Secret. |
 | `ANTHROPIC_API_KEY` | no | — | Anthropic API key for the Messages API (`@flowaid/provider-anthropic`). Example: `sk-ant-...`. Secret. |
-| `OLLAMA_HOST` | no | — | Base URL of a local Ollama server (`@flowaid/provider-ollama`). Unset disables the provider. Example: `http://localhost:11434`. |
+| `OLLAMA_HOST` | no | — | Base URL of a local Ollama server (`@flowaid/provider-ollama`). Unset disables the provider. Workflows may always reach this exact origin, even on this computer, without `FLOWAID_ALLOW_PRIVATE_NETWORK` (you configured it); "Ollama (no credential)" credentials use it. Example: `http://localhost:11434`. |
+| `FLOWAID_PAGEINDEX_URL` | no | — | Base URL of the FlowAId PageIndex service (`apps/pageindex`), which indexes PDFs into section trees for PageIndex document sources and the `flowaid.pageindex.*` nodes. Set it together with `FLOWAID_PAGEINDEX_TOKEN`, or leave both unset to turn PageIndex off (the rest of FlowAId is unaffected). `pnpm start --pageindex` and the compose `pageindex` profile set both. Example: `http://127.0.0.1:8765`. |
+| `FLOWAID_PAGEINDEX_TOKEN` | no | — | Shared bearer token between the api/worker and the PageIndex service (at least 32 characters; the service reads the same variable). Generate with `openssl rand -hex 32`. Example: `<64 hex characters from openssl rand -hex 32>`. Secret. |
 | `FLOWAID_PROVIDER_FIXTURES` | no | `off` | Deterministic provider calls for tests: `record` writes every TypeSafe and LLM request and response to `FLOWAID_PROVIDER_FIXTURES_DIR`, keyed by provider, model and the request hash; `replay` serves them and fails on a miss; `off` calls the providers. Values: `off`, `record`, `replay`. |
 | `FLOWAID_PROVIDER_FIXTURES_DIR` | no | `fixtures/providers` | Directory of the recorded provider fixtures (`*.json`) read in `replay` mode and written in `record` mode. |
 
@@ -251,7 +243,7 @@ lists them empty for you to generate (`openssl rand -hex 16`).
 | `BIND_ADDRESS` | no | `127.0.0.1` | Host interface the compose stack publishes its ports on (api, web, postgres, redis). Loopback by default so a laptop does not expose the stack on its network; `0.0.0.0` publishes on every interface (put a TLS reverse proxy in front of api and web). Compose only: not read by the api. |
 | `POSTGRES_PORT` | no | `5432` | Host port of the compose `postgres` service. Compose only: not read by the api. |
 | `REDIS_PORT` | no | `6379` | Host port of the compose `redis` service (scale profile). Compose only: not read by the api. |
-| `WEB_PORT` | no | `3001` | Host port of the compose `web` service (the api uses `PORT`). Compose only: not read by the api. |
+| `WEB_PORT` | no | `3000` | Host port of the compose `web` service, the address people open (the api uses `PORT`). Compose only: not read by the api. |
 | `WORKER_CODE_CONCURRENCY` | no | `4` | `WORKER_CONCURRENCY` of the sandbox host `worker-code`. Compose only: not read by the api. |
 | `RUSTFS_PORT` | no | `9000` | Host port of the bundled S3-compatible store (`rustfs`, profile `s3`), published on `BIND_ADDRESS`. Compose only: not read by the api. |
 | `WORKER_REPLICAS` | no | `1` | Number of `worker` containers started by the scale profile. Compose only: not read by the api. |

@@ -60,8 +60,8 @@ x-service-env: &service-env
   FLOWAID_JWT_KEYS_DIR: /data/keys
   FLOWAID_PLUGIN_DIR: /data/plugins
   FLOWAID_VENDOR_DIR: /opt/flowaid/vendor
-  FLOWAID_BASE_URL: ${FLOWAID_BASE_URL:-http://localhost:3000}
-  FLOWAID_WEB_URL: ${FLOWAID_WEB_URL:-http://localhost:3001}
+  FLOWAID_BASE_URL: ${FLOWAID_BASE_URL:-http://localhost:3001}
+  FLOWAID_WEB_URL: ${FLOWAID_WEB_URL:-http://localhost:3000}
 
 x-worker-security: &worker-security
   security_opt:
@@ -112,15 +112,16 @@ services:
     environment:
       <<: *service-env
       HOST: 0.0.0.0
-      PORT: "3000"
+      # the api listens on 3001 in its container too; PORT in .env is the host port only
+      PORT: "3001"
       # a stack other people reach signs in with a password; `local` (no sign-in) is for
       # `pnpm start` on your own computer, and the api container never sees loopback callers
       FLOWAID_AUTH_MODE: ${FLOWAID_AUTH_MODE:-password}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3001}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
       # Owner connection used only for migrations (DATABASE.md).
       DATABASE_ADMIN_URL: postgres://${POSTGRES_USER:-flowaid}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env (openssl rand -hex 16)}@postgres:5432/${POSTGRES_DB:-flowaid}
     ports:
-      - "${BIND_ADDRESS:-127.0.0.1}:${PORT:-3000}:3000"
+      - "${BIND_ADDRESS:-127.0.0.1}:${PORT:-3001}:3001"
     volumes:
       - flowaid-data:/data
     networks:
@@ -132,7 +133,7 @@ services:
     security_opt:
       - no-new-privileges:true
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/v1/health"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3001/v1/health"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -172,6 +173,32 @@ services:
       timeout: 5s
       retries: 4
       start_period: 30s
+    restart: unless-stopped
+
+  # PageIndex document indexes (profile pageindex; docs/pageindex/SETUP.md): indexes uploaded PDFs
+  # into section trees for the worker. Private: no published port; the api and worker reach it at
+  # http://pageindex:8765 with FLOWAID_PAGEINDEX_TOKEN. `edge` lets it call the indexing model.
+  pageindex:
+    build:
+      context: ..
+      dockerfile: docker/pageindex.Dockerfile
+    image: flowaid/pageindex:local
+    profiles: [pageindex]
+    environment:
+      # empty (unset) makes the service refuse to start
+      FLOWAID_PAGEINDEX_TOKEN: ${FLOWAID_PAGEINDEX_TOKEN:-}
+      FLOWAID_PAGEINDEX_CONCURRENCY: ${FLOWAID_PAGEINDEX_CONCURRENCY:-2}
+      FLOWAID_PAGEINDEX_MAX_PAGES: ${FLOWAID_PAGEINDEX_MAX_PAGES:-500}
+    volumes:
+      - pageindex-data:/data
+    tmpfs:
+      - /tmp
+    read_only: true
+    networks:
+      - internal
+      - edge
+    <<: *worker-security
+    pids_limit: 256
     restart: unless-stopped
 
   # Sandbox host for the `code` pool: claims delegated code-node executions and runs them in
@@ -279,17 +306,17 @@ services:
       dockerfile: docker/Dockerfile
       target: web
       args:
-        NEXT_PUBLIC_FLOWAID_BASE_URL: ${FLOWAID_BASE_URL:-http://localhost:3000}
+        NEXT_PUBLIC_FLOWAID_BASE_URL: ${FLOWAID_BASE_URL:-http://localhost:3001}
     image: flowaid/web:local
     environment:
       NODE_ENV: production
       HOSTNAME: 0.0.0.0
       PORT: "3000"
       # Where the web app's proxy reaches the api (read per request, so one image fits any host).
-      FLOWAID_API_INTERNAL_URL: http://api:3000
-      NEXT_PUBLIC_FLOWAID_BASE_URL: ${FLOWAID_BASE_URL:-http://localhost:3000}
+      FLOWAID_API_INTERNAL_URL: http://api:3001
+      NEXT_PUBLIC_FLOWAID_BASE_URL: ${FLOWAID_BASE_URL:-http://localhost:3001}
     ports:
-      - "${BIND_ADDRESS:-127.0.0.1}:${WEB_PORT:-3001}:3000"
+      - "${BIND_ADDRESS:-127.0.0.1}:${WEB_PORT:-3000}:3000"
     networks:
       - edge
     depends_on:
@@ -317,3 +344,5 @@ volumes:
   s3-data:
   # Master key file, generated JWT keys and installed plugins, shared by api and worker only.
   flowaid-data:
+  # PageIndex stores (one per workspace) and job records (profile pageindex).
+  pageindex-data:

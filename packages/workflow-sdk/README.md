@@ -6,7 +6,7 @@ Isomorphic: it uses `fetch` and web streams only, so it runs on Node 24 and in b
 ```ts
 import { Flowaid } from "@flowaid/workflow-sdk";
 
-const fa = new Flowaid({ baseUrl: "http://localhost:3000", apiKey: process.env.FLOWAID_API_KEY });
+const fa = new Flowaid({ baseUrl: "http://localhost:3001", apiKey: process.env.FLOWAID_API_KEY });
 const run = await fa.workflows.run(workflowId, { message: "hi" }, { environmentId });
 for await (const ev of run.stream()) {
   if (ev.type === "DECISION_COMPLETED") console.log(ev.decision.confidence); // typed by RunEventSchema

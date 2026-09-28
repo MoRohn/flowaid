@@ -21,6 +21,7 @@ export { formatUsd, suggestionDiagnostics } from "./suggestions.js";
 export { RUBRIC, piiInputs, type CritiqueInput, type RubricRule } from "./rubric.js";
 export { CRITIC_CHECKS, critique, workflowSummary, type Judge } from "./critic.js";
 export {
+  builderPromptHash,
   catalogForPrompt,
   compactDefinitionSchema,
   generateWorkflow,
@@ -28,3 +29,26 @@ export {
   type GenerateWorkflowInput,
   type GeneratedWorkflow,
 } from "./builder.js";
+export {
+  ASSISTANT_SYSTEM_PROMPT,
+  ask,
+  assistantPromptHash,
+  type AskInput,
+  type AssistantAnswer,
+  type AssistantSource,
+  type AssistantStatement,
+  type AssistantTool,
+  type AssistantToolResult,
+  type SourceKind,
+  type StatementKind,
+} from "./assistant.js";
+export {
+  ASSISTANT_EVAL_CASES,
+  fixtureTools,
+  formatEvalReport,
+  runAssistantEval,
+  scoreCase,
+  type AssistantEvalCase,
+  type CaseResult,
+  type EvalReport,
+} from "./evals/assistant.js";

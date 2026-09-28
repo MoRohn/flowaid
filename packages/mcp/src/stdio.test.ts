@@ -90,6 +90,33 @@ describe("stdio policy", () => {
     expect(plan.env).toEqual({ HOME: "/home/flowaid", LANG: "en_US.UTF-8", APIKEY: "k" });
   });
 
+  it.each([
+    ["path", /PATH/],
+    ["home", /HOME/],
+    ["lang", /LANG/],
+    ["ld-preload", /LD_PRELOAD/],
+    ["node_options", /NODE_OPTIONS/],
+    ["https_proxy", /HTTPS_PROXY/],
+    ["java_tool_options", /JAVA_TOOL_OPTIONS/],
+  ])("refuses a credential field %s that would set a system variable", (field, message) => {
+    expect(() =>
+      planStdioSpawn(policy, { command: "/usr/bin/python3", args: ["s.py"] }, { [field]: "x" }),
+    ).toThrow(message);
+  });
+
+  it.each([
+    "JAVA_TOOL_OPTIONS",
+    "_JAVA_OPTIONS",
+    "JDK_JAVA_OPTIONS",
+    "PYTHONHOME",
+    "NODE_EXTRA_CA_CERTS",
+    "DOTNET_STARTUP_HOOKS",
+  ])("rejects the loader variable %s in the server env", (name) => {
+    expect(() =>
+      validateStdioConfig({ command: "/usr/bin/python3", args: ["s.py"], env: { [name]: "x" } }),
+    ).toThrow(name);
+  });
+
   it("requires absolute commands", () => {
     expect(() => validateStdioConfig({ command: "python3" })).toThrow(/absolute/);
   });

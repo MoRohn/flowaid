@@ -1,15 +1,16 @@
 "use client";
 /**
- * The ⌘K menu with the workspace in it: create actions, workflows, recent runs, templates,
- * settings and help, next to the navigation and the page's own commands. The lists load only
- * while the menu is open.
+ * The ⌘K menu with the workspace in it: go to a run by id, pending approvals, create actions,
+ * workflows, recent runs, templates, settings and help, next to the navigation and the page's own
+ * commands. The lists load only while the menu is open (pending approvals come from the frame).
  */
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { useMemo, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import {
   BookOpen,
   Bug,
+  CheckSquare,
   CircleHelp,
   FileInput,
   FlaskConical,
@@ -17,6 +18,7 @@ import {
   Keyboard,
   LayoutTemplate,
   Library,
+  MessageSquareText,
   Play,
   Plus,
   Settings,
@@ -29,7 +31,7 @@ import {
   type CommandMenuPage,
 } from "@flowaid/ui/shell";
 import { get } from "~/api/client";
-import type { Page } from "~/api/types";
+import type { HumanTask, Page } from "~/api/types";
 import { useSession } from "~/session";
 import { commandGroups, type CommandIcon } from "./commandGroups";
 
@@ -47,19 +49,28 @@ const ICON: Record<CommandIcon, ReactNode> = {
   keyboard: <Keyboard strokeWidth={1.75} />,
   docs: <BookOpen strokeWidth={1.75} />,
   bug: <Bug strokeWidth={1.75} />,
+  approval: <CheckSquare strokeWidth={1.75} />,
+  ask: <MessageSquareText strokeWidth={1.75} />,
 };
 
 export function WorkspaceCommandMenu({
   pages,
   actions,
+  pending = [],
+  onAsk,
 }: {
   pages: CommandMenuPage[];
   actions: CommandMenuAction[];
+  /** Open human tasks (the frame already polls them for the nav badge). */
+  pending?: readonly HumanTask[];
+  /** opens Ask FlowAId, asking the question when there is one */
+  onAsk?: (question?: string) => void;
 }) {
   const s = useSession();
   const router = useRouter();
   const shell = useAppShellOptional();
   const open = shell?.commandOpen ?? false;
+  const [query, setQuery] = useState("");
   const workflows = useQuery({
     queryKey: ["command", "workflows", s.ws],
     queryFn: () =>
@@ -93,6 +104,8 @@ export function WorkspaceCommandMenu({
       workflows: workflows.data?.items ?? [],
       runs: runs.data?.items ?? [],
       templates: templates.data ?? [],
+      query,
+      pending,
     });
     const view = (g: (typeof built.leading)[number]) => ({
       id: g.id,
@@ -108,11 +121,15 @@ export function WorkspaceCommandMenu({
           if (t.to) router.push(t.to);
           else if (t.href) window.open(t.href, "_blank", "noopener,noreferrer");
           else if (t.action === "shortcuts") shell?.setShortcutsOpen(true);
+          else if (t.action === "ask") {
+            shell?.setCommandOpen(false);
+            onAsk?.(t.question);
+          }
         },
       })),
     });
     return { leading: built.leading.map(view), trailing: built.trailing.map(view) };
-  }, [s, workflows.data, runs.data, templates.data, router, shell]);
+  }, [s, workflows.data, runs.data, templates.data, query, pending, router, shell, onAsk]);
 
   return (
     <CommandMenu
@@ -120,7 +137,9 @@ export function WorkspaceCommandMenu({
       actions={actions}
       leadingGroups={groups.leading}
       extraGroups={groups.trailing}
-      placeholder="Search workflows, runs, templates, settings, or type a command…"
+      search={query}
+      onSearchChange={setQuery}
+      placeholder="Search workflows, runs, templates, settings, paste a run id, or type a command…"
     />
   );
 }

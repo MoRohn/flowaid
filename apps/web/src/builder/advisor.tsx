@@ -15,6 +15,7 @@ import {
 } from "@flowaid/ui/builder";
 import { Button, EmptyState, toast } from "@flowaid/ui/primitives";
 import { ApiError, post } from "~/api/client";
+import { FixPreview } from "./FixPreview";
 import { categoryOf, type Catalog } from "./model";
 import type { BuilderStore } from "./store";
 
@@ -78,6 +79,9 @@ export function toFindingView(a: Advice): CriticFindingView {
     detail: a.detail,
     nodeIds: a.nodeIds,
     fixAvailable: a.fix !== undefined && a.fix.patch.length > 0,
+    ...(a.fix?.title ? { fixTitle: a.fix.title } : {}),
+    // a rubric finding is a deterministic rule; the judge is a model's opinion
+    source: a.source === "judge" ? "judge" : "rule",
   };
 }
 
@@ -305,6 +309,10 @@ export function ReviewTab({
       nodeName={(id) => definition.nodes.find((n) => n.id === id)?.name ?? id}
       onFocusNode={onFocusNode}
       onApplyFix={(f) => void advisor.applyAdvice(f.id)}
+      renderFixPreview={(f) => {
+        const fix = review?.data.advice.find((a) => a.id === f.id)?.fix;
+        return fix ? <FixPreview patch={fix.patch} definition={definition} /> : null;
+      }}
       onRerun={advisor.runReview}
     />
   );
