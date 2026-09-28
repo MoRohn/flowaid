@@ -15,7 +15,7 @@
   <img alt="Local-first" src="https://img.shields.io/badge/local--first-no%20sign--in-2f5be8">
   <img alt="TypeScript 5.9 strict" src="https://img.shields.io/badge/TypeScript-5.9%20strict-17171c">
   <img alt="Node.js 24+" src="https://img.shields.io/badge/node-%E2%89%A524-17171c">
-  <img alt="Tests: 5,471 passing" src="https://img.shields.io/badge/tests-5%2C471%20passing-1f9d64">
+  <img alt="Tests: 5,638 passing" src="https://img.shields.io/badge/tests-5%2C638%20passing-1f9d64">
 </p>
 
 <p align="center">
@@ -44,26 +44,42 @@ decides what happens next: act automatically, gather more evidence, or ask a per
 
 > [!NOTE]
 > **FlowAId is in public beta.** Everything described here runs today and every change is gated
-> by 5,471 tests, the PostgreSQL suites, an accessibility gallery and a browser acceptance
+> by 5,638 tests, the PostgreSQL suites, an accessibility gallery and a browser acceptance
 > journey against the production builds. Interfaces may still change before 1.0; the first
 > tagged release (0.4.0, with published container images) is being prepared.
 
 ## What's new
 
-- **Local-first.** `pnpm start` opens FlowAId without a sign-in on your own computer; only this
-  computer can use that automatic session. Behind public URLs it switches to password sign-in.
-- **A guided first run.** The Overview walks you from an empty install to a workflow your code
-  can call: connect TypeSafe, create a workflow, run it, answer a human task, publish, call it.
-- **Faster everyday work.** ⌘K searches workflows, runs and templates and creates anything;
-  lists open on a click; webhooks and schedules are added from the app with a ready-to-paste
-  request; failed runs offer _Retry node_; forks can target any published version.
-- **Clearer graphs.** Imported and template flows lay out without edges running behind nodes and
-  open at a readable zoom.
-- **Knowledge, evaluations and credentials that guide you.** Embedding models show whether a key
-  is ready, evaluation cases are entered as forms, and each provider key links to where to get
-  one and is tested when saved.
-- **Releases.** Versioned with changesets; each release publishes multi-arch images with SBOMs
-  and provenance to `ghcr.io/morohn/flowaid-{api,worker,web}`.
+**V2: FlowAId tells you what needs you, what changed, and why, with evidence.**
+
+- **Needs attention.** The Overview opens with what waits for a person (open approvals, the
+  oldest one, what expires today) and the workflows whose runs failed, each a link to act.
+- **What changed.** Per workflow, FlowAId compares the recent window with the four before it and
+  reports only changes that are statistically significant _and_ large enough to matter: failure
+  rate (Fisher's exact test), latency, cost and decision confidence (Mann–Whitney), and new error
+  codes, with Benjamini–Hochberg across every test. Each finding shows its evidence and the
+  version it coincides with.
+- **Ask FlowAId.** Ask in plain words ("why did support triage start failing?") from the top bar
+  or ⌘K. The answer comes from read-only lookups of your runs, metrics, insights and approvals;
+  each statement says whether it is a fact, a calculation, a suggestion or unconfirmed, and links
+  to the records it rests on. It changes nothing on its own. Measured with an evaluation set
+  (`pnpm eval:assistant`, see [AI evaluation](docs/FLOWAID_AI_EVALUATION.md)).
+- **Honest numbers.** Streamed generations are priced (they were counted at $0), dashboards count
+  production traffic only, and agents check their budget before each turn.
+- **Sturdier runtime.** Retention runs, runs no longer hang in scale mode, crash-looping jobs are
+  dead-lettered, and restarts resume runs without waiting out their leases.
+- **Safer by default.** Binding to your network switches to password sign-in; credentials never
+  follow cross-origin redirects; the database node and every outbound call share one address
+  guard, with `FLOWAID_ALLOW_PRIVATE_NETWORK` to reach services on your own machine.
+- **Trust and orientation.** AI-built workflows show the model, tokens, cost and remaining
+  diagnostics; critic findings say whether a rule or the AI judge raised them and preview their
+  fix; the navigation counts pending approvals; every page has its own title; run detail works on
+  phones and tablets.
+- **Operations.** [Backup and restore](docs/operations/BACKUP_AND_RESTORE.md) (including the
+  master key), [upgrades](docs/operations/UPGRADES.md) and a [runbook](docs/operations/RUNBOOK.md);
+  releases wait for CI and E2E to pass.
+
+The review, plan and audit behind V2 are in [docs/FLOWAID_V2_FINAL_AUDIT.md](docs/FLOWAID_V2_FINAL_AUDIT.md).
 
 The full history is in [CHANGELOG.md](CHANGELOG.md); the live snapshot is
 [docs/STATUS.md](docs/STATUS.md).
@@ -431,7 +447,7 @@ networks and secret scoping in [`docker/README.md`](docker/README.md).
 | Gate                     | Where                                                                                             |
 | ------------------------ | ------------------------------------------------------------------------------------------------- |
 | Audit, boundaries, types | `pnpm check` and CI `check`: dependency audit, the package boundary graph, generated files, lint  |
-| 5,471 tests              | CI `test` and `integration` (PostgreSQL with pgvector, Redis, isolated-vm)                        |
+| 5,638 tests              | CI `test` and `integration` (PostgreSQL with pgvector, Redis, isolated-vm)                        |
 | Accessibility            | CI `ui gallery`: axe (WCAG 2.x A and AA) and console checks over every component, both themes     |
 | Acceptance journey       | E2E against the production builds with recorded provider replay and secret-canary log checks      |
 | Releases                 | Changesets, multi-arch images with SBOMs and provenance, Dependabot for patches and minor updates |
@@ -603,26 +619,33 @@ boundaries.json         The allowed dependency graph between packages
 
 ## Documentation
 
-|                                                                                     |                                                                          |
-| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| [Documentation index](docs/README.md)                                               | Every design document, guide and research source                         |
-| [Product specification](docs/design/SPEC.md)                                        | What FlowAId is meant to be                                              |
-| [Architecture](docs/design/ARCHITECTURE.md) · [API](docs/design/API.md)             | How it is built, and the REST, SSE, SDK and CLI surface                  |
-| [Jev engineering](docs/jev/overview.md)                                             | Decision contracts, packets, routing, calibration, shadow mode, receipts |
-| [Download code](docs/design/CODE_EXPORT.md) · [LangChain](docs/design/LANGCHAIN.md) | Code export and the LangChain boundary                                   |
-| [Importing](apps/docs/content/importing.md)                                         | Bringing external flow exports into FlowAId                              |
-| [Environment](packages/env/README.md) · [Docker](docker/README.md)                  | Every setting, and the production stack                                  |
-| [Upgrade plan](docs/UPGRADE_PLAN.md) · [Status](docs/STATUS.md)                     | What is next, and where things stand                                     |
-| [Changelog](CHANGELOG.md) · [Releasing](docs/RELEASING.md)                          | Release notes, versions and published images                             |
+|                                                                                              |                                                                          |
+| -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| [Documentation index](docs/README.md)                                                        | Every design document, guide and research source                         |
+| [Product specification](docs/design/SPEC.md)                                                 | What FlowAId is meant to be                                              |
+| [Architecture](docs/design/ARCHITECTURE.md) · [API](docs/design/API.md)                      | How it is built, and the REST, SSE, SDK and CLI surface                  |
+| [Jev engineering](docs/jev/overview.md)                                                      | Decision contracts, packets, routing, calibration, shadow mode, receipts |
+| [Download code](docs/design/CODE_EXPORT.md) · [LangChain](docs/design/LANGCHAIN.md)          | Code export and the LangChain boundary                                   |
+| [Importing](apps/docs/content/importing.md)                                                  | Bringing external flow exports into FlowAId                              |
+| [Environment](packages/env/README.md) · [Docker](docker/README.md)                           | Every setting, and the production stack                                  |
+| [Upgrade plan](docs/UPGRADE_PLAN.md) · [Status](docs/STATUS.md)                              | What is next, and where things stand                                     |
+| [Changelog](CHANGELOG.md) · [Releasing](docs/RELEASING.md)                                   | Release notes, versions and published images                             |
+| [V2 overview](docs/architecture/V2_OVERVIEW.md) · [V2 audit](docs/FLOWAID_V2_FINAL_AUDIT.md) | The V2 intelligence layer, and what was verified                         |
+| [Ask FlowAId](docs/ai/ASSISTANT.md) · [AI evaluation](docs/FLOWAID_AI_EVALUATION.md)         | The workspace assistant, and how FlowAId measures its AI                 |
+| [Insights](docs/data/INSIGHTS.md) · [Threat model](docs/security/THREAT_MODEL.md)            | Change detection and its statistics; the security model                  |
+| [Operations](docs/operations/RUNBOOK.md)                                                     | Backup and restore, upgrades, day-to-day running                         |
 
 ## Roadmap
 
 FlowAId is local-first by design: it runs for one person on their own computer without accounts,
 so team identity (single sign-on, invitations, MFA) is deliberately not planned. Next:
 
-1. **0.4.0**, the first tagged release, with its published images.
-2. **Track J:** Jev decision contracts across the platform.
-3. **Track L:** a Lean 4 checker that certifies run and evaluation results (see
+1. **The first tagged release** of V2, with its published images.
+2. **Beyond V2** ([roadmap](docs/FLOWAID_V2_ROADMAP.md)): Ask FlowAId actions with preview and
+   confirmation, an evaluation set for the AI builder, Jev calibration in the product, spend
+   forecasting on daily rollups.
+3. **Track J:** Jev decision contracts across the platform.
+4. **Track L:** a Lean 4 checker that certifies run and evaluation results (see
    [LEAN_VERIFICATION.md](docs/design/LEAN_VERIFICATION.md)).
 
 ## Contributing

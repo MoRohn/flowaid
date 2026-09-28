@@ -18,6 +18,22 @@
 | [UPGRADES.md](operations/UPGRADES.md)                     | Pinning image tags, upgrading, how migrations run, and rolling back by restoring                        |
 | [RUNBOOK.md](operations/RUNBOOK.md)                       | Health checks, logs, metrics, stuck runs, the queue, scaling workers and key rotation                   |
 
+## V2 (`FLOWAID_V2_*`, `architecture/`, `ai/`, `data/`, `security/`, `operations/`)
+
+| Document                                                         | What it is                                                                    |
+| ---------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| [FLOWAID_V2_CODE_REVIEW.md](FLOWAID_V2_CODE_REVIEW.md)           | The assessment that opened V2: findings with evidence, severity and priority  |
+| [FLOWAID_V2_REFACTOR_PLAN.md](FLOWAID_V2_REFACTOR_PLAN.md)       | P0–P3 stabilisation work                                                      |
+| [FLOWAID_V2_PRODUCT_STRATEGY.md](FLOWAID_V2_PRODUCT_STRATEGY.md) | Vision, users, journeys, principles, and what V2 does not do                  |
+| [FLOWAID_V2_ROADMAP.md](FLOWAID_V2_ROADMAP.md)                   | The phases, initiative by initiative                                          |
+| [FLOWAID_AI_EVALUATION.md](FLOWAID_AI_EVALUATION.md)             | How the assistant, change detection and AI builder are measured, with results |
+| [FLOWAID_V2_FINAL_AUDIT.md](FLOWAID_V2_FINAL_AUDIT.md)           | What V2 delivered, what was verified, and what is deferred                    |
+| [architecture/V2_OVERVIEW.md](architecture/V2_OVERVIEW.md)       | Where the V2 modules sit                                                      |
+| [ai/ASSISTANT.md](ai/ASSISTANT.md)                               | Ask FlowAId: tools, grounding, guardrails, model strategy                     |
+| [data/INSIGHTS.md](data/INSIGHTS.md)                             | "Needs attention" and "What changed": data, tests, lifecycle                  |
+| [security/THREAT_MODEL.md](security/THREAT_MODEL.md)             | Assets, boundaries, threats and controls                                      |
+| [operations/](operations/RUNBOOK.md)                             | Backup and restore, upgrades, the runbook                                     |
+
 ## Design (`design/`)
 
 The design is authoritative. Where documents disagree, `CONTRACTS.ts` wins, then ARCHITECTURE.
