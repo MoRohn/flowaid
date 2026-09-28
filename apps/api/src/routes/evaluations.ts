@@ -29,7 +29,7 @@ import {
   type JsonObject,
   type JsonValue,
 } from "@flowaid/workflow-core";
-import { canSeeWorkflow, type Principal } from "../auth/principal.js";
+import { assertEnvironmentAllowed, canSeeWorkflow, type Principal } from "../auth/principal.js";
 import type { ApiContext } from "../context.js";
 import { IdParams, ListQuery, NoContent, decodeCursor, encodeCursor } from "../dto/common.js";
 import { resolveRunVersion } from "../services/runs.js";
@@ -454,6 +454,7 @@ export function evaluationRoutes(app: FastifyInstance, ctx: ApiContext): void {
               .where(and(eq(environments.workspaceId, p.workspaceId), eq(environments.name, "dev")))
           )[0]?.id;
         if (!envId) throw new BadRequestError("pass environmentId");
+        assertEnvironmentAllowed(p, envId);
         const version = await resolveRunVersion(tx, p, workflowId, envId, {
           versionId: b.versionId,
           draft: b.draft,
