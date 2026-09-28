@@ -28,6 +28,7 @@ import {
 import { scopeContext } from "../context.js";
 import { bindSandbox } from "../sandbox.js";
 import type {
+  DocumentIndexAccess,
   ExecutionContext,
   KnowledgeAccess,
   NodeEmittable,
@@ -80,6 +81,8 @@ export interface TestContextOptions<C = JsonObject> {
   sandbox?: SandboxExecutor;
   /** RFC-0021: a knowledge base for retrieval nodes (e.g. `KnowledgeService` over a memory index) */
   knowledge?: KnowledgeAccess;
+  /** RFC-0022: document indexes for PageIndex nodes (e.g. an in-memory fake) */
+  documents?: DocumentIndexAccess;
   budget?: Partial<ExecutionContext["budget"]>;
   node?: Partial<ExecutionContext["node"]>;
   run?: Partial<ExecutionContext["run"]>;
@@ -97,6 +100,7 @@ const ALL_CAPABILITIES: NodeCapability[] = [
   "sandbox",
   "suspend",
   "knowledge",
+  "documents",
 ];
 
 function pick<T>(value: T | ((arg: never) => T) | undefined, arg: unknown, what: string): T {
@@ -249,6 +253,7 @@ export function createTestContext<C = JsonObject>(
     ...ctx,
     sandbox: bindSandbox(options.sandbox, ctx),
     ...(options.knowledge ? { knowledge: options.knowledge } : {}),
+    ...(options.documents ? { documents: options.documents } : {}),
   };
   return { ctx: scopeContext(full, options.capabilities ?? ALL_CAPABILITIES), recorder };
 }
