@@ -22,7 +22,7 @@ PageIndex documents live in a knowledge source of kind `pageindex`, created with
     "indexModel": { "provider": "ollama", "model": "qwen2.5:3b" },
     "credentialId": null,
     "mode": "flash",
-    "optimize": "merge"
+    "optimize": "off"
   }
 }
 ```
@@ -33,7 +33,7 @@ The config fields:
 - **`credentialId`** is a workspace credential of the model's type. When it is null, the server
   key is used (`OPENAI_API_KEY` or `ANTHROPIC_API_KEY`); Ollama uses `OLLAMA_HOST`.
 - **`mode`**: `flash` (layout-based, the default) or `standard` (a tree built by the LLM).
-- **`optimize`**: `merge` (default), `full` or `off`.
+- **`optimize`**: `off` (default: keeps the detected section hierarchy), `merge` (folds short sections together) or `full` (merge plus model expansion).
 
 Changing `indexModel`, `mode` or `optimize` changes the configuration hash. The next index
 request then builds a new index version; existing indexes stay readable until it is promoted.
