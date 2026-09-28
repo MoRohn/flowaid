@@ -117,4 +117,27 @@ describe("command menu groups", () => {
       to: "/default/human-tasks",
     });
   });
+
+  it("offers Ask FlowAId with the typed question when the assistant is on", () => {
+    const on = { ...base, features: { ...base.features, assistant: true } };
+    const ask = (query?: string) =>
+      commandGroups({ ...on, ...(query !== undefined ? { query } : {}) }).leading.find(
+        (g) => g.id === "ask",
+      )?.items;
+    expect(ask()).toMatchObject([{ label: "Ask FlowAId…", action: "ask" }]);
+    expect(ask()?.[0]?.question).toBeUndefined();
+    expect(ask("why did triage fail?")).toMatchObject([
+      {
+        label: "Ask FlowAId: “why did triage fail?”",
+        action: "ask",
+        question: "why did triage fail?",
+      },
+    ]);
+    // a run id is not a question
+    expect(ask("01a0e530-5ea8")?.[0]?.question).toBeUndefined();
+    expect(commandGroups(base).leading.some((g) => g.id === "ask")).toBe(false);
+    expect(
+      commandGroups({ ...on, can: (s) => s !== "runs:read" }).leading.some((g) => g.id === "ask"),
+    ).toBe(false);
+  });
 });

@@ -16,7 +16,9 @@ export interface CommandTarget {
   icon: CommandIcon;
   to?: string;
   href?: string;
-  action?: "shortcuts";
+  action?: "shortcuts" | "ask";
+  /** the question for `action: "ask"` */
+  question?: string;
 }
 
 export type CommandIcon =
@@ -33,7 +35,8 @@ export type CommandIcon =
   | "keyboard"
   | "docs"
   | "bug"
-  | "approval";
+  | "approval"
+  | "ask";
 
 export interface CommandGroup {
   id: string;
@@ -103,6 +106,25 @@ function goToRun(i: CommandInput, at: (path: string) => string): CommandTarget[]
           to: at(`runs?q=${encodeURIComponent(q.value)}`),
         },
       ];
+}
+
+/** "Ask FlowAId" (features.assistant): the typed text as a question, or the empty panel. */
+function askItems(i: CommandInput): CommandTarget[] {
+  if (!i.features.assistant || !i.can("runs:read")) return [];
+  const q = (i.query ?? "").trim();
+  const question = q.length >= 3 && !runIdQuery(q) ? q : undefined;
+  return [
+    {
+      id: "ask",
+      label: question ? `Ask FlowAId: “${question}”` : "Ask FlowAId…",
+      description: "Answers about runs, failures, costs and approvals, with sources",
+      icon: "ask",
+      // cmdk filters on keywords: the typed text itself keeps the item visible
+      keywords: ["ask", "question", "assistant", "why", "what", q],
+      action: "ask",
+      ...(question ? { question } : {}),
+    },
+  ];
 }
 
 export function commandGroups(i: CommandInput): {
@@ -190,6 +212,7 @@ export function commandGroups(i: CommandInput): {
   const pending = i.pending ?? [];
   const leading: CommandGroup[] = [
     { id: "goto", heading: "Go to", items: goToRun(i, at) },
+    { id: "ask", heading: "Ask", items: askItems(i) },
     {
       id: "pending",
       heading: "Pending approvals",

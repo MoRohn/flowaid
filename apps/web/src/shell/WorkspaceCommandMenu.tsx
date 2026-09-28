@@ -18,6 +18,7 @@ import {
   Keyboard,
   LayoutTemplate,
   Library,
+  MessageSquareText,
   Play,
   Plus,
   Settings,
@@ -49,17 +50,21 @@ const ICON: Record<CommandIcon, ReactNode> = {
   docs: <BookOpen strokeWidth={1.75} />,
   bug: <Bug strokeWidth={1.75} />,
   approval: <CheckSquare strokeWidth={1.75} />,
+  ask: <MessageSquareText strokeWidth={1.75} />,
 };
 
 export function WorkspaceCommandMenu({
   pages,
   actions,
   pending = [],
+  onAsk,
 }: {
   pages: CommandMenuPage[];
   actions: CommandMenuAction[];
   /** Open human tasks (the frame already polls them for the nav badge). */
   pending?: readonly HumanTask[];
+  /** opens Ask FlowAId, asking the question when there is one */
+  onAsk?: (question?: string) => void;
 }) {
   const s = useSession();
   const router = useRouter();
@@ -116,11 +121,15 @@ export function WorkspaceCommandMenu({
           if (t.to) router.push(t.to);
           else if (t.href) window.open(t.href, "_blank", "noopener,noreferrer");
           else if (t.action === "shortcuts") shell?.setShortcutsOpen(true);
+          else if (t.action === "ask") {
+            shell?.setCommandOpen(false);
+            onAsk?.(t.question);
+          }
         },
       })),
     });
     return { leading: built.leading.map(view), trailing: built.trailing.map(view) };
-  }, [s, workflows.data, runs.data, templates.data, query, pending, router, shell]);
+  }, [s, workflows.data, runs.data, templates.data, query, pending, router, shell, onAsk]);
 
   return (
     <CommandMenu
