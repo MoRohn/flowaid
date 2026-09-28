@@ -5,6 +5,7 @@
  * cited context block sized for a prompt.
  */
 import { z } from "zod";
+import { UNTRUSTED_CLOSE, capText, escapeDelimiters, untrustedOpen } from "@flowaid/shared";
 import { defineNode, ok, type ExecutionContext } from "@flowaid/node-sdk";
 import {
   BadRequestError,
@@ -174,22 +175,37 @@ export const retrievalRerankNode = defineNode({
   },
 });
 
-/** A numbered context block with a source line per passage, cut at the token budget. */
+/**
+ * A numbered context block with a source line per passage, cut at the token budget. The block is
+ * wrapped in untrusted-content delimiters (passages are data, not instructions; delimiter
+ * lookalikes inside them are escaped) and never exceeds `maxTokens` (about four characters a
+ * token), delimiters included: a first passage larger than the budget is truncated, not kept whole.
+ */
 export function contextBlock(hits: Hit[], maxTokens: number): { context: string; used: Hit[] } {
+  const open = untrustedOpen("retrieved passages");
+  const budget = maxTokens * 4 - (open.length + UNTRUSTED_CLOSE.length + 2);
   const parts: string[] = [];
   const used: Hit[] = [];
-  let tokens = 0;
+  let chars = 0;
   for (const h of hits) {
     const n = used.length + 1;
     const cite = [h.title, h.uri].filter(Boolean).join(" — ");
-    const part = `[${n}]${cite ? ` ${cite}` : ""}\n${h.content.trim()}`;
-    const t = Math.ceil(part.length / 4);
-    if (used.length > 0 && tokens + t > maxTokens) break;
-    parts.push(part);
-    used.push(h);
-    tokens += t;
+    const part = escapeDelimiters(`[${n}]${cite ? ` ${cite}` : ""}\n${h.content.trim()}`);
+    const sep = used.length > 0 ? 2 : 0;
+    if (chars + sep + part.length <= budget) {
+      parts.push(part);
+      used.push(h);
+      chars += sep + part.length;
+      continue;
+    }
+    if (used.length === 0 && budget > 0) {
+      parts.push(capText(part, { maxTokens: Math.floor(budget / 4) }).text);
+      used.push(h);
+    }
+    break;
   }
-  return { context: parts.join("\n\n"), used };
+  if (parts.length === 0) return { context: "", used };
+  return { context: `${open}\n${parts.join("\n\n")}\n${UNTRUSTED_CLOSE}`, used };
 }
 
 export const knowledgeBaseNode = defineNode({

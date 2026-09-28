@@ -3,7 +3,8 @@
  * (path templating with `encodeURIComponent`, query serialisation, JSON / form / multipart / text
  * bodies), applies auth, forwards `Idempotency-Key` for keyed operations, refuses arguments that set
  * `Host`, `Content-Length` or an undeclared `Authorization` header or any CR/LF header value,
- * re-checks the server address, and maps ≥ 400 to `ToolExecutionError{ retryable }`.
+ * re-checks the server address, and maps ≥ 400 to `ToolExecutionError{ retryable }`. Response
+ * bodies are read up to OPENAPI_RESPONSE_MAX_BYTES; a longer one is cut (and not parsed as JSON).
  */
 import Ajv2020Module from "ajv/dist/2020.js";
 import {
@@ -52,6 +53,43 @@ const str = (v: JsonValue): string =>
     : typeof v === "number" || typeof v === "boolean"
       ? String(v)
       : JSON.stringify(v);
+
+/** UTF-8 bytes of a response body that are read; the rest is dropped and the result marked. */
+export const OPENAPI_RESPONSE_MAX_BYTES = 1_048_576;
+
+/** The body's text up to `max` bytes; reading stops (and the stream is cancelled) past it. */
+async function readCapped(
+  res: Response,
+  max: number,
+): Promise<{ text: string; truncated: boolean }> {
+  if (!res.body) return { text: "", truncated: false };
+  const reader: ReadableStreamDefaultReader<Uint8Array> = res.body.getReader();
+  const parts: Uint8Array[] = [];
+  let size = 0;
+  let truncated = false;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    parts.push(value);
+    size += value.length;
+    if (size > max) {
+      truncated = true;
+      await reader.cancel().catch(() => undefined);
+      break;
+    }
+  }
+  const bytes = new Uint8Array(Math.min(size, max));
+  let at = 0;
+  for (const part of parts) {
+    const take = part.subarray(0, Math.min(part.length, bytes.length - at));
+    bytes.set(take, at);
+    at += take.length;
+    if (at >= bytes.length) break;
+  }
+  // a multi-byte character cut at the boundary decodes to U+FFFD: drop it
+  const text = new TextDecoder().decode(bytes);
+  return { text: truncated ? text.replace(/\uFFFD$/, "") : text, truncated };
+}
 
 const RETRYABLE = new Set([408, 425, 429, 500, 502, 503, 504]);
 const REFUSED_HEADERS = new Set(["host", "content-length", "transfer-encoding", "connection"]);
@@ -277,9 +315,15 @@ export async function executeOperation(
       `${op.method.toUpperCase()} ${url.origin}${url.pathname} failed: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
-  const text = res.status === 204 ? "" : await res.text();
+  const read =
+    res.status === 204
+      ? { text: "", truncated: false }
+      : await readCapped(res, OPENAPI_RESPONSE_MAX_BYTES);
+  const text = read.truncated
+    ? `${read.text}\n[truncated: the response exceeded ${OPENAPI_RESPONSE_MAX_BYTES} bytes]`
+    : read.text;
   let parsed: JsonValue = text === "" ? null : text;
-  if (text && /json/i.test(res.headers.get("content-type") ?? "")) {
+  if (text && !read.truncated && /json/i.test(res.headers.get("content-type") ?? "")) {
     try {
       parsed = JSON.parse(text) as JsonValue;
     } catch {
@@ -299,7 +343,11 @@ export async function executeOperation(
   return {
     ok: true,
     content: typeof parsed === "string" ? parsed : JSON.stringify(parsed),
-    structured: { status: res.status, body: parsed },
+    structured: {
+      status: res.status,
+      body: parsed,
+      ...(read.truncated ? { truncated: true } : {}),
+    },
     ...(coerced.length ? { coerced } : {}),
     latencyMs: Math.max(0, (o.now ?? Date.now)() - started),
   };
