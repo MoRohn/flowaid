@@ -1,0 +1,13 @@
+{
+  "mcpServers": [],
+  "knowledgeSources": [
+    {
+      "key": "baseline",
+      "description": "Knowledge source with the baseline documents (PageIndex indexes); five documents across both sources at most."
+    },
+    {
+      "key": "comparison",
+      "description": "Knowledge source with the documents compared against the baseline (PageIndex indexes)."
+    }
+  ]
+}

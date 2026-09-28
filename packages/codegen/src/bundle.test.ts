@@ -141,6 +141,23 @@ describe("buildExportBundle", () => {
     expect(readme).toContain("`inputs/example.json#/message` (pii)");
   });
 
+  it("says in the README that PageIndex nodes need services.documents outside a server", async () => {
+    const readme = async (name: string) => {
+      const p = planOf(name);
+      const d = fixture(name) as { id: string; name: string };
+      const bundle = await buildExportBundle({
+        ...base,
+        definition: d,
+        plan: p,
+        versions: Object.fromEntries(packageClosure(p).map((s) => [s, "0.1.0"])),
+      });
+      return text(bundle.files.get("README.md"));
+    };
+    for (const name of ["variants/pageindex-document-qa", "variants/pageindex-agent"])
+      expect(await readme(name), name).toContain("`services.documents`");
+    expect(await readme("example-support-reply")).not.toContain("services.documents");
+  });
+
   it("vendored: ships the closure's tarballs with SHA256SUMS and pins them by file:", async () => {
     const closure = packageClosure(plan);
     const vendor = [...closure, "sandbox"].map((short) => ({

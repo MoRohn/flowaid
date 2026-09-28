@@ -1,0 +1,16 @@
+{
+  "$comment": "Resources this template needs bound on instantiate: each `$template.<kind>.<key>` sentinel in the definition is replaced by the chosen resource id. `tools` are the signatures the template calls, used to type-check it before binding.",
+  "id": "pageindex-agent",
+  "name": "Document agent (PageIndex)",
+  "description": "An agent that reads indexed PDFs with read-only outline, page and search tools and cites pages.",
+  "category": "knowledge",
+  "requiredResources": [
+    {
+      "kind": "knowledge",
+      "key": "documents",
+      "name": "Documents",
+      "description": "The knowledge source the agent may read (PDFs indexed with PageIndex); nothing outside it is reachable.",
+      "tools": []
+    }
+  ]
+}

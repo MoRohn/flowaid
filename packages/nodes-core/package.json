@@ -40,6 +40,7 @@
     "@flowaid/knowledge": "workspace:*",
     "@flowaid/mcp": "workspace:*",
     "@flowaid/node-sdk": "workspace:*",
+    "@flowaid/pageindex": "workspace:*",
     "@flowaid/providers": "workspace:*",
     "@flowaid/shared": "workspace:*",
     "@flowaid/workflow-core": "workspace:*",

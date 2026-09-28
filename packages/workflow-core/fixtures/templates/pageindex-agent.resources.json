@@ -1,0 +1,9 @@
+{
+  "mcpServers": [],
+  "knowledgeSources": [
+    {
+      "key": "documents",
+      "description": "Knowledge source the agent may read through its document tools (PageIndex indexes); the only documents it can reach."
+    }
+  ]
+}

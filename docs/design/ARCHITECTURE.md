@@ -105,7 +105,7 @@ observability     → workflow-core, credentials (Redactor), shared, env
 mcp               → workflow-core, shared
 openapi-tools     → workflow-core, shared
 knowledge         → workflow-core, shared                       (the pgvector adapter lives in database)
-nodes-core        → node-sdk, providers, mcp, openapi-tools, knowledge, workflow-core, shared
+nodes-core        → node-sdk, providers, mcp, openapi-tools, knowledge, pageindex, workflow-core, shared
 sandbox           → workflow-core, shared
 workflow-runtime  → workflow-core, workflow-compiler, node-sdk, providers, credentials, observability, shared, env
 database          → workflow-core, shared, env                 (implements RunStore/QueueDriver/EventBus/ArtifactStore/CredentialRepository)

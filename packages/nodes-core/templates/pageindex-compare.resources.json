@@ -1,0 +1,23 @@
+{
+  "$comment": "Resources this template needs bound on instantiate: each `$template.<kind>.<key>` sentinel in the definition is replaced by the chosen resource id. `tools` are the signatures the template calls, used to type-check it before binding.",
+  "id": "pageindex-compare",
+  "name": "Compare documents (PageIndex)",
+  "description": "Compares two document sources on a question with checked page citations; flags contradictions and gaps.",
+  "category": "knowledge",
+  "requiredResources": [
+    {
+      "kind": "knowledge",
+      "key": "baseline",
+      "name": "Baseline documents",
+      "description": "The knowledge source to compare against (e.g. last year's policy), indexed with PageIndex.",
+      "tools": []
+    },
+    {
+      "kind": "knowledge",
+      "key": "comparison",
+      "name": "Comparison documents",
+      "description": "The knowledge source to compare (e.g. this year's policy), indexed with PageIndex.",
+      "tools": []
+    }
+  ]
+}

@@ -22,6 +22,7 @@ describe("packageClosure", () => {
       "node-sdk",
       "nodes-core",
       "observability",
+      "pageindex",
       "provider-openai",
       "provider-typesafe",
       "providers",
@@ -37,6 +38,15 @@ describe("packageClosure", () => {
     expect(nodeTypes(planOf("github-issue-triage"))).toContain("flowaid.tools.mcp");
     expect(packageClosure(planOf("research-agent"))).toContain("provider-anthropic");
     expect(packageClosure(planOf("research-agent"))).not.toContain("sandbox");
+  });
+
+  it("vendors pageindex for the PageIndex templates", () => {
+    expect(nodeTypes(planOf("variants/pageindex-document-qa"))).toEqual([
+      "flowaid.ai.generate",
+      "flowaid.pageindex.cite",
+      "flowaid.pageindex.retrieve",
+    ]);
+    expect(packageClosure(planOf("variants/pageindex-document-qa"))).toContain("pageindex");
   });
 
   it("knows each package's real version and @flowaid dependencies", () => {

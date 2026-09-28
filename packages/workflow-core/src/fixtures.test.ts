@@ -24,9 +24,12 @@ const NAMES = Object.keys(FIXTURES);
 const FIXTURES_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "fixtures");
 const readJson = (...path: string[]): unknown =>
   JSON.parse(readFileSync(join(FIXTURES_DIR, ...path), "utf8"));
-/** Knowledge-slice variants (fixtures/variants/): parsed here, excluded from first-slice compile tests. */
+/** Knowledge-slice variants and PageIndex templates (fixtures/variants/): parsed here, excluded from first-slice compile tests. */
 const VARIANTS: Record<string, unknown> = {
   "github-issue-triage.retrieval": readJson("variants", "github-issue-triage.retrieval.json"),
+  "pageindex-document-qa": readJson("variants", "pageindex-document-qa.json"),
+  "pageindex-compare": readJson("variants", "pageindex-compare.json"),
+  "pageindex-agent": readJson("variants", "pageindex-agent.json"),
 };
 /** Returns a fresh deep copy of a fixture document. */
 function loadRaw(name: string): unknown {
@@ -179,7 +182,7 @@ const RequiredResourcesSchema = z.strictObject({
   ),
 });
 
-/** The shipped templates: the three demos and the knowledge-slice variant of demo 2. */
+/** The shipped templates: the three demos, the knowledge-slice variant of demo 2 and the PageIndex templates. */
 const TEMPLATES: Record<string, unknown> = {
   "support-triage": supportTriage,
   "github-issue-triage": githubIssueTriage,
