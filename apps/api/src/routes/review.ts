@@ -9,7 +9,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
-import { and, eq, gt, isNull } from "drizzle-orm";
+import { and, desc, eq, gt, isNull } from "drizzle-orm";
 import { humanTaskReviewTokens, humanTasks, recordAudit, workflows } from "@flowaid/database";
 import { uuidv7 } from "@flowaid/shared";
 import {
@@ -26,6 +26,17 @@ import { NoContent } from "../dto/common.js";
 import { checkResponse } from "./runs.js";
 
 const MAX_TTL_MS = 7 * 24 * 3600 * 1000;
+
+/** An external review link as the task page lists it: never its token. */
+export const ReviewLinkSchema = z.object({
+  id: z.uuid(),
+  createdAt: z.string(),
+  expiresAt: z.string(),
+  usedAt: z.string().nullable(),
+  revokedAt: z.string().nullable(),
+  createdBy: z.string(),
+  status: z.enum(["active", "used", "revoked", "expired"]),
+});
 
 function reviewToken(req: FastifyRequest): string {
   if (typeof (req.query as Record<string, unknown> | undefined)?.t === "string")
@@ -94,6 +105,67 @@ export function reviewRoutes(app: FastifyInstance, ctx: ApiContext): void {
         id: created.id,
         url: `${ctx.config.webUrl.replace(/\/$/, "")}/review#t=${token}`,
         expiresAt: created.expiresAt.toISOString(),
+      });
+    },
+  );
+
+  r.get(
+    "/v1/human-tasks/:id/review-links",
+    {
+      config: {
+        auth: "session_or_api_key",
+        scope: "runs:read",
+        cli: { noun: "task", verb: "review-links", positional: ["id"] },
+      },
+      schema: {
+        tags: ["human-tasks"],
+        params: z.object({ id: z.uuid() }),
+        response: { 200: z.array(ReviewLinkSchema) },
+      },
+    },
+    async (req) => {
+      const p = req.principal;
+      if (!p) throw new ForbiddenError("no principal");
+      const now = ctx.clock.now();
+      return ctx.db.tenant(p.workspaceId, async (tx) => {
+        const [t] = await tx
+          .select({ workflowId: humanTasks.workflowId })
+          .from(humanTasks)
+          .where(and(eq(humanTasks.id, req.params.id), eq(humanTasks.workspaceId, p.workspaceId)));
+        if (!t || !canSeeWorkflow(p, t.workflowId)) throw new NotFoundError("task not found");
+        // metadata only: the token exists nowhere but in the link that was handed out
+        const rows = await tx
+          .select({
+            id: humanTaskReviewTokens.id,
+            createdAt: humanTaskReviewTokens.createdAt,
+            expiresAt: humanTaskReviewTokens.expiresAt,
+            usedAt: humanTaskReviewTokens.usedAt,
+            revokedAt: humanTaskReviewTokens.revokedAt,
+            createdBy: humanTaskReviewTokens.createdBy,
+          })
+          .from(humanTaskReviewTokens)
+          .where(
+            and(
+              eq(humanTaskReviewTokens.taskId, req.params.id),
+              eq(humanTaskReviewTokens.workspaceId, p.workspaceId),
+            ),
+          )
+          .orderBy(desc(humanTaskReviewTokens.createdAt));
+        return rows.map((l) => ({
+          id: l.id,
+          createdAt: l.createdAt.toISOString(),
+          expiresAt: l.expiresAt.toISOString(),
+          usedAt: l.usedAt?.toISOString() ?? null,
+          revokedAt: l.revokedAt?.toISOString() ?? null,
+          createdBy: l.createdBy,
+          status: l.revokedAt
+            ? ("revoked" as const)
+            : l.usedAt
+              ? ("used" as const)
+              : l.expiresAt.getTime() <= now
+                ? ("expired" as const)
+                : ("active" as const),
+        }));
       });
     },
   );

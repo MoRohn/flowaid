@@ -335,6 +335,8 @@ describe("secret-safe serialisation", () => {
         "OPENAI_API_KEY",
         "ANTHROPIC_API_KEY",
         "SMTP_URL",
+        "VAULT_TOKEN",
+        "AZURE_CLIENT_SECRET",
       ].sort(),
     );
   });

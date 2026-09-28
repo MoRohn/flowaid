@@ -5,14 +5,15 @@
  *   env:FLOWAID_SECRET_<NAME>                       only that prefix, never a platform setting
  *   vault:<path>#<key>                              KV v2 (`<mount>/<path>` read through the data API)
  *   aws-sm:arn:aws:secretsmanager:<region>:<acct>:secret:<name>[#<json key>]
- *   azure-kv:<vault>/<secret>[/<version>]           parsed now, resolved in P6-07
- *   gcp-sm:projects/<p>/secrets/<s>/versions/<v>    parsed now, resolved in P6-07
+ *   azure-kv:<vault>/<secret>[/<version>]           Key Vault secret (latest without a version)
+ *   gcp-sm:projects/<p>/secrets/<s>/versions/<v>    Secret Manager version (`latest` or a number)
  *
  * `env:` refuses every name the environment schema knows (`ENV_SCHEMA_KEYS`), so a credential
  * can never read `FLOWAID_MASTER_KEY`, `DATABASE_URL` or another platform secret.
  */
 import { ENV_SCHEMA_KEYS } from "@flowaid/env";
 import { BadRequestError, CredentialError, type SafeFetch } from "@flowaid/workflow-core";
+import type { HttpFetch, TokenSource } from "./masterKey/cloud.js";
 
 export type ExternalRef =
   | { scheme: "env"; name: string }
@@ -113,6 +114,10 @@ export interface ExternalResolverOptions {
   secretEnv?: Readonly<Record<string, string>>;
   vault?: { address: string; token: string; namespace?: string; http: SafeFetch };
   awsSecretsManager?: SecretsManagerClient;
+  /** Azure Key Vault secrets, with a token for `https://vault.azure.net`. */
+  azureKeyVault?: { token: TokenSource; http: HttpFetch; dnsSuffix?: string };
+  /** GCP Secret Manager, with a cloud-platform token. */
+  gcpSecretManager?: { token: TokenSource; http: HttpFetch; endpoint?: string };
   clock?: () => number;
 }
 
@@ -187,11 +192,42 @@ export class ExternalResolver {
           throw new CredentialError(`Secret ${ref.arn} has no string key '${ref.jsonKey}'`);
         return value;
       }
-      case "azure-kv":
-      case "gcp-sm":
-        throw new CredentialError(
-          `${ref.scheme} references are not supported yet (planned: P6-07)`,
+      case "azure-kv": {
+        const azure = this.options.azureKeyVault;
+        if (!azure)
+          throw new CredentialError("Azure Key Vault is not configured for external credentials");
+        const name = `${ref.vault}/${ref.secret}${ref.version ? `/${ref.version}` : ""}`;
+        const response = await azure.http(
+          `https://${ref.vault}.${azure.dnsSuffix ?? "vault.azure.net"}/secrets/${ref.secret}${
+            ref.version ? `/${ref.version}` : ""
+          }?api-version=7.4`,
+          { headers: { authorization: `Bearer ${await azure.token()}` } },
         );
+        if (!response.ok)
+          throw new CredentialError(`Key Vault read of ${name} failed (${response.status})`);
+        const json = (await response.json()) as { value?: unknown };
+        if (typeof json.value !== "string")
+          throw new CredentialError(`Key Vault secret ${name} has no value`);
+        return json.value;
+      }
+      case "gcp-sm": {
+        const gcp = this.options.gcpSecretManager;
+        if (!gcp)
+          throw new CredentialError(
+            "GCP Secret Manager is not configured for external credentials",
+          );
+        const name = `projects/${ref.project}/secrets/${ref.secret}/versions/${ref.version}`;
+        const response = await gcp.http(
+          `${(gcp.endpoint ?? "https://secretmanager.googleapis.com").replace(/\/+$/, "")}/v1/${name}:access`,
+          { headers: { authorization: `Bearer ${await gcp.token()}` } },
+        );
+        if (!response.ok)
+          throw new CredentialError(`Secret Manager read of ${name} failed (${response.status})`);
+        const json = (await response.json()) as { payload?: { data?: unknown } };
+        if (typeof json.payload?.data !== "string")
+          throw new CredentialError(`Secret Manager version ${name} has no payload`);
+        return Buffer.from(json.payload.data, "base64").toString("utf8");
+      }
     }
   }
 

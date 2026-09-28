@@ -173,6 +173,7 @@ task list {--limit --cursor --order --status --workflow-id --assigned-to-me --ou
 task reassign <id> {--assignees --comment --body --out}
 task respond <id> {--response --body --out}
 task review-link <id> {--ttl-ms --body --out}
+task review-links <id> {--out}
 task revoke-review-link <id> <linkId> {--out}
 template
 template list {--include --out}
@@ -194,6 +195,10 @@ version get <id> {--include --out}
 version list <id> {--out}
 version package <id> {--mode --include-sample-from-run-id --include-recorded-run-id --body --out}
 version restore <id> {--out}
+view
+view delete <id> {--out}
+view list {--scope --out}
+view save {--scope --name --filters --body --out}
 webhook
 webhook deliveries <id> {--limit --cursor --order --out}
 webhook list {--workflow-id --out}
@@ -284,6 +289,7 @@ Commands:
   template|templates                template operations
   tool|tools                        tool operations
   version|versions                  version operations
+  view|views                        view operations
   webhook|webhooks                  webhook operations
   workflow|workflows                workflow operations
   workspace|workspaces              workspace operations

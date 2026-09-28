@@ -21,6 +21,7 @@ import {
   NODE_ENVS,
   PROVIDER_FIXTURE_MODES,
   SANDBOX_MODES,
+  MASTER_KEY_PROVIDERS,
   WORKER_POOLS,
   type EnvVarDoc,
   type EnvVarName,
@@ -588,6 +589,65 @@ export function siteOf(url: URL): string {
  * each with its documented override. A worker serving only the `code` pool is exempt from the
  * key requirements and must not hold a master key.
  */
+const MASTER_KEY_ID_FORMAT: Record<string, { re: RegExp; shape: string }> = {
+  "vault-transit": { re: /^[A-Za-z0-9_.-]+$/, shape: "a Transit key name" },
+  "azure-keyvault": {
+    re: /^https:\/\/[a-z0-9-]{3,24}\.(?:vault|managedhsm)\.(?:azure\.net|azure\.cn|usgovcloudapi\.net)\/keys\/[A-Za-z0-9-]{1,127}(?:\/[0-9a-f]{32})?$/,
+    shape: "https://<vault>.vault.azure.net/keys/<name>[/<version>]",
+  },
+  "gcp-kms": {
+    re: /^projects\/[a-z][a-z0-9-]{4,28}[a-z0-9]\/locations\/[a-z0-9-]+\/keyRings\/[A-Za-z0-9_-]{1,63}\/cryptoKeys\/[A-Za-z0-9_-]{1,63}$/,
+    shape: "projects/<p>/locations/<l>/keyRings/<r>/cryptoKeys/<k>",
+  },
+};
+
+/** The master key provider's settings: its key, and the credentials each service needs. */
+function masterKeyIssues(
+  has: (name: EnvVarName) => boolean,
+  str: (name: EnvVarName) => string,
+  isDefault: (name: EnvVarName) => boolean,
+): CrossFieldIssue[] {
+  const issues: CrossFieldIssue[] = [];
+  const provider = isDefault("FLOWAID_MASTER_KEY_PROVIDER")
+    ? "local"
+    : str("FLOWAID_MASTER_KEY_PROVIDER");
+  if (provider === "local") {
+    if (has("FLOWAID_MASTER_KEY_ID"))
+      issues.push({
+        path: "FLOWAID_MASTER_KEY_ID",
+        message: "has no effect with FLOWAID_MASTER_KEY_PROVIDER=local",
+      });
+  } else {
+    const format = MASTER_KEY_ID_FORMAT[provider];
+    if (!has("FLOWAID_MASTER_KEY_ID"))
+      issues.push({
+        path: "FLOWAID_MASTER_KEY_ID",
+        message: `is required with FLOWAID_MASTER_KEY_PROVIDER=${provider}`,
+      });
+    else if (format && !format.re.test(str("FLOWAID_MASTER_KEY_ID")))
+      issues.push({ path: "FLOWAID_MASTER_KEY_ID", message: `must be ${format.shape}` });
+    if (has("FLOWAID_MASTER_KEY"))
+      issues.push({
+        path: "FLOWAID_MASTER_KEY",
+        message: `must not be set with FLOWAID_MASTER_KEY_PROVIDER=${provider}: the key service holds the master`,
+      });
+  }
+  if (has("VAULT_ADDR") !== has("VAULT_TOKEN"))
+    issues.push({
+      path: has("VAULT_ADDR") ? "VAULT_TOKEN" : "VAULT_ADDR",
+      message: "VAULT_ADDR and VAULT_TOKEN must be set together",
+    });
+  if (provider === "vault-transit" && !has("VAULT_ADDR"))
+    issues.push({
+      path: "VAULT_ADDR",
+      message: "is required with FLOWAID_MASTER_KEY_PROVIDER=vault-transit",
+    });
+  if (has("AZURE_CLIENT_SECRET"))
+    for (const name of ["AZURE_TENANT_ID", "AZURE_CLIENT_ID"] as const)
+      if (!has(name)) issues.push({ path: name, message: "is required with AZURE_CLIENT_SECRET" });
+  return issues;
+}
+
 export function crossFieldIssues(vars: Partial<Record<EnvVarName, unknown>>): CrossFieldIssue[] {
   const issues: CrossFieldIssue[] = [];
   const has = (name: EnvVarName): boolean => vars[name] !== undefined;
@@ -628,6 +688,7 @@ export function crossFieldIssues(vars: Partial<Record<EnvVarName, unknown>>): Cr
   if (has("OIDC_ROLE_CLAIM") && !has("OIDC_ISSUER")) {
     issues.push({ path: "OIDC_ROLE_CLAIM", message: "has no effect without OIDC_ISSUER" });
   }
+  issues.push(...masterKeyIssues(has, str, isDefault));
   if (has("FLOWAID_ADMIN_EMAIL") !== has("FLOWAID_ADMIN_PASSWORD")) {
     issues.push({
       path: has("FLOWAID_ADMIN_EMAIL") ? "FLOWAID_ADMIN_PASSWORD" : "FLOWAID_ADMIN_EMAIL",
@@ -700,7 +761,14 @@ export function crossFieldIssues(vars: Partial<Record<EnvVarName, unknown>>): Cr
   }
 
   if (sandboxOnly) {
-    for (const name of ["FLOWAID_MASTER_KEY", "FLOWAID_MASTER_KEY_FILE"] as const) {
+    for (const name of [
+      "FLOWAID_MASTER_KEY",
+      "FLOWAID_MASTER_KEY_FILE",
+      "FLOWAID_MASTER_KEY_PROVIDER",
+      "VAULT_TOKEN",
+      "AZURE_CLIENT_SECRET",
+      "GOOGLE_APPLICATION_CREDENTIALS",
+    ] as const) {
       if (has(name) && !isDefault(name)) {
         issues.push({
           path: name,
@@ -723,6 +791,7 @@ export function crossFieldIssues(vars: Partial<Record<EnvVarName, unknown>>): Cr
 
   if (
     !sandboxOnly &&
+    isDefault("FLOWAID_MASTER_KEY_PROVIDER") &&
     !has("FLOWAID_MASTER_KEY") &&
     isDefault("FLOWAID_MASTER_KEY_FILE") &&
     !autogenerate
@@ -806,6 +875,19 @@ export const EnvSchema = z
     FLOWAID_ALLOW_INSECURE_HTTP: boolWithDefault("FLOWAID_ALLOW_INSECURE_HTTP"),
     FLOWAID_ALLOW_CROSS_SITE: boolWithDefault("FLOWAID_ALLOW_CROSS_SITE"),
     FLOWAID_MASTER_KEY_AUTOGENERATE: boolWithDefault("FLOWAID_MASTER_KEY_AUTOGENERATE"),
+    FLOWAID_MASTER_KEY_PROVIDER: enumWithDefault(
+      "FLOWAID_MASTER_KEY_PROVIDER",
+      MASTER_KEY_PROVIDERS,
+    ),
+    FLOWAID_MASTER_KEY_ID: optionalString("FLOWAID_MASTER_KEY_ID"),
+    VAULT_ADDR: optionalUrl("VAULT_ADDR", /^https?$/, "http:// or https://"),
+    VAULT_TOKEN: optionalString("VAULT_TOKEN"),
+    VAULT_NAMESPACE: optionalString("VAULT_NAMESPACE"),
+    VAULT_TRANSIT_MOUNT: stringWithDefault("VAULT_TRANSIT_MOUNT"),
+    AZURE_TENANT_ID: optionalString("AZURE_TENANT_ID"),
+    AZURE_CLIENT_ID: optionalString("AZURE_CLIENT_ID"),
+    AZURE_CLIENT_SECRET: optionalString("AZURE_CLIENT_SECRET"),
+    GOOGLE_APPLICATION_CREDENTIALS: optionalString("GOOGLE_APPLICATION_CREDENTIALS"),
 
     OIDC_ISSUER: optionalUrl("OIDC_ISSUER", /^https?$/, "http:// or https://"),
     OIDC_CLIENT_ID: optionalString("OIDC_CLIENT_ID"),

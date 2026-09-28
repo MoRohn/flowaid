@@ -25,6 +25,17 @@ export const WORKER_POOLS = [
 /** Sandbox executors for the `code` pool (ARCHITECTURE.md §10.7). */
 export const SANDBOX_MODES = ["isolated-vm", "container"] as const;
 
+/**
+ * Where the master key lives (ARCHITECTURE.md §10.6): `local` is `FLOWAID_MASTER_KEY` or the key
+ * file; the others wrap KEKs in a key service and never hold the master.
+ */
+export const MASTER_KEY_PROVIDERS = [
+  "local",
+  "vault-transit",
+  "azure-keyvault",
+  "gcp-kms",
+] as const;
+
 /** Dependency modes of exported code (CODE_EXPORT.md §2). */
 export const EXPORT_MODES = ["npm", "vendored"] as const;
 
@@ -416,6 +427,87 @@ const docs = {
     default: "false",
     required: false,
     example: "true",
+    secret: false,
+  },
+  FLOWAID_MASTER_KEY_PROVIDER: {
+    group: "security",
+    description:
+      "Where the master key that wraps the key-encryption keys lives. `local`: `FLOWAID_MASTER_KEY` or `FLOWAID_MASTER_KEY_FILE`. `vault-transit`: a HashiCorp Vault Transit key (`VAULT_ADDR`, `VAULT_TOKEN`). `azure-keyvault`: an Azure Key Vault or Managed HSM RSA key (managed identity, or `AZURE_TENANT_ID`/`AZURE_CLIENT_ID`/`AZURE_CLIENT_SECRET`). `gcp-kms`: a Cloud KMS symmetric key (the metadata server's service account, or `GOOGLE_APPLICATION_CREDENTIALS`). With a key service the master never leaves it; `FLOWAID_MASTER_KEY_ID` names the key. Changing providers needs a master rotation, not an edit: KEKs wrapped by one provider do not unwrap with another.",
+    default: "local",
+    required: false,
+    example: "azure-keyvault",
+    secret: false,
+    values: MASTER_KEY_PROVIDERS,
+  },
+  FLOWAID_MASTER_KEY_ID: {
+    group: "security",
+    description:
+      "The key of `FLOWAID_MASTER_KEY_PROVIDER`: the Transit key name (`vault-transit`), the key URL `https://<vault>.vault.azure.net/keys/<name>[/<version>]` (`azure-keyvault`), or `projects/<p>/locations/<l>/keyRings/<r>/cryptoKeys/<k>` (`gcp-kms`). Required unless the provider is `local`.",
+    required: false,
+    example: "https://acme-flowaid.vault.azure.net/keys/master",
+    secret: false,
+  },
+  VAULT_ADDR: {
+    group: "security",
+    description:
+      "HashiCorp Vault address for the `vault-transit` master key and for `vault:` external credential references.",
+    required: false,
+    example: "https://vault.internal:8200",
+    secret: false,
+  },
+  VAULT_TOKEN: {
+    group: "security",
+    description:
+      "Vault token with `encrypt`/`decrypt` on the Transit key and `read` on the KV paths that `vault:` references name. Required with `VAULT_ADDR`.",
+    required: false,
+    example: "hvs.CAESIJ...",
+    secret: true,
+  },
+  VAULT_NAMESPACE: {
+    group: "security",
+    description: "Vault Enterprise namespace sent with every Vault call.",
+    required: false,
+    example: "admin/flowaid",
+    secret: false,
+  },
+  VAULT_TRANSIT_MOUNT: {
+    group: "security",
+    description: "Mount path of the Transit secrets engine for the `vault-transit` master key.",
+    default: "transit",
+    required: false,
+    example: "transit",
+    secret: false,
+  },
+  AZURE_TENANT_ID: {
+    group: "security",
+    description:
+      "Azure AD tenant of the service principal that reaches Key Vault (the `azure-keyvault` master key and `azure-kv:` references). Leave the three `AZURE_*` variables unset to use the host's managed identity.",
+    required: false,
+    example: "72f988bf-86f1-41af-91ab-2d7cd011db47",
+    secret: false,
+  },
+  AZURE_CLIENT_ID: {
+    group: "security",
+    description:
+      "Application (client) id of the service principal, or alone: the user-assigned managed identity to use.",
+    required: false,
+    example: "8f9e7d6c-5b4a-3c2d-1e0f-a9b8c7d6e5f4",
+    secret: false,
+  },
+  AZURE_CLIENT_SECRET: {
+    group: "security",
+    description:
+      "Client secret of the service principal; requires `AZURE_TENANT_ID` and `AZURE_CLIENT_ID`.",
+    required: false,
+    example: "Q~abc...",
+    secret: true,
+  },
+  GOOGLE_APPLICATION_CREDENTIALS: {
+    group: "security",
+    description:
+      "Path of a service-account key file for Cloud KMS (the `gcp-kms` master key) and Secret Manager (`gcp-sm:` references). Unset uses the metadata server's service account (GCE, GKE, Cloud Run).",
+    required: false,
+    example: "/var/run/secrets/gcp/flowaid.json",
     secret: false,
   },
   "FLOWAID_SECRET_<NAME>": {

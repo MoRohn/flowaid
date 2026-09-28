@@ -41,6 +41,17 @@ export interface ReviewLink {
   expiresAt: string;
 }
 
+/** `GET /v1/human-tasks/:id/review-links`: a link's metadata, never its token. */
+export interface ReviewLinkInfo {
+  id: string;
+  createdAt: string;
+  expiresAt: string;
+  usedAt: string | null;
+  revokedAt: string | null;
+  createdBy: string;
+  status: "active" | "used" | "revoked" | "expired";
+}
+
 /** `GET /v1/review`: what an external reviewer may see, nothing more. */
 export interface ExternalReviewView {
   title: string;

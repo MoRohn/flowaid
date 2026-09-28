@@ -66,7 +66,7 @@ compiled API, worker and Docker images run plain `node` on `dist`.
 
 ## Known gaps
 
-- Identity: no OIDC, invitations, password resets, TOTP MFA or Azure/GCP key providers (P6-07).
-- Runs list: saved views.
-- Human tasks: no route lists a task's existing review links.
-- Rerank calls are not recorded by the provider fixtures (they reach the vendor in every mode).
+- Identity: no OIDC, invitations, password resets or TOTP MFA (P6-07).
+- AWS KMS and Secrets Manager need an AWS SDK client the apps do not wire yet; the other master key
+  providers (`local`, `vault-transit`, `azure-keyvault`, `gcp-kms`) and external references
+  (`env:`, `vault:`, `azure-kv:`, `gcp-sm:`) are configured from the environment.

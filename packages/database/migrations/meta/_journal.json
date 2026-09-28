@@ -64,6 +64,13 @@
       "when": 1790542969555,
       "tag": "0008_plugin_location",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790595852145,
+      "tag": "0009_saved_views",
+      "breakpoints": true
     }
   ]
 }

@@ -102,6 +102,17 @@ describeDb("external review links and the MCP server endpoint (Postgres)", () =>
       (await review("POST", "/v1/review/respond", token, { response: { action: "approve" } }))
         .statusCode,
     ).toBe(404);
+    // the task page lists both links by state, and never their tokens
+    const links = await call(t.app, jar, "GET", `/v1/human-tasks/${taskId}/review-links`);
+    expect(links.statusCode).toBe(200);
+    expect((links.json() as { id: string; status: string }[]).map((l) => [l.id, l.status])).toEqual(
+      [
+        [other.id, "revoked"],
+        [link.json().id, "used"],
+      ],
+    );
+    expect(links.body).not.toContain(token);
+    expect(links.body).not.toContain(otherToken);
     const task = (await call(t.app, jar, "GET", `/v1/human-tasks/${taskId}`)).json();
     expect(task.task).toMatchObject({
       status: "responded",
