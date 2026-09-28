@@ -15,7 +15,7 @@
   <img alt="Local-first" src="https://img.shields.io/badge/local--first-no%20sign--in-2f5be8">
   <img alt="TypeScript 5.9 strict" src="https://img.shields.io/badge/TypeScript-5.9%20strict-17171c">
   <img alt="Node.js 24+" src="https://img.shields.io/badge/node-%E2%89%A524-17171c">
-  <img alt="Tests: 5,638 passing" src="https://img.shields.io/badge/tests-5%2C638%20passing-1f9d64">
+  <img alt="Tests: 5,831 passing" src="https://img.shields.io/badge/tests-5%2C831%20passing-1f9d64">
 </p>
 
 <p align="center">
@@ -44,7 +44,7 @@ decides what happens next: act automatically, gather more evidence, or ask a per
 
 > [!NOTE]
 > **FlowAId is in public beta.** Everything described here runs today and every change is gated
-> by 5,638 tests, the PostgreSQL suites, an accessibility gallery and a browser acceptance
+> by 5,831 tests, the PostgreSQL suites, an accessibility gallery and a browser acceptance
 > journey against the production builds. Interfaces may still change before 1.0; the first
 > tagged release (0.4.0, with published container images) is being prepared.
 
@@ -64,6 +64,12 @@ decides what happens next: act automatically, gather more evidence, or ask a per
   each statement says whether it is a fact, a calculation, a suggestion or unconfirmed, and links
   to the records it rests on. It changes nothing on its own. Measured with an evaluation set
   (`pnpm eval:assistant`, see [AI evaluation](docs/FLOWAID_AI_EVALUATION.md)).
+- **PageIndex document intelligence.** Upload PDFs to a PageIndex knowledge source and FlowAId
+  indexes each one into its section tree once (pinned PageIndex SDK, on your machine). TypeSafe
+  Jev then navigates the tree to the pages that answer a question. Answers cite physical pages of
+  the exact file version, every citation is checked against the page text, and the viewer opens
+  the cited page. Three templates (Q&A, comparison, agent), `./flowaid --pageindex`, and a
+  measured evaluation. See [docs/pageindex/SETUP.md](docs/pageindex/SETUP.md).
 - **Honest numbers.** Streamed generations are priced (they were counted at $0), dashboards count
   production traffic only, and agents check their budget before each turn.
 - **Sturdier runtime.** Retention runs, runs no longer hang in scale mode, crash-looping jobs are
@@ -450,7 +456,7 @@ networks and secret scoping in [`docker/README.md`](docker/README.md).
 | Gate                     | Where                                                                                             |
 | ------------------------ | ------------------------------------------------------------------------------------------------- |
 | Audit, boundaries, types | `pnpm check` and CI `check`: dependency audit, the package boundary graph, generated files, lint  |
-| 5,638 tests              | CI `test` and `integration` (PostgreSQL with pgvector, Redis, isolated-vm)                        |
+| 5,831 tests              | CI `test` and `integration` (PostgreSQL with pgvector, Redis, isolated-vm)                        |
 | Accessibility            | CI `ui gallery`: axe (WCAG 2.x A and AA) and console checks over every component, both themes     |
 | Acceptance journey       | E2E against the production builds with recorded provider replay and secret-canary log checks      |
 | Releases                 | Changesets, multi-arch images with SBOMs and provenance, Dependabot for patches and minor updates |

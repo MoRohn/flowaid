@@ -15,7 +15,7 @@ and E2E run on every push to `main`.
 | Acceptance journey (`e2e/acceptance`)                          | pass against the production builds with recorded provider replay and secret-canary log checks       |
 | UI accessibility gallery                                       | pass (axe checks over the `@flowaid/ui` gallery and the web pages, CI job `ui-gallery`)             |
 | Docker images (`docker/Dockerfile`)                            | api, worker and web build and boot; `docker compose up` reaches healthy on every service            |
-| Tests                                                          | 5,638 passing locally (17 more need CI's Node 24 isolated-vm or Docker) plus the browser journey    |
+| Tests                                                          | 5,831 passing locally (14 more need CI's Node 24 isolated-vm or Docker) plus the browser journey    |
 
 ## Apps
 

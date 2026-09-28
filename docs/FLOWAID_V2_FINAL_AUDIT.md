@@ -21,7 +21,7 @@ Run on 2026-09-28 against the final tree, before this document was committed.
 | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | `pnpm check` (audit, boundaries, env/SDK/UI-inventory generators, docs, format, lint, types, build, tests) | pass: 148/148 turbo tasks, 0 lint errors                                                                           |
 | PostgreSQL and Redis suites (`FLOWAID_TEST_DATABASE_URL`, `FLOWAID_TEST_REDIS_URL`)                        | pass: database 60, workflow-runtime 94, nodes-core 161, api 137, worker 57                                         |
-| Tests in total                                                                                             | 5,638 passing locally, 17 skipped here (they need CI's Node 24 isolated-vm or Docker); baseline was 5,471          |
+| Tests in total                                                                                             | 5,831 passing locally with PageIndex (5,638 at the V2 audit), skipped ones need CI or Docker; baseline was 5,471   |
 | Acceptance journey (`pnpm test:acceptance`) against `start.ts --prod` with provider fixtures replayed      | pass: 9 passed, 2 skipped (the sign-in page, which local mode does not show)                                       |
 | Secret canaries in the stack log                                                                           | none found (3 canaries checked)                                                                                    |
 | Real-browser pass (agent-browser, 1440 and 390 px)                                                         | Overview panels, ⌘K, page titles and the skip link work. One phone-width overflow was found and fixed (`61cbbdf`). |
@@ -182,6 +182,47 @@ risks and open items are listed in
 `docker build -f docker/Dockerfile --target api .` builds (exit 0), and
 `import('@flowaid/insights')` resolves inside the image. The web and worker images and a full
 `docker compose up` were **not rebuilt** for V2; CI's image jobs cover them on push.
+
+## PageIndex document intelligence (added after the V2 audit above)
+
+Specified in [pageindex/ADR.md](pageindex/ADR.md); measured in [pageindex/EVALUATION.md](pageindex/EVALUATION.md).
+Each item below is from the integration brief's acceptance list, with how it was verified.
+
+| #   | acceptance item                                                                                   | status   | how it was verified                                                                                                                                                                                      |
+| --- | ------------------------------------------------------------------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Clean install starts and discovers the nodes                                                      | complete | `pnpm check` (manifest check), `./flowaid --pageindex` run from scratch (first run installs the pinned venv), catalog lists `flowaid.pageindex.*`                                                        |
+| 2   | A real sample indexes through the packaged backend and survives a restart                         | complete | live: travel policy via the real SDK and qwen2.5:3b through `./flowaid --pageindex`; after a full stack restart the same index (v1, ready) answered again; service `test_live.py` restart case           |
+| 3   | A workflow answers with citations opening the correct page                                        | complete | live: Document Q&A template run → `sufficient`, citation page 1 ("$260") supported 0.98; browser: citation opened the viewer at version 1, page 2 of the file                                            |
+| 4   | Repeated questions reuse the index; repeated indexing requests join the same work                 | complete | live (one index after restart and repeated runs); PG tests for dedupe of requests and identical uploads                                                                                                  |
+| 5   | Unsupported/scanned files fail clearly                                                            | complete | live: scanned sample → `SCANNED_PDF` with OCR advice; API 415 for non-PDF; service tests                                                                                                                 |
+| 6   | Changed content yields a new version without corrupting the old                                   | complete | PG tests (API and worker): version 2, new index, atomic promotion, pinned superseded index still readable                                                                                                |
+| 7   | Cross-tenant and out-of-scope access rejected, incl. discovery and caches                         | complete | PG tests (API 404s from a second workspace; worker access scoping), service tests (per-workspace stores), node tests (pinned ids outside scope, forged document names in agent tools)                    |
+| 8   | Provider errors, throttling, timeout, cancellation, worker/service restart leave consistent state | complete | worker PG tests (503 then success, retries exhausted, cancel mid-run, cancel at completion, service restart → resubmission), service tests (deadline, kill on cancel, restart reporting)                 |
+| 9   | Malicious document instructions cannot expand permissions or call management actions              | complete | no management tools exist; scope comes from node config; evidence wrapped as untrusted; agent-tool tests; the injection case pattern from the assistant evaluation                                       |
+| 10  | Save/reload/export/import preserve configuration and prompt for remapping                         | partial  | definitions store only ids (no bytes or credentials); the web pickers flag unknown ids as "unavailable resource — pick again" (component tests); not exercised through a real export → import round trip |
+| 11  | Deletion and revocation stop retrieval and citation access                                        | complete | PG tests: delete → lists, file route and query scope exclude it at once; cleanup job removes upstream documents and bytes; source deletion cleans up first                                               |
+| 12  | FlowAId works when PageIndex is off or unavailable                                                | complete | feature off by default; env pairing validated; API 409 and worker BAD_REQUEST only for document features; acceptance journey passes with PageIndex off                                                   |
+
+- **Evaluation** (thresholds fixed before the first run):
+  - **Passing:** evidence recall 89–100%, citation validity 100% and abstention 100%.
+  - **Missing:** citation support (70–78%) and answer correctness (44–56%) miss their thresholds
+    with the 3B local answer writer.
+  - A 7B writer did not fit this machine's Docker memory. A hosted writer is **not measured** (no
+    key here).
+- **Cloud mode:** not enabled, because it could not be verified without credentials.
+- **Found and fixed through the live journey:**
+  - misleading section options (shared page summaries);
+  - sentence splitting in citation checks;
+  - new templates missing on upgraded installs;
+  - local Ollama unreachable by default (`OLLAMA_HOST` ignored by the provider and blocked by the
+    egress guard);
+  - `./flowaid` failing after one `--pageindex` run;
+  - truncated table columns.
+- **Also delivered with it:**
+  - the branded address **http://flowaid.localhost:3000**, with the API on 3001 and the next free
+    port when a default one is busy;
+  - `./flowaid` as the single start command;
+  - a two-step Quick Start.
 
 ## Release
 
