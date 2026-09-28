@@ -52,6 +52,10 @@ export async function buildServer(ctx: ApiContext, o: BuildOptions = {}): Promis
   const app = Fastify({
     logger: o.logger ?? false,
     bodyLimit: 2 * 1024 * 1024,
+    // Node's requestTimeout bounds receiving the request (headers and body), so a slow or
+    // stalled client cannot hold a connection by trickling bytes. It stops once the request
+    // is read: SSE run streams and MCP responses stay open as long as they need.
+    requestTimeout: 120_000,
     trustProxy: ctx.config.trustProxy,
     genReqId: (req) => {
       const given = req.headers["x-request-id"];
