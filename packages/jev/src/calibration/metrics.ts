@@ -178,6 +178,59 @@ export function wilsonLower(p: number, n: number, z = 1.96): number {
   return Math.max(0, (centre - margin) / (1 + z2 / n));
 }
 
+/**
+ * Kish's effective sample size of weighted observations, (Σw)² / Σw²: the number of equally
+ * weighted observations that would give the same variance. With 1/π weights it is below the raw
+ * count whenever the inclusion probabilities differ.
+ */
+export function kishEffectiveSize(weights: readonly number[]): number {
+  let sum = 0;
+  let sumSq = 0;
+  for (const w of weights) {
+    sum += w;
+    sumSq += w * w;
+  }
+  return sumSq > 0 ? (sum * sum) / sumSq : 0;
+}
+
+/**
+ * The standard normal quantile Φ⁻¹(p) for 0 < p < 1 (Acklam's rational approximation, relative
+ * error below 1.2e-9).
+ */
+export function normalQuantile(p: number): number {
+  if (!(p > 0 && p < 1)) throw new RangeError(`normalQuantile needs 0 < p < 1, got ${p}`);
+  const a = [
+    -3.969683028665376e1, 2.209460984245205e2, -2.759285104469687e2, 1.38357751867269e2,
+    -3.066479806614716e1, 2.506628277459239,
+  ] as const;
+  const b = [
+    -5.447609879822406e1, 1.615858368580409e2, -1.556989798598866e2, 6.680131188771972e1,
+    -1.328068155288572e1,
+  ] as const;
+  const c = [
+    -7.784894002430293e-3, -3.223964580411365e-1, -2.400758277161838, -2.549732539343734,
+    4.374664141464968, 2.938163982698783,
+  ] as const;
+  const d = [
+    7.784695709041462e-3, 3.224671290700398e-1, 2.445134137142996, 3.754408661907416,
+  ] as const;
+  const low = 0.02425;
+  if (p < low) {
+    const q = Math.sqrt(-2 * Math.log(p));
+    return (
+      (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) /
+      ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1)
+    );
+  }
+  if (p > 1 - low) return -normalQuantile(1 - p);
+  const q = p - 0.5;
+  const r = q * q;
+  return (
+    ((((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q) /
+    (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1)
+  );
+}
+
 /** 10-bin histogram of routing confidence over all decisions. */
 export function confidenceHistogram(
   confidences: readonly number[],
