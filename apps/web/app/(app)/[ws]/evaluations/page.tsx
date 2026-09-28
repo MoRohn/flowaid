@@ -29,7 +29,7 @@ import { get, post, qs } from "~/api/client";
 import type { Page, WorkflowSummary } from "~/api/types";
 import { runTone } from "~/admin/logic";
 import type { EvaluationRun, EvaluationSet } from "~/admin/types";
-import { QueryView, useMutate } from "~/admin/ui";
+import { QueryView, useMutate, useOpenFromQuery } from "~/admin/ui";
 import { useSession } from "~/session";
 import { AppFrame, PageBody } from "~/shell/AppFrame";
 import { HELP } from "~/shell/help";
@@ -135,7 +135,7 @@ function NewSetDialog({
 
 export default function EvaluationsPage() {
   const s = useSession();
-  const [creating, setCreating] = useState(false);
+  const [creating, setCreating] = useOpenFromQuery();
   const canWrite = s.can("evaluations:write");
   const sets = useQuery({
     queryKey: ["evaluation-sets", s.ws],

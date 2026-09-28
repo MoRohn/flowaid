@@ -30,7 +30,7 @@ import { PageHeader } from "@flowaid/ui/shell";
 import { get, post } from "~/api/client";
 import type { Credential, ModelInfo, Provider } from "~/admin/types";
 import { providerName } from "~/admin/providerNames";
-import { Notice, QueryView, useMutate } from "~/admin/ui";
+import { Notice, QueryView, useMutate, useOpenFromQuery } from "~/admin/ui";
 import {
   EMPTY_SOURCE,
   KIND_LABEL,
@@ -356,7 +356,7 @@ function NewSourceDialog({
 
 export default function KnowledgePage() {
   const s = useSession();
-  const [creating, setCreating] = useState(false);
+  const [creating, setCreating] = useOpenFromQuery();
   const canWrite = s.can("knowledge:write");
   const sources = useQuery({
     queryKey: ["knowledge-sources", s.ws],

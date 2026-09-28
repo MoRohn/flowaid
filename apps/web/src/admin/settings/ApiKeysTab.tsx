@@ -33,6 +33,7 @@ import { useSession } from "~/session";
 import { SCOPE_GROUPS, SCOPE_PRESETS, daysUntil } from "../logic";
 import type { CreatedKey } from "../types";
 import { OneTimeSecretDialog, QueryView, Section, useConfirm, useMutate } from "../ui";
+import { useOpenFromQuery } from "~/admin/ui";
 
 const ANY = "__any";
 const EXPIRY_DAYS = [30, 90, 180, 365] as const;
@@ -259,7 +260,7 @@ function CreateKeyDialog({
 
 export function ApiKeysTab() {
   const s = useSession();
-  const [creating, setCreating] = useState(false);
+  const [creating, setCreating] = useOpenFromQuery();
   const [secret, setSecret] = useState<{ title: string; key: string } | null>(null);
   const [rotating, setRotating] = useState<ApiKeySummary | null>(null);
   const [grace, setGrace] = useState("60");

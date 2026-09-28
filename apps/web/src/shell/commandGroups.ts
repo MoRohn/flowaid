@@ -96,7 +96,7 @@ export function commandGroups(i: CommandInput): {
             label: "Add a provider key or credential",
             icon: "key" as const,
             keywords: ["api key", "secret", "typesafe", "openai", "anthropic", "credential"],
-            to: at("credentials"),
+            to: at("credentials?new=1"),
           },
         ]
       : []),
@@ -108,7 +108,7 @@ export function commandGroups(i: CommandInput): {
             description: "For scripts, the SDK and the CLI",
             icon: "key" as const,
             keywords: ["token", "sdk", "cli", "curl"],
-            to: at("settings?tab=api-keys"),
+            to: at("settings?tab=api-keys&new=1"),
           },
         ]
       : []),
@@ -119,7 +119,7 @@ export function commandGroups(i: CommandInput): {
             label: "New knowledge source",
             icon: "knowledge" as const,
             keywords: ["rag", "documents", "search", "retrieval"],
-            to: at("knowledge"),
+            to: at("knowledge?new=1"),
           },
         ]
       : []),
@@ -130,7 +130,7 @@ export function commandGroups(i: CommandInput): {
             label: "New evaluation set",
             icon: "evaluation" as const,
             keywords: ["test", "regression", "cases"],
-            to: at("evaluations"),
+            to: at("evaluations?new=1"),
           },
         ]
       : []),

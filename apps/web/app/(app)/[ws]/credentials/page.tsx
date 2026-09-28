@@ -12,14 +12,14 @@ import {
   RotateCredentialDialog,
 } from "~/admin/credentials/CredentialDialogs";
 import type { Credential, CredentialType } from "~/admin/types";
-import { QueryView, useMutate } from "~/admin/ui";
+import { QueryView, useMutate, useOpenFromQuery } from "~/admin/ui";
 import { useSession } from "~/session";
 import { AppFrame, PageBody } from "~/shell/AppFrame";
 
 export default function CredentialsPage() {
   const s = useSession();
   const canWrite = s.can("credentials:write");
-  const [creating, setCreating] = useState(false);
+  const [creating, setCreating] = useOpenFromQuery();
   const [openId, setOpenId] = useState<string | null>(null);
   const [rotating, setRotating] = useState<Credential | null>(null);
   const [q, setQ] = useState("");

@@ -122,6 +122,37 @@ export function useQueryTab<T extends string>(allowed: readonly T[]): [T, (tab: 
   return [tab, set];
 }
 
+/**
+ * A page's create form, opened by `?new=1` too (the command menu's "Create …" items). Closing it
+ * drops the parameter so a reload does not reopen it.
+ */
+export function useOpenFromQuery(): [boolean, (open: boolean) => void] {
+  const params = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const requested = params.get("new") === "1";
+  const [open, setOpenState] = useState(requested);
+  // the menu used again while already on this page
+  const [seen, setSeen] = useState(requested);
+  if (requested !== seen) {
+    setSeen(requested);
+    if (requested) setOpenState(true);
+  }
+  const setOpen = useCallback(
+    (next: boolean) => {
+      setOpenState(next);
+      if (!next && params.has("new")) {
+        const u = new URLSearchParams(params.toString());
+        u.delete("new");
+        const q = u.toString();
+        router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
+      }
+    },
+    [params, pathname, router],
+  );
+  return [open, setOpen];
+}
+
 // ── layout ──────────────────────────────────────────────────────────────────────────────────
 
 export function Section({
