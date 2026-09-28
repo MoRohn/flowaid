@@ -25,9 +25,16 @@ export default [
   // third-party exceptions (later entries win for the files they match).
   ...boundaryConfigs(),
   // Only @flowaid/env reads process.env; @flowaid/cli and the `pnpm start` launcher build the env
-  // for local runs (ARCHITECTURE.md §1.1, "Environment boundary"). Mirrors their eslint.config.js.
+  // for local runs (ARCHITECTURE.md §1.1, "Environment boundary"), and the `prepare` hook installer
+  // checks CI. Mirrors their eslint.config.js.
   {
     ...allowProcessEnv,
-    files: ["packages/env/**", "packages/cli/**", "scripts/start.ts", "e2e/**"],
+    files: [
+      "packages/env/**",
+      "packages/cli/**",
+      "scripts/start.ts",
+      "scripts/install-hooks.ts",
+      "e2e/**",
+    ],
   },
 ];

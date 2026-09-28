@@ -12,6 +12,9 @@ allowBuilds:
   unrs-resolver: true
   # optional native speed-up of BullMQ's msgpack; the pure-JS path is used instead
   msgpackr-extract: false
+  # its postinstall would install hooks on every install (CI, Docker): the root `prepare`
+  # script installs them for contributors instead
+  lefthook: false
 
 # pnpm's supply-chain policy refuses very new releases; these were published in
 # the last days and are pinned to exact versions we verified.

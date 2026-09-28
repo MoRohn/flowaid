@@ -300,6 +300,11 @@ done
 docker compose up -d
 ```
 
+To run a published release instead of building from source, set `FLOWAID_IMAGE_TAG` (for
+example `0.4.0`) and add the images overlay: `docker compose -f docker/compose.yml -f
+docker/compose.images.yml up -d` pulls `ghcr.io/morohn/flowaid-api`, `-worker` and `-web`
+([docs/RELEASING.md](docs/RELEASING.md)).
+
 Without `FLOWAID_ADMIN_PASSWORD`, the first boot generates the owner's password and prints it
 once (`docker compose logs api`); the first sign-in asks for a new one.
 

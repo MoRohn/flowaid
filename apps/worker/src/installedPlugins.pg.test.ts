@@ -16,7 +16,7 @@ import { z } from "zod";
 import { plugins } from "@flowaid/database";
 import { describeDb } from "@flowaid/database/testing";
 import { defineNode, ok, toManifest } from "@flowaid/node-sdk";
-import { RegistryClient, resolvePlugin } from "@flowaid/plugins";
+import { PLATFORM_SDK_VERSION, RegistryClient, resolvePlugin } from "@flowaid/plugins";
 import { startFakeRegistry, type FakeRegistry } from "@flowaid/plugins/testing";
 import { uuidv7 } from "@flowaid/shared";
 import type { PluginHost } from "./plugins/host.js";
@@ -103,7 +103,7 @@ describeDb("installed plugins (Postgres)", () => {
       await registry.publish({
         name,
         version: "1.2.0",
-        flowaid: { sdk: "^0.1.0" },
+        flowaid: { sdk: `^${PLATFORM_SDK_VERSION}` },
         files: {
           "index.js": SOURCE.replaceAll("@acme/weather", name),
           "manifest.json": MANIFEST.replaceAll("@acme/weather", name),

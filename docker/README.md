@@ -15,7 +15,7 @@ needs. The root `docker-compose.yml` only includes the files in this directory.
 | `rustfs`, `rustfs-init` | `rustfs/rustfs:1.0.0@sha256:…`            | 9000 (`--profile s3`)            | Optional S3-compatible artifact store and a one-shot that creates the bucket. See [Object storage](#object-storage-profile-s3).                                                                                                                                  |
 
 Every image is pinned to a release tag **and** its `sha256` digest (`docker/compose.test.ts`
-fails on a floating tag); renovate proposes bumps.
+fails on a floating tag); Dependabot proposes bumps.
 
 Health checks gate `depends_on`: `postgres` (pg_isready) → `api` (`GET /v1/health`) →
 `worker`, `worker-code` (`node dist/health.js`, exits 0 while the heartbeat is fresh),
@@ -162,3 +162,25 @@ The three images are built from `apps/api`, `apps/worker` and `apps/web`: `dist/
 (api, worker), `dist/health.js` (worker) and Next's `output: "standalone"` server (web). The
 release gate (`.github/workflows/e2e.yml`) drives the acceptance journey against the same
 production builds.
+
+## Published images (`compose.images.yml`)
+
+Every release publishes the three targets for `linux/amd64` and `linux/arm64` as
+`ghcr.io/morohn/flowaid-api`, `-worker` and `-web`, tagged with the version, with SBOMs and
+signed build provenance ([docs/RELEASING.md](../docs/RELEASING.md)). To run a release instead of
+building from source, add the overlay, which changes only where the app images come from:
+
+```sh
+# .env
+FLOWAID_IMAGE_TAG=0.4.0            # optionally 0.4.0@sha256:<digest>
+# FLOWAID_IMAGE_REGISTRY=ghcr.io/morohn
+
+docker compose -f docker/compose.yml -f docker/compose.images.yml up -d
+# with the scale profile:
+docker compose -f docker/compose.yml -f docker/compose.scale.yml -f docker/compose.images.yml \
+  --profile scale up -d
+```
+
+`docker/compose.test.ts` checks that the overlay touches nothing but `image` and `pull_policy`.
+Upgrading is a new `FLOWAID_IMAGE_TAG` and `up -d`: the api applies pending migrations before
+it listens.

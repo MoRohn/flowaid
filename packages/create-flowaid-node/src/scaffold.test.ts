@@ -11,7 +11,7 @@ import { runNode } from "@flowaid/node-sdk/testing";
 import { RegistryClient, packTarball, resolvePlugin } from "@flowaid/plugins";
 import { startFakeRegistry } from "@flowaid/plugins/testing";
 import { create } from "./main.js";
-import { scaffold, validateName } from "./scaffold.js";
+import { SDK_RANGE, scaffold, validateName } from "./scaffold.js";
 
 // Generated packages are written inside this package so their imports resolve here.
 const TMP = join(import.meta.dirname, "../.scaffold-test");
@@ -42,7 +42,7 @@ describe("create-flowaid-node", () => {
     expect(pkg.keywords).toContain("flowaid-node");
     expect(pkg.flowaid).toEqual({
       package: "nodePackage",
-      sdk: "^0.1.0",
+      sdk: SDK_RANGE,
       manifest: "manifest.json",
     });
 

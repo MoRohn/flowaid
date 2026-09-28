@@ -818,6 +818,25 @@ const docs = {
     secret: false,
     composeOnly: true,
   },
+  FLOWAID_IMAGE_TAG: {
+    group: "compose",
+    description:
+      "Release of the published images `docker/compose.images.yml` runs instead of building from source (a version such as `0.4.0`, optionally with `@sha256:<digest>`). Required with that overlay; the default stack builds locally and ignores it.",
+    required: false,
+    example: "0.4.0",
+    secret: false,
+    composeOnly: true,
+  },
+  FLOWAID_IMAGE_REGISTRY: {
+    group: "compose",
+    description:
+      "Registry and namespace of the published images for `docker/compose.images.yml` (`<registry>/flowaid-api`, `-worker`, `-web`); point it at a mirror to pull from there.",
+    default: "ghcr.io/morohn",
+    required: false,
+    example: "ghcr.io/morohn",
+    secret: false,
+    composeOnly: true,
+  },
 } as const satisfies Record<string, EnvVarDoc>;
 
 /** The name of a documented environment variable. */

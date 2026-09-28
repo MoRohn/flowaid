@@ -244,5 +244,7 @@ lists them empty for you to generate (`openssl rand -hex 16`).
 | `WORKER_CODE_CONCURRENCY` | no | `4` | `WORKER_CONCURRENCY` of the sandbox host `worker-code`. Compose only: not read by the api. |
 | `RUSTFS_PORT` | no | `9000` | Host port of the bundled S3-compatible store (`rustfs`, profile `s3`), published on `BIND_ADDRESS`. Compose only: not read by the api. |
 | `WORKER_REPLICAS` | no | `1` | Number of `worker` containers started by the scale profile. Compose only: not read by the api. |
+| `FLOWAID_IMAGE_TAG` | no | — | Release of the published images `docker/compose.images.yml` runs instead of building from source (a version such as `0.4.0`, optionally with `@sha256:<digest>`). Required with that overlay; the default stack builds locally and ignores it. Example: `0.4.0`. Compose only: not read by the api. |
+| `FLOWAID_IMAGE_REGISTRY` | no | `ghcr.io/morohn` | Registry and namespace of the published images for `docker/compose.images.yml` (`<registry>/flowaid-api`, `-worker`, `-web`); point it at a mirror to pull from there. Compose only: not read by the api. |
 
 <!-- env-table:end -->

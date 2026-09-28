@@ -198,11 +198,15 @@ export const CORE_NODES: readonly AnyNodeDefinition[] = [
   permissionCheckNode,
 ] as readonly AnyNodeDefinition[];
 
+/** The package's release and the node SDK range it targets (kept current by `pnpm version-packages`). */
+export const PACKAGE_VERSION = "0.1.0";
+export const SDK_RANGE = "^0.1.0";
+
 export const coreNodes: NodePackage = definePackage({
   name: "@flowaid/nodes-core",
-  version: "0.1.0",
+  version: PACKAGE_VERSION,
   nodes: CORE_NODES,
-  sdk: "^0.1.0",
+  sdk: SDK_RANGE,
 });
 
 export default coreNodes;

@@ -5,6 +5,7 @@
 | Document                                         | What it is                                                                                                                            |
 | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
 | [STATUS.md](STATUS.md)                           | What is built, what passes, what is next                                                                                              |
+| [RELEASING.md](RELEASING.md)                     | Changesets, the release workflow, the published images and how to verify them                                                         |
 | [UPGRADE_PLAN.md](UPGRADE_PLAN.md)               | The active delivery plan: phases P0–P6 and tracks J (Jev) and L (Lean). Machine-readable copy: [upgrade-plan.json](upgrade-plan.json) |
 | [design/SPEC.md](design/SPEC.md)                 | The product specification                                                                                                             |
 | [design/ARCHITECTURE.md](design/ARCHITECTURE.md) | The authoritative architecture                                                                                                        |

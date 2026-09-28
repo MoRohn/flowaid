@@ -23,7 +23,15 @@ FlowAId executes workflows that call external services with stored credentials. 
 
 ## Supported versions
 
-FlowAId has not had a release yet. Until the first release, fixes land on `main` only. After it, only the latest minor release receives security fixes.
+| Version                  | Security fixes                     |
+| ------------------------ | ---------------------------------- |
+| latest `0.x` minor       | yes, as a patch release            |
+| older `0.x` minors       | no: upgrade to the latest minor    |
+| `main` (unreleased code) | yes, fixed before the next release |
+
+While FlowAId is 0.x, only the latest minor release receives fixes. Published images
+(`ghcr.io/morohn/flowaid-*`) carry signed build provenance; verify them as described in
+[docs/RELEASING.md](docs/RELEASING.md#verifying-an-image) before you deploy.
 
 ## Operating securely
 

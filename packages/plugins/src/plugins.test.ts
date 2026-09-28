@@ -19,6 +19,8 @@ import {
 import { startFakeRegistry, type FakeRegistry } from "./testing.js";
 
 const ROOT = join(import.meta.dirname, "../../..");
+/** The range a package built for this platform declares (follows the release version). */
+const SDK = `^${PLATFORM_SDK_VERSION}`;
 const CORE = JSON.parse(readFileSync(join(ROOT, "packages/nodes-core/manifest.json"), "utf8")) as {
   nodes: NodeManifest[];
 };
@@ -103,14 +105,14 @@ describe("resolvePlugin against a fake registry", () => {
       name: "@acme/nodes-crm",
       version: "1.0.0",
       description: "CRM nodes",
-      flowaid: { package: "nodePackage", sdk: "^0.1.0" },
+      flowaid: { package: "nodePackage", sdk: SDK },
       files: { "manifest.json": manifestFor("@acme/nodes-crm") },
     });
     await reg.publish({
       name: "@acme/nodes-crm",
       version: "1.2.0",
       description: "CRM nodes",
-      flowaid: { package: "nodePackage", sdk: "^0.1.0" },
+      flowaid: { package: "nodePackage", sdk: SDK },
       files: { "manifest.json": manifestFor("@acme/nodes-crm", "lookup") },
     });
     await reg.publish({ name: "@acme/not-a-plugin", version: "1.0.0", keywords: ["other"] });
@@ -123,13 +125,13 @@ describe("resolvePlugin against a fake registry", () => {
     await reg.publish({
       name: "@acme/squatter",
       version: "1.0.0",
-      flowaid: { sdk: "^0.1.0" },
+      flowaid: { sdk: SDK },
       files: { "manifest.json": manifestFor("@acme/nodes-crm") },
     });
     await reg.publish({
       name: "@acme/tampered",
       version: "1.0.0",
-      flowaid: { sdk: "^0.1.0" },
+      flowaid: { sdk: SDK },
       files: { "manifest.json": manifestFor("@acme/tampered") },
       tamper: await packTarball({ "package.json": "{}", "manifest.json": "[]" }),
     });
@@ -154,7 +156,7 @@ describe("resolvePlugin against a fake registry", () => {
       registry: client,
       allowList: ["@acme"],
     });
-    expect(latest).toMatchObject({ name: "@acme/nodes-crm", version: "1.2.0", sdk: "^0.1.0" });
+    expect(latest).toMatchObject({ name: "@acme/nodes-crm", version: "1.2.0", sdk: SDK });
     expect(latest.integrity).toMatch(/^sha512-/);
     expect(latest.manifests.map((m) => m.id)).toEqual(["@acme/nodes-crm.lookup"]);
     const pinned = await resolvePlugin("@acme/nodes-crm@~1.0.0", {
