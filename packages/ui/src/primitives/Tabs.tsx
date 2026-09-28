@@ -1,8 +1,12 @@
 import {
   createContext,
   forwardRef,
+  useCallback,
   useContext,
+  useEffect,
   useId,
+  useRef,
+  useState,
   type ComponentPropsWithoutRef,
   type ComponentRef,
   type ReactNode,
@@ -62,17 +66,64 @@ export const Tabs = forwardRef<ComponentRef<typeof TabsPrimitive.Root>, TabsProp
 
 export type TabsListProps = ComponentPropsWithoutRef<typeof TabsPrimitive.List>;
 
+/** The edges of a scrollable row that hide content: they fade, so the row reads as scrollable. */
+function useOverflowEdges<T extends HTMLElement>() {
+  const ref = useRef<T | null>(null);
+  const [edges, setEdges] = useState({ start: false, end: false });
+  const measure = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    const start = el.scrollLeft > 1;
+    const end = el.scrollLeft + el.clientWidth < el.scrollWidth - 1;
+    setEdges((prev) => (prev.start === start && prev.end === end ? prev : { start, end }));
+  }, []);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    // the selected tab is the one a narrow screen must show
+    el.querySelector<HTMLElement>('[data-state="active"]')?.scrollIntoView?.({
+      block: "nearest",
+      inline: "nearest",
+    });
+    measure();
+    el.addEventListener("scroll", measure, { passive: true });
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    observer?.observe(el);
+    return () => {
+      el.removeEventListener("scroll", measure);
+      observer?.disconnect();
+    };
+  }, [measure]);
+  return { ref, edges };
+}
+
+const FADE = "1.5rem";
+
 export const TabsList = forwardRef<ComponentRef<typeof TabsPrimitive.List>, TabsListProps>(
-  function TabsList({ className, ...rest }, ref) {
+  function TabsList({ className, style, ...rest }, forwarded) {
     const { size } = useContext(TabsContext);
+    const { ref, edges } = useOverflowEdges<HTMLDivElement>();
+    const mask =
+      edges.start || edges.end
+        ? `linear-gradient(to right, ${edges.start ? `transparent, #000 ${FADE}` : "#000"}, ${
+            edges.end ? `#000 calc(100% - ${FADE}), transparent` : "#000"
+          })`
+        : undefined;
     return (
       <TabsPrimitive.List
-        ref={ref}
+        ref={(el) => {
+          ref.current = el;
+          if (typeof forwarded === "function") forwarded(el);
+          else if (forwarded) forwarded.current = el;
+        }}
+        data-overflow-start={edges.start || undefined}
+        data-overflow-end={edges.end || undefined}
         className={cn(
-          "relative flex shrink-0 items-end gap-4 overflow-x-auto border-b border-border",
+          "relative flex shrink-0 items-end gap-4 overflow-x-auto border-b border-border [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
           size === "sm" ? "h-7" : "h-8",
           className,
         )}
+        style={mask ? { ...style, maskImage: mask, WebkitMaskImage: mask } : style}
         {...rest}
       />
     );

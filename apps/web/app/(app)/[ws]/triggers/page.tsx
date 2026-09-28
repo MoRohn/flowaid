@@ -8,6 +8,7 @@ import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { PageHeader } from "@flowaid/ui/shell";
 import { ExposuresSection, useWorkflowNames } from "~/admin/integrations/McpTab";
+import { AddTriggerButton } from "~/admin/triggers/AddTriggerDialog";
 import { ScheduleList } from "~/admin/triggers/Schedules";
 import { WebhookList } from "~/admin/triggers/Webhooks";
 import { Section, useQueryTab } from "~/admin/ui";
@@ -41,14 +42,16 @@ function Triggers() {
         {tab === "webhooks" ? (
           <Section
             title="Webhooks"
-            description="Signed HTTP endpoints. The path and signature scheme come from the workflow; the rest is per environment."
+            description="URLs other services call to start runs. The path and signature scheme belong to the workflow; enabling, secrets and replay protection are per environment."
+            actions={<AddTriggerButton kind="webhook" />}
           >
             <WebhookList workflowName={name} highlight={params.get("webhook")} />
           </Section>
         ) : tab === "schedules" ? (
           <Section
             title="Schedules"
-            description="Cron triggers. Pause them, choose how missed runs are handled, spread load with jitter, or run one now."
+            description="Runs on a timetable. Pause them, choose how missed runs are handled, spread load with jitter, or run one now."
+            actions={<AddTriggerButton kind="schedule" />}
           >
             <ScheduleList workflowName={name} />
           </Section>

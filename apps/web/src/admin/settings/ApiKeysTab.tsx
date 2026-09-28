@@ -6,6 +6,7 @@ import { KeyRound, Plus, RotateCw, Trash2 } from "lucide-react";
 import {
   Badge,
   Button,
+  CopyButton,
   Checkbox,
   ConfirmDialog,
   Dialog,
@@ -383,6 +384,7 @@ export function ApiKeysTab() {
         secret={secret?.key ?? null}
         title={secret?.title ?? ""}
         onClose={() => setSecret(null)}
+        extra={secret ? <KeyExample apiKey={secret.key} /> : null}
       />
       <ConfirmDialog
         open={rotating !== null}
@@ -417,5 +419,34 @@ export function ApiKeysTab() {
         }}
       />
     </Section>
+  );
+}
+
+/** How to use a fresh key: start a deployed workflow's run from a script. */
+function KeyExample({ apiKey }: { apiKey: string }) {
+  const origin = typeof window === "undefined" ? "" : window.location.origin;
+  const example = [
+    `curl -X POST ${origin}/v1/workflows/<workflow id>/run \\`,
+    `  -H "Authorization: Bearer ${apiKey}" \\`,
+    "  -H 'content-type: application/json' \\",
+    `  -d '{"input": {"message": "Hello"}, "mode": "sync"}'`,
+  ].join("\n");
+  return (
+    <div className="flex flex-col gap-1.5">
+      <p className="text-xs text-ink-2">
+        Start a run of the version deployed to the key&apos;s environment (the workflow id is in the
+        workflow&apos;s address):
+      </p>
+      <div className="flex items-start gap-2">
+        <pre className="min-w-0 flex-1 overflow-x-auto rounded-md border border-border bg-surface-2 p-2 font-mono text-2xs text-ink">
+          {example}
+        </pre>
+        <CopyButton value={example} label="Copy example request" size="sm" />
+      </div>
+      <p className="text-xs text-ink-3">
+        The same key works with the SDK and the <code className="font-mono">flowaid</code> CLI (
+        <code className="font-mono">FLOWAID_API_KEY</code>).
+      </p>
+    </div>
   );
 }

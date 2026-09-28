@@ -2,7 +2,7 @@
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { BookOpen, Plus } from "lucide-react";
 import {
   Badge,
@@ -19,19 +19,22 @@ import {
   FieldRow,
   Input,
   NumberInput,
+  RadioGroup,
+  RadioItem,
   Select,
   SelectItem,
-  Switch,
   Textarea,
 } from "@flowaid/ui/primitives";
 import { RelativeTime } from "@flowaid/ui/data";
 import { PageHeader } from "@flowaid/ui/shell";
 import { get, post } from "~/api/client";
-import type { Credential } from "~/admin/types";
+import type { Credential, ModelInfo, Provider } from "~/admin/types";
+import { providerName } from "~/admin/providerNames";
 import { Notice, QueryView, useMutate } from "~/admin/ui";
 import {
   EMPTY_SOURCE,
   KIND_LABEL,
+  embeddingOptions,
   countsLine,
   sourceBody,
   sourceFormError,
@@ -70,20 +73,45 @@ function NewSourceDialog({
     select: (rows) => new Set(rows.map((c) => c.type)),
     enabled: open,
   });
-  const create = useMutate(() => post<KnowledgeSource>("/v1/knowledge/sources", sourceBody(f)), {
+  const providers = useQuery({
+    queryKey: ["providers", s.ws],
+    queryFn: () => get<Provider[]>("/v1/providers"),
+    enabled: open,
+  });
+  const models = useQuery({
+    queryKey: ["models", s.ws],
+    queryFn: () => get<ModelInfo[]>("/v1/models"),
+    enabled: open,
+  });
+  const options = useMemo(
+    () =>
+      embeddingOptions(
+        models.data ?? [],
+        providers.data ?? [],
+        credentialTypes.data ?? new Set<string>(),
+      ),
+    [models.data, providers.data, credentialTypes.data],
+  );
+  // "provider/model", "keyword", or null while the person has not chosen: then the first model
+  // this workspace can call, else keyword search (a model without a key fails every document)
+  const [choice, setChoice] = useState<string | null>(null);
+  const firstReady = options.find((o) => o.ready);
+  const embedding =
+    choice ?? (firstReady ? `${firstReady.provider}/${firstReady.model}` : "keyword");
+  const keywordOnly = embedding === "keyword";
+  const chosen = keywordOnly
+    ? undefined
+    : options.find((o) => `${o.provider}/${o.model}` === embedding);
+  const [chosenProvider = "", chosenModel = ""] = keywordOnly ? [] : embedding.split(/\/(.*)/s);
+  const form: SourceForm = { ...f, embeddingProvider: chosenProvider, embeddingModel: chosenModel };
+  const create = useMutate(() => post<KnowledgeSource>("/v1/knowledge/sources", sourceBody(form)), {
     success: (x) => `Created ${x.name}`,
     invalidate: [["knowledge-sources", s.ws]],
     onSuccess: (x) => router.push(`/${s.ws}/knowledge/${x.id}`),
   });
-  const error = sourceFormError(f);
-  const keywordOnly = !f.embeddingProvider;
-  // indexing embeds with a workspace credential of the provider (Ollama needs none)
-  const provider = f.embeddingProvider.trim().toLowerCase();
-  const missingKey =
-    !keywordOnly &&
-    provider !== "ollama" &&
-    credentialTypes.data !== undefined &&
-    !credentialTypes.data.has(`${provider}.api_key`);
+  const error = sourceFormError(form);
+  const missingKey = !keywordOnly && chosen !== undefined && !chosen.ready;
+  const loadingModels = models.isPending || providers.isPending;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -209,47 +237,67 @@ function NewSourceDialog({
               </div>
             ) : null}
             <div className="flex flex-col gap-3 rounded-md border border-border p-3">
-              <label className="flex items-center gap-2 text-xs text-ink-2">
-                <Switch
-                  size="sm"
-                  checked={!keywordOnly}
-                  onCheckedChange={(on) =>
-                    setF((prev) => ({
-                      ...prev,
-                      embeddingProvider: on ? EMPTY_SOURCE.embeddingProvider : "",
-                      embeddingModel: on ? EMPTY_SOURCE.embeddingModel : "",
-                    }))
-                  }
-                />
-                Embed chunks for semantic search (off: keyword search only)
-              </label>
+              <FieldRow label="Search by">
+                <RadioGroup
+                  value={keywordOnly ? "keyword" : "meaning"}
+                  onValueChange={(v) => {
+                    const pick = firstReady ?? options[0];
+                    setChoice(
+                      v === "keyword" || !pick ? "keyword" : `${pick.provider}/${pick.model}`,
+                    );
+                  }}
+                  aria-label="Search by"
+                >
+                  <RadioItem
+                    value="meaning"
+                    label="Meaning and keywords"
+                    description="Chunks are embedded, so a search finds passages that say the same thing in other words."
+                    disabled={options.length === 0}
+                  />
+                  <RadioItem
+                    value="keyword"
+                    label="Keywords only"
+                    description="No embedding model or key needed; matches the words a search uses."
+                  />
+                </RadioGroup>
+              </FieldRow>
               {!keywordOnly ? (
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <FieldRow label="Embedding provider" htmlFor="ks-provider">
-                    <Input
-                      id="ks-provider"
-                      value={f.embeddingProvider}
-                      onChange={(e) => set("embeddingProvider", e.target.value)}
-                    />
-                  </FieldRow>
-                  <FieldRow label="Embedding model" htmlFor="ks-model">
-                    <Input
-                      id="ks-model"
-                      value={f.embeddingModel}
-                      onChange={(e) => set("embeddingModel", e.target.value)}
-                    />
-                  </FieldRow>
-                  {missingKey ? (
-                    <p role="status" className="text-xs text-warn-text sm:col-span-2">
-                      This workspace has no {f.embeddingProvider} API key, so documents will fail to
-                      index.{" "}
-                      <a className="underline" href={`/${s.ws}/credentials`}>
-                        Add a credential
-                      </a>
-                      , or turn embeddings off for keyword search.
-                    </p>
-                  ) : null}
-                </div>
+                <FieldRow label="Embedding model" htmlFor="ks-model">
+                  <Select
+                    id="ks-model"
+                    value={embedding}
+                    onValueChange={setChoice}
+                    placeholder={loadingModels ? "Loading…" : "Choose a model"}
+                  >
+                    {options.map((o) => (
+                      <SelectItem
+                        key={`${o.provider}/${o.model}`}
+                        value={`${o.provider}/${o.model}`}
+                        description={o.ready ? "Ready" : "Needs a key"}
+                      >
+                        {providerName(o.provider)} · {o.model}
+                      </SelectItem>
+                    ))}
+                  </Select>
+                </FieldRow>
+              ) : !loadingModels && !firstReady ? (
+                <p className="text-xs text-ink-3">
+                  No embedding provider has a key in this workspace yet.{" "}
+                  <a className="text-accent-text hover:underline" href={`/${s.ws}/credentials`}>
+                    Add an OpenAI or Gemini key
+                  </a>{" "}
+                  to search by meaning.
+                </p>
+              ) : null}
+              {missingKey && chosen ? (
+                <p role="status" className="text-xs text-warn-text">
+                  {providerName(chosen.provider)} has no API key in this workspace, so documents
+                  will fail to index.{" "}
+                  <a className="underline" href={`/${s.ws}/credentials`}>
+                    Add a credential
+                  </a>
+                  , pick a ready model, or search by keywords only.
+                </p>
               ) : null}
               <div className="grid gap-4 sm:grid-cols-3">
                 <FieldRow label="Chunking" htmlFor="ks-strategy">

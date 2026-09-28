@@ -759,10 +759,26 @@ export function ExposuresSection() {
       <QueryView query={exposures}>
         {(rows) =>
           rows.length === 0 ? (
-            <p className="text-xs text-ink-3">
-              No workflow is exposed yet. Exposed workflows appear to MCP clients as tools with the
-              deployed version's input schema.
-            </p>
+            <div className="flex flex-col gap-2 text-xs text-ink-2">
+              <p className="text-ink-3">
+                No workflow is exposed yet. MCP clients (desktop assistants, IDE agents) can call a
+                deployed workflow as a tool, with its input schema as the tool&apos;s arguments.
+              </p>
+              <ol className="flex list-decimal flex-col gap-1 pl-4">
+                <li>
+                  <span className="font-medium text-ink">Expose workflow</span>: pick a deployed
+                  workflow, its environment and a tool name.
+                </li>
+                <li>
+                  <span className="font-medium text-ink">Mint token</span>: a key limited to the
+                  tools you choose, shown once.
+                </li>
+                <li>
+                  Give your MCP client the endpoint above, with the token as a{" "}
+                  <code className="font-mono">Bearer</code> authorization header.
+                </li>
+              </ol>
+            </div>
           ) : (
             <ul
               className="flex flex-col divide-y divide-border rounded-md border border-border"

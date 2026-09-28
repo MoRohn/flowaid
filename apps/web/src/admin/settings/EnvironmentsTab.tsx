@@ -97,7 +97,11 @@ function EnvironmentDialog({
             >
               <Switch id="env-protected" checked={isProtected} onCheckedChange={setProtected} />
             </FieldRow>
-            <FieldRow label="Variables" error={vars.errors[0]}>
+            <FieldRow
+              label="Variables"
+              error={vars.errors[0]}
+              hint="Values for workflow variables whose source is the environment; nodes read them as $vars.NAME. Secrets belong in credentials, not here."
+            >
               <KeyValueEditor
                 value={rows}
                 onChange={(r) => setRows(r.map((x) => ({ key: x.key, value: x.value })))}
@@ -148,7 +152,7 @@ export function EnvironmentsTab() {
   return (
     <Section
       title="Environments"
-      description="Each environment has its own deployments, secret bindings and variables."
+      description="Stages a workflow moves through (dev, staging, prod). Each has its own deployed version, secret bindings, variables, webhooks and schedules."
       actions={
         canEdit ? (
           <Button

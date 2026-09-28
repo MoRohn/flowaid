@@ -24,7 +24,10 @@ import {
   Select,
   SelectItem,
   Switch,
+  ToggleGroup,
+  ToggleGroupItem,
 } from "@flowaid/ui/primitives";
+import { SchemaForm, withDefaults } from "@flowaid/ui/forms";
 import {
   DataTable,
   RelativeTime,
@@ -34,7 +37,7 @@ import {
 import { formatPercent } from "@flowaid/ui/lib";
 import { PageHeader } from "@flowaid/ui/shell";
 import { del, get, patch, post, qs } from "~/api/client";
-import type { Page, VersionSummary, WorkflowSummary } from "~/api/types";
+import type { Page, VersionSummary, WorkflowDetail, WorkflowSummary } from "~/api/types";
 import {
   expectationSummary,
   expectationTemplate,
@@ -55,19 +58,36 @@ const NONE = "__none";
 
 function CaseDialog({
   setId,
+  workflowId,
   editing,
   onClose,
 }: {
   setId: string;
+  /** the set's workflow: its input schema turns the input into a form */
+  workflowId: string | null;
   editing: EvaluationCase | "new" | null;
   onClose: () => void;
 }) {
   const s = useSession();
   const existing = editing && editing !== "new" ? editing : null;
-  const [input, setInput] = useState(existing ? pretty(existing.input) : '{\n  "message": ""\n}');
+  const workflow = useQuery({
+    queryKey: ["workflow", s.ws, workflowId],
+    queryFn: () => get<WorkflowDetail>(`/v1/workflows/${workflowId as string}`),
+    enabled: Boolean(workflowId),
+  });
+  const schema = workflow.data?.draft.inputs as
+    { type?: string; properties?: Record<string, unknown> } | undefined;
+  const hasForm = Boolean(schema?.properties && Object.keys(schema.properties).length > 0);
+  const [inputMode, setInputMode] = useState<"form" | "json" | null>(null);
+  const mode = inputMode ?? (hasForm ? "form" : "json");
+  // the form is uncontrolled: it re-seeds when the JSON editor hands a value back
+  const [seed, setSeed] = useState(0);
+  const [input, setInput] = useState<string | null>(existing ? pretty(existing.input) : null);
+  const inputText =
+    input ?? pretty(schema && hasForm ? withDefaults(schema as never, {}) : { message: "" });
   const [expected, setExpected] = useState(pretty(existing?.expected ?? expectationTemplate()));
   const [tags, setTags] = useState(existing?.tags.join(", ") ?? "");
-  const inputOk = parseJsonText(input);
+  const inputOk = parseJsonText(inputText);
   const expectedOk = parseJsonObject(expected);
   const save = useMutate(
     () => {
@@ -106,14 +126,44 @@ function CaseDialog({
             </DialogDescription>
           </DialogHeader>
           <DialogBody className="grid max-h-[70vh] gap-4 overflow-auto lg:grid-cols-2">
-            <JsonField
-              id="case-input"
-              label="Input"
-              value={input}
-              onChange={setInput}
-              error={inputOk.ok ? null : inputOk.error}
-              minRows={10}
-            />
+            <div className="flex flex-col gap-2">
+              {hasForm ? (
+                <ToggleGroup
+                  type="single"
+                  size="sm"
+                  value={mode}
+                  onValueChange={(v) => {
+                    if (v === "form") setSeed((n) => n + 1);
+                    if (v === "form" || v === "json") setInputMode(v);
+                  }}
+                  aria-label="Input editor"
+                  className="self-start"
+                >
+                  <ToggleGroupItem value="form">Form</ToggleGroupItem>
+                  <ToggleGroupItem value="json">JSON</ToggleGroupItem>
+                </ToggleGroup>
+              ) : null}
+              {mode === "form" && hasForm ? (
+                <FieldRow label="Input" hint="What the run starts with, from the workflow's inputs">
+                  <SchemaForm
+                    key={seed}
+                    schema={schema as never}
+                    defaultValues={(inputOk.ok ? inputOk.value : {}) as Record<string, unknown>}
+                    onChange={(v) => setInput(pretty(v))}
+                    aria-label="Case input"
+                  />
+                </FieldRow>
+              ) : (
+                <JsonField
+                  id="case-input"
+                  label="Input"
+                  value={inputText}
+                  onChange={setInput}
+                  error={inputOk.ok ? null : inputOk.error}
+                  minRows={10}
+                />
+              )}
+            </div>
             <JsonField
               id="case-expected"
               label="Expected"
@@ -164,7 +214,8 @@ function RunDialog({
   const s = useSession();
   const router = useRouter();
   const [workflowId, setWorkflowId] = useState(set.workflowId ?? "");
-  const [version, setVersion] = useState(DRAFT);
+  // null until chosen: the latest published version when there is one (what callers run), else the draft
+  const [chosenVersion, setVersion] = useState<string | null>(null);
   const [env, setEnv] = useState(s.environments[0]?.id ?? "");
   const [baseline, setBaseline] = useState(NONE);
   const [concurrency, setConcurrency] = useState<number | null>(4);
@@ -183,6 +234,7 @@ function RunDialog({
     select: (v) =>
       v.filter((x) => x.kind === "published").sort((a, b) => (b.version ?? 0) - (a.version ?? 0)),
   });
+  const version = chosenVersion ?? versions.data?.[0]?.id ?? DRAFT;
   const start = useMutate(
     () =>
       post<EvaluationRun>("/v1/evaluations/runs", {
@@ -226,7 +278,7 @@ function RunDialog({
                   placeholder="Choose a workflow"
                   onValueChange={(v) => {
                     setWorkflowId(v);
-                    setVersion(DRAFT);
+                    setVersion(null);
                     setBaseline(NONE);
                   }}
                 >
@@ -242,8 +294,12 @@ function RunDialog({
               <FieldRow label="Version" htmlFor="run-version" required>
                 <Select id="run-version" value={version} onValueChange={setVersion} mono>
                   <SelectItem value={DRAFT}>Current draft</SelectItem>
-                  {(versions.data ?? []).map((v) => (
-                    <SelectItem key={v.id} value={v.id}>
+                  {(versions.data ?? []).map((v, i) => (
+                    <SelectItem
+                      key={v.id}
+                      value={v.id}
+                      {...(i === 0 ? { description: "Latest published" } : {})}
+                    >
                       v{v.version}
                     </SelectItem>
                   ))}
@@ -590,6 +646,7 @@ export default function SetPage({ params }: { params: Promise<{ setId: string }>
         <CaseDialog
           key={editing === "new" ? "new" : editing.id}
           setId={setId}
+          workflowId={set.data?.workflowId ?? null}
           editing={editing}
           onClose={() => setEditing(null)}
         />

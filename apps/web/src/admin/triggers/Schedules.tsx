@@ -24,6 +24,7 @@ import type { Schedule } from "../types";
 import { Notice, QueryView, useMutate } from "../ui";
 import { formatJitter, parseJitterSeconds } from "./logic";
 
+import { NoTriggers } from "./AddTriggerDialog";
 export function ScheduleList({
   workflowId,
   workflowName,
@@ -55,9 +56,7 @@ export function ScheduleList({
     <QueryView query={schedules} rows={2}>
       {(rows) =>
         rows.length === 0 ? (
-          <p className="text-xs text-ink-3">
-            No schedule is live. Add a schedule trigger in the builder, publish and deploy.
-          </p>
+          <NoTriggers kind="schedule" {...(workflowId ? { workflowId } : {})} />
         ) : (
           <ul
             className="flex flex-col divide-y divide-border rounded-md border border-border"

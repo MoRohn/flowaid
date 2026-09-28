@@ -134,17 +134,41 @@ export function AgentDialog({
           </FieldRow>
           <fieldset className="flex flex-col gap-2">
             <legend className="text-eyebrow mb-1">Tools</legend>
+            <p className="-mt-1 text-xs text-ink-3">
+              What the agent may call to act or look things up. For each tool choose whether it runs
+              on its own or waits for a person to approve the call.
+            </p>
             {errors.tools ? (
               <p className="text-xs text-danger" role="alert">
                 {errors.tools}
               </p>
             ) : null}
             {available.length === 0 ? (
-              <p className="text-sm text-ink-3">
-                {catalog.isPending
-                  ? "Loading tools…"
-                  : "No tools yet: connect an MCP server, import an OpenAPI document or register a workflow as a tool under Integrations."}
-              </p>
+              catalog.isPending ? (
+                <p className="text-sm text-ink-3">Loading tools…</p>
+              ) : (
+                <p className="rounded-sm border border-dashed border-border px-3 py-2.5 text-sm text-ink-3">
+                  No tools yet. An agent without tools only writes answers.{" "}
+                  <a className="text-accent-text hover:underline" href={`/${s.ws}/integrations`}>
+                    Connect an MCP server
+                  </a>
+                  ,{" "}
+                  <a
+                    className="text-accent-text hover:underline"
+                    href={`/${s.ws}/integrations?tab=openapi`}
+                  >
+                    import an OpenAPI document
+                  </a>{" "}
+                  or{" "}
+                  <a
+                    className="text-accent-text hover:underline"
+                    href={`/${s.ws}/triggers?tab=mcp`}
+                  >
+                    expose a workflow as a tool
+                  </a>
+                  , then come back.
+                </p>
+              )
             ) : (
               <ul className="flex flex-col divide-y divide-border rounded-sm border border-border">
                 {available.map((t) => {
@@ -186,7 +210,12 @@ export function AgentDialog({
             )}
           </fieldset>
           <div className="grid gap-4 sm:grid-cols-3">
-            <FieldRow label="Max steps" htmlFor="agent-steps" error={errors.maxSteps}>
+            <FieldRow
+              label="Max steps"
+              htmlFor="agent-steps"
+              error={errors.maxSteps}
+              hint="Model turns before it must answer"
+            >
               <Input
                 id="agent-steps"
                 inputMode="numeric"
@@ -194,7 +223,12 @@ export function AgentDialog({
                 onChange={(e) => set("maxSteps", e.target.value)}
               />
             </FieldRow>
-            <FieldRow label="Max tool calls" htmlFor="agent-calls" error={errors.maxToolCalls}>
+            <FieldRow
+              label="Max tool calls"
+              htmlFor="agent-calls"
+              error={errors.maxToolCalls}
+              hint="Across all steps"
+            >
               <Input
                 id="agent-calls"
                 inputMode="numeric"
@@ -202,7 +236,12 @@ export function AgentDialog({
                 onChange={(e) => set("maxToolCalls", e.target.value)}
               />
             </FieldRow>
-            <FieldRow label="Max cost (USD)" htmlFor="agent-cost" error={errors.maxCostUsd}>
+            <FieldRow
+              label="Max cost (USD)"
+              htmlFor="agent-cost"
+              error={errors.maxCostUsd}
+              hint="Per run of the agent"
+            >
               <Input
                 id="agent-cost"
                 inputMode="decimal"
