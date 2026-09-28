@@ -190,37 +190,38 @@ const docs = {
   },
   PORT: {
     group: "core",
-    description: "TCP port of the api (HTTP, SSE, webhooks, MCP endpoint).",
-    default: "3000",
+    description:
+      "TCP port of the api (HTTP, SSE, webhooks, MCP endpoint). The web app, the address people open, is on 3000 beside it. Under compose it is the host port the api is published on (the container always listens on 3001).",
+    default: "3001",
     required: false,
-    example: "3000",
+    example: "3001",
     secret: false,
   },
   FLOWAID_BASE_URL: {
     group: "core",
     description:
       "Public URL of the api as seen by browsers, webhook callers and MCP clients. Used to build external review links, webhook URLs and the OpenAPI `servers` entry. In production it must be `https:` unless the host is loopback or `FLOWAID_ALLOW_INSECURE_HTTP=true`.",
-    default: "http://localhost:3000",
+    default: "http://localhost:3001",
     required: false,
-    example: "http://localhost:3000",
+    example: "http://localhost:3001",
     secret: false,
   },
   FLOWAID_WEB_URL: {
     group: "core",
     description:
       "Public URL of the web app. Used for deep links in notifications and as the default CORS origin. Same production rule as `FLOWAID_BASE_URL`.",
-    default: "http://localhost:3001",
+    default: "http://localhost:3000",
     required: false,
-    example: "http://localhost:3001",
+    example: "http://localhost:3000",
     secret: false,
   },
   CORS_ORIGINS: {
     group: "core",
     description:
       "Comma-separated list of browser origins allowed to call the api with credentials. `*` is always rejected (the api allows credentialed requests); in production so is an origin cross-site with `FLOWAID_BASE_URL` unless `FLOWAID_ALLOW_CROSS_SITE=true`.",
-    default: "http://localhost:3001",
+    default: "http://localhost:3000",
     required: false,
-    example: "http://localhost:3001,https://flowaid.example.com",
+    example: "http://localhost:3000,https://flowaid.example.com",
     secret: false,
   },
   RATE_LIMIT_MAX: {
@@ -235,9 +236,9 @@ const docs = {
   FLOWAID_API_INTERNAL_URL: {
     group: "core",
     description:
-      "URL the web app's server side uses to reach the api over the deployment's private network (compose: `http://api:3000`). Unset means `FLOWAID_BASE_URL`.",
+      "URL the web app's server side uses to reach the api over the deployment's private network (compose: `http://api:3001`). Unset means `FLOWAID_BASE_URL`.",
     required: false,
-    example: "http://api:3000",
+    example: "http://api:3001",
     secret: false,
   },
   FLOWAID_TRUST_PROXY: {
@@ -877,10 +878,11 @@ const docs = {
   },
   WEB_PORT: {
     group: "compose",
-    description: "Host port of the compose `web` service (the api uses `PORT`).",
-    default: "3001",
+    description:
+      "Host port of the compose `web` service, the address people open (the api uses `PORT`).",
+    default: "3000",
     required: false,
-    example: "3001",
+    example: "3000",
     secret: false,
     composeOnly: true,
   },

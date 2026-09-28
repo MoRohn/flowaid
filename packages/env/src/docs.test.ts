@@ -198,7 +198,7 @@ describe("environment variable documentation", () => {
   it("renders required variables set, defaults set, quick-start values set and optionals commented", () => {
     const text = renderEnvExample();
     expect(text).toContain("\nDATABASE_URL=postgres://flowaid:flowaid@localhost:5432/flowaid\n");
-    expect(text).toContain("\nPORT=3000\n");
+    expect(text).toContain("\nPORT=3001\n");
     expect(text).toContain("\n# REDIS_URL=redis://localhost:6379\n");
     expect(text).toContain("# Values: development | test | production");
     expect(text).toContain("\nFLOWAID_ADMIN_EMAIL=admin@flowaid.local\n");

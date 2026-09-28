@@ -57,7 +57,7 @@ describe("loadEnv", () => {
   it("returns a frozen Env with flags from a minimal source", () => {
     const env = loadEnv(MINIMAL);
     expect(env.DATABASE_URL).toBe(MINIMAL.DATABASE_URL);
-    expect(env.PORT).toBe(3000);
+    expect(env.PORT).toBe(3001);
     expect(Object.isFrozen(env)).toBe(true);
     expect(Object.isFrozen(env.flags)).toBe(true);
     expect(Object.isFrozen(env.secretRefs)).toBe(true);
@@ -95,7 +95,7 @@ describe("loadEnv", () => {
   it("treats empty and whitespace-only strings as unset", () => {
     const env = loadEnv({ ...MINIMAL, REDIS_URL: "", PORT: "   ", OPENAI_API_KEY: " " });
     expect(env.REDIS_URL).toBeUndefined();
-    expect(env.PORT).toBe(3000);
+    expect(env.PORT).toBe(3001);
     expect(env.flags.hasOpenAI).toBe(false);
   });
 
@@ -347,8 +347,8 @@ describe("secret-safe serialisation", () => {
       FLOWAID_MASTER_KEY: REDACTED_PLACEHOLDER,
       FLOWAID_SECRET_SLACK_TOKEN: REDACTED_PLACEHOLDER,
       FLOWAID_ADMIN_EMAIL: "owner@example.com",
-      PORT: "3000",
-      CORS_ORIGINS: "http://localhost:3001",
+      PORT: "3001",
+      CORS_ORIGINS: "http://localhost:3000",
     });
     expect(JSON.stringify({ env })).not.toContain("canary");
     expect(JSON.stringify([env])).not.toContain("canary");
