@@ -696,14 +696,6 @@ export const Inspector = forwardRef<HTMLDivElement, InspectorProps>(function Ins
         <div className="flex h-6 min-w-0 items-center gap-2">
           <CategoryDot category={node.category} />
           <InlineName name={node.name} onRename={onRename} />
-          {/* the type yields to the name: it truncates first and names it in full on hover */}
-          <Hint
-            hint={node.nodeType ?? node.kind}
-            announce={false}
-            className="min-w-0 max-w-[45%] shrink truncate font-mono text-2xs tracking-wide text-ink-3"
-          >
-            {node.nodeType ?? node.kind}
-          </Hint>
           {onClose ? (
             <IconButton label="Close inspector" size="sm" onClick={onClose} className="-mr-1">
               <X strokeWidth={1.75} />
@@ -718,6 +710,14 @@ export const Inspector = forwardRef<HTMLDivElement, InspectorProps>(function Ins
               Not run
             </Badge>
           )}
+          {/* the name has the first row to itself; the type reads here, in full where it fits */}
+          <Hint
+            hint={node.nodeType ?? node.kind}
+            announce={false}
+            className="min-w-0 max-w-full truncate font-mono text-2xs tracking-wide text-ink-3"
+          >
+            {node.nodeType ?? node.kind}
+          </Hint>
           {node.provider ? (
             <Badge tone="outline" mono size="sm" className="text-ink-3">
               {node.provider}
