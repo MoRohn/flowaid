@@ -97,6 +97,10 @@
       "dir": "packages/knowledge",
       "allow": ["workflow-core", "shared"]
     },
+    "pageindex": {
+      "dir": "packages/pageindex",
+      "allow": ["workflow-core", "shared"]
+    },
     "insights": {
       "dir": "packages/insights",
       "allow": ["shared"],

@@ -12,6 +12,7 @@ import type {
   ProviderAccess,
   SafeFetch,
   SandboxAccess,
+  DocumentIndexAccess,
   KnowledgeAccess,
   StateAccess,
   ToolAccess,
@@ -47,6 +48,7 @@ export const CAPABILITY_SERVICES: Readonly<Record<string, NodeCapability>> = {
   "providers.rerank": "generation",
   sandbox: "sandbox",
   knowledge: "knowledge",
+  documents: "documents",
 };
 
 /** Wraps a full context so that services of undeclared capabilities throw `ForbiddenError`. */
@@ -117,6 +119,16 @@ export function scopeContext<C>(
         upsertDocument: () => rejected("knowledge", "ctx.knowledge.upsertDocument"),
         deleteDocument: () => rejected("knowledge", "ctx.knowledge.deleteDocument"),
       };
+  // RFC-0022: nodes that did not declare `documents` never see document indexes
+  const documents: DocumentIndexAccess | undefined = has("documents")
+    ? ctx.documents
+    : {
+        resolve: () => rejected("documents", "ctx.documents.resolve"),
+        getIndex: () => rejected("documents", "ctx.documents.getIndex"),
+        outline: () => rejected("documents", "ctx.documents.outline"),
+        readPages: () => rejected("documents", "ctx.documents.readPages"),
+        requestIndex: () => rejected("documents", "ctx.documents.requestIndex"),
+      };
   return {
     ...ctx,
     credentials,
@@ -128,5 +140,6 @@ export function scopeContext<C>(
     providers,
     ...(sandbox ? { sandbox } : {}),
     ...(knowledge ? { knowledge } : {}),
+    ...(documents ? { documents } : {}),
   };
 }

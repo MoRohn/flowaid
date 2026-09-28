@@ -14,8 +14,8 @@ const exported: unknown[] = Object.values(schema);
 const tables = exported.filter(isTable);
 
 describe("schema", () => {
-  it("has the 48 tables of DATABASE.md", () => {
-    expect(tables).toHaveLength(48);
+  it("has the 50 tables of DATABASE.md", () => {
+    expect(tables).toHaveLength(50);
   });
 
   it("indexes every tenant table by workspace first (or by a unique key that starts with it)", () => {
