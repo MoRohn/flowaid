@@ -371,7 +371,7 @@ export const CriteriaEditor = forwardRef<HTMLDivElement, CriteriaEditorProps>(
                   showIssues && keyIssue && (touched || Boolean(field["aria-invalid"]));
                 return (
                   <div className="flex flex-col gap-1">
-                    <div className="grid grid-cols-[20px_minmax(0,2fr)_minmax(0,3fr)_28px] items-center gap-1.5">
+                    <div className="grid grid-cols-[20px_minmax(0,2fr)_minmax(0,3fr)_28px] items-start gap-1.5 [&>*:first-child]:mt-1.5 [&>*:last-child]:mt-0.5">
                       {handle}
                       <Input
                         mono
@@ -401,11 +401,16 @@ export const CriteriaEditor = forwardRef<HTMLDivElement, CriteriaEditorProps>(
                             });
                         }}
                       />
-                      <Input
+                      {/* descriptions run to a sentence: they wrap instead of scrolling out of view */}
+                      <Textarea
                         aria-label={`Option ${index + 1} description`}
                         placeholder="The customer asks for money back"
                         value={opt.description}
                         disabled={isDisabled}
+                        autoGrow
+                        minRows={1}
+                        maxRows={4}
+                        className="text-xs"
                         onChange={(e) =>
                           set({
                             kind: "choice",

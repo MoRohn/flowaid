@@ -732,7 +732,7 @@ export const Inspector = forwardRef<HTMLDivElement, InspectorProps>(function Ins
             <Hint
               hint={node.description}
               announce={false}
-              className="basis-full truncate text-2xs text-ink-3"
+              className="line-clamp-3 basis-full text-2xs text-ink-3"
             >
               {node.description}
             </Hint>

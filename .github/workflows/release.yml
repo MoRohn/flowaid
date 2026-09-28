@@ -32,6 +32,8 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+    env:
+      HAS_RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN != '' }}
     outputs:
       tag: ${{ steps.tag.outputs.tag }}
     steps:
@@ -48,18 +50,47 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Open or update the Version packages pull request
-        id: changesets
+      # Pull requests opened with the default token do not start CI; one opened with a GitHub App
+      # token or a fine-grained PAT in RELEASE_TOKEN does (contents, pull requests and workflows:
+      # read and write on this repository, docs/RELEASING.md). A token that is missing or lacks a
+      # permission never blocks a release: the default token opens the pull request instead.
+      - name: Open or update the Version packages pull request (RELEASE_TOKEN)
+        id: with-token
+        if: env.HAS_RELEASE_TOKEN == 'true'
+        continue-on-error: true
         uses: changesets/action@v2
         with:
-          # pull requests opened with the default token do not start CI; a token of a GitHub App
-          # or a fine-grained PAT (contents + pull requests: write) in RELEASE_TOKEN does
-          github-token: ${{ secrets.RELEASE_TOKEN || github.token }}
+          github-token: ${{ secrets.RELEASE_TOKEN }}
           version-script: pnpm version-packages
           commit-message: "Version packages"
           pr-title: "Version packages"
           create-github-releases: false
           push-git-tags: false
+
+      - name: RELEASE_TOKEN was refused
+        if: steps.with-token.outcome == 'failure'
+        run: |
+          echo "::warning title=RELEASE_TOKEN::The token could not update the Version packages branch; it needs contents, pull requests and workflows read and write on this repository (docs/RELEASING.md). Falling back to the default token: CI will not start on that pull request."
+          git reset --hard "$GITHUB_SHA"
+          git clean -fd
+          git checkout --detach "$GITHUB_SHA"
+
+      - name: Open or update the Version packages pull request
+        id: with-default
+        if: steps.with-token.outcome != 'success'
+        uses: changesets/action@v2
+        with:
+          github-token: ${{ github.token }}
+          version-script: pnpm version-packages
+          commit-message: "Version packages"
+          pr-title: "Version packages"
+          create-github-releases: false
+          push-git-tags: false
+
+      - name: Pending changesets
+        id: changesets
+        run: |
+          echo "has-changesets=${{ steps.with-token.outputs.has-changesets || steps.with-default.outputs.has-changesets }}" >> "$GITHUB_OUTPUT"
 
       - name: Tag the released version
         id: tag

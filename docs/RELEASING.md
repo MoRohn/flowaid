@@ -92,8 +92,13 @@ source repository.
   (the Version packages pull request).
 - **`RELEASE_TOKEN`** (recommended): pull requests opened with the default `GITHUB_TOKEN` do not
   start other workflows, so CI would not run on the Version packages pull request. Store a
-  fine-grained token (or a GitHub App token) with Contents and Pull requests write access as the
-  `RELEASE_TOKEN` repository secret; the workflow uses it when present.
+  fine-grained token (or a GitHub App token) as the `RELEASE_TOKEN` repository secret, with
+  repository access to this repository only and these permissions set to **Read and write**:
+  **Contents**, **Pull requests** and **Workflows** (the Version packages branch is reset to
+  `main`, whose history changes `.github/workflows`; without Workflows GitHub refuses the update
+  with "Resource not accessible by personal access token"). The workflow uses the token when
+  present; when the token is refused it warns and falls back to the default token, so a release
+  is never blocked by it.
 - **Branch protection**: require the `check`, `test`, `integration` and `acceptance journey`
   checks on `main`, so a release is only ever cut from a green commit.
 

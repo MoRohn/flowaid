@@ -9,7 +9,7 @@ import {
 import type { ExpressionScope } from "@/types";
 import { FieldHint, Input, ToggleGroup, ToggleGroupItem } from "@/primitives";
 import { CodeEditor } from "./CodeEditor";
-import { ExpressionInput } from "./ExpressionInput";
+import { ExpressionTextarea } from "./ExpressionInput";
 import {
   BINDING_MODES,
   bindingModeOf,
@@ -266,13 +266,17 @@ export function BindingField({
         </>
       ) : null}
       {mode === "template" ? (
-        <ExpressionInput
+        // templates are often prompts over several lines: a growing, wrapping editor
+        <ExpressionTextarea
           aria-label={`${label} template`}
           scope={scope ?? EMPTY_SCOPE_VALUE}
           value={templateDraft}
           onChange={emitTemplate}
           disabled={disabled}
           invalid={invalid}
+          placeholder="Text with {{ node.port }} references"
+          minRows={2}
+          maxRows={14}
         />
       ) : null}
       {mode === "expr" ? (

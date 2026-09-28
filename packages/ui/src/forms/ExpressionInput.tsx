@@ -152,7 +152,8 @@ export const ExpressionInput = forwardRef<ExpressionEditorHandle, ExpressionInpu
     );
 
     const staticExtensions = useMemo<Extension>(
-      () => [baseExtensions, singleLine, expressionExtensions()],
+      // one line of text (no newlines), shown soft-wrapped so a long template is never hidden
+      () => [baseExtensions, singleLine, EditorView.lineWrapping, expressionExtensions()],
       [],
     );
 
@@ -217,7 +218,7 @@ export const ExpressionInput = forwardRef<ExpressionEditorHandle, ExpressionInpu
         >
           <div
             ref={containerRef}
-            className="fa-expression min-w-0 flex-1 [&_.cm-content]:py-[3px] [&_.cm-editor]:min-h-[26px] [&_.cm-line]:pl-2 [&_.cm-scroller]:overflow-x-auto [&_.cm-scroller]:overflow-y-hidden [&_.cm-scroller]:[scrollbar-width:none]"
+            className="fa-expression min-w-0 flex-1 [&_.cm-content]:py-[3px] [&_.cm-editor]:min-h-[26px] [&_.cm-line]:pl-2 [&_.cm-scroller]:overflow-x-hidden [&_.cm-scroller]:overflow-y-hidden"
           />
           {referencePicker ? (
             <div className="flex shrink-0 items-center pr-1">

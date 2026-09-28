@@ -22,7 +22,7 @@ import { usePersistedState } from "./usePersistedState";
 export const DEFAULT_SHELL_LAYOUT: AppShellLayout = {
   navCollapsed: false,
   inspectorOpen: true,
-  inspectorWidth: 320,
+  inspectorWidth: 360,
   bottomOpen: true,
   bottomHeight: 280,
 };
