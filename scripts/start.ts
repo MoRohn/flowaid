@@ -27,9 +27,11 @@ import {
   DEFAULT_HOST,
   DEFAULT_PORT,
   ROOT,
+  authModeForBind,
   checkPort,
   formatReport,
   hasFailures,
+  isLoopbackBind,
   probe,
   runPreflight,
   useColor,
@@ -105,7 +107,7 @@ if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/i.test(o
   console.error(`--domain: "${opts.domain}" is not a host name`);
   process.exit(2);
 }
-const loopbackBind = host === "localhost" || host === "::1" || /^127\./.test(host);
+const loopbackBind = isLoopbackBind(host);
 const exposed = !loopbackBind;
 const browserHost = loopbackBind || host === "0.0.0.0" ? opts.domain : host;
 
@@ -407,6 +409,14 @@ if (opts.playground) {
       ? "generated local secrets in .flowaid/dev.env"
       : "local secrets from .flowaid/dev.env",
   );
+  // never local mode (no sign-in) where other computers can connect
+  const bindAuth = authModeForBind(
+    host,
+    secrets.values.FLOWAID_AUTH_MODE ?? fileEnv.FLOWAID_AUTH_MODE ?? process.env.FLOWAID_AUTH_MODE,
+  );
+  if ("error" in bindAuth) fail(bindAuth.error);
+  else if (bindAuth.forced)
+    warn(`--host ${host} is reachable from your network: every browser signs in (password mode)`);
   const providers = [
     "TYPESAFE_API_KEY",
     "OPENAI_API_KEY",
@@ -458,6 +468,7 @@ if (opts.playground) {
     CORS_ORIGINS: fileEnv.CORS_ORIGINS ?? webUrl,
     // the web app's proxy runs on this machine: trust its X-Forwarded-For (rate limits, audit)
     FLOWAID_TRUST_PROXY: fileEnv.FLOWAID_TRUST_PROXY ?? "loopback",
+    ...("mode" in bindAuth && bindAuth.mode ? { FLOWAID_AUTH_MODE: bindAuth.mode } : {}),
     LOG_LEVEL: process.env.LOG_LEVEL ?? fileEnv.LOG_LEVEL ?? "warn",
     // provider record/replay (P5-03): off | record | replay, fixtures at the repo root whatever the cwd
     FLOWAID_PROVIDER_FIXTURES:
@@ -513,6 +524,8 @@ if (opts.playground) {
       {
         ...env,
         PORT: String(webPort),
+        // the web app's proxy reads its bind address from here (src/server/proxy.ts)
+        HOSTNAME: host,
       },
     );
   if (!(await waitFor(`http://127.0.0.1:${webPort}/login`, 180_000)))

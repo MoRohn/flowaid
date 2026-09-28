@@ -46,6 +46,27 @@ describeDb("local mode: no sign-in on this computer (Postgres)", () => {
     expect((await signIn(local, { host: "localhost" })).statusCode).toBe(403);
   });
 
+  it("refuses a LAN client posing as this computer through an exposed web app", async () => {
+    // Host: localhost and X-Forwarded-For: 127.0.0.1 are the client's; the proxy marks the chain
+    const res = await signIn(local, {
+      "x-requested-with": "flowaid",
+      host: "127.0.0.1:3000",
+      "x-forwarded-for": "127.0.0.1",
+      "x-forwarded-host": "localhost",
+      "x-flowaid-client-unverified": "1",
+    });
+    expect(res.statusCode).toBe(403);
+    expect(
+      (
+        await signIn(local, {
+          "x-requested-with": "flowaid",
+          host: "localhost",
+          "x-real-ip": "192.168.1.20",
+        })
+      ).statusCode,
+    ).toBe(403);
+  });
+
   it("does not exist in password mode", async () => {
     const res = await signIn(password, { "x-requested-with": "flowaid", host: "localhost" });
     expect(res.statusCode).toBe(404);

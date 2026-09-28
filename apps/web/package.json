@@ -6,9 +6,9 @@
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {
-    "dev": "next dev --port 3001",
+    "dev": "next dev --port 3001 --hostname 127.0.0.1",
     "build": "next build",
-    "start": "next start --port 3001",
+    "start": "next start --port 3001 --hostname 127.0.0.1",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint app src",
     "test": "vitest run",
