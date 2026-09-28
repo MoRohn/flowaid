@@ -124,6 +124,15 @@ export class PgQueueDriver implements QueueDriver {
     return rows[0] ?? null;
   }
 
+  /** Jobs of a queue that wait for a consumer (ready or delayed, not claimed): the queue-depth gauge. */
+  async depth(queue: QueueName): Promise<number> {
+    const [row] = await this.sql<{ n: number }[]>`
+      select count(*)::int as n from queue_jobs
+      where queue = ${queue} and done_at is null and attempts < max_attempts
+        and (locked_until is null or locked_until < now())`;
+    return row?.n ?? 0;
+  }
+
   private async complete(id: string): Promise<void> {
     await this.sql`
       update queue_jobs set done_at = now(), locked_by = null, locked_until = null

@@ -71,6 +71,11 @@ export class BullMqQueueDriver implements QueueDriver {
     };
   }
 
+  /** Jobs of a queue that wait for a consumer (waiting, delayed, prioritized): the queue-depth gauge. */
+  depth(queue: QueueName): Promise<number> {
+    return this.queue(queue).count();
+  }
+
   async scheduleTimer(timer: RunTimer): Promise<void> {
     const delay = Math.max(0, Date.parse(timer.fireAt) - Date.now());
     await this.enqueue(

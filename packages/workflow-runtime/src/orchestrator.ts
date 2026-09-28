@@ -174,6 +174,11 @@ export class Orchestrator {
     return next;
   }
 
+  /** Runs this worker holds right now (leased and in memory): the active-runs gauge. */
+  get activeRuns(): number {
+    return this.held.size;
+  }
+
   handle(runId: string, trigger: Trigger): Promise<HandleResult> {
     return this.serial(runId, () => this.handleNow(runId, trigger));
   }

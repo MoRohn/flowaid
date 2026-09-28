@@ -118,6 +118,8 @@ export interface WorkerDeps {
   maintenance?: { timerPollMs?: number; heartbeatMs?: number; reapMs?: number };
   /** delay before a run job is redelivered when another worker holds the run (default 1 s) */
   busyRetryMs?: number;
+  /** how often the queue-depth and active-runs gauges are sampled (default 15 s) */
+  metricsSampleMs?: number;
   /** RETENTION_SWEEP_CRON: enqueues `retention.sweep` on the maintenance queue; null disables */
   retentionCron?: string | null;
   /** code export (`export.package` on the `jobs` queue): FLOWAID_VENDOR_DIR for vendored mode */
@@ -144,6 +146,11 @@ export const ALL_POOLS: readonly WorkerPool[] = [
   "retrieval",
   "high_memory",
 ];
+
+/** Both built-in queue drivers count the jobs waiting on a queue (the queue-depth gauge). */
+type CountingQueue = QueueDriver & { depth(queue: QueueName): Promise<number> };
+const countsJobs = (queue: QueueDriver): queue is CountingQueue =>
+  "depth" in queue && typeof queue.depth === "function";
 
 const TERMINAL = new Set(["RUN_COMPLETED", "RUN_FAILED", "RUN_CANCELLED", "RUN_TIMED_OUT"]);
 const silent: WorkerLogger = {
@@ -751,6 +758,41 @@ export function createWorker(deps: WorkerDeps): Worker {
           );
       });
       stops.push(unsub);
+      // Gauges: jobs waiting per queue this worker consumes, runs this worker holds.
+      const instruments = deps.instruments;
+      if (instruments) {
+        const queues: QueueName[] = [
+          "run:general",
+          "run:control",
+          "evaluation",
+          "jobs",
+          "trace_review",
+          "ingest",
+          "maintenance",
+          ...[...localPools].map((p): QueueName => `run:${p}`),
+        ];
+        const queue = deps.queue;
+        const sample = async () => {
+          instruments.workerActiveRuns.record(orchestrator.activeRuns, { pool: "general" });
+          if (!countsJobs(queue)) return;
+          for (const name of queues)
+            instruments.queueDepth.record(await queue.depth(name), { queue: name });
+        };
+        let sampling = false;
+        const timer = setInterval(() => {
+          if (sampling) return;
+          sampling = true;
+          void sample()
+            .catch((error: unknown) =>
+              log.warn({ err: String(error) }, "sampling queue metrics failed"),
+            )
+            .finally(() => {
+              sampling = false;
+            });
+        }, deps.metricsSampleMs ?? 15_000);
+        timer.unref();
+        stops.push(() => Promise.resolve(clearInterval(timer)));
+      }
       orchestrator.startMaintenance({
         timerPollMs: 1_000,
         heartbeatMs: 10_000,
