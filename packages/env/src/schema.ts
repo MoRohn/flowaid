@@ -663,6 +663,20 @@ export function crossFieldIssues(vars: Partial<Record<EnvVarName, unknown>>): Cr
       message: "FLOWAID_JWT_PRIVATE_KEY and FLOWAID_JWT_PUBLIC_KEY must be set together",
     });
   }
+  // PageIndex needs both its URL and its token, and the token must be long enough to be a secret
+  if (has("FLOWAID_PAGEINDEX_URL") !== has("FLOWAID_PAGEINDEX_TOKEN")) {
+    issues.push({
+      path: has("FLOWAID_PAGEINDEX_URL") ? "FLOWAID_PAGEINDEX_TOKEN" : "FLOWAID_PAGEINDEX_URL",
+      message:
+        "FLOWAID_PAGEINDEX_URL and FLOWAID_PAGEINDEX_TOKEN must be set together (or neither, to turn PageIndex off)",
+    });
+  }
+  if (has("FLOWAID_PAGEINDEX_TOKEN") && str("FLOWAID_PAGEINDEX_TOKEN").length < 32) {
+    issues.push({
+      path: "FLOWAID_PAGEINDEX_TOKEN",
+      message: "must be at least 32 characters (generate one with `openssl rand -hex 32`)",
+    });
+  }
   const s3Set = S3_VARS.filter((key) => has(key));
   if (s3Set.length > 0 && s3Set.length < S3_VARS.length) {
     for (const key of S3_VARS) {
@@ -919,6 +933,8 @@ export const EnvSchema = z
     OPENAI_API_KEY: optionalString("OPENAI_API_KEY"),
     ANTHROPIC_API_KEY: optionalString("ANTHROPIC_API_KEY"),
     OLLAMA_HOST: optionalUrl("OLLAMA_HOST", /^https?$/, "http:// or https://"),
+    FLOWAID_PAGEINDEX_URL: optionalUrl("FLOWAID_PAGEINDEX_URL", /^https?$/, "http:// or https://"),
+    FLOWAID_PAGEINDEX_TOKEN: optionalString("FLOWAID_PAGEINDEX_TOKEN"),
     FLOWAID_PROVIDER_FIXTURES: enumWithDefault("FLOWAID_PROVIDER_FIXTURES", PROVIDER_FIXTURE_MODES),
     FLOWAID_PROVIDER_FIXTURES_DIR: stringWithDefault("FLOWAID_PROVIDER_FIXTURES_DIR"),
 

@@ -44,6 +44,8 @@ export interface ApiConfig {
   exportMode: "npm" | "vendored";
   /** The packed runtime packages exist (FLOWAID_VENDOR_DIR/SHA256SUMS), so vendored exports work. */
   vendorAvailable: boolean;
+  /** The PageIndex service (FLOWAID_PAGEINDEX_URL/TOKEN); null turns PageIndex off. */
+  pageIndex: { url: string; token: string } | null;
   /** Plugins (ARCHITECTURE.md §3.5): the allow-list, the npm registry, and whether local installs are accepted. */
   plugins: { allowList: readonly string[]; registry: string; allowLocal: boolean };
 }
@@ -111,6 +113,10 @@ export function configFromEnv(env: Env): ApiConfig {
     vendorAvailable: existsSync(
       join(String(env.FLOWAID_VENDOR_DIR ?? "/opt/flowaid/vendor"), "SHA256SUMS"),
     ),
+    pageIndex:
+      env.FLOWAID_PAGEINDEX_URL && env.FLOWAID_PAGEINDEX_TOKEN
+        ? { url: String(env.FLOWAID_PAGEINDEX_URL), token: env.FLOWAID_PAGEINDEX_TOKEN }
+        : null,
     plugins: {
       allowList: env.FLOWAID_PLUGIN_ALLOWED_SCOPES,
       registry: String(env.FLOWAID_PLUGIN_REGISTRY),
@@ -148,6 +154,7 @@ export function defaultConfig(over: Partial<ApiConfig> = {}): ApiConfig {
     s3: null,
     exportMode: "npm",
     vendorAvailable: false,
+    pageIndex: null,
     plugins: { allowList: ["@flowaid"], registry: "https://registry.npmjs.org", allowLocal: false },
     ...over,
   };

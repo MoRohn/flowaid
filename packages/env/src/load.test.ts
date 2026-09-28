@@ -72,6 +72,7 @@ describe("loadEnv", () => {
       hasOpenAI: false,
       hasAnthropic: false,
       hasOllama: false,
+      hasPageIndex: false,
       hasGenerationProvider: false,
       hasOtel: false,
       hasPrometheus: false,
@@ -202,6 +203,7 @@ describe("loadEnv", () => {
       hasOpenAI: false,
       hasAnthropic: true,
       hasOllama: false,
+      hasPageIndex: false,
       hasGenerationProvider: true,
       hasOtel: true,
       hasPrometheus: true,
@@ -327,6 +329,7 @@ describe("secret-safe serialisation", () => {
         "SMTP_URL",
         "VAULT_TOKEN",
         "AZURE_CLIENT_SECRET",
+        "FLOWAID_PAGEINDEX_TOKEN",
       ].sort(),
     );
   });

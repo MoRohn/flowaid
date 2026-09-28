@@ -140,6 +140,10 @@ describe("EnvSchema", () => {
         if (name === "FLOWAID_ADMIN_PASSWORD") {
           input.FLOWAID_ADMIN_EMAIL = ENV_VAR_DOCS.FLOWAID_ADMIN_EMAIL.example;
         }
+        if (name === "FLOWAID_PAGEINDEX_URL" || name === "FLOWAID_PAGEINDEX_TOKEN") {
+          input.FLOWAID_PAGEINDEX_URL = ENV_VAR_DOCS.FLOWAID_PAGEINDEX_URL.example;
+          input.FLOWAID_PAGEINDEX_TOKEN = ENV_VAR_DOCS.FLOWAID_PAGEINDEX_TOKEN.example;
+        }
         if (name.startsWith("S3_") && !["S3_REGION", "S3_FORCE_PATH_STYLE"].includes(name)) {
           for (const key of [
             "S3_ENDPOINT",
@@ -348,6 +352,15 @@ describe("EnvSchema", () => {
 
     const admin = issuesFor({ ...MINIMAL, FLOWAID_ADMIN_EMAIL: "a@b.co" });
     expect(admin.get("FLOWAID_ADMIN_PASSWORD")?.[0]).toContain("must be set together");
+
+    const pageIndex = issuesFor({ ...MINIMAL, FLOWAID_PAGEINDEX_URL: "http://127.0.0.1:8765" });
+    expect(pageIndex.get("FLOWAID_PAGEINDEX_TOKEN")?.[0]).toContain("must be set together");
+    const shortToken = issuesFor({
+      ...MINIMAL,
+      FLOWAID_PAGEINDEX_URL: "http://127.0.0.1:8765",
+      FLOWAID_PAGEINDEX_TOKEN: "short",
+    });
+    expect(shortToken.get("FLOWAID_PAGEINDEX_TOKEN")?.[0]).toContain("at least 32 characters");
 
     const s3 = issuesFor({ ...MINIMAL, S3_ENDPOINT: "http://minio:9000", S3_BUCKET: "b" });
     expect(s3.get("S3_ACCESS_KEY")?.[0]).toContain("required when S3_ENDPOINT, S3_BUCKET are set");

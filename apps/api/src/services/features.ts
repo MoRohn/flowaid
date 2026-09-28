@@ -43,6 +43,8 @@ export function featuresFor(
     plugins.packages.some((p) => p.name === "@flowaid/nodes-langchain");
   // The critic and optimizer are deterministic; the AI builder needs a generation model.
   out.ai_builder = runtime.aiBuilder && !disabled.has("ai_builder");
+  // PageIndex documents need the PageIndex service to be configured.
+  out.pageindex = config.pageIndex !== null && !disabled.has("pageindex");
   // Ask FlowAId answers with the same generation model.
   out.assistant = runtime.aiBuilder && !disabled.has("assistant");
   // Code export works in npm mode, or vendored with the packed runtime packages present.

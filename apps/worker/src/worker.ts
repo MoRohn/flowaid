@@ -573,6 +573,8 @@ export function createWorker(deps: WorkerDeps): Worker {
       case "node.exec":
       case "schedule.tick":
       case "ingest.source":
+      case "pageindex.index":
+      case "pageindex.cleanup":
       case "evaluation.run":
       case "trace_review.run":
       case "export.package":

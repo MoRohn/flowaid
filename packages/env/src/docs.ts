@@ -64,6 +64,7 @@ export const FEATURE_KEYS = [
   "agents",
   "ai_builder",
   "assistant",
+  "pageindex",
   "advisor",
   "code_export",
   "langchain",
@@ -717,6 +718,22 @@ const docs = {
     required: false,
     example: "http://localhost:11434",
     secret: false,
+  },
+  FLOWAID_PAGEINDEX_URL: {
+    group: "providers",
+    description:
+      "Base URL of the FlowAId PageIndex service (`apps/pageindex`), which indexes PDFs into section trees for PageIndex document sources and the `flowaid.pageindex.*` nodes. Set it together with `FLOWAID_PAGEINDEX_TOKEN`, or leave both unset to turn PageIndex off (the rest of FlowAId is unaffected). `pnpm start --pageindex` and the compose `pageindex` profile set both.",
+    required: false,
+    example: "http://127.0.0.1:8765",
+    secret: false,
+  },
+  FLOWAID_PAGEINDEX_TOKEN: {
+    group: "providers",
+    description:
+      "Shared bearer token between the api/worker and the PageIndex service (at least 32 characters; the service reads the same variable). Generate with `openssl rand -hex 32`.",
+    required: false,
+    example: "<64 hex characters from openssl rand -hex 32>",
+    secret: true,
   },
   FLOWAID_PROVIDER_FIXTURES: {
     group: "providers",

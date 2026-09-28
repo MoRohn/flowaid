@@ -165,6 +165,8 @@ describe("environment variable documentation", () => {
       "OPENAI_API_KEY",
       "ANTHROPIC_API_KEY",
       "OLLAMA_HOST",
+      "FLOWAID_PAGEINDEX_URL",
+      "FLOWAID_PAGEINDEX_TOKEN",
       "OTEL_EXPORTER_OTLP_ENDPOINT",
       "PROMETHEUS_PORT",
       "SMTP_URL",

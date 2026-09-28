@@ -2213,6 +2213,8 @@ export type Job =
   | { type: 'timer.fire'; runId: string; timerId: string }
   | { type: 'schedule.tick'; scheduleId: string; at: string }
   | { type: 'ingest.source'; sourceId: string }
+  | { type: 'pageindex.index'; workspaceId: string; indexId: string } // RFC-0022
+  | { type: 'pageindex.cleanup'; workspaceId: string; documentId: string } // RFC-0022
   | { type: 'evaluation.run'; evaluationRunId: string }
   | { type: 'trace_review.run'; runId: string }
   // RFC-0001: API-initiated background jobs (queue 'jobs') and maintenance (queue 'maintenance')

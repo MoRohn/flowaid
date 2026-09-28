@@ -34,6 +34,8 @@ export interface EnvFlags {
   readonly hasAnthropic: boolean;
   /** `OLLAMA_HOST` is set. */
   readonly hasOllama: boolean;
+  /** `FLOWAID_PAGEINDEX_URL` and `FLOWAID_PAGEINDEX_TOKEN` are set: PageIndex documents are available. */
+  readonly hasPageIndex: boolean;
   /** At least one generation provider (OpenAI, Anthropic or Ollama) is configured. */
   readonly hasGenerationProvider: boolean;
   /** `OTEL_EXPORTER_OTLP_ENDPOINT` is set: spans and metrics are exported. */
@@ -178,6 +180,8 @@ export function deriveFlags(vars: EnvVars): EnvFlags {
     hasOpenAI,
     hasAnthropic,
     hasOllama,
+    hasPageIndex:
+      vars.FLOWAID_PAGEINDEX_URL !== undefined && vars.FLOWAID_PAGEINDEX_TOKEN !== undefined,
     hasGenerationProvider: hasOpenAI || hasAnthropic || hasOllama,
     hasOtel: vars.OTEL_EXPORTER_OTLP_ENDPOINT !== undefined,
     hasPrometheus: vars.PROMETHEUS_PORT !== undefined,

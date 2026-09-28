@@ -4,7 +4,8 @@
 - Raised by: the PageIndex integration (docs/pageindex/ADR.md), whose nodes build hierarchical
   indexes of uploaded documents and retrieve evidence by navigating them
 - Implemented by: the PageIndex integration
-- Affects: `CONTRACTS.ts` §4 `NodeCapability` (one value added), §15 a Document indexes block
+- Affects: `CONTRACTS.ts` §4 `NodeCapability` (one value added), §14 `Job` (two variants:
+  `pageindex.index`, `pageindex.cleanup`), §15 a Document indexes block
   (types only), §16 `ExecutionContext` (one optional member) and `DocumentIndexAccess`;
   `@flowaid/workflow-core` 0.3.8 → 0.3.9
 
