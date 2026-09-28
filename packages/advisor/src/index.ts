@@ -21,6 +21,7 @@ export { formatUsd, suggestionDiagnostics } from "./suggestions.js";
 export { RUBRIC, piiInputs, type CritiqueInput, type RubricRule } from "./rubric.js";
 export { CRITIC_CHECKS, critique, workflowSummary, type Judge } from "./critic.js";
 export {
+  builderPromptHash,
   catalogForPrompt,
   compactDefinitionSchema,
   generateWorkflow,

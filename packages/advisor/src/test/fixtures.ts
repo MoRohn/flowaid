@@ -147,3 +147,50 @@ export function triage(
     ],
   });
 }
+
+/** A refund decision that drives an irreversible HTTP POST. */
+export function refundPayout(gated: boolean): WorkflowDefinition {
+  const nodes: unknown[] = [
+    { id: "ticket", kind: "input", name: "Ticket" },
+    task(
+      "is_refund",
+      "flowaid.decision.boolean",
+      { instructions: "Refund?" },
+      { state },
+      { typesafe: "TYPESAFE_API_KEY" },
+    ),
+    task(
+      "payout",
+      "flowaid.tools.http",
+      { method: "POST", url: "https://payments.example.com/refunds" },
+      {},
+      {},
+    ),
+    { id: "done", kind: "output", name: "Done", value: { kind: "literal", value: {} } },
+  ];
+  const edges = [
+    { id: "e1", from: { node: "ticket", port: "done" }, to: { node: "is_refund" } },
+    ...(gated
+      ? [
+          { id: "e2", from: { node: "is_refund", port: "done" }, to: { node: "approve" } },
+          { id: "e3", from: { node: "approve", port: "approved" }, to: { node: "payout" } },
+          { id: "e5", from: { node: "approve", port: "rejected" }, to: { node: "done" } },
+        ]
+      : [{ id: "e2", from: { node: "is_refund", port: "done" }, to: { node: "payout" } }]),
+    { id: "e4", from: { node: "payout", port: "done" }, to: { node: "done" } },
+  ];
+  if (gated)
+    nodes.splice(2, 0, {
+      id: "approve",
+      kind: "human",
+      name: "Approve",
+      mode: { type: "approval" },
+      title: { kind: "literal", value: "Pay out?" },
+    });
+  return define({
+    secrets: [{ name: "TYPESAFE_API_KEY", credentialType: "typesafe.api_key" }],
+    execution: { maxCostUsd: 0.1, decisions: { failover: [{ provider: "human" }] } },
+    nodes,
+    edges,
+  });
+}
