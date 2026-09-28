@@ -316,11 +316,35 @@ describe("compose images and builds", () => {
     expect(text(service("rustfs")["image"])).toMatch(/^rustfs\/rustfs:\d+\.\d+\.\d+@/);
   });
 
+  it("runs the PageIndex service privately, non-root, on a pinned Python image (profile pageindex)", () => {
+    const svc = STACK["pageindex"];
+    expect(isRecord(svc)).toBe(true);
+    if (!isRecord(svc)) return;
+    expect(svc["profiles"]).toEqual(["pageindex"]);
+    expect(svc["build"]).toEqual({ context: "..", dockerfile: "docker/pageindex.Dockerfile" });
+    // private: no published port, reachable on `internal`, model calls through `edge`
+    expect(svc["ports"]).toBeUndefined();
+    expect(svc["networks"]).toEqual(["internal", "edge"]);
+    expect(svc["read_only"]).toBe(true);
+    expect(svc["cap_drop"]).toEqual(["ALL"]);
+    expect(svc["security_opt"]).toEqual(["no-new-privileges:true"]);
+    expect(svc["volumes"]).toEqual(["pageindex-data:/data"]);
+    const env = svc["environment"];
+    expect(isRecord(env) && env["FLOWAID_PAGEINDEX_TOKEN"]).toBe("${FLOWAID_PAGEINDEX_TOKEN:-}");
+    const dockerfile = readFileSync(join(DOCKER_DIR, "pageindex.Dockerfile"), "utf8");
+    expect(dockerfile).toMatch(/^ARG PYTHON_IMAGE=python:3\.12\.\d+-slim@sha256:[0-9a-f]{64}$/m);
+    expect(dockerfile).toContain(
+      "pip install --require-hashes --only-binary=:all: -r requirements.lock",
+    );
+    expect(dockerfile).toMatch(/^USER 10001:10001$/m);
+    expect(dockerfile).toMatch(/^HEALTHCHECK /m);
+  });
+
   it("builds every app from docker/Dockerfile with a target", () => {
     const targets: Record<string, string> = {};
     for (const [name, svc] of Object.entries(STACK)) {
       const build = svc["build"];
-      if (!isRecord(build)) {
+      if (!isRecord(build) || name === "pageindex") {
         continue;
       }
       expect(build["context"], name).toBe("..");

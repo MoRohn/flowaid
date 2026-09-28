@@ -17,8 +17,15 @@
  * Runs on plain Node (native type stripping) so it works before `pnpm install`.
  */
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
-import { randomBytes } from "node:crypto";
-import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { createHash, randomBytes } from "node:crypto";
+import {
+  appendFileSync,
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 import { join, resolve } from "node:path";
 import { parseArgs, parseEnv } from "node:util";
 
@@ -53,6 +60,9 @@ Options
   --open              Open the browser once the web app is ready
   --verify            Run every CI gate (pnpm check) before starting
   --skip-install      Never install dependencies, even when they are missing or stale
+  --pageindex         Also run the PageIndex service for PDF document indexes (needs Python 3.10+;
+                      the first run installs its pinned packages into .flowaid/pageindex-venv)
+  --pageindex-port <n> PageIndex service port (default 8765)
   --playground        Serve the @flowaid/ui component playground instead (port ${DEFAULT_PORT})
   -h, --help          Show this help
 
@@ -76,6 +86,8 @@ try {
       verify: { type: "boolean", default: false },
       "skip-install": { type: "boolean", default: false },
       playground: { type: "boolean", default: false },
+      pageindex: { type: "boolean", default: false },
+      "pageindex-port": { type: "string", default: "8765" },
       help: { type: "boolean", short: "h", default: false },
     },
   });
@@ -120,7 +132,7 @@ const fail = (text: string): never => {
   process.exit(1);
 };
 
-const TOTAL = (opts.playground ? 4 : 6) + (opts.verify ? 1 : 0);
+const TOTAL = (opts.playground ? 4 : 6) + (opts.verify ? 1 : 0) + (opts.pageindex ? 1 : 0);
 let step = 0;
 const heading = (text: string) => {
   step += 1;
@@ -174,6 +186,73 @@ function localSecrets(): { values: Record<string, string>; created: boolean } {
     { mode: 0o600 },
   );
   return { values, created: true };
+}
+
+// ─── PageIndex ───────────────────────────────────────────────────────────────────────────────
+
+const PAGEINDEX_DIR = join(ROOT, "apps/pageindex");
+
+/** A Python 3.10+ interpreter: FLOWAID_PYTHON, else the newest python3.x on PATH. */
+function findPython(): string | null {
+  const candidates = [
+    process.env.FLOWAID_PYTHON,
+    "python3.13",
+    "python3.12",
+    "python3.11",
+    "python3.10",
+    "python3",
+  ].filter((c): c is string => Boolean(c));
+  return (
+    candidates.find(
+      (cmd) =>
+        spawnSync(cmd, ["-c", "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)"])
+          .status === 0,
+    ) ?? null
+  );
+}
+
+/**
+ * The service's virtualenv in .flowaid/pageindex-venv, (re)installed from the hash-locked
+ * requirements when they change. Returns its python.
+ */
+async function ensurePageIndexVenv(): Promise<string> {
+  const venv = join(ROOT, ".flowaid/pageindex-venv");
+  const python = join(venv, process.platform === "win32" ? "Scripts/python.exe" : "bin/python");
+  const lock = readFileSync(join(PAGEINDEX_DIR, "requirements.lock"));
+  const stamp = join(venv, ".requirements.sha256");
+  const want = createHash("sha256").update(lock).digest("hex");
+  if (existsSync(python) && existsSync(stamp) && readFileSync(stamp, "utf8") === want) {
+    ok("PageIndex packages up to date");
+    return python;
+  }
+  const base = findPython();
+  if (!base)
+    fail(
+      "--pageindex needs Python 3.10 or newer (python3.10 … python3.13 on PATH, or set FLOWAID_PYTHON)",
+    );
+  await mustRun("PageIndex virtualenv created", base as string, ["-m", "venv", "--clear", venv]);
+  await mustRun("PageIndex packages installed (pinned, hash-checked)", python, [
+    "-m",
+    "pip",
+    "install",
+    "--quiet",
+    "--require-hashes",
+    "--only-binary=:all:",
+    "-r",
+    join(PAGEINDEX_DIR, "requirements.lock"),
+  ]);
+  writeFileSync(stamp, want);
+  return python;
+}
+
+/** The shared token, generated once into .flowaid/dev.env. */
+function pageIndexToken(secrets: Record<string, string>): string {
+  const existing = secrets.FLOWAID_PAGEINDEX_TOKEN;
+  if (existing) return existing;
+  const token = randomBytes(32).toString("hex");
+  appendFileSync(join(ROOT, ".flowaid", "dev.env"), `FLOWAID_PAGEINDEX_TOKEN=${token}\n`);
+  secrets.FLOWAID_PAGEINDEX_TOKEN = token;
+  return token;
 }
 
 // ─── database ────────────────────────────────────────────────────────────────────────────────
@@ -446,8 +525,23 @@ if (opts.playground) {
     "--output-logs=errors-only",
   ]);
 
+  // PageIndex (optional): the service runs from its own virtualenv; the api and worker find it
+  // through FLOWAID_PAGEINDEX_URL/TOKEN unless .env already points at another instance.
+  let pageIndexPython: string | null = null;
+  if (opts.pageindex) {
+    heading("PageIndex");
+    pageIndexPython = await ensurePageIndexVenv();
+  }
+
   heading("Start");
   const data = join(ROOT, ".flowaid");
+  const pageIndexPort = portOption(opts["pageindex-port"], "--pageindex-port");
+  const pageIndexEnv: Record<string, string> = pageIndexPython
+    ? {
+        FLOWAID_PAGEINDEX_URL: `http://127.0.0.1:${pageIndexPort}`,
+        FLOWAID_PAGEINDEX_TOKEN: pageIndexToken(secrets.values),
+      }
+    : {};
   mkdirSync(join(data, "keys"), { recursive: true });
   const apiUrl = `http://${browserHost}:${apiPort}`;
   const webUrl = `http://${browserHost}:${webPort}`;
@@ -469,6 +563,7 @@ if (opts.playground) {
     // the web app's proxy runs on this machine: trust its X-Forwarded-For (rate limits, audit)
     FLOWAID_TRUST_PROXY: fileEnv.FLOWAID_TRUST_PROXY ?? "loopback",
     ...("mode" in bindAuth && bindAuth.mode ? { FLOWAID_AUTH_MODE: bindAuth.mode } : {}),
+    ...pageIndexEnv,
     LOG_LEVEL: process.env.LOG_LEVEL ?? fileEnv.LOG_LEVEL ?? "warn",
     // provider record/replay (P5-03): off | record | replay, fixtures at the repo root whatever the cwd
     FLOWAID_PROVIDER_FIXTURES:
@@ -485,6 +580,20 @@ if (opts.playground) {
   const api = join(ROOT, "apps/api");
   const worker = join(ROOT, "apps/worker");
   const web = join(ROOT, "apps/web");
+  if (pageIndexPython) {
+    // only what the service needs: never the master key, database or provider keys
+    start("pidx", 35, pageIndexPython, ["-m", "flowaid_pageindex"], PAGEINDEX_DIR, {
+      PATH: process.env.PATH ?? "",
+      HOME: process.env.HOME ?? "",
+      FLOWAID_PAGEINDEX_TOKEN: pageIndexEnv.FLOWAID_PAGEINDEX_TOKEN ?? "",
+      FLOWAID_PAGEINDEX_HOST: "127.0.0.1",
+      FLOWAID_PAGEINDEX_PORT: String(pageIndexPort),
+      FLOWAID_PAGEINDEX_DATA_DIR: join(data, "pageindex"),
+    });
+    if (!(await waitFor(`http://127.0.0.1:${pageIndexPort}/readyz`, 60_000)))
+      fail("the PageIndex service did not become ready (see the pidx lines above)");
+    ok(`PageIndex service ready on http://127.0.0.1:${pageIndexPort}`);
+  }
   start(
     "api",
     34,

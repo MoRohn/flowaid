@@ -174,6 +174,32 @@ services:
       start_period: 30s
     restart: unless-stopped
 
+  # PageIndex document indexes (profile pageindex; docs/pageindex/SETUP.md): indexes uploaded PDFs
+  # into section trees for the worker. Private: no published port; the api and worker reach it at
+  # http://pageindex:8765 with FLOWAID_PAGEINDEX_TOKEN. `edge` lets it call the indexing model.
+  pageindex:
+    build:
+      context: ..
+      dockerfile: docker/pageindex.Dockerfile
+    image: flowaid/pageindex:local
+    profiles: [pageindex]
+    environment:
+      # empty (unset) makes the service refuse to start
+      FLOWAID_PAGEINDEX_TOKEN: ${FLOWAID_PAGEINDEX_TOKEN:-}
+      FLOWAID_PAGEINDEX_CONCURRENCY: ${FLOWAID_PAGEINDEX_CONCURRENCY:-2}
+      FLOWAID_PAGEINDEX_MAX_PAGES: ${FLOWAID_PAGEINDEX_MAX_PAGES:-500}
+    volumes:
+      - pageindex-data:/data
+    tmpfs:
+      - /tmp
+    read_only: true
+    networks:
+      - internal
+      - edge
+    <<: *worker-security
+    pids_limit: 256
+    restart: unless-stopped
+
   # Sandbox host for the `code` pool: claims delegated code-node executions and runs them in
   # isolated-vm isolates. No .env, no /data, no master key; the flowaid_code role reaches only
   # the queue and the delegated-node functions.
@@ -317,3 +343,5 @@ volumes:
   s3-data:
   # Master key file, generated JWT keys and installed plugins, shared by api and worker only.
   flowaid-data:
+  # PageIndex stores (one per workspace) and job records (profile pageindex).
+  pageindex-data:
