@@ -48,7 +48,7 @@ import {
 } from "./preflight.ts";
 import { DEFAULT_API_PORT, DEFAULT_WEB_PORT } from "./ports.ts";
 
-const HELP = `Usage: pnpm start [options]
+const HELP = `Usage: ./flowaid [options]   (or: pnpm start [options])
 
 Start FlowAId locally: Postgres, the API, the worker and the web app.
 

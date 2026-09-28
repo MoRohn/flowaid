@@ -260,36 +260,34 @@ local Ollama enable generation. Everything else runs without any key.
 ### 2. Start FlowAId
 
 ```sh
-git clone https://github.com/MoRohn/flowaid.git
-cd flowaid
-echo "TYPESAFE_API_KEY=ts_…" >> .env.local   # optional: enables decision nodes
-pnpm start
+git clone https://github.com/MoRohn/flowaid.git && cd flowaid
+./flowaid
 ```
 
-`pnpm start` takes a fresh clone to a running platform in one command. It checks your machine
-(Node.js, pnpm, free ports, Docker) and prints the fix for anything missing, installs
-dependencies, generates local secrets into `.flowaid/dev.env`, starts PostgreSQL 16 with
-pgvector in Docker (or uses `--database-url`), builds what the apps need, and starts the API,
-the worker and the web app:
+Then open **<http://flowaid.localhost:3000>**. There is no account to create: on your own
+computer FlowAId signs you in by itself.
+
+That is the whole setup. `./flowaid` checks Node.js and pnpm, and hands over to `pnpm start`
+(the same command, if you prefer it). It installs dependencies, generates local secrets into
+`.flowaid/dev.env`, and starts PostgreSQL 16 with pgvector in Docker. Then it builds and starts
+the API, the worker and the web app:
 
 ```text
-[6/6] Start
 ✓ API ready on http://flowaid.localhost:3001
 
 → http://flowaid.localhost:3000   (Ctrl+C to stop)
   opens without a sign-in on this computer
-  API http://flowaid.localhost:3001 · docs http://flowaid.localhost:3001/docs
 ```
 
-Open <http://flowaid.localhost:3000>. Any `*.localhost` name reaches your own computer, so the
-address needs no setup (`http://127.0.0.1:3000` works too, and `--domain` picks another name).
-The API sits beside it on port 3001. When another app already uses 3000, `pnpm start` moves to
-the next free port and says where, for example
-`port 3000 is in use (another app); FlowAId is on http://flowaid.localhost:3002 instead`.
-There is no account to create: FlowAId signs this computer in by
-itself (the API checks for a loopback address, a local host name and a CSRF header on every such
-session, so other computers and web pages cannot use it). The API reference (OpenAPI 3.1) is at
-<http://flowaid.localhost:3001/docs>.
+- **Keys (optional).** Put provider keys in `.env.local`: `TYPESAFE_API_KEY=ts_…` for decision
+  nodes, and `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` or `OLLAMA_HOST` for generation.
+- **PDF documents.** `./flowaid --pageindex` also runs the PageIndex service, which needs
+  Python 3.10+ (see [docs/pageindex/SETUP.md](docs/pageindex/SETUP.md)).
+- **The address.** Any `*.localhost` name reaches your own computer, so it needs no setup;
+  `http://127.0.0.1:3000` works too. The API is on port 3001, and its reference is at
+  <http://flowaid.localhost:3001/docs>.
+- **A busy port.** If another app already uses 3000, FlowAId moves to the next free port and
+  prints the address.
 
 ### 3. Your first workflow
 
@@ -360,20 +358,21 @@ cron schedules and event subscriptions when a version is deployed to an environm
 
 ### 5. Options
 
-| Command                                    | What it does                                                                         |
-| ------------------------------------------ | ------------------------------------------------------------------------------------ |
-| `pnpm start --open`                        | Also opens the browser                                                               |
-| `pnpm start --port 3100 --api-port 3101`   | Serves the web app and the API on these ports (and stops if either is taken)         |
-| `pnpm start --database-url postgres://…`   | Uses your PostgreSQL 16 (with pgvector) instead of the Docker container              |
-| `pnpm start --prod`                        | Runs the production builds (Next's standalone server, compiled API and worker)       |
-| `pnpm start --domain my.flowaid.localhost` | Opens the app under another name (any `*.localhost` name reaches this computer)      |
-| `pnpm start --host 0.0.0.0`                | Listens on every interface (put a TLS proxy in front before exposing it)             |
-| `pnpm start --verify`                      | Runs every CI gate first (`pnpm check`), then starts                                 |
-| `pnpm start --playground`                  | Serves the `@flowaid/ui` component playground instead                                |
-| `pnpm start -- --help`                     | Lists every option                                                                   |
-| `pnpm preflight`                           | Only the machine checks                                                              |
-| `pnpm check`                               | Every CI gate: audit, boundaries, generated files, format, lint, types, build, tests |
-| `pnpm test:acceptance`                     | The browser acceptance journey against a running stack                               |
+| Command                                   | What it does                                                                         |
+| ----------------------------------------- | ------------------------------------------------------------------------------------ |
+| `./flowaid --open`                        | Also opens the browser                                                               |
+| `./flowaid --pageindex`                   | Also runs the PageIndex service for PDF documents (Python 3.10+)                     |
+| `./flowaid --port 3100 --api-port 3101`   | Serves the web app and the API on these ports (and stops if either is taken)         |
+| `./flowaid --database-url postgres://…`   | Uses your PostgreSQL 16 (with pgvector) instead of the Docker container              |
+| `./flowaid --prod`                        | Runs the production builds (Next's standalone server, compiled API and worker)       |
+| `./flowaid --domain my.flowaid.localhost` | Opens the app under another name (any `*.localhost` name reaches this computer)      |
+| `./flowaid --host 0.0.0.0`                | Listens on every interface (put a TLS proxy in front before exposing it)             |
+| `./flowaid --verify`                      | Runs every CI gate first (`pnpm check`), then starts                                 |
+| `./flowaid --playground`                  | Serves the `@flowaid/ui` component playground instead                                |
+| `./flowaid --help`                        | Lists every option                                                                   |
+| `pnpm preflight`                          | Only the machine checks                                                              |
+| `pnpm check`                              | Every CI gate: audit, boundaries, generated files, format, lint, types, build, tests |
+| `pnpm test:acceptance`                    | The browser acceptance journey against a running stack                               |
 
 ### 6. Troubleshooting
 
