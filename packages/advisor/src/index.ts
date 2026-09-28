@@ -28,3 +28,17 @@ export {
   type GenerateWorkflowInput,
   type GeneratedWorkflow,
 } from "./builder.js";
+export {
+  ASSISTANT_SYSTEM_PROMPT,
+  ask,
+  assistantPromptHash,
+  wrapUntrusted,
+  type AskInput,
+  type AssistantAnswer,
+  type AssistantSource,
+  type AssistantStatement,
+  type AssistantTool,
+  type AssistantToolResult,
+  type SourceKind,
+  type StatementKind,
+} from "./assistant.js";

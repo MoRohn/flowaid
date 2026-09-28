@@ -63,6 +63,7 @@ export const FEATURE_KEYS = [
   "settings_notifications",
   "agents",
   "ai_builder",
+  "assistant",
   "advisor",
   "code_export",
   "langchain",

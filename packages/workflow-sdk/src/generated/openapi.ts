@@ -539,6 +539,85 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/assistant/ask": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Ask a question about this workspace; the answer cites the records it rests on */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            history?: {
+              content: string;
+              /** @enum {string} */
+              role: "user" | "assistant";
+            }[];
+            question: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              costUsd: number;
+              model: {
+                model: string;
+                provider: string;
+              };
+              promptHash: string;
+              rounds: number;
+              sources: {
+                id: string;
+                /** @enum {string} */
+                kind: "workflow" | "run" | "task" | "insight" | "metrics";
+                label: string;
+                workflowId?: string;
+              }[];
+              statements: {
+                /** @enum {string} */
+                kind: "fact" | "calculation" | "recommendation" | "uncertain";
+                sources: string[];
+                text: string;
+                /** @enum {boolean} */
+                unverified?: true;
+              }[];
+              stopped: ("rounds" | "budget") | null;
+              toolCalls: {
+                name: string;
+                ok: boolean;
+              }[];
+              usage: {
+                inputTokens: number;
+                outputTokens: number;
+              };
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/audit": {
     parameters: {
       query?: never;

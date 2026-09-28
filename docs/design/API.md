@@ -328,6 +328,7 @@ export const FeatureKeySchema = z.enum([
   "settings_notifications",
   "agents",
   "ai_builder",
+  "assistant",
   "advisor",
   "code_export",
   "langchain",

@@ -147,6 +147,23 @@ export const OPERATIONS: readonly CliOperation[] = [
     body: null,
   },
   {
+    noun: "assistant",
+    verb: "ask",
+    method: "POST",
+    path: "/v1/assistant/ask",
+    summary: "Ask a question about this workspace; the answer cites the records it rests on",
+    auth: "session_or_api_key",
+    positional: [],
+    query: [],
+    body: {
+      required: true,
+      properties: [
+        { name: "question", type: "string", required: true },
+        { name: "history", type: "array", required: false },
+      ],
+    },
+  },
+  {
     noun: "audit",
     verb: "list",
     method: "GET",

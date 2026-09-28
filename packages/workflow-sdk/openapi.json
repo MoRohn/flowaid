@@ -571,6 +571,7 @@
                           "settings_notifications",
                           "agents",
                           "ai_builder",
+                          "assistant",
                           "advisor",
                           "code_export",
                           "langchain",
@@ -596,6 +597,7 @@
                         "settings_notifications",
                         "agents",
                         "ai_builder",
+                        "assistant",
                         "advisor",
                         "code_export",
                         "langchain",
@@ -8880,6 +8882,141 @@
                     }
                   },
                   "required": ["computedAt", "window", "baseline", "attention", "insights"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/assistant/ask": {
+      "post": {
+        "summary": "Ask a question about this workspace; the answer cites the records it rests on",
+        "tags": ["assistant"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "question": { "type": "string", "minLength": 3, "maxLength": 2000 },
+                  "history": {
+                    "maxItems": 12,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "role": { "type": "string", "enum": ["user", "assistant"] },
+                        "content": { "type": "string", "maxLength": 4000 }
+                      },
+                      "required": ["role", "content"]
+                    }
+                  }
+                },
+                "required": ["question"]
+              }
+            }
+          }
+        },
+        "x-cli": { "noun": "assistant", "verb": "ask" },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["runs:read"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statements": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "text": { "type": "string" },
+                          "kind": {
+                            "type": "string",
+                            "enum": ["fact", "calculation", "recommendation", "uncertain"]
+                          },
+                          "sources": { "type": "array", "items": { "type": "string" } },
+                          "unverified": { "type": "boolean", "enum": [true] }
+                        },
+                        "required": ["text", "kind", "sources"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "sources": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": { "type": "string" },
+                          "kind": {
+                            "type": "string",
+                            "enum": ["workflow", "run", "task", "insight", "metrics"]
+                          },
+                          "label": { "type": "string" },
+                          "workflowId": { "type": "string" }
+                        },
+                        "required": ["id", "kind", "label"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "toolCalls": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": { "name": { "type": "string" }, "ok": { "type": "boolean" } },
+                        "required": ["name", "ok"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "rounds": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "stopped": {
+                      "anyOf": [
+                        { "type": "string", "enum": ["rounds", "budget"] },
+                        { "type": "null" }
+                      ]
+                    },
+                    "usage": {
+                      "type": "object",
+                      "properties": {
+                        "inputTokens": { "type": "number" },
+                        "outputTokens": { "type": "number" }
+                      },
+                      "required": ["inputTokens", "outputTokens"],
+                      "additionalProperties": false
+                    },
+                    "costUsd": { "type": "number" },
+                    "promptHash": { "type": "string" },
+                    "model": {
+                      "type": "object",
+                      "properties": {
+                        "provider": { "type": "string" },
+                        "model": { "type": "string" }
+                      },
+                      "required": ["provider", "model"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "statements",
+                    "sources",
+                    "toolCalls",
+                    "rounds",
+                    "stopped",
+                    "usage",
+                    "costUsd",
+                    "promptHash",
+                    "model"
+                  ],
                   "additionalProperties": false
                 }
               }

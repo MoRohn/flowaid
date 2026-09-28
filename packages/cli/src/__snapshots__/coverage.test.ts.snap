@@ -16,6 +16,8 @@ api-key revoke <id> {--out}
 api-key rotate <id> {--grace-minutes --body --out}
 artifact
 artifact download <id> {--inline --out}
+assistant
+assistant ask {--question --history --body --out}
 audit
 audit list {--limit --cursor --order --actor --action --resource-type --resource-id --from --to --out}
 auth
@@ -261,6 +263,7 @@ Commands:
   alerts                            alerts operations
   api-key|api-keys                  api-key operations
   artifact|artifacts                artifact operations
+  assistant|assistants              assistant operations
   audit|audits                      audit operations
   auth|auths                        auth operations
   credential-type|credential-types  credential-type operations
