@@ -27,6 +27,11 @@
  * Untrusted content: tool results (and tool error text) and the `context` input reach the model
  * capped (AGENT_LIMITS) and wrapped in labelled delimiters the content cannot forge, and the system
  * prompt always ends with UNTRUSTED_NOTICE telling the model that such content is data.
+ *
+ * Documents (RFC-0022): with a `documents` scope the agent also gets three read-only tools
+ * (`document_outline`, `document_read_pages`, `document_search`, see agentDocuments.ts) that run
+ * here over `ctx.documents`, confined to the scope. Their calls and spend count against the same
+ * caps as every other tool call and model turn. Without `documents` nothing changes.
  */
 import { z } from "zod";
 import { DefaultModelCatalog, estimateInputTokens } from "@flowaid/providers";
@@ -50,6 +55,8 @@ import {
   type ToolDefinition,
 } from "@flowaid/workflow-core";
 import { callCtx, generationModel, usageSchema } from "../common.js";
+import { documentScopeSchema } from "../retrieval/documents.js";
+import { DOCUMENTS_NOTICE, documentTools } from "./agentDocuments.js";
 
 /** The builtin tool the worker answers with an agent preset's settings. */
 export const AGENT_PRESET_BUILTIN = "agent_preset";
@@ -330,6 +337,11 @@ export const agentNode = defineNode({
             help: "An agent preset (Agents page); the node's own settings override it.",
           },
         }),
+      documents: documentScopeSchema.optional().meta({
+        "x-ui": {
+          help: "Documents the agent may read with read-only outline, page and search tools. Unset: no document tools.",
+        },
+      }),
     })
     .strict(),
   inputSchema: z.object({
@@ -348,15 +360,29 @@ export const agentNode = defineNode({
       types: ["openai.api_key", "anthropic.api_key", "ollama.none"],
       required: false,
     },
+    {
+      name: "typesafe",
+      types: ["typesafe.api_key"],
+      required: false,
+      description: "TypeSafe API key for document_search's section choices (with `documents`).",
+    },
   ],
-  capabilities: ["generation", "credentials", "tools", "suspend", "streaming"],
+  capabilities: [
+    "generation",
+    "credentials",
+    "tools",
+    "suspend",
+    "streaming",
+    "documents",
+    "decision",
+  ],
   idempotency: "none",
   generation: true,
   streams: true,
   // a spend bound the compiler can see (E_AGENT_UNBOUNDED); the loop enforces it too
   defaultPolicy: { timeoutMs: 600_000, maxCostUsd: AGENT_DEFAULTS.maxCostUsd },
   execute: async (ctx, input) => {
-    const { agentId, ...own } = ctx.config;
+    const { agentId, documents, ...own } = ctx.config;
     const preset = agentId ? await loadPreset(ctx, agentId) : null;
     const a = effectiveAgent(own, preset);
 
@@ -371,6 +397,12 @@ export const agentNode = defineNode({
       return { def, approval: t.approval };
     });
     const entryOf = (name: string) => defs.find((d) => d.def.name === name);
+    const docTools = documents ? await documentTools(ctx, documents) : null;
+    for (const d of defs)
+      if (docTools?.has(d.def.name))
+        throw new BadRequestError(
+          `The agent's tool '${d.def.name}' has the name of a document tool; rename it or remove documents`,
+        );
 
     const resumed = ctx.resume && isAgentState(ctx.resume.state) ? ctx.resume.state : undefined;
     const usage: TokenUsage = resumed ? { ...resumed.usage } : { inputTokens: 0, outputTokens: 0 };
@@ -383,7 +415,12 @@ export const agentNode = defineNode({
     const messages: ChatMessage[] = resumed
       ? [...resumed.messages]
       : [
-          { role: "system", content: `${a.system}\n\n${UNTRUSTED_NOTICE}` },
+          {
+            role: "system",
+            content: docTools
+              ? `${a.system}\n\n${DOCUMENTS_NOTICE}\n\n${UNTRUSTED_NOTICE}`
+              : `${a.system}\n\n${UNTRUSTED_NOTICE}`,
+          },
           {
             role: "user",
             content:
@@ -400,6 +437,26 @@ export const agentNode = defineNode({
 
     /** Runs one call; failures go back to the model as text. */
     const run = async (call: ToolCall): Promise<ChatMessage> => {
+      if (docTools?.has(call.name)) {
+        // read-only, confined to the scope, run here; spend counts toward the agent's caps
+        try {
+          const r = await docTools.call(call.name, call.args);
+          log.push({ name: call.name, args: call.args, ok: true });
+          if (r.usage) {
+            usage.inputTokens += r.usage.inputTokens;
+            usage.outputTokens += r.usage.outputTokens;
+          }
+          costUsd += r.costUsd;
+          return { role: "tool", toolCallId: call.id, content: toolContent(call.name, r.content) };
+        } catch (error) {
+          log.push({ name: call.name, args: call.args, ok: false });
+          return {
+            role: "tool",
+            toolCallId: call.id,
+            content: `The tool failed: ${toolContent(call.name, toFlowaidError(error).message)}`,
+          };
+        }
+      }
       const entry = entryOf(call.name);
       if (!entry) {
         log.push({ name: call.name, args: call.args, ok: false });
@@ -468,7 +525,7 @@ export const agentNode = defineNode({
         : usage.inputTokens + usage.outputTokens + ctx.budget.remainingTokens,
     );
     const provider = ctx.providers.generation(a.model, { credentialSlot: "llm" });
-    const toolDefs = defs.map((d) => d.def);
+    const toolDefs = [...defs.map((d) => d.def), ...(docTools?.definitions ?? [])];
     const fromCatalog = catalogRates(a.model);
     const toolTokens = toolDefs.length ? Math.ceil(JSON.stringify(toolDefs).length / 4) : 0;
     for (;;) {

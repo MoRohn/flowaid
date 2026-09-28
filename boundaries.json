@@ -64,6 +64,7 @@
         "mcp",
         "openapi-tools",
         "knowledge",
+        "pageindex",
         "workflow-core",
         "shared"
       ]

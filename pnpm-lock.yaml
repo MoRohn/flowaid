@@ -1100,6 +1100,9 @@ importers:
       '@flowaid/node-sdk':
         specifier: workspace:*
         version: link:../node-sdk
+      '@flowaid/pageindex':
+        specifier: workspace:*
+        version: link:../pageindex
       '@flowaid/providers':
         specifier: workspace:*
         version: link:../providers
