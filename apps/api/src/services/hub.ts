@@ -3,6 +3,9 @@
  * shared by every SSE stream and sync waiter. Durable notifications carry ids only
  * (`{ runId, fromSeq, toSeq }`); listeners re-read events by seq. Ephemeral events (generation
  * deltas, logs) arrive on `run_deltas` with the event itself.
+ *
+ * Commit notices are `pg_notify('run_events')` calls inside the append transaction, so they are
+ * read from `commits` (a Postgres bus) even when `bus` is Redis pub/sub (scale mode).
  */
 import { RUN_EVENTS_CHANNEL } from "@flowaid/database";
 import type { EventBus, JsonValue } from "@flowaid/workflow-core";
@@ -19,12 +22,15 @@ export class RunEventHub {
   private started: Promise<void> | null = null;
   private unsubs: (() => Promise<void>)[] = [];
 
-  constructor(private readonly bus: EventBus) {}
+  constructor(
+    private readonly bus: EventBus,
+    private readonly commits: EventBus = bus,
+  ) {}
 
   private start(): Promise<void> {
     this.started ??= (async () => {
       this.unsubs.push(
-        await this.bus.subscribe(RUN_EVENTS_CHANNEL, (m) => {
+        await this.commits.subscribe(RUN_EVENTS_CHANNEL, (m) => {
           const msg = m as { runId?: string; fromSeq?: number; toSeq?: number };
           if (typeof msg.runId !== "string") return;
           for (const l of this.listeners.get(msg.runId) ?? [])

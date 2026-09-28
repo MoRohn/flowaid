@@ -230,6 +230,61 @@ describeDb("credentials, artifacts, retention and seeds", () => {
     expect(await sweepRetention(t.app)).toMatchObject({ expiredRuns: 0, idempotencyKeys: 0 });
   });
 
+  it("nulls sensitive node I/O past rows it cannot touch, one batch at a time", async () => {
+    const store = new PgRunStore(t.app);
+    const played: string[] = [];
+    // an internal run first: its old node runs must not fill the batch forever
+    for (const dataClass of ["internal", "internal", "sensitive"] as const) {
+      const { run, created } = newRun(tenant);
+      await store.createRun(run, created);
+      await store.acquireLease(run.id, "w1", 30_000);
+      let seq = 1;
+      for (const batch of supportTriageLog().batches)
+        seq = (await store.appendEvents(run.id, batch, { leaseOwner: "w1", expectedSeq: seq }))
+          .lastSeq;
+      await t.admin`update runs set data_class = ${dataClass} where id = ${run.id}`;
+      await t.admin`update node_runs set ended_at = now() - interval '30 days', input = '{"q":1}'::jsonb where run_id = ${run.id}`;
+      played.push(run.id);
+    }
+    const sensitive = played[2] as string;
+    const [{ n: total = 0 } = {}] = await t.admin<
+      { n: number }[]
+    >`select count(*)::int as n from node_runs where run_id = ${sensitive}`;
+    expect(total).toBeGreaterThan(2);
+    let nulled = 0;
+    for (let i = 0; i < total; i++) {
+      const r = await sweepRetention(t.app, { batch: 2 });
+      expect(r.sensitiveNodeRuns).toBeLessThanOrEqual(2);
+      nulled += r.sensitiveNodeRuns;
+    }
+    expect(nulled).toBe(total);
+    const left = await t.admin<{ run_id: string; n: number }[]>`
+      select run_id, count(*)::int as n from node_runs
+      where run_id in ${t.admin(played)} and (input is not null or output is not null)
+      group by run_id`;
+    expect(left.map((r) => r.run_id).sort()).toEqual([played[0], played[1]].sort());
+  });
+
+  it("sweeps finished queue jobs and old deliveries in bounded batches", async () => {
+    await t.admin`
+      insert into queue_jobs (id, queue, payload, done_at, created_at)
+      select 'old-' || i, 'ingest', '{}'::jsonb, now() - interval '8 days', now() - interval '9 days'
+      from generate_series(1, 5) i`;
+    await t.admin`insert into queue_jobs (id, queue, payload) values ('pending-old', 'ingest', '{}'::jsonb)`;
+    await t.admin`update queue_jobs set created_at = now() - interval '30 days' where id = 'pending-old'`;
+    await t.admin`insert into queue_jobs (id, queue, payload, done_at) values ('recent', 'ingest', '{}'::jsonb, now())`;
+    const first = await sweepRetention(t.app, { batch: 3 });
+    expect(first.queueJobs).toBe(3);
+    expect((await sweepRetention(t.app, { batch: 3 })).queueJobs).toBe(2);
+    const ids = (
+      await t.admin<
+        { id: string }[]
+      >`select id from queue_jobs where id in ('pending-old', 'recent') or id like 'old-%'`
+    ).map((r) => r.id);
+    expect(ids.sort()).toEqual(["pending-old", "recent"]);
+    expect(first.alertDeliveries).toBe(0);
+  });
+
   it("keeps the last checkpoint of finished runs and two of active ones", async () => {
     const store = new PgRunStore(t.app);
     const { run, created } = newRun(tenant);

@@ -165,4 +165,39 @@ describeDb("PgQueueDriver", () => {
     await q.scheduleTimer({ id: "t", runId: "r", nodeRunId: null, purpose: "retry", fireAt: "x" });
     await q.cancelTimer("t");
   });
+
+  it("dead-letters a job whose consumers keep dying instead of redelivering it forever", async () => {
+    const errors: string[] = [];
+    const q = new PgQueueDriver(t.app.sql, {
+      pollMs: 10,
+      maxAttempts: 2,
+      onError: (error) => errors.push(error instanceof Error ? error.message : String(error)),
+    });
+    await q.enqueue("ingest", { type: "ingest.source", sourceId: "poison" }, { jobId: "poison" });
+    // two consumers crashed mid-job: every attempt is spent and the last lease lapsed
+    await t.admin`update queue_jobs set locked_by = 'dead', locked_until = now() - interval '1 second', attempts = 2 where id = 'poison'`;
+    const got: string[] = [];
+    const c = await q.consume(
+      "ingest",
+      (job) => {
+        if (job.type === "ingest.source") got.push(job.sourceId);
+        return Promise.resolve();
+      },
+      { concurrency: 1 },
+    );
+    await expect
+      .poll(
+        async () =>
+          (
+            await t.admin`select done_at is not null as done, attempts, last_error, locked_by from queue_jobs where id = 'poison'`
+          )[0],
+        { timeout: 5_000 },
+      )
+      .toMatchObject({ done: true, attempts: 2, locked_by: null });
+    await c.stop();
+    expect(got).toEqual([]);
+    const [row] = await t.admin`select last_error from queue_jobs where id = 'poison'`;
+    expect(row?.last_error).toMatch(/2 attempts/);
+    expect(errors.some((e) => e.includes("poison"))).toBe(true);
+  });
 });

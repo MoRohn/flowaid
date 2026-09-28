@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { uuidv7 } from "@flowaid/shared";
 import { compile, COMPILER_VERSION } from "@flowaid/workflow-compiler";
 import type { ExecutionPlan, Run } from "@flowaid/workflow-core";
@@ -286,7 +286,7 @@ describe("Orchestrator on shared stores", () => {
       });
       return id;
     };
-    return { plan, store, make, create };
+    return { plan, store, queue, make, create };
   }
 
   it("a second worker takes over a run whose worker died, and retries its safe node", async () => {
@@ -298,7 +298,7 @@ describe("Orchestrator on shared stores", () => {
     const runId = await create();
     const a = make("worker-a", 40);
     expect(await a.handle(runId, { type: "start" })).toBe("ok");
-    await a.close(); // dies with `slow` in flight; its lease lapses
+    await a.close({ releaseLeases: false }); // dies with `slow` in flight; its lease lapses
     await new Promise((r) => setTimeout(r, 60));
     const b = make("worker-b");
     // Make the retried attempt quick: the second attempt is a fresh execution.
@@ -320,6 +320,36 @@ describe("Orchestrator on shared stores", () => {
         { leaseOwner: "worker-a", expectedSeq: events.length },
       ),
     ).rejects.toThrow(/not leased/);
+  });
+
+  it("hands its runs on when it shuts down instead of waiting for the lease to lapse", async () => {
+    const { store, queue, make, create } = setup([
+      start,
+      task("slow", "@test/kit.slow", { ms: 60_000 }, { value: ref("start", "x") }),
+      { id: "out", kind: "output", name: "out", value: ref("slow", "value") },
+    ]);
+    const runId = await create();
+    const a = make("worker-a");
+    expect(await a.handle(runId, { type: "start" })).toBe("ok");
+    expect(a.activeRuns).toBe(1);
+    await a.close();
+    expect(a.activeRuns).toBe(0);
+    // the lease is free at once, and a resume job wakes whoever takes the run
+    expect(await store.acquireLease(runId, "worker-b", 30_000)).not.toBeNull();
+    await store.releaseLease(runId, "worker-b");
+    const jobs: unknown[] = [];
+    const consumer = await queue.consume(
+      "run:general",
+      (job) => {
+        jobs.push(job);
+        return Promise.resolve();
+      },
+      { concurrency: 1 },
+    );
+    await vi.waitFor(() =>
+      expect(jobs).toEqual([{ type: "run.resume", runId, reason: "recovery" }]),
+    );
+    await consumer.stop();
   });
 
   it("reports every appended event once to onEvents, in order", async () => {
@@ -390,6 +420,30 @@ describe("Orchestrator on shared stores", () => {
     expect(fired.reduce((x, y) => x + y, 0)).toBe(1);
     await new Promise((r) => setTimeout(r, 20));
     expect(await store.getRun(runId)).toMatchObject({ status: "completed", output: "woke" });
+  });
+
+  it("keeps a due timer pending while another worker holds the run", async () => {
+    const { store, make, create } = setup(
+      [
+        start,
+        { id: "w", kind: "wait", name: "w", until: { type: "delay", ms: 30 } },
+        { id: "out", kind: "output", name: "out", value: { kind: "literal", value: "woke" } },
+      ],
+      [edge("e0", "start", "done", "w"), edge("e1", "w", "done", "out")],
+    );
+    const runId = await create();
+    const a = make("worker-a");
+    await a.handle(runId, { type: "start" });
+    expect((await store.getRun(runId))?.status).toBe("waiting");
+    expect(await store.acquireLease(runId, "worker-other", 60_000)).not.toBeNull();
+    await new Promise((r) => setTimeout(r, 40));
+    expect(await a.fireDueTimers()).toBe(0);
+    expect(await store.dueTimers(new Date(), 10)).toHaveLength(1);
+    await store.releaseLease(runId, "worker-other");
+    expect(await a.fireDueTimers()).toBe(1);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(await store.getRun(runId)).toMatchObject({ status: "completed", output: "woke" });
+    expect(await store.dueTimers(new Date(), 10)).toHaveLength(0);
   });
 });
 

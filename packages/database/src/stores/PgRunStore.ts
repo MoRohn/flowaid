@@ -333,6 +333,7 @@ export class PgRunStore implements RunStore {
     );
   }
 
+  /** Leases past their `lease_until` by the database clock; `now` only fills a missing time. */
   async expiredLeases(now: Date, limit: number): Promise<LeaseInfo[]> {
     const rows = await this.tx((tx) =>
       tx
@@ -343,7 +344,7 @@ export class PgRunStore implements RunStore {
           lastSeq: runs.lastSeq,
         })
         .from(runs)
-        .where(and(isNotNull(runs.leaseOwner), lt(runs.leaseUntil, now)))
+        .where(and(isNotNull(runs.leaseOwner), lt(runs.leaseUntil, sql`now()`)))
         .orderBy(asc(runs.leaseUntil))
         .limit(limit),
     );

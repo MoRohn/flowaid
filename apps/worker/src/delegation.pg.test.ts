@@ -121,11 +121,15 @@ describeDb("delegated code pool (Postgres)", () => {
     expect(executedOn).toHaveLength(1);
     const events = await h.store.listEvents(runId, 0, 200);
     expect(events.map((e) => e.type)).toContain("NODE_DELEGATED");
-    // the handoff row is consumed once the orchestrator has the result
-    const left = await h.db.app.system((tx) =>
-      tx.execute(sql`select count(*)::int as n from delegated_nodes`),
-    );
-    expect((left as unknown as { n: number }[])[0]?.n).toBe(0);
+    // the handoff row is removed once the run handled the result (just after that step)
+    await expect
+      .poll(async () => {
+        const left = await h.db.app.system((tx) =>
+          tx.execute(sql`select count(*)::int as n from delegated_nodes`),
+        );
+        return (left as unknown as { n: number }[])[0]?.n;
+      })
+      .toBe(0);
   });
 
   it("gives the sandbox role no table access beyond the queue", async () => {
