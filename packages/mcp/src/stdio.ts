@@ -84,7 +84,13 @@ const SHELLS = new Set([
 const PACKAGE_RUNNERS = new Set(["npx", "pnpx", "bunx", "uvx", "pipx"]);
 /** Environment names that change how any process loads code. */
 const DANGEROUS_ENV =
-  /^(?:LD_|DYLD_)|^(?:NODE_OPTIONS|NODE_PATH|PYTHONPATH|PYTHONSTARTUP|PERL5OPT|PERL5LIB|RUBYOPT|RUBYLIB|BASH_ENV|ENV|PROMPT_COMMAND|IFS|GCONV_PATH)$/;
+  /^(?:LD_|DYLD_)|^(?:NODE_OPTIONS|NODE_PATH|NODE_EXTRA_CA_CERTS|PYTHONPATH|PYTHONSTARTUP|PYTHONHOME|PYTHONUSERBASE|PERL5OPT|PERL5LIB|RUBYOPT|RUBYLIB|JAVA_TOOL_OPTIONS|_JAVA_OPTIONS|JDK_JAVA_OPTIONS|CLASSPATH|DOTNET_STARTUP_HOOKS|BASH_ENV|ENV|PROMPT_COMMAND|IFS|GCONV_PATH)$/;
+/**
+ * Names the process environment already means something by: where binaries, home and temp
+ * files are, locale, trust stores and proxies. A credential field never sets one.
+ */
+const SYSTEM_ENV =
+  /^(?:LC_|XDG_)|^(?:PATH|HOME|USER|LOGNAME|SHELL|PWD|OLDPWD|TMPDIR|TMP|TEMP|LANG|LANGUAGE|TZ|TERM|SSL_CERT_FILE|SSL_CERT_DIR|REQUESTS_CA_BUNDLE|CURL_CA_BUNDLE|HTTP_PROXY|HTTPS_PROXY|NO_PROXY|ALL_PROXY)$/;
 
 export class StdioPolicyError extends ForbiddenError {}
 
@@ -153,10 +159,15 @@ export function planStdioSpawn(
     const v = config.env?.[name] ?? policy.parentEnv?.[name];
     if (v !== undefined) env[name] = v;
   }
-  // The bound credential's fields reach the child as environment variables (upper-cased names).
+  // The bound credential's fields reach the child as environment variables (upper-cased names),
+  // never as a loader, system or allow-listed variable (`path` would otherwise replace PATH).
   for (const [k, v] of Object.entries(credentialFields)) {
     const name = k.replace(/[^A-Za-z0-9_]/g, "_").toUpperCase();
-    if (!DANGEROUS_ENV.test(name)) env[name] = v;
+    if (DANGEROUS_ENV.test(name) || SYSTEM_ENV.test(name) || allowed.has(name))
+      throw new StdioPolicyError(
+        `credential field ${k} would set the environment variable ${name}; rename the field`,
+      );
+    env[name] = v;
   }
   return { command: config.command, args, env };
 }
