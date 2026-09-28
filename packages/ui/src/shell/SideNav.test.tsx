@@ -84,6 +84,37 @@ describe("SideNav", () => {
     expect(tooltip).toHaveTextContent("G");
   });
 
+  it("names a count with its label instead of a bare number, expanded or collapsed", () => {
+    const pending: SideNavItem = {
+      id: "tasks",
+      label: "Human tasks",
+      icon: <Workflow />,
+      count: 3,
+      countTone: "warn",
+      countLabel: "pending",
+    };
+    renderNav({ items: [pending], collapsed: true });
+    const rail = screen.getByRole("button", { name: "Human tasks 3 pending" });
+    expect(rail.querySelector("[data-nav-count]")).toHaveAttribute("aria-hidden", "true");
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    cleanup();
+    renderNav({ items: [pending], collapsed: false });
+    expect(screen.getByRole("button", { name: "Human tasks 3 pending" })).toBeInTheDocument();
+  });
+
+  it("leaves modified clicks on links to the browser", () => {
+    const onNavigate = vi.fn();
+    renderNav({
+      onNavigate,
+      items: [{ id: "docs", label: "Docs", icon: <Workflow />, href: "/docs" }],
+    });
+    const link = screen.getByRole("link", { name: /Docs/ });
+    const e = new MouseEvent("click", { bubbles: true, cancelable: true, ctrlKey: true });
+    link.dispatchEvent(e);
+    expect(onNavigate).not.toHaveBeenCalled();
+    expect(e.defaultPrevented).toBe(false);
+  });
+
   it("reports collapse changes and offers the theme toggle", async () => {
     const user = userEvent.setup();
     const onCollapsedChange = vi.fn();

@@ -1,7 +1,7 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { Monitor, Moon, Play, Sparkles, Sun, Workflow } from "lucide-react";
 import { formatMs } from "@/lib/format";
-import { statusLabel } from "@/primitives";
+import { statusLabel, useControllableState } from "@/primitives";
 import { CommandPalette, type CommandGroupView, type CommandItemView } from "./CommandPalette";
 import { useTheme, type ThemeSetting } from "@/theme";
 import type { RunStatus } from "@/lib/categories";
@@ -63,6 +63,9 @@ export interface CommandMenuProps {
   /** Extra groups appended after the built-in ones. */
   extraGroups?: CommandGroupView[];
   placeholder?: string;
+  /** Controlled search text, for groups that depend on what is typed (go to a run by id). */
+  search?: string;
+  onSearchChange?: (search: string) => void;
 }
 
 /**
@@ -81,6 +84,8 @@ export function CommandMenu({
   leadingGroups = [],
   extraGroups = [],
   placeholder = "Search pages, workflows, runs or type a command…",
+  search,
+  onSearchChange,
 }: CommandMenuProps) {
   const shell = useAppShellOptional();
   const open = openProp ?? shell?.commandOpen ?? false;
@@ -89,7 +94,7 @@ export function CommandMenu({
     if (openProp === undefined && shell) shell.setCommandOpen(next);
   };
   const { setting, setTheme } = useTheme();
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useControllableState(search, "", onSearchChange);
 
   const groups = useMemo<CommandGroupView[]>(() => {
     const list: CommandGroupView[] = [];

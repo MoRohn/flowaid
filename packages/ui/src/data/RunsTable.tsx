@@ -15,6 +15,7 @@ import {
   Zap,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { isPlainClick } from "@/lib/events";
 import { ORIGIN_LABEL, type RunOrigin } from "@/lib/categories";
 import { ConfidenceSparkbar } from "@/decision";
 import { formatCost, formatMs, formatProbability, formatTokens } from "@/lib/format";
@@ -192,6 +193,7 @@ export function RunsTable({
   extraColumns,
   defaultSorting,
   onRowActivate,
+  rowHref,
   ...rest
 }: RunsTableProps) {
   const columns = useMemo<DataTableColumns<RunView>>(() => {
@@ -207,12 +209,31 @@ export function RunsTable({
         size: 176,
         minSize: 130,
         meta: { mono: true },
-        cell: ({ getValue }) => {
+        cell: ({ getValue, row }) => {
           const id = getValue();
+          const href = rowHref?.(row.original);
           return (
             <span className="group/id flex min-w-0 items-center gap-1">
               <Hint hint={id} announce={false} className="truncate text-ink-2">
-                {id}
+                {href ? (
+                  // a real link, so cmd/middle click and "copy link" work; the row stays the
+                  // keyboard target (Enter opens it), so the link is not an extra Tab stop
+                  <a
+                    href={href}
+                    tabIndex={-1}
+                    onClick={(e) => {
+                      if (onOpen && isPlainClick(e)) {
+                        e.preventDefault();
+                        onOpen(row.original);
+                      }
+                    }}
+                    className="underline-offset-2 hover:text-ink hover:underline"
+                  >
+                    {id}
+                  </a>
+                ) : (
+                  id
+                )}
               </Hint>
               <span
                 role="presentation"
@@ -400,7 +421,7 @@ export function RunsTable({
       },
     });
     return [...base, ...(extraColumns ?? []), actions];
-  }, [thresholds, onOpen, onReplay, onCancel, extraColumns]);
+  }, [thresholds, onOpen, onReplay, onCancel, extraColumns, rowHref]);
 
   return (
     <DataTable<RunView>
@@ -409,6 +430,7 @@ export function RunsTable({
       itemLabel={["run", "runs"]}
       defaultSorting={defaultSorting ?? [{ id: "createdAt", desc: true }]}
       onRowActivate={onRowActivate ?? onOpen}
+      {...(rowHref ? { rowHref } : {})}
       aria-label="Runs"
       {...rest}
     />

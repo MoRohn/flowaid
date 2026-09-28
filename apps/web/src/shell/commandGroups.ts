@@ -4,6 +4,7 @@
  * component; here every item carries a `to` (an app path), an `href` (a page outside the app) or
  * an `action` the component knows.
  */
+import { humanizeId } from "~/runs/humanTasks";
 import { HELP } from "./help";
 
 export interface CommandTarget {
@@ -31,7 +32,8 @@ export type CommandIcon =
   | "help"
   | "keyboard"
   | "docs"
-  | "bug";
+  | "bug"
+  | "approval";
 
 export interface CommandGroup {
   id: string;
@@ -48,12 +50,60 @@ export interface CommandInput {
   workflows: readonly { id: string; name: string; latestVersion: number | null }[];
   runs: readonly { id: string; workflowId: string; status: string }[];
   templates: readonly { id: string; name: string; description?: string }[];
+  /** What is typed in the menu: a run id (or its first 8+ characters) offers "Go to run". */
+  query?: string;
+  /** Open human tasks, newest first; the first five are listed. */
+  pending?: readonly {
+    id: string;
+    nodeId: string;
+    nodeName?: string;
+    workflowId: string;
+    runId: string;
+  }[];
 }
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const ID_PREFIX = /^[0-9a-f]{8}[0-9a-f-]{0,27}$/i;
+
+/** A full run id, or the start of one (8+ hex characters, as the UI shows them). */
+export function runIdQuery(query: string): { kind: "id" | "prefix"; value: string } | null {
+  const q = query.trim().toLowerCase();
+  if (UUID.test(q)) return { kind: "id", value: q };
+  if (ID_PREFIX.test(q)) return { kind: "prefix", value: q };
+  return null;
+}
+
+const PENDING_SHOWN = 5;
 
 const STATUS: Record<string, string> = {
   waiting_for_human: "waiting for a person",
   timed_out: "timed out",
 };
+
+/**
+ * "Go to run …" for a typed run id: straight to the run for a full id or for a prefix one recent
+ * run matches, otherwise the runs list searched by the prefix.
+ */
+function goToRun(i: CommandInput, at: (path: string) => string): CommandTarget[] {
+  const q = runIdQuery(i.query ?? "");
+  if (!q || !i.can("runs:read")) return [];
+  const matches = q.kind === "prefix" ? i.runs.filter((r) => r.id.startsWith(q.value)) : [];
+  const id = q.kind === "id" ? q.value : matches.length === 1 ? matches[0]?.id : undefined;
+  // cmdk filters on keywords: the typed text itself keeps the item visible
+  const keywords = ["run", "go to", "id", i.query?.trim() ?? ""];
+  return id
+    ? [{ id: "goto-run", label: `Go to run ${id}`, icon: "run", keywords, to: at(`runs/${id}`) }]
+    : [
+        {
+          id: "goto-run",
+          label: `Find runs starting with ${q.value}`,
+          description: "Searches the runs list by id",
+          icon: "run",
+          keywords,
+          to: at(`runs?q=${encodeURIComponent(q.value)}`),
+        },
+      ];
+}
 
 export function commandGroups(i: CommandInput): {
   leading: CommandGroup[];
@@ -137,7 +187,35 @@ export function commandGroups(i: CommandInput): {
   ];
 
   const names = new Map(i.workflows.map((w) => [w.id, w.name]));
+  const pending = i.pending ?? [];
   const leading: CommandGroup[] = [
+    { id: "goto", heading: "Go to", items: goToRun(i, at) },
+    {
+      id: "pending",
+      heading: "Pending approvals",
+      items: [
+        ...pending.slice(0, PENDING_SHOWN).map((t) => ({
+          id: `pending-${t.id}`,
+          label: t.nodeName ?? humanizeId(t.nodeId),
+          description: `${names.get(t.workflowId) ?? "Workflow"} · run ${t.runId.slice(0, 8)}`,
+          meta: "pending",
+          icon: "approval" as const,
+          keywords: ["approval", "pending", "review", "human task", t.runId],
+          to: at(`human-tasks/${t.id}`),
+        })),
+        ...(pending.length > PENDING_SHOWN
+          ? [
+              {
+                id: "pending-all",
+                label: `All pending approvals (${pending.length})`,
+                icon: "approval" as const,
+                keywords: ["approval", "pending", "inbox", "human tasks"],
+                to: at("human-tasks"),
+              },
+            ]
+          : []),
+      ],
+    },
     { id: "create", heading: "Create", items: create },
     {
       id: "workflows",

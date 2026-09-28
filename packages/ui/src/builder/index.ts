@@ -37,6 +37,7 @@ export {
   type BuilderPlanThreshold,
   type BuilderPlanNode,
   type BuilderPlanEdge,
+  type BuilderPlanDiagnostic,
 } from "./AIBuilderPanel";
 export {
   WorkflowCriticPanel,

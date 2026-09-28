@@ -9,6 +9,7 @@ import {
 } from "react";
 import { ChevronRight, Pencil } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { isPlainClick } from "@/lib/events";
 import { Tooltip } from "@/primitives";
 
 export interface BreadcrumbItem {
@@ -16,6 +17,7 @@ export interface BreadcrumbItem {
   label: string;
   href?: string;
   icon?: ReactNode;
+  /** With `href`, a plain click calls this instead of loading the page (client-side routing). */
   onClick?: () => void;
 }
 
@@ -174,12 +176,26 @@ export const Breadcrumbs = forwardRef<HTMLElement, BreadcrumbsProps>(function Br
             node = (
               <a
                 href={item.href}
-                onClick={item.onClick}
+                onClick={(e) => {
+                  // with an onClick the app routes a plain click itself; modified clicks open tabs
+                  if (item.onClick && isPlainClick(e)) {
+                    e.preventDefault();
+                    item.onClick();
+                  }
+                }}
                 className={cn(crumbClass, "text-ink-3 hover:bg-surface-3 hover:text-ink")}
               >
                 {item.icon}
                 <span className="truncate">{item.label}</span>
               </a>
+            );
+          } else if (!item.onClick) {
+            // nothing to go to: plain text, not a button that does nothing
+            node = (
+              <span className={cn(crumbClass, "text-ink-3")}>
+                {item.icon}
+                <span className="truncate">{item.label}</span>
+              </span>
             );
           } else {
             node = (

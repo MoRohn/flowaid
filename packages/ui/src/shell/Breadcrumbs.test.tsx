@@ -20,6 +20,35 @@ describe("Breadcrumbs", () => {
       "page",
     );
     expect(screen.queryByRole("button", { name: "Rename" })).not.toBeInTheDocument();
+    // an ancestor with nowhere to go is text, not a button that does nothing
+    expect(screen.getByText("Acme Support").closest("a,button")).toBeNull();
+  });
+
+  it("routes a plain click through onClick and leaves modified clicks to the browser", () => {
+    const onClick = vi.fn();
+    render(
+      <Breadcrumbs
+        items={[
+          { id: "wf", label: "Workflows", href: "/workflows", onClick },
+          { id: "name", label: "Support triage" },
+        ]}
+      />,
+    );
+    const link = screen.getByRole("link", { name: "Workflows" });
+    expect(link).toHaveAttribute("href", "/workflows");
+    const plain = new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 });
+    link.dispatchEvent(plain);
+    expect(onClick).toHaveBeenCalledTimes(1);
+    expect(plain.defaultPrevented).toBe(true);
+    const meta = new MouseEvent("click", {
+      bubbles: true,
+      cancelable: true,
+      button: 0,
+      metaKey: true,
+    });
+    link.dispatchEvent(meta);
+    expect(onClick).toHaveBeenCalledTimes(1);
+    expect(meta.defaultPrevented).toBe(false);
   });
 
   it("renames inline: Enter commits, Escape cancels, empty names are rejected", async () => {
