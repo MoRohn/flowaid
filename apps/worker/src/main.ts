@@ -250,6 +250,7 @@ async function main(): Promise<void> {
     exports: { vendorDir: String(env.FLOWAID_VENDOR_DIR ?? "/opt/flowaid/vendor") },
     concurrency: Number(env.WORKER_CONCURRENCY ?? 8),
     pools: env.WORKER_POOLS,
+    retentionCron: String(env.RETENTION_SWEEP_CRON),
     log,
   });
   await worker.start();
@@ -289,7 +290,9 @@ async function main(): Promise<void> {
         .catch(() => undefined);
     },
   });
-  const stopHeartbeat = startHeartbeat(heartbeatPath(env));
+  const stopHeartbeat = startHeartbeat(heartbeatPath(env), 10_000, () => ({
+    retentionSweep: worker.lastRetentionSweep,
+  }));
 
   const shutdown = async (signal: string) => {
     log.info({ signal }, "shutting down");

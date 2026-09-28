@@ -16,11 +16,17 @@ export function heartbeatPath(env: {
   return join(dirname(env.FLOWAID_MASTER_KEY_FILE ?? "/data/master.key"), "worker.heartbeat");
 }
 
-export function startHeartbeat(path: string, everyMs = 10_000): () => void {
+/** `status` adds fields to the file (e.g. the last retention sweep); the health check reads `at`. */
+export function startHeartbeat(
+  path: string,
+  everyMs = 10_000,
+  status?: () => Record<string, unknown>,
+): () => void {
   const beat = () =>
-    void writeFile(path, JSON.stringify({ at: new Date().toISOString(), pid: process.pid })).catch(
-      () => undefined,
-    );
+    void writeFile(
+      path,
+      JSON.stringify({ at: new Date().toISOString(), pid: process.pid, ...status?.() }),
+    ).catch(() => undefined);
   beat();
   const t = setInterval(beat, everyMs);
   t.unref();

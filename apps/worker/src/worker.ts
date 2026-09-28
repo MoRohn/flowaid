@@ -79,6 +79,12 @@ import {
 import { runTraceReviewJob, wantsReview } from "./jobs/traceReview.js";
 import { recordRunMetrics, type AlertDispatcher, type Instruments } from "@flowaid/observability";
 import { runIngestJob } from "./jobs/ingest.js";
+import {
+  isMaintenanceJob,
+  runMaintenanceJob,
+  scheduleRetentionSweep,
+  type RetentionSweepReport,
+} from "./jobs/maintenance.js";
 import { knowledgeServiceFor, type KnowledgeDeps } from "./services/knowledge.js";
 
 export interface WorkerLogger {
@@ -112,6 +118,8 @@ export interface WorkerDeps {
   maintenance?: { timerPollMs?: number; heartbeatMs?: number; reapMs?: number };
   /** delay before a run job is redelivered when another worker holds the run (default 1 s) */
   busyRetryMs?: number;
+  /** RETENTION_SWEEP_CRON: enqueues `retention.sweep` on the maintenance queue; null disables */
+  retentionCron?: string | null;
   /** code export (`export.package` on the `jobs` queue): FLOWAID_VENDOR_DIR for vendored mode */
   exports?: { vendorDir?: string | null };
   /**
@@ -173,6 +181,8 @@ export interface Worker {
   stop(): Promise<void>;
   /** jobs handled so far (diagnostics, tests) */
   readonly handled: number;
+  /** the last `retention.sweep` this worker ran (the heartbeat file carries it) */
+  readonly lastRetentionSweep: RetentionSweepReport | null;
 }
 
 export function createWorker(deps: WorkerDeps): Worker {
@@ -586,12 +596,16 @@ export function createWorker(deps: WorkerDeps): Worker {
         await clearDelegatedResult(deps.db, target.trigger.nodeRunId);
     };
 
+  let lastRetentionSweep: RetentionSweepReport | null = null;
   const stops: (() => Promise<void>)[] = [];
   return {
     id: workerId,
     orchestrator,
     get handled() {
       return handled;
+    },
+    get lastRetentionSweep() {
+      return lastRetentionSweep;
     },
     async start() {
       const concurrency = deps.concurrency ?? 8;
@@ -664,7 +678,26 @@ export function createWorker(deps: WorkerDeps): Worker {
         },
         { concurrency: 2 },
       );
+      const maintenance = await deps.queue.consume(
+        "maintenance",
+        async (job) => {
+          if (!isMaintenanceJob(job)) return;
+          const report = await runMaintenanceJob({ db: deps.db, storage, log }, job);
+          if (report) lastRetentionSweep = report;
+        },
+        { concurrency: 1 },
+      );
+      if (deps.retentionCron) {
+        const stopCron = scheduleRetentionSweep({
+          queue: deps.queue,
+          cron: deps.retentionCron,
+          onError: (error) =>
+            log.error({ err: String(error) }, "scheduling the retention sweep failed"),
+        });
+        stops.push(() => Promise.resolve(stopCron()));
+      }
       stops.push(
+        () => maintenance.stop(),
         () => ingest.stop(),
         () => general.stop(),
         () => control.stop(),
