@@ -12,7 +12,7 @@
  * - Responses are capped (25 MiB by default); per-workspace allow/deny host lists apply.
  */
 import { lookup as dnsLookup, type LookupAddress } from "node:dns";
-import { isIP } from "node:net";
+import { isIP, type TcpNetConnectOpts } from "node:net";
 import { Agent, type Dispatcher } from "undici";
 import {
   ForbiddenError,
@@ -125,38 +125,46 @@ const hostMatches = (host: string, rule: string) => {
 
 export class SsrfBlockedError extends ForbiddenError {}
 
-export function createSafeFetch(o: SafeFetchOptions = {}): SafeFetch {
+/** The `lookup` hook of `net.connect` (and undici's `connect` options). */
+export type ConnectLookup = NonNullable<TcpNetConnectOpts["lookup"]>;
+
+/**
+ * A `net.connect` lookup that refuses blocked addresses at connect time (so DNS rebinding
+ * between a check and the connection cannot slip through). Shared by safe fetch and the other
+ * outbound connections nodes make (the database query node).
+ */
+export function createGuardedLookup(
+  o: Pick<SafeFetchOptions, "allowPrivate" | "lookup"> = {},
+): ConnectLookup {
   const lookup: LookupFn = o.lookup ?? ((host, opts, cb) => dnsLookup(host, opts, cb));
-  const agent: Dispatcher = new Agent({
-    connect: {
-      // net.connect calls this with `{ all: true }` (happy eyeballs) and then expects an array.
-      lookup: (hostname, options, cb) => {
-        const all = (options as { all?: boolean } | undefined)?.all === true;
-        const reply = cb;
-        const literal = isIP(hostname.replace(/^\[|\]$/g, ""));
-        const check = (addresses: LookupAddress[]) => {
-          const ok = o.allowPrivate
-            ? addresses
-            : addresses.filter((a) => !isBlockedAddress(a.address));
-          const first = ok[0];
-          if (!first)
-            return reply(
-              new SsrfBlockedError(
-                `refused to connect to ${hostname}: it resolves to a private or reserved address`,
-              ),
-              all ? [] : "",
-              4,
-            );
-          if (all) reply(null, ok);
-          else reply(null, first.address, first.family);
-        };
-        if (literal) return check([{ address: hostname.replace(/^\[|\]$/g, ""), family: literal }]);
-        lookup(hostname, { all: true }, (err, addresses) =>
-          err ? reply(err, all ? [] : "", 4) : check(addresses),
+  // net.connect calls this with `{ all: true }` (happy eyeballs) and then expects an array.
+  return (hostname, options, cb) => {
+    const all = (options as { all?: boolean } | undefined)?.all === true;
+    const reply = cb;
+    const literal = isIP(hostname.replace(/^\[|\]$/g, ""));
+    const check = (addresses: LookupAddress[]) => {
+      const ok = o.allowPrivate ? addresses : addresses.filter((a) => !isBlockedAddress(a.address));
+      const first = ok[0];
+      if (!first)
+        return reply(
+          new SsrfBlockedError(
+            `refused to connect to ${hostname}: it resolves to a private or reserved address`,
+          ),
+          all ? [] : "",
+          4,
         );
-      },
-    },
-  });
+      if (all) reply(null, ok);
+      else reply(null, first.address, first.family);
+    };
+    if (literal) return check([{ address: hostname.replace(/^\[|\]$/g, ""), family: literal }]);
+    lookup(hostname, { all: true }, (err, addresses) =>
+      err ? reply(err, all ? [] : "", 4) : check(addresses),
+    );
+  };
+}
+
+export function createSafeFetch(o: SafeFetchOptions = {}): SafeFetch {
+  const agent: Dispatcher = new Agent({ connect: { lookup: createGuardedLookup(o) } });
   const maxRedirects = o.maxRedirects ?? SAFE_FETCH_DEFAULTS.maxRedirects;
   const maxBytesDefault = o.maxBytes ?? SAFE_FETCH_DEFAULTS.maxBytes;
 
