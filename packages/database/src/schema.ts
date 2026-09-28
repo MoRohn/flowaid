@@ -47,7 +47,7 @@ import type {
 
 /* ───────────────────────── custom types ───────────────────────── */
 // Unsized: sources choose their embedding model, so vectors of different dimensions share the
-// table; migration 0005 adds a partial HNSW index per common dimension (see DATABASE.md).
+// table; migration 0007 adds a partial HNSW index per common dimension (see DATABASE.md).
 const vector = customType<{ data: number[]; driverData: string }>({
   dataType() {
     return "vector";
@@ -573,7 +573,7 @@ export const runEvents = pgTable(
     check("run_events_payload_size", sql`pg_column_size(${t.payload}) < 262144`),
   ],
 );
-// RUN_EVENTS_PARTITIONED=true: migration 0003 converts to PARTITION BY RANGE (at), monthly partitions created 3 months ahead by the sweep job.
+// RUN_EVENTS_PARTITIONED=true: migration 0002 converts to PARTITION BY RANGE (at), monthly partitions created 3 months ahead by the sweep job.
 
 export const nodeRuns = pgTable(
   "node_runs",
