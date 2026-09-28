@@ -29,6 +29,7 @@ import type {
   ProviderHealth,
   ProviderHop,
   ScoreDecision,
+  TokenUsage,
 } from "@flowaid/workflow-core";
 import type { ExecutionCall } from "./executor.js";
 import type { NodeEmitted } from "./step.js";
@@ -54,6 +55,15 @@ function hopLabel(hop: ProviderHop | undefined): { provider: string; model: stri
     case "human":
       return { provider: hop.provider, model: "" };
   }
+}
+
+/** The model that served a stream: the candidate it failed over to, else the first one. */
+function servedBy(failedOverTo: string | undefined, first: ModelRef): ModelRef {
+  if (!failedOverTo) return first;
+  const slash = failedOverTo.indexOf("/");
+  return slash > 0
+    ? { provider: failedOverTo.slice(0, slash), model: failedOverTo.slice(slash + 1) }
+    : first;
 }
 
 export interface RegistryAccessOptions {
@@ -165,11 +175,15 @@ export function registryProviderAccess(
 
   const generation = (selection: ModelRef | GenerationPolicy): GenerationProvider => {
     let resolved: Promise<GenerationProvider> | null = null;
+    // the candidate a stream last failed over to ("provider/model"), to price what served it
+    let failedOverTo: string | undefined;
     // A policy resolves to a failover chain (RFC-0005); its hand-overs become PROVIDER_FAILOVER.
     const get = () =>
       (resolved ??= registry.generation(selection, resolveCtx, {
-        onFailover: (f) =>
-          emit({ type: "PROVIDER_FAILOVER", from: f.from, to: f.to, error: f.error.toInfo() }),
+        onFailover: (f) => {
+          failedOverTo = f.to;
+          emit({ type: "PROVIDER_FAILOVER", from: f.from, to: f.to, error: f.error.toInfo() });
+        },
       }));
     const ref = modelCandidates(selection)[0] as ModelRef;
     const completed = (r: GenerationResult) =>
@@ -200,14 +214,38 @@ export function registryProviderAccess(
         completed(result);
         return result;
       },
+      // A stream carries usage but no price: the final usage is priced from the catalog here, so
+      // streamed and non-streamed generations count the same toward run cost and maxCostUsd.
       stream: (req, ctx) => ({
         async *[Symbol.asyncIterator](): AsyncGenerator<GenerationChunk> {
+          const started = Date.now();
           const provider = await get();
+          failedOverTo = undefined;
+          let usage: TokenUsage = { inputTokens: 0, outputTokens: 0 };
+          let finishReason: GenerationResult["finishReason"] = "stop";
+          let outputChars = 0;
           for await (const chunk of provider.stream(req, ctx)) {
             if (chunk.type === "text" || chunk.type === "thinking")
               call.onDelta?.(chunk.type, chunk.delta);
+            if (chunk.type === "text") outputChars += chunk.delta.length;
+            else if (chunk.type === "usage") usage = chunk.usage;
+            else if (chunk.type === "done") finishReason = chunk.finishReason;
             yield chunk;
           }
+          const served = servedBy(failedOverTo, ref);
+          const model = registry.catalog.resolveAlias(served.provider, served.model);
+          const price = registry.catalog.price(served.provider, model, usage);
+          emit({
+            type: "GENERATION_COMPLETED",
+            provider: served.provider,
+            model,
+            usage,
+            costUsd: price.costUsd,
+            priceSnapshot: price.snapshot,
+            finishReason,
+            outputChars,
+            latencyMs: Math.max(0, Date.now() - started),
+          });
         },
       }),
       health: () => HEALTHY,
