@@ -124,8 +124,10 @@ export { splitText } from "./data/split.js";
 export { detectPii, redactPii, PII_KINDS, type PiiFinding, type PiiKind } from "./safety/pii.js";
 export { extractJson } from "./ai/structured_generate.js";
 export {
+  AGENT_LIMITS,
   AGENT_PRESET_BUILTIN,
   APPROVAL_MODES,
+  UNTRUSTED_NOTICE,
   agentSettingsSchema,
   effectiveAgent,
   needsApproval,
