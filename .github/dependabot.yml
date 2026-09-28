@@ -15,6 +15,11 @@ updates:
     groups:
       minor-and-patch:
         update-types: [minor, patch]
+    # major upgrades (test runner, linter, Node types) change the toolchain: they are planned by
+    # hand, not proposed weekly
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
   # the digest-pinned base images: node in the Dockerfile; postgres, redis, rustfs in compose
   - package-ecosystem: docker
     directory: /docker
