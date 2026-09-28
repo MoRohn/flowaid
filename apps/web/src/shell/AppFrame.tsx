@@ -10,6 +10,7 @@ import { Plus } from "lucide-react";
 import { AppShell, SideNav, TopBar, UserMenu, type TopBarProps } from "@flowaid/ui/shell";
 import { Button, IconButton } from "@flowaid/ui/primitives";
 import { useSession } from "~/session";
+import { documentTitle, useDocumentTitle, usePendingTasks } from "./frame";
 import { HelpMenu } from "./HelpMenu";
 import { NAV, NAV_SECONDARY, visibleNav } from "./nav";
 import { WorkspaceCommandMenu } from "./WorkspaceCommandMenu";
@@ -47,23 +48,35 @@ export function AppFrame({
   const items = visibleNav(NAV, s.features);
   const secondary = visibleNav(NAV_SECONDARY, s.features);
   const active = [...items, ...secondary].find((e) => section === e.path)?.id ?? section;
+  const pending = usePendingTasks(s);
+  const pendingCount = pending.data?.items.length ?? 0;
   const toItem = (e: (typeof items)[number]) => ({
     id: e.id,
     label: e.label,
     icon: e.icon,
     href: e.path ? `/${s.ws}/${e.path}` : `/${s.ws}`,
     shortcut: e.shortcut,
+    ...(e.id === "human-tasks" && pendingCount > 0
+      ? { count: pendingCount, countTone: "warn" as const, countLabel: "pending" }
+      : {}),
   });
+  useDocumentTitle(documentTitle(crumbs, s.workspaceName));
+  // the workspace crumb leads home; every crumb with a path is a real link that routes client-side
+  const links = crumbs.map((c, i) =>
+    !c.href && i === 0 && i < crumbs.length - 1 && c.label === s.workspaceName
+      ? { ...c, href: `/${s.ws}` }
+      : c,
+  );
 
   return (
     <AppShell
       storageKey={storageKey}
       topbar={
         <TopBar
-          breadcrumbs={crumbs.map((c, i) => ({
+          breadcrumbs={links.map((c, i) => ({
             id: String(i),
             label: c.label,
-            ...(c.href ? { onClick: () => router.push(c.href as string) } : {}),
+            ...(c.href ? { href: c.href, onClick: () => router.push(c.href as string) } : {}),
           }))}
           onLogoClick={() => go("")}
           layoutToggles={Boolean(inspector || bottomPanel)}
@@ -141,6 +154,7 @@ export function AppFrame({
             onSelect: () => go(e.path),
           }))}
           actions={commands}
+          pending={pending.data?.items ?? []}
         />
       }
     >

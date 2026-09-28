@@ -1,6 +1,9 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
+import { ThemeProvider } from "@/theme";
+import { CommandMenu } from "./CommandMenu";
 import { CommandPalette, type CommandGroupView } from "./CommandPalette";
 import { installDomStubs } from "@/primitives/testStubs";
 
@@ -122,5 +125,43 @@ describe("CommandPalette", () => {
   it("shows the loading state", () => {
     render(<CommandPalette open onOpenChange={() => undefined} groups={[]} loading />);
     expect(screen.getByText("Loading commands")).toBeInTheDocument();
+  });
+});
+
+describe("CommandMenu search", () => {
+  function Menu({ onGo }: { onGo: (id: string) => void }) {
+    const [search, setSearch] = useState("");
+    // a group built from what is typed, as the workspace menu does for run ids
+    const goto: CommandGroupView[] = /^[0-9a-f]{8}$/.test(search)
+      ? [
+          {
+            id: "goto",
+            heading: "Go to",
+            items: [
+              {
+                id: "goto-run",
+                label: `Go to run ${search}`,
+                keywords: [search],
+                onSelect: () => onGo(search),
+              },
+            ],
+          },
+        ]
+      : [];
+    return (
+      <ThemeProvider defaultSetting="light">
+        <CommandMenu open leadingGroups={goto} search={search} onSearchChange={setSearch} />
+      </ThemeProvider>
+    );
+  }
+
+  it("hands the typed text to the parent and runs a query-built item from the keyboard", async () => {
+    const user = userEvent.setup();
+    const onGo = vi.fn();
+    render(<Menu onGo={onGo} />);
+    await user.type(screen.getByRole("combobox"), "01a0e530");
+    expect(screen.getByRole("option", { name: /Go to run 01a0e530/ })).toBeInTheDocument();
+    await user.keyboard("{Enter}");
+    expect(onGo).toHaveBeenCalledWith("01a0e530");
   });
 });
