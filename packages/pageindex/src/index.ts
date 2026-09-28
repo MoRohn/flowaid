@@ -56,3 +56,14 @@ export {
   type ServiceOutlineNode,
   type SubmitJobInput,
 } from "./protocol.js";
+export {
+  PAGEINDEX_EVAL_CASES,
+  SAMPLE_FILES,
+  THRESHOLDS,
+  scorePageIndexCase,
+  summarizePageIndexEval,
+  type PageIndexCaseResult,
+  type PageIndexEvalCase,
+  type PageIndexEvalSummary,
+  type SampleDocument,
+} from "./evals.js";

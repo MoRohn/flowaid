@@ -43,6 +43,13 @@ describe("claims and lexical support", () => {
     expect(
       lexicalSupport("Chat transcripts are kept forever", EVIDENCE[0]?.excerpt ?? "").supported,
     ).toBe(false);
+    // extraction artefacts: a ligature and a line break inside the phrase
+    expect(
+      lexicalSupport(
+        "Trips above $5,000 need finance approval within 2 business hours",
+        "Trips above\n$5,000 in total also need approval from the \ufb01nance department within 2\nbusiness hours.",
+      ).supported,
+    ).toBe(true);
   });
 });
 

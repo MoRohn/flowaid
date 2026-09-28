@@ -69,12 +69,13 @@ export function lexicalSupport(
   claim: string,
   excerpt: string,
 ): { supported: boolean; score: number } {
-  const text = excerpt.toLowerCase().replace(/,/g, "");
+  // PDF text extraction leaves ligatures ("ﬁ") and line breaks inside phrases
+  const text = excerpt.normalize("NFKC").toLowerCase().replace(/\s+/g, " ").replace(/,/g, "");
   const nums = numbers(claim);
   if (nums.some((n) => !text.includes(n))) return { supported: false, score: 0 };
   const w = [...new Set(words(claim))];
   if (!w.length) return { supported: nums.length > 0, score: nums.length > 0 ? 1 : 0 };
-  const bag = new Set(words(excerpt));
+  const bag = new Set(words(text));
   const hit = w.filter((x) => bag.has(x) || text.includes(x)).length;
   const score = hit / w.length;
   return { supported: score >= 0.6, score: Number(score.toFixed(3)) };
