@@ -122,21 +122,37 @@ describe("checkPort", () => {
     server = undefined;
   });
 
-  it("fails on a port that is in use and suggests the next one", async () => {
-    server = createServer();
-    const port = await new Promise<number>((resolve) => {
-      server?.listen(0, "127.0.0.1", () => {
+  const listen = () =>
+    new Promise<number>((resolve) => {
+      server = createServer();
+      server.listen(0, "127.0.0.1", () => {
         const address = server?.address();
         resolve(typeof address === "object" && address ? address.port : 0);
       });
     });
+
+  it("fails on an explicit port that is in use", async () => {
+    const port = await listen();
     const busy = await checkPort("127.0.0.1", port);
     expect(busy.status).toBe("fail");
-    expect(busy.fix).toContain(`--port ${port + 1}`);
+    expect(busy.fix).toBe("stop the app using it, or pass another --port");
+    const api = await checkPort("127.0.0.1", port, { name: "API port", flag: "--api-port" });
+    expect(api).toMatchObject({ name: "API port", status: "fail" });
+    expect(api.fix).toContain("--api-port");
 
     await new Promise<void>((resolve) => server?.close(() => resolve()));
     server = undefined;
     expect((await checkPort("127.0.0.1", port)).status).toBe("ok");
+  });
+
+  it("moves a busy default port to the next free one without failing", async () => {
+    const port = await listen();
+    const moved = await checkPort("127.0.0.1", port, { explicit: false });
+    expect(moved.status).toBe("info");
+    expect(moved.port).toBeGreaterThan(port);
+    expect(moved.detail).toBe(
+      `127.0.0.1:${port} is in use (another app); using ${moved.port} instead`,
+    );
   });
 });
 
