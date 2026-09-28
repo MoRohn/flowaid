@@ -633,13 +633,33 @@ export class Orchestrator {
     for (const fn of set) fn();
   }
 
-  /** Aborts executions and stops maintenance (SIGTERM). Held leases expire and are reaped elsewhere. */
-  async close(): Promise<void> {
+  /**
+   * Aborts executions, stops maintenance and hands on the runs this worker holds (SIGTERM): each
+   * lease is released and a `run.resume` job queued, so another worker (or this one after a
+   * restart) takes the run over now instead of after the lease TTL. `releaseLeases: false`
+   * leaves the leases to lapse, as a crash would (tests).
+   */
+  async close(opts: { releaseLeases?: boolean } = {}): Promise<void> {
     this.stopMaintenance();
     for (const a of this.active.values())
       a.controller.abort(new CancelledError("Worker shutting down"));
     await Promise.allSettled([...this.active.values()].map((a) => a.done));
     this.active.clear();
+    await Promise.allSettled([...this.locks.values()]);
+    const held = [...this.held.keys()];
     this.held.clear();
+    if (opts.releaseLeases === false) return;
+    for (const runId of held) {
+      try {
+        await this.o.store.releaseLease(runId, this.workerId);
+        await this.o.queue.enqueue("run:general", {
+          type: "run.resume",
+          runId,
+          reason: "recovery",
+        });
+      } catch (error) {
+        this.error(error, "release", runId);
+      }
+    }
   }
 }
