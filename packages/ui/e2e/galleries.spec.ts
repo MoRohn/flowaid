@@ -58,8 +58,31 @@ async function openGallery(page: Page, slug: string, theme: Theme): Promise<void
   await expect(page.locator("main").getByText("loading…", { exact: true })).toHaveCount(0);
   await expect(page.locator("main h1").first()).toBeVisible();
   await page.waitForLoadState("networkidle");
-  // Let charts, measured widths and xyflow's first fit settle before auditing.
-  await page.waitForTimeout(400);
+  // Let charts, measured widths and xyflow's first fit settle before auditing: the layout of
+  // <main> (its size and every canvas viewport's transform) is the same in two samples in a row.
+  let previous = "";
+  await expect
+    .poll(
+      async () => {
+        const current = await page.evaluate(() => {
+          const main = document.querySelector("main");
+          const viewports = [...document.querySelectorAll(".react-flow__viewport")].map(
+            (v) => getComputedStyle(v).transform,
+          );
+          return JSON.stringify([
+            main?.scrollWidth,
+            main?.scrollHeight,
+            document.querySelectorAll("main svg").length,
+            viewports,
+          ]);
+        });
+        const same = current === previous;
+        previous = current;
+        return same;
+      },
+      { intervals: [100], timeout: 10_000, message: "the gallery's layout settles" },
+    )
+    .toBe(true);
 }
 
 for (const theme of THEMES) {

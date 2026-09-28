@@ -6,7 +6,7 @@
  * test-results/secret-canaries.txt so the workflow can search the logs again once every spec ran.
  */
 import { randomBytes } from "node:crypto";
-import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 import { apiHeaders, credentials, signIn } from "./helpers.ts";
 
@@ -128,6 +128,8 @@ test("secret values never come back from the API or reach the logs", async ({ pa
   await keep(await page.request.get(`/v1/runs/${runId}/node-runs`, { headers }));
 
   // A wrong password is refused and not logged either.
+  const log = process.env["E2E_STACK_LOG"];
+  const logOffset = log && existsSync(log) ? statSync(log).size : 0;
   const login = await page.request.post("/v1/auth/login", {
     headers: { "x-requested-with": "flowaid" },
     data: { email: credentials().email, password: CANARIES.password },
@@ -138,11 +140,17 @@ test("secret values never come back from the API or reach the logs", async ({ pa
   for (const value of Object.values(CANARIES))
     for (const text of seen) expect(text).not.toContain(value);
 
-  const log = process.env["E2E_STACK_LOG"];
   if (log) {
     expect(existsSync(log), `${log} exists`).toBe(true);
-    // give the processes a moment to flush what they logged about these requests
-    await page.waitForTimeout(2_000);
+    // The processes have flushed what they logged about these requests once the API's log line
+    // for the refused sign-in (the last request, logged at LOG_LEVEL=info as the e2e workflow
+    // runs the stack) is in the log.
+    await expect
+      .poll(() => readFileSync(log, "utf8").slice(logOffset).includes('"statusCode":401'), {
+        timeout: 15_000,
+        message: `the refused sign-in reaches ${log}`,
+      })
+      .toBe(true);
     const contents = readFileSync(log, "utf8");
     for (const [label, value] of Object.entries(CANARIES))
       expect(contents.includes(value), `the ${label} canary is in ${log}`).toBe(false);
