@@ -198,8 +198,13 @@ export interface DataTableProps<TData extends RowData> {
   onColumnVisibilityChange?: (visibility: ColumnVisibilityState) => void;
 
   onRowClick?: (row: TData, event: MouseEvent<HTMLTableRowElement>) => void;
-  /** Enter on a focused row (and double-click). */
+  /**
+   * Opens a row: Enter on a focused row, and a click. When the table also takes `onRowClick` or
+   * selects rows, a click keeps that meaning and a double-click opens the row instead.
+   */
   onRowActivate?: (row: TData) => void;
+  /** Where a row leads: Ctrl/⌘-click and middle-click open it in a new tab. */
+  rowHref?: (row: TData) => string | undefined;
   /** Highlights the row (the one open in an inspector, for example). */
   isRowActive?: (row: TData) => boolean;
   rowClassName?: (row: TData) => string | undefined;
@@ -358,6 +363,7 @@ export function DataTable<TData extends RowData>(props: DataTableProps<TData>) {
     onColumnVisibilityChange,
     onRowClick,
     onRowActivate,
+    rowHref,
     isRowActive,
     rowClassName,
     stickyHeader = true,
@@ -772,9 +778,22 @@ export function DataTable<TData extends RowData>(props: DataTableProps<TData>) {
         onFocus={() => setFocusedRowId(row.id)}
         onClick={(e) => {
           setFocusedRowId(row.id);
-          onRowClick?.(row.original, e);
+          if (onRowClick) {
+            onRowClick(row.original, e);
+            return;
+          }
+          if (!onRowActivate || selectable || !isPlainRowClick(e)) return;
+          const href = rowHref?.(row.original);
+          if (href && (e.metaKey || e.ctrlKey)) window.open(href, "_blank", "noopener");
+          else onRowActivate(row.original);
         }}
-        onDoubleClick={() => onRowActivate?.(row.original)}
+        onAuxClick={(e) => {
+          const href = e.button === 1 && isPlainRowClick(e) ? rowHref?.(row.original) : undefined;
+          if (href) window.open(href, "_blank", "noopener");
+        }}
+        onDoubleClick={(e) => {
+          if ((onRowClick || selectable) && isPlainRowClick(e, true)) onRowActivate?.(row.original);
+        }}
         style={{ height: rowHeight, ...style }}
         className={cn(
           "group/row flex w-full outline-none transition-colors duration-(--dur-fast)",
@@ -862,7 +881,7 @@ export function DataTable<TData extends RowData>(props: DataTableProps<TData>) {
       data-density={density}
     >
       {hasToolbar || selectionToolbar ? (
-        <div className="relative flex h-10 shrink-0 items-center gap-2 border-b border-border px-2">
+        <div className="relative flex min-h-10 shrink-0 items-center gap-2 border-b border-border px-2 py-1">
           {showSelectionBar ? (
             <div
               key="selection"
@@ -1055,4 +1074,17 @@ export function DataTable<TData extends RowData>(props: DataTableProps<TData>) {
       ) : null}
     </div>
   );
+}
+
+/**
+ * A click on the row itself: not on a control inside it (menus, checkboxes, links), not from a
+ * portal rendered by the row (React bubbles those through the tree), not the end of a text drag
+ * (a double click selects a word, so it skips that check).
+ */
+function isPlainRowClick(e: MouseEvent<HTMLTableRowElement>, doubleClick = false): boolean {
+  const target = e.target as Element;
+  if (!e.currentTarget.contains(target)) return false;
+  if (target.closest("a,button,input,select,textarea,label,[role=menuitem],[role=checkbox]"))
+    return false;
+  return doubleClick || !window.getSelection()?.toString();
 }

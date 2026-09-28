@@ -2,7 +2,7 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { installDomStubs } from "@/primitives/testStubs";
-import { NodePaletteMenu } from "./NodePaletteMenu";
+import { NodePaletteMenu, paletteScore } from "./NodePaletteMenu";
 import { SAMPLE_CATALOG } from "./sampleWorkflow";
 
 installDomStubs();
@@ -88,5 +88,36 @@ describe("NodePaletteMenu", () => {
     setup({ onAskBuilder: undefined });
     await user.keyboard("zzzz");
     expect(screen.getByText("No node matches.")).toBeInTheDocument();
+  });
+});
+
+describe("paletteScore", () => {
+  const rerank = [
+    "Rerank",
+    "Reorders candidates by relevance",
+    "flowaid.ai.rerank",
+    "Generation",
+    "",
+  ];
+  const router = [
+    "Router",
+    "Routes to the control port a rule, a rerun or a knob picks",
+    "flowaid.decision.router",
+    "Decision",
+    "",
+  ];
+
+  it("ranks name matches above type, category and description matches", () => {
+    expect(paletteScore("x", "rer", rerank)).toBe(1);
+    expect(paletteScore("x", "rerank", rerank)).toBeGreaterThan(
+      paletteScore("x", "rerank", router),
+    );
+    expect(paletteScore("x", "decision.router", router)).toBe(0.7);
+    expect(paletteScore("x", "relevance", rerank)).toBe(0.4);
+  });
+
+  it("does not match letters scattered across a description", () => {
+    expect(paletteScore("x", "rerank", router)).toBe(0);
+    expect(paletteScore("x", "", router)).toBe(1);
   });
 });

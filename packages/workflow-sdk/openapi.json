@@ -4175,7 +4175,13 @@
             "required": false
           },
           { "schema": { "type": "string" }, "in": "query", "name": "origin", "required": false },
-          { "schema": { "type": "string" }, "in": "query", "name": "sessionId", "required": false }
+          { "schema": { "type": "string" }, "in": "query", "name": "sessionId", "required": false },
+          {
+            "schema": { "type": "string", "enum": ["decisions"] },
+            "in": "query",
+            "name": "include",
+            "required": false
+          }
         ],
         "x-cli": { "noun": "run", "verb": "list" },
         "x-auth": "session_or_api_key",
@@ -4239,7 +4245,21 @@
                           "nodeRunCount": { "type": "number" },
                           "createdAt": { "type": "string" },
                           "startedAt": { "type": ["string", "null"] },
-                          "endedAt": { "type": ["string", "null"] }
+                          "endedAt": { "type": ["string", "null"] },
+                          "decisions": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "nodeId": { "type": "string" },
+                                "nodeName": { "type": "string" },
+                                "kind": { "type": "string" },
+                                "confidence": { "type": "number" }
+                              },
+                              "required": ["nodeId", "nodeName", "kind", "confidence"],
+                              "additionalProperties": false
+                            }
+                          }
                         },
                         "required": [
                           "id",
@@ -4863,6 +4883,7 @@
                           },
                           "nodeRunId": { "type": "string" },
                           "nodeId": { "type": "string" },
+                          "nodeName": { "type": "string" },
                           "scope": { "type": "string" },
                           "workflowId": {
                             "type": "string",
@@ -5091,6 +5112,7 @@
                     },
                     "nodeRunId": { "type": "string" },
                     "nodeId": { "type": "string" },
+                    "nodeName": { "type": "string" },
                     "scope": { "type": "string" },
                     "workflowId": {
                       "type": "string",

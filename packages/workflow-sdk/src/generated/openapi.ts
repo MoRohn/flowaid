@@ -1950,6 +1950,7 @@ export interface paths {
                 /** Format: uuid */
                 id: string;
                 nodeId: string;
+                nodeName?: string;
                 nodeRunId: string;
                 request: unknown;
                 respondedAt: string | null;
@@ -2052,6 +2053,7 @@ export interface paths {
               /** Format: uuid */
               id: string;
               nodeId: string;
+              nodeName?: string;
               nodeRunId: string;
               request: unknown;
               respondedAt: string | null;
@@ -4744,6 +4746,7 @@ export interface paths {
         query?: {
           cursor?: string;
           environmentId?: string;
+          include?: "decisions";
           limit?: number;
           order?: "asc" | "desc";
           origin?: string;
@@ -4767,6 +4770,12 @@ export interface paths {
               items: {
                 costUsd: number;
                 createdAt: string;
+                decisions?: {
+                  confidence: number;
+                  kind: string;
+                  nodeId: string;
+                  nodeName: string;
+                }[];
                 endedAt: string | null;
                 /** Format: uuid */
                 environmentId: string;

@@ -50,6 +50,9 @@ export function formatAxisTick(value: number, unit: ChartUnit = "count"): string
       return value >= 1000 ? `${trimZeros((value / 1000).toFixed(1))}s` : `${Math.round(value)}ms`;
     case "usd":
       if (value === 0) return "$0";
+      // sub-cent ticks keep two significant digits instead of all rounding to "$0"
+      if (value < 0.01)
+        return `$${trimZeros(value.toFixed(Math.min(8, 1 - Math.floor(Math.log10(value)))))}`;
       if (value < 1) return `$${trimZeros(value.toFixed(2))}`;
       return `$${formatCompactNumber(value)}`;
     case "percent":

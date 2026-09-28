@@ -53,11 +53,20 @@ export interface LowestConfidence {
   decisions: number;
 }
 
-/** The least confident decision in a run, or null when no node decided anything. */
-export function lowestConfidence(run: Pick<RunView, "nodeRuns">): LowestConfidence | null {
+/**
+ * The least confident decision in a run, or null when no node decided anything. Reads the node
+ * runs, or the run's decision summaries when the node runs are not loaded (the runs list).
+ */
+export function lowestConfidence(
+  run: Pick<RunView, "nodeRuns"> & Partial<Pick<RunView, "decisions">>,
+): LowestConfidence | null {
   let best: LowestConfidence | null = null;
   let decisions = 0;
-  for (const n of run.nodeRuns) {
+  const rows =
+    run.nodeRuns.length === 0 && run.decisions
+      ? run.decisions.map((d) => ({ nodeId: d.nodeId, nodeName: d.nodeName, decision: d }))
+      : run.nodeRuns;
+  for (const n of rows) {
     const d = n.decision;
     if (!d || !Number.isFinite(d.confidence)) continue;
     decisions++;
@@ -266,8 +275,8 @@ export function RunsTable({
       helper.accessor((r) => r.durationMs, {
         id: "duration",
         header: "Duration",
-        size: 96,
-        minSize: 92,
+        size: 108,
+        minSize: 104,
         sortFn: "basic",
         sortUndefined: "last",
         meta: { numeric: true },
@@ -300,8 +309,8 @@ export function RunsTable({
       helper.accessor((r) => (r.usage ? r.usage.inputTokens + r.usage.outputTokens : undefined), {
         id: "tokens",
         header: "Tokens",
-        size: 88,
-        minSize: 72,
+        size: 96,
+        minSize: 92,
         sortFn: "basic",
         sortUndefined: "last",
         meta: { numeric: true },

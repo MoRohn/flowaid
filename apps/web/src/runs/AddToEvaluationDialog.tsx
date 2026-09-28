@@ -12,6 +12,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  FieldHint,
   FieldRow,
   Label,
   Select,
@@ -47,10 +48,13 @@ export function AddToEvaluationDialog({
     queryFn: () => get<EvaluationSetSummary[]>(`/v1/evaluations/sets${qs({ workflowId })}`),
     enabled: open,
   });
+  // the only set that fits this workflow is the one meant
+  const only = sets.data?.length === 1 ? sets.data[0]?.id : undefined;
+  const chosen = setId || only || "";
   const add = useMutation({
     mutationFn: () =>
       post(`/v1/runs/${runId}/add-to-evaluation`, {
-        setId,
+        setId: chosen,
         ...(expectOutput && output !== undefined && output !== null
           ? { expected: { output: [{ path: "", matcher: { type: "equals", value: output } }] } }
           : {}),
@@ -77,7 +81,7 @@ export function AddToEvaluationDialog({
             <Label htmlFor="eval-set">Evaluation set</Label>
             <Select
               id="eval-set"
-              value={setId}
+              value={chosen}
               onValueChange={setSetId}
               placeholder={
                 sets.isPending
@@ -94,6 +98,14 @@ export function AddToEvaluationDialog({
                 </SelectItem>
               ))}
             </Select>
+            {sets.data?.length === 0 ? (
+              <FieldHint>
+                <a className="text-accent-text hover:underline" href={`/${ws}/evaluations`}>
+                  Create an evaluation set
+                </a>{" "}
+                for this workflow first.
+              </FieldHint>
+            ) : null}
           </FieldRow>
           {output !== undefined && output !== null ? (
             <label className="flex items-center gap-2 text-sm text-ink">
@@ -111,7 +123,7 @@ export function AddToEvaluationDialog({
           </Button>
           <Button
             variant="primary"
-            disabled={!setId}
+            disabled={!chosen}
             loading={add.isPending}
             onClick={() => add.mutate()}
           >

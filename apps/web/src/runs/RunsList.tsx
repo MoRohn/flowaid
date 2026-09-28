@@ -54,7 +54,10 @@ export function RunsList({ workflowId }: { workflowId?: string }) {
     queryKey: ["runs", s.ws, server],
     initialPageParam: null as string | null,
     queryFn: ({ pageParam, signal }) =>
-      get<Page<Run>>(`/v1/runs${qs({ ...server, limit: PAGE, cursor: pageParam })}`, { signal }),
+      get<Page<Run>>(
+        `/v1/runs${qs({ ...server, include: "decisions", limit: PAGE, cursor: pageParam })}`,
+        { signal },
+      ),
     getNextPageParam: (last) => last.next_cursor,
     refetchInterval: (q) =>
       q.state.data?.pages.some((p) => p.items.some((r) => isActiveRun(r.status))) ? 3000 : false,
@@ -111,6 +114,8 @@ export function RunsList({ workflowId }: { workflowId?: string }) {
         runs={rows}
         loading={runs.isPending}
         onOpen={(r) => router.push(`/${s.ws}/runs/${r.id}`)}
+        rowHref={(r) => `/${s.ws}/runs/${r.id}`}
+        {...(workflowId ? { defaultColumnVisibility: { workflowName: false } } : {})}
         {...(s.can("runs:cancel") ? { onCancel: (r) => cancel.mutate(r.id) } : {})}
         {...(s.can("runs:replay") ? { onReplay: (r) => replay.mutate(r.id) } : {})}
         toolbar={

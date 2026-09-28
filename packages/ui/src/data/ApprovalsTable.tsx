@@ -326,10 +326,10 @@ export function ApprovalsTable({
     <DataTable<PendingApprovalView>
       columns={columns}
       data={approvals}
-      itemLabel={["approval", "approvals"]}
+      itemLabel={["task", "tasks"]}
       defaultSorting={defaultSorting ?? [{ id: "sla", desc: false }]}
       onRowActivate={onRowActivate ?? onReview}
-      aria-label="Pending approvals"
+      aria-label="Waiting human tasks"
       {...rest}
     />
   );

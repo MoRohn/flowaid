@@ -49,6 +49,10 @@ describeDb("runs, streams and human tasks (Postgres)", () => {
       if (r.status === "completed") break;
       await new Promise((r) => setTimeout(r, 50));
     }
+    // a signed-in person started it: the builder's "Run" is a ui run, not an api one
+    expect((await call(t.app, jar, "GET", `/v1/runs/${id}`)).json()).toMatchObject({
+      origin: "ui",
+    });
     expect((await call(t.app, jar, "GET", `/v1/runs/${id}/output`)).json()).toEqual({
       output: { message: 'echo: {"message":"hi"}' },
       outcome: null,
@@ -202,6 +206,16 @@ describeDb("runs, streams and human tasks (Postgres)", () => {
     ).json();
     expect(list.items).toHaveLength(3);
     expect(list.next_cursor).not.toBeNull();
+    expect(list.items[0]).not.toHaveProperty("decisions");
+    const withDecisions = (
+      await call(t.app, jar, "GET", `/v1/runs?workflowId=${workflowId}&limit=3&include=decisions`)
+    ).json();
+    // the fake worker's runs decide nothing: the summaries are there, and empty
+    expect(withDecisions.items.map((r: { decisions: unknown[] }) => r.decisions)).toEqual([
+      [],
+      [],
+      [],
+    ]);
     expect((await call(t.app, jar, "DELETE", `/v1/runs/${done}`)).statusCode).toBe(204);
     expect((await call(t.app, jar, "GET", `/v1/runs/${done}`)).statusCode).toBe(404);
   });

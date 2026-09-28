@@ -121,6 +121,8 @@ export interface Run {
   usage: { inputTokens?: number; outputTokens?: number } | null;
   costUsd: number;
   nodeRunCount: number;
+  /** with `include=decisions` on the list */
+  decisions?: { nodeId: string; nodeName: string; kind: string; confidence: number }[];
   createdAt: string;
   startedAt: string | null;
   endedAt: string | null;
@@ -130,6 +132,8 @@ export interface HumanTask {
   runId: string;
   nodeRunId: string;
   nodeId: string;
+  /** the node's name (the list) */
+  nodeName?: string;
   scope: string;
   workflowId: string;
   request: HumanRequest;

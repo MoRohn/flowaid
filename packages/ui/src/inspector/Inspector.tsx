@@ -696,9 +696,14 @@ export const Inspector = forwardRef<HTMLDivElement, InspectorProps>(function Ins
         <div className="flex h-6 min-w-0 items-center gap-2">
           <CategoryDot category={node.category} />
           <InlineName name={node.name} onRename={onRename} />
-          <span className="shrink-0 font-mono text-2xs tracking-wide text-ink-3">
+          {/* the type yields to the name: it truncates first and names it in full on hover */}
+          <Hint
+            hint={node.nodeType ?? node.kind}
+            announce={false}
+            className="min-w-0 max-w-[45%] shrink truncate font-mono text-2xs tracking-wide text-ink-3"
+          >
             {node.nodeType ?? node.kind}
-          </span>
+          </Hint>
           {onClose ? (
             <IconButton label="Close inspector" size="sm" onClick={onClose} className="-mr-1">
               <X strokeWidth={1.75} />

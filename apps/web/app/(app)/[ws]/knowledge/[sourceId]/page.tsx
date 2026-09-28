@@ -259,7 +259,7 @@ function Playground({ source }: { source: KnowledgeSource }) {
             placeholder="How long do refunds take?"
           />
         </FieldRow>
-        <FieldRow label="Mode" htmlFor="kq-mode">
+        <FieldRow label="Mode" htmlFor="kq-mode" className="w-36 shrink-0">
           <Select id="kq-mode" value={mode} onValueChange={(v) => setMode(v as SearchMode)}>
             <SelectItem value="hybrid" disabled={!source.pipeline.embedding}>
               Hybrid
@@ -270,7 +270,7 @@ function Playground({ source }: { source: KnowledgeSource }) {
             <SelectItem value="keyword">Keyword</SelectItem>
           </Select>
         </FieldRow>
-        <FieldRow label="Results" htmlFor="kq-k">
+        <FieldRow label="Results" htmlFor="kq-k" className="shrink-0">
           <NumberInput
             id="kq-k"
             value={topK}

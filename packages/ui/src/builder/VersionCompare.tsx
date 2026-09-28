@@ -54,7 +54,10 @@ export function VersionBadge({
 }) {
   return (
     <span className={cn("inline-flex items-center gap-1.5", className)}>
-      <span className="font-mono text-sm font-semibold tabular text-ink">v{version.version}</span>
+      {/* a draft has no number yet: its badge says so on its own */}
+      {version.status === "draft" && !version.version ? null : (
+        <span className="font-mono text-sm font-semibold tabular text-ink">v{version.version}</span>
+      )}
       <Badge tone={STATUS_TONE[version.status]} dot={version.status === "production"}>
         {version.status}
       </Badge>

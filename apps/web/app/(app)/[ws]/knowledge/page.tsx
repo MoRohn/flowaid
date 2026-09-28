@@ -64,6 +64,12 @@ function NewSourceDialog({
     select: (rows) => rows.filter((c) => c.type === "http.bearer"),
     enabled: open && f.kind === "github",
   });
+  const credentialTypes = useQuery({
+    queryKey: ["credentials", s.ws],
+    queryFn: () => get<Credential[]>("/v1/credentials"),
+    select: (rows) => new Set(rows.map((c) => c.type)),
+    enabled: open,
+  });
   const create = useMutate(() => post<KnowledgeSource>("/v1/knowledge/sources", sourceBody(f)), {
     success: (x) => `Created ${x.name}`,
     invalidate: [["knowledge-sources", s.ws]],
@@ -71,6 +77,13 @@ function NewSourceDialog({
   });
   const error = sourceFormError(f);
   const keywordOnly = !f.embeddingProvider;
+  // indexing embeds with a workspace credential of the provider (Ollama needs none)
+  const provider = f.embeddingProvider.trim().toLowerCase();
+  const missingKey =
+    !keywordOnly &&
+    provider !== "ollama" &&
+    credentialTypes.data !== undefined &&
+    !credentialTypes.data.has(`${provider}.api_key`);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -226,6 +239,16 @@ function NewSourceDialog({
                       onChange={(e) => set("embeddingModel", e.target.value)}
                     />
                   </FieldRow>
+                  {missingKey ? (
+                    <p role="status" className="text-xs text-warn-text sm:col-span-2">
+                      This workspace has no {f.embeddingProvider} API key, so documents will fail to
+                      index.{" "}
+                      <a className="underline" href={`/${s.ws}/credentials`}>
+                        Add a credential
+                      </a>
+                      , or turn embeddings off for keyword search.
+                    </p>
+                  ) : null}
                 </div>
               ) : null}
               <div className="grid gap-4 sm:grid-cols-3">

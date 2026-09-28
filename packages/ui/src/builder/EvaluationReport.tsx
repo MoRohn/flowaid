@@ -54,7 +54,8 @@ const GATE: Record<EvaluationGate, { tone: string; icon: ReactNode; title: strin
  * Dataset evaluation report: metric deltas against the baseline, the
  * regressions with expected vs actual, a per-case table and the publish
  * gate. `gate` decides which actions are offered: pass publishes normally,
- * warn and fail offer "Publish anyway" (danger) next to "Block publish".
+ * warn with regressions and fail offer "Publish anyway" (danger) next to
+ * "Block publish"; warn without regressions (warnings only) publishes normally.
  */
 export const EvaluationReport = forwardRef<HTMLDivElement, EvaluationReportProps>(
   function EvaluationReport(
@@ -79,7 +80,12 @@ export const EvaluationReport = forwardRef<HTMLDivElement, EvaluationReportProps
     const regressions = useMemo(() => cases.filter((c) => c.regression), [cases]);
     const passed = cases.filter((c) => c.passed).length;
     const rows = cases.slice(0, maxRows);
-    const g = GATE[gate];
+    // a gate that passed with warnings but no regression is not a risky publish
+    const risky = gate === "fail" || (gate === "warn" && regressions.length > 0);
+    const g =
+      gate === "warn" && regressions.length === 0
+        ? { ...GATE.warn, title: "Gate passed with warnings" }
+        : GATE[gate];
     const versions = (
       <span className="flex flex-wrap items-center gap-2 text-2xs text-ink-3">
         {base ? (
@@ -120,8 +126,8 @@ export const EvaluationReport = forwardRef<HTMLDivElement, EvaluationReportProps
                 </Button>
               ) : (
                 <>
-                  <Button size="sm" variant="danger" onClick={onPublish}>
-                    Publish anyway
+                  <Button size="sm" variant={risky ? "danger" : "primary"} onClick={onPublish}>
+                    {risky ? "Publish anyway" : "Publish"}
                   </Button>
                   <Button
                     size="sm"
@@ -143,7 +149,7 @@ export const EvaluationReport = forwardRef<HTMLDivElement, EvaluationReportProps
           <MetricsDeltaStrip metrics={metrics} />
 
           {calibrationNote ? (
-            <p className={cn("rounded-md border px-3 py-2 text-xs text-ink-2", g.tone)}>
+            <p className="rounded-md border border-border bg-surface-2 px-3 py-2 text-xs text-ink-2">
               <span className="font-medium text-ink">Calibration. </span>
               {calibrationNote}
             </p>

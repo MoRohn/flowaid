@@ -330,7 +330,9 @@ function AppShellInner({
                   minSize={120}
                   className={cn("flex flex-col", bottomExpanded && "invisible")}
                 >
-                  {children}
+                  <main id="main-content" className="flex min-h-0 min-w-0 flex-1 flex-col">
+                    {children}
+                  </main>
                 </ResizablePanel>
                 {showBottom ? (
                   <>

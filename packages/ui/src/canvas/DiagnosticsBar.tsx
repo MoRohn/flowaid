@@ -190,30 +190,33 @@ export const DiagnosticsBar = forwardRef<HTMLDivElement, DiagnosticsBarProps>(
             }
           >
             <span className="flex items-center gap-3">
-              <span
-                className={cn(
-                  "inline-flex items-center gap-1 font-mono text-2xs tabular",
-                  errors > 0 ? "text-danger-text" : "text-ink-3",
-                )}
-              >
-                <SeverityIcon severity="error" />
-                {errors}
-              </span>
-              <span
-                className={cn(
-                  "inline-flex items-center gap-1 font-mono text-2xs tabular",
-                  warnings > 0 ? "text-warn-text" : "text-ink-3",
-                )}
-              >
-                <SeverityIcon severity="warning" />
-                {warnings}
-              </span>
-              {infos > 0 ? (
-                <span className="inline-flex items-center gap-1 font-mono text-2xs tabular text-info-text">
-                  <SeverityIcon severity="info" />
-                  {infos}
+              {/* the counts are for the eye; the summary text says the same to a screen reader */}
+              <span aria-hidden="true" className="contents">
+                <span
+                  className={cn(
+                    "inline-flex items-center gap-1 font-mono text-2xs tabular",
+                    errors > 0 ? "text-danger-text" : "text-ink-3",
+                  )}
+                >
+                  <SeverityIcon severity="error" />
+                  {errors}
                 </span>
-              ) : null}
+                <span
+                  className={cn(
+                    "inline-flex items-center gap-1 font-mono text-2xs tabular",
+                    warnings > 0 ? "text-warn-text" : "text-ink-3",
+                  )}
+                >
+                  <SeverityIcon severity="warning" />
+                  {warnings}
+                </span>
+                {infos > 0 ? (
+                  <span className="inline-flex items-center gap-1 font-mono text-2xs tabular text-info-text">
+                    <SeverityIcon severity="info" />
+                    {infos}
+                  </span>
+                ) : null}
+              </span>
               <span className="text-ink-3">{summary}</span>
             </span>
           </CollapsibleTrigger>

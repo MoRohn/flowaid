@@ -33,7 +33,7 @@ import { BottomPanel } from "@flowaid/ui/builder";
 import { TraceTimeline } from "@flowaid/ui/trace";
 import { JsonView } from "@flowaid/ui/data";
 import { withDefaults } from "@flowaid/ui/forms";
-import { isEditableTarget } from "@flowaid/ui/shell";
+import { isEditableTarget, useAppShellOptional } from "@flowaid/ui/shell";
 import {
   Button,
   ConfirmDialog,
@@ -771,6 +771,9 @@ function BuilderView({
       ]}
     >
       <div className="flex h-full flex-col">
+        <OpenInspectorOnSelect
+          nodeId={selection.nodes.length === 1 ? selection.nodes[0] : undefined}
+        />
         <WorkflowTabs workflowId={workflow.id} active="builder" />
         <div className="min-h-0 flex-1">
           <FlowCanvas
@@ -870,4 +873,18 @@ function ConflictDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+/**
+ * Under the compact breakpoint the inspector is a sheet the canvas does not show: selecting a
+ * node opens it, so a tap on a node leads somewhere on a phone as it does on a desktop.
+ */
+function OpenInspectorOnSelect({ nodeId }: { nodeId: string | undefined }) {
+  const shell = useAppShellOptional();
+  const compact = shell?.compact ?? false;
+  const open = shell?.setInspectorOpen;
+  useEffect(() => {
+    if (compact && nodeId) open?.(true);
+  }, [compact, nodeId, open]);
+  return null;
 }

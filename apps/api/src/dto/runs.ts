@@ -55,11 +55,26 @@ export const RunSchema = z.object({
   endedAt: z.string().nullable(),
 });
 
+/** A decision a run made, as the runs list shows it (`include=decisions`). */
+export const RunDecisionSummarySchema = z.object({
+  nodeId: z.string(),
+  nodeName: z.string(),
+  kind: z.string(),
+  confidence: z.number(),
+});
+
+/** A runs-list row: the run, plus its decisions with `include=decisions`. */
+export const RunListItemSchema = RunSchema.extend({
+  decisions: z.array(RunDecisionSummarySchema).optional(),
+});
+
 export const HumanTaskSchema = z.object({
   id: z.uuid(),
   runId: z.uuid(),
   nodeRunId: z.string(),
   nodeId: z.string(),
+  /** the node's name in the workflow (the list) */
+  nodeName: z.string().optional(),
   scope: z.string(),
   workflowId: z.uuid(),
   request: z.unknown(),

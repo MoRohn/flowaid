@@ -21,7 +21,7 @@ const columns = helper.columns([
       <div className="flex min-w-0 flex-col">
         <span className="truncate text-ink">{c.getValue()}</span>
         <span className="truncate font-mono text-2xs text-ink-3">
-          {humanizeId(c.row.original.task.nodeId)}
+          {c.row.original.task.nodeName ?? humanizeId(c.row.original.task.nodeId)}
         </span>
       </div>
     ),

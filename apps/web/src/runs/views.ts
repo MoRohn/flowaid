@@ -29,11 +29,17 @@ export function environmentView(
 /** A list row: the run without node runs. */
 export function toRunRow(run: Run, j: RunJoinsLookup): RunView {
   const env = environmentView(j.environments, run.environmentId);
-  return toRunView(run as Parameters<typeof toRunView>[0], {
+  const view = toRunView(run as Parameters<typeof toRunView>[0], {
     workflowName: j.workflowNames.get(run.workflowId) ?? "Untitled workflow",
     version: j.versions.get(run.workflowVersionId) ?? "draft",
     ...(env ? { environment: env } : {}),
   });
+  if (run.decisions)
+    view.decisions = run.decisions.map((d) => ({
+      ...d,
+      kind: d.kind as NonNullable<RunView["decisions"]>[number]["kind"],
+    }));
+  return view;
 }
 
 /** Node id → definition node, for names and categories. */

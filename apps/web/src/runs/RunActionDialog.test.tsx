@@ -73,6 +73,31 @@ describe("run action dialogs", () => {
     );
   });
 
+  it("fork can target any published version, the run's own marked", async () => {
+    const { onSubmit } = open({
+      kind: "fork",
+      versionId: "v-1",
+      input: null,
+      versions: [
+        { id: "v-2", version: 2 },
+        { id: "v-1", version: 1 },
+      ],
+    });
+    expect(screen.getByLabelText(/v1/).closest("label")?.textContent).toContain(
+      "This run's version",
+    );
+    act(() => {
+      fireEvent.click(screen.getByLabelText(/v2/));
+    });
+    click("Fork");
+    await waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith({
+        path: `/v1/runs/${RUN}/fork`,
+        body: { versionId: "v-2" },
+      }),
+    );
+  });
+
   it("restart sends the node, its scope and the optional input override", async () => {
     const { onSubmit } = open({ kind: "restart", nodeId: "draft", nodeName: "Draft", scope: "0" });
     expect(screen.getByText("Restart from Draft")).toBeTruthy();

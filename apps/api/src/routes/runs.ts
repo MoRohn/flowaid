@@ -39,8 +39,9 @@ import {
   HumanTaskSchema,
   RunAcceptedSchema,
   RunCompletedSchema,
+  RunListItemSchema,
   RunRequestSchema,
-  RunSchema,
+  type RunDecisionSummarySchema,
 } from "../dto/runs.js";
 import { envelope } from "../plugins/errors.js";
 import { startRun, waitForRun, type StartRunRequest } from "../services/runs.js";
@@ -206,7 +207,11 @@ export function runRoutes(app: FastifyInstance, ctx: ApiContext): void {
       variables: body.variables as Record<string, JsonValue> | undefined,
       labels: body.labels,
     };
-    const started = await startRun(ctx, p, workflowId, request, { idempotencyKey: key });
+    // a signed-in person started it (the builder, the run page): origin "ui"; keys and tokens "api"
+    const started = await startRun(ctx, p, workflowId, request, {
+      idempotencyKey: key,
+      ...(p.type === "user" ? { origin: "ui" as const } : {}),
+    });
     req.audit = {
       resourceId: started.run.id,
       details: { workflowId, mode: body.mode, reused: started.reused },
@@ -345,8 +350,10 @@ export function runRoutes(app: FastifyInstance, ctx: ApiContext): void {
           status: z.union([z.string(), z.array(z.string())]).optional(),
           origin: z.string().optional(),
           sessionId: z.string().optional(),
+          /** `decisions`: each run's decisions (node, kind, confidence) for the list's column */
+          include: z.enum(["decisions"]).optional(),
         }),
-        response: { 200: page(RunSchema) },
+        response: { 200: page(RunListItemSchema) },
       },
     },
     async (req) => {
@@ -374,7 +381,45 @@ export function runRoutes(app: FastifyInstance, ctx: ApiContext): void {
       const items = p.workflowIds
         ? out.items.filter((x) => canSeeWorkflow(p, x.workflowId))
         : out.items;
-      return { items, next_cursor: out.nextCursor };
+      if (req.query.include !== "decisions" || items.length === 0)
+        return { items, next_cursor: out.nextCursor };
+      const rows = await ctx.db.tenant(p.workspaceId, (tx) =>
+        tx
+          .select({
+            runId: nodeRuns.runId,
+            nodeId: nodeRuns.nodeId,
+            nodeName: nodeRuns.nodeName,
+            kind: nodeRuns.decisionKind,
+            confidence: nodeRuns.decisionConfidence,
+          })
+          .from(nodeRuns)
+          .where(
+            and(
+              eq(nodeRuns.workspaceId, p.workspaceId),
+              inArray(
+                nodeRuns.runId,
+                items.map((x) => x.id),
+              ),
+              sql`${nodeRuns.decision} IS NOT NULL`,
+            ),
+          ),
+      );
+      const byRun = new Map<string, z.infer<typeof RunDecisionSummarySchema>[]>();
+      for (const d of rows) {
+        if (d.kind === null || d.confidence === null) continue;
+        const list = byRun.get(d.runId) ?? [];
+        list.push({
+          nodeId: d.nodeId,
+          nodeName: d.nodeName,
+          kind: d.kind,
+          confidence: Number(d.confidence),
+        });
+        byRun.set(d.runId, list);
+      }
+      return {
+        items: items.map((x) => ({ ...x, decisions: byRun.get(x.id) ?? [] })),
+        next_cursor: out.nextCursor,
+      };
     },
   );
 
@@ -958,7 +1003,18 @@ export function runRoutes(app: FastifyInstance, ctx: ApiContext): void {
       const cursor = decodeCursor(req.query.cursor);
       const rows = await ctx.db.tenant(p.workspaceId, (tx) =>
         tx
-          .select()
+          .select({
+            t: humanTasks,
+            // node runs record the node id; the name the author gave it is in the version
+            nodeName: sql<string | null>`(
+              select n->>'name'
+              from ${runs} r
+              join ${workflowVersions} v on v.id = r.workflow_version_id,
+                jsonb_array_elements(v.definition->'nodes') n
+              where r.id = ${humanTasks.runId} and n->>'id' = ${humanTasks.nodeId}
+              limit 1
+            )`,
+          })
           .from(humanTasks)
           .where(
             and(
@@ -988,9 +1044,13 @@ export function runRoutes(app: FastifyInstance, ctx: ApiContext): void {
           .limit(req.query.limit + 1),
       );
       const items = rows.slice(0, req.query.limit);
-      const last = items.at(-1);
+      const last = items.at(-1)?.t;
       return {
-        items: items.map((t) => ({ ...toHumanTask(t), assignees: t.assignees })),
+        items: items.map(({ t, nodeName }) => ({
+          ...toHumanTask(t),
+          assignees: t.assignees,
+          ...(nodeName ? { nodeName } : {}),
+        })),
         next_cursor:
           rows.length > req.query.limit && last
             ? encodeCursor(last.createdAt.toISOString(), last.id)

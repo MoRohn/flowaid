@@ -146,7 +146,7 @@ run delete <id> {--out}
 run events <id> {--follow --after --limit --types}
 run fork <id> {--version-id --draft --node-id --input --variables --body --out}
 run get <id> {--include --out}
-run list {--limit --cursor --order --workflow-id --environment-id --status --origin --session-id --out}
+run list {--limit --cursor --order --workflow-id --environment-id --status --origin --session-id --include --out}
 run node-run <id> <nodeRunId> {--out}
 run node-runs <id> {--node-id --scope --out}
 run output <id> {--out}

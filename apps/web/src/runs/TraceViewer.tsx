@@ -23,6 +23,7 @@ import {
 import { JsonView } from "@flowaid/ui/data";
 import { EventLog, LogViewer, RunHeader, TraceTimeline } from "@flowaid/ui/trace";
 import { get, post } from "~/api/client";
+import type { VersionSummary } from "~/api/types";
 import { useSession } from "~/session";
 import { ErrorPanel, errorMessage } from "~/shell/states";
 import { AddToEvaluationDialog } from "./AddToEvaluationDialog";
@@ -81,6 +82,13 @@ export function TraceViewer({ runId }: { runId: string }) {
     queryFn: () => get<VersionDetail>(`/v1/workflow-versions/${versionId as string}`),
     enabled: Boolean(versionId),
     staleTime: Infinity,
+  });
+  const workflowId = detail.data?.workflowId;
+  const published = useQuery({
+    queryKey: ["versions", s.ws, workflowId],
+    queryFn: () => get<VersionSummary[]>(`/v1/workflows/${workflowId as string}/versions`),
+    enabled: Boolean(workflowId),
+    staleTime: 60_000,
   });
   const catalog = useCatalog(s.ws);
   const names = useWorkflowNames(s.ws);
@@ -231,6 +239,10 @@ export function TraceViewer({ runId }: { runId: string }) {
                     kind: "fork",
                     versionId: version.data?.kind === "draft" ? null : (versionId ?? null),
                     input: run.input,
+                    versions: (published.data ?? [])
+                      .filter((v) => v.kind === "published" && v.version !== null)
+                      .map((v) => ({ id: v.id, version: v.version as number }))
+                      .sort((a, b) => b.version - a.version),
                   }),
               }
             : {})}

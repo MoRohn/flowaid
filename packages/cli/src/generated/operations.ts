@@ -1481,6 +1481,7 @@ export const OPERATIONS: readonly CliOperation[] = [
       { name: "status", type: "any", required: false },
       { name: "origin", type: "string", required: false },
       { name: "sessionId", type: "string", required: false },
+      { name: "include", type: "string", required: false, enum: ["decisions"] },
     ],
     body: null,
   },

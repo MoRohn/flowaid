@@ -224,10 +224,18 @@ export function useAdvisor(o: { workflowId: string; store: BuilderStore; enabled
     [cost, fetchCost, store],
   );
 
-  /** Applies a Problems-panel quick fix (compiler or `I_COST_SUGGESTION`). */
+  /**
+   * Applies a Problems-panel quick fix (compiler or `I_COST_SUGGESTION`). A fix without a patch
+   * ("Choose the resource") is a choice only the author can make: it opens the node instead.
+   */
   const applyDiagnosticFix = useCallback(
     (d: Diagnostic) => {
-      if (!d.fix?.patch.length) return;
+      if (!d.fix) return;
+      if (!d.fix.patch.length) {
+        const nodeId = d.location.nodeId;
+        if (nodeId) store.getState().select({ nodes: [nodeId], edges: [] });
+        return;
+      }
       if (d.code === "I_COST_SUGGESTION") {
         const s = cost?.data.suggestions.find((x) => x.title === d.fix?.title);
         if (s) {

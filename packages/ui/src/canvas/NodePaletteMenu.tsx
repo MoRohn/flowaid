@@ -57,9 +57,9 @@ export interface NodePaletteMenuProps {
 /**
  * Node palette: a cmdk list in a Popover anchored at a screen point. Opened
  * by the "+" button, a right-click (anchored at the pointer) or ⌘K / "/".
- * Groups node definitions by category with a "Recent" group first; fuzzy
- * search covers name, description, kind and category; the last row always
- * hands the query to the AI builder.
+ * Groups node definitions by category with a "Recent" group first; search
+ * covers name, description, kind and category (`paletteScore`); the last row
+ * always hands the query to the AI builder.
  */
 export function NodePaletteMenu({
   open,
@@ -120,7 +120,12 @@ export function NodePaletteMenu({
         className={cn("overflow-hidden", className)}
         aria-label="Add node"
       >
-        <Cmdk label="Add node" loop className="fa-palette flex min-h-0 flex-col">
+        <Cmdk
+          label="Add node"
+          loop
+          filter={paletteScore}
+          className="fa-palette flex min-h-0 flex-col"
+        >
           <div className="flex h-10 shrink-0 items-center gap-2 border-b border-border px-3">
             <Search className="size-4 shrink-0 text-ink-3" strokeWidth={1.75} aria-hidden="true" />
             <Cmdk.Input
@@ -172,7 +177,7 @@ export function NodePaletteMenu({
                           {def.description}
                         </span>
                       </span>
-                      <span className="shrink-0 font-mono text-2xs text-ink-3">
+                      <span className="max-w-[42%] shrink truncate font-mono text-2xs text-ink-3">
                         {def.provider ?? def.kind}
                       </span>
                     </Cmdk.Item>
@@ -210,4 +215,27 @@ export function NodePaletteMenu({
       </PopoverContent>
     </Popover>
   );
+}
+
+/**
+ * Ranks a palette row for the query: the name first (prefix, word prefix, anywhere), then the
+ * node type and provider, the category, and the description. Every word of the query must appear
+ * somewhere; letters scattered across a long description do not count as a match.
+ * `keywords` is `[name, description, kind, category, provider]`.
+ */
+export function paletteScore(value: string, search: string, keywords: string[] = []): number {
+  if (value === "builder:ask") return 1;
+  const q = search.trim().toLowerCase();
+  if (!q) return 1;
+  const [name = "", description = "", kind = "", category = "", provider = ""] = keywords.map((k) =>
+    k.toLowerCase(),
+  );
+  if (name.startsWith(q)) return 1;
+  if (name.split(/[\s()/-]+/).some((w) => w.startsWith(q))) return 0.9;
+  if (name.includes(q)) return 0.8;
+  if (kind.includes(q) || provider.includes(q)) return 0.7;
+  if (category.startsWith(q)) return 0.5;
+  if (description.includes(q)) return 0.4;
+  const all = [name, description, kind, category, provider].join(" ");
+  return q.split(/\s+/).every((w) => all.includes(w)) ? 0.3 : 0;
 }

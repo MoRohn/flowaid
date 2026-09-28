@@ -221,6 +221,57 @@ describe("DataTable keyboard", () => {
   });
 });
 
+describe("DataTable row clicks", () => {
+  const withMenu: DataTableColumns<Item> = helper.columns([
+    ...columns,
+    helper.display({ id: "menu", header: "", size: 60, cell: () => <button>More</button> }),
+  ]);
+  const setup = (props: Partial<Parameters<typeof DataTable<Item>>[0]> = {}) => {
+    const onRowActivate = vi.fn();
+    render(
+      <DataTable
+        columns={withMenu}
+        data={items}
+        onRowActivate={onRowActivate}
+        rowHref={(r) => `/items/${r.id}`}
+        showColumnMenu={false}
+        showDensityToggle={false}
+        {...props}
+      />,
+    );
+    return onRowActivate;
+  };
+
+  it("opens a row on a single click, but not from a control inside it", async () => {
+    const user = userEvent.setup();
+    const onRowActivate = setup();
+    await user.click(screen.getByText("Alpha"));
+    expect(onRowActivate).toHaveBeenCalledTimes(1);
+    expect(onRowActivate).toHaveBeenCalledWith(items[1]);
+    await user.click(screen.getAllByRole("button", { name: "More" })[0] as HTMLElement);
+    expect(onRowActivate).toHaveBeenCalledTimes(1);
+  });
+
+  it("opens the row's link in a new tab on Ctrl/⌘-click and middle click", () => {
+    const openSpy = vi.spyOn(window, "open").mockReturnValue(null);
+    const onRowActivate = setup();
+    fireEvent.click(screen.getByText("Gamma"), { metaKey: true });
+    fireEvent(screen.getByText("Beta"), new MouseEvent("auxclick", { bubbles: true, button: 1 }));
+    expect(openSpy.mock.calls.map((c) => c[0])).toEqual(["/items/c", "/items/b"]);
+    expect(onRowActivate).not.toHaveBeenCalled();
+    openSpy.mockRestore();
+  });
+
+  it("keeps a click for selection in selectable tables and opens on double click", async () => {
+    const user = userEvent.setup();
+    const onRowActivate = setup({ selectable: true });
+    await user.click(screen.getByText("Alpha"));
+    expect(onRowActivate).not.toHaveBeenCalled();
+    await user.dblClick(screen.getByText("Alpha"));
+    expect(onRowActivate).toHaveBeenCalledWith(items[1]);
+  });
+});
+
 describe("DataTable states", () => {
   it("renders skeleton rows while loading without data", () => {
     render(

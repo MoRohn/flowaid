@@ -66,6 +66,7 @@ export default function WorkflowsPage() {
               workflows={list.data.items.map((w) => toWorkflowListItem(w, s.environments))}
               environments={envs}
               onOpen={(w) => router.push(`/${s.ws}/workflows/${w.id}`)}
+              tableProps={{ rowHref: (w) => `/${s.ws}/workflows/${w.id}` }}
               toolbar={
                 <SearchInput
                   value={q}

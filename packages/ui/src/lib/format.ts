@@ -23,7 +23,9 @@ export function formatPercent(p: number, digits = 0): string {
 export function formatCost(usd: number): string {
   if (!Number.isFinite(usd)) return "—";
   if (usd === 0) return "$0";
-  if (usd < 0.0001) return `$${usd.toExponential(1)}`;
+  // plain decimals, never scientific notation: $0.000012, and a floor for dust
+  if (usd < 0.000001) return "<$0.000001";
+  if (usd < 0.0001) return `$${Number(usd.toPrecision(2)).toFixed(6).replace(/0+$/, "")}`;
   if (usd < 0.01) return `$${usd.toFixed(5)}`;
   if (usd < 1) return `$${usd.toFixed(4)}`;
   return `$${usd.toFixed(2)}`;

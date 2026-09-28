@@ -346,7 +346,7 @@ function BranchEditor({
           <div className="flex gap-2">
             <Input
               aria-label="Port"
-              className="w-28 font-mono"
+              className="w-36 shrink-0 font-mono"
               defaultValue={c.port}
               disabled={readOnly}
               onBlur={(e) =>
@@ -378,9 +378,13 @@ function BranchEditor({
               }
             />
           </div>
-          <Input
+          {/* conditions run long; wrap them instead of hiding the end of the expression */}
+          <Textarea
             aria-label="When"
-            className="font-mono"
+            mono
+            autoGrow
+            minRows={1}
+            maxRows={6}
             defaultValue={c.when}
             disabled={readOnly}
             onBlur={(e) =>

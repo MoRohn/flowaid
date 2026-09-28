@@ -22,7 +22,7 @@ export function taskToPending(
     id: task.id,
     runId: task.runId,
     nodeId: task.nodeId,
-    nodeName: humanizeId(task.nodeId),
+    nodeName: task.nodeName ?? humanizeId(task.nodeId),
     request: task.request,
     requestedAt: task.createdAt,
     workflowId: task.workflowId,

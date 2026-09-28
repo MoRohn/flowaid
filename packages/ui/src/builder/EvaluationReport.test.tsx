@@ -88,6 +88,13 @@ describe("EvaluationReport", () => {
     expect(onBlock).toHaveBeenCalledTimes(1);
   });
 
+  it("publishes normally when the gate passed with warnings but no regression", () => {
+    renderReport("warn", { cases: [] });
+    expect(screen.getByText("Gate passed with warnings")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Publish" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Publish anyway" })).not.toBeInTheDocument();
+  });
+
   it("makes Block publish the primary action when the gate fails", () => {
     const { container } = renderReport("fail");
     expect(screen.getByText("Gate failed")).toBeInTheDocument();

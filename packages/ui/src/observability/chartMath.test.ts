@@ -94,6 +94,8 @@ describe("formatting", () => {
     expect(formatAxisTick(250, "ms")).toBe("250ms");
     expect(formatAxisTick(0, "usd")).toBe("$0");
     expect(formatAxisTick(0.5, "usd")).toBe("$0.5");
+    expect(formatAxisTick(0.000012, "usd")).toBe("$0.000012");
+    expect(formatAxisTick(0.005, "usd")).toBe("$0.005");
     expect(formatAxisTick(1200, "usd")).toBe("$1.2K");
     expect(formatAxisTick(0.075, "percent")).toBe("7.5%");
     expect(formatAxisTick(0.5, "percent")).toBe("50%");

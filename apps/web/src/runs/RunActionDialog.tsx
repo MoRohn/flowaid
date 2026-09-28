@@ -14,6 +14,8 @@ export type RunAction =
       /** The run's published version, or null when the run executed the draft. */
       versionId: string | null;
       input: unknown;
+      /** The workflow's published versions, newest first, to fork onto. */
+      versions?: readonly { id: string; version: number }[];
     }
   | { kind: "restart"; nodeId: string; nodeName: string; scope?: string }
   | { kind: "retry"; nodeRunId: string; nodeName: string };
@@ -58,8 +60,9 @@ function ActionForm({
   onSubmit,
 }: RunActionDialogProps & { action: RunAction }) {
   const [mode, setMode] = useState("reexecute");
+  // "draft", or the id of a published version
   const [target, setTarget] = useState(
-    action.kind === "fork" && action.versionId ? "version" : "draft",
+    action.kind === "fork" && action.versionId ? action.versionId : "draft",
   );
   const [json, setJson] = useState(action.kind === "fork" ? pretty(action.input) : "");
   const [busy, setBusy] = useState(false);
@@ -74,9 +77,7 @@ function ActionForm({
         return {
           path: `${base}/fork`,
           body: {
-            ...(target === "version" && action.versionId
-              ? { versionId: action.versionId }
-              : { draft: true }),
+            ...(target === "draft" ? { draft: true } : { versionId: target }),
             ...(parsed.value ? { input: parsed.value } : {}),
           },
         };
@@ -161,7 +162,14 @@ function ActionForm({
       {action.kind === "fork" ? (
         <div className="flex flex-col gap-4">
           <RadioGroup value={target} onValueChange={setTarget} aria-label="Fork onto">
-            {action.versionId ? <RadioItem value="version" label="This run's version" /> : null}
+            {forkVersions(action).map((v) => (
+              <RadioItem
+                key={v.id}
+                value={v.id}
+                label={`v${v.version}`}
+                {...(v.id === action.versionId ? { description: "This run's version" } : {})}
+              />
+            ))}
             <RadioItem
               value="draft"
               label="The current draft"
@@ -206,3 +214,13 @@ function ActionForm({
 }
 
 const errorOf = (p: { error?: string }) => (p.error ? { error: p.error } : {});
+
+/** The versions a fork can target: the published ones, and the run's own when it is not listed. */
+export function forkVersions(
+  action: Extract<RunAction, { kind: "fork" }>,
+): { id: string; version: number | string }[] {
+  const listed: { id: string; version: number | string }[] = [...(action.versions ?? [])];
+  if (action.versionId && !listed.some((v) => v.id === action.versionId))
+    listed.unshift({ id: action.versionId, version: "?" });
+  return listed;
+}

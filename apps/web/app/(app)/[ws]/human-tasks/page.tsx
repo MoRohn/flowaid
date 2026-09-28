@@ -115,6 +115,7 @@ function Inbox() {
             approvals={pending}
             loading={tasks.isPending}
             onReview={(a) => open(a.id)}
+            rowHref={(a) => `/${s.ws}/human-tasks/${a.id}`}
             {...(s.can("runs:approve") && s.me.user
               ? { onAssignToMe: (a) => assignToMe.mutate(a.id) }
               : {})}

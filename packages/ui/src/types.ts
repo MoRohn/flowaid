@@ -400,6 +400,16 @@ export interface RunView {
   error?: ErrorInfo;
   /** Present while a human task is open. */
   pendingApproval?: ApprovalRequestView;
+  /** The run's decisions when its node runs are not loaded (the runs list, `include=decisions`). */
+  decisions?: RunDecisionSummaryView[];
+}
+
+/** One decision of a run, without the rest of its node run. */
+export interface RunDecisionSummaryView {
+  nodeId: string;
+  nodeName: string;
+  kind: DecisionKind;
+  confidence: number;
 }
 
 /** One row of `GET /v1/runs/:id/trace` (UI.md §7.1), built by `@flowaid/observability` `buildTimeline()`. */
