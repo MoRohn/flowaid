@@ -115,6 +115,7 @@ function AppShellInner({
   className,
 }: AppShellProps) {
   const rootRef = useRef<HTMLDivElement>(null);
+  const mainElRef = useRef<HTMLElement>(null);
   const width = useContainerWidth(rootRef);
   const uid = useId();
   const panelId = (name: string) => `shell${uid}${name}`;
@@ -305,6 +306,18 @@ function AppShellInner({
           className,
         )}
       >
+        {/* WCAG 2.4.1: the first stop on Tab skips the top bar and the nav */}
+        <a
+          href="#main-content"
+          onClick={(e) => {
+            // focus the landmark without leaving "#main-content" in the URL
+            e.preventDefault();
+            mainElRef.current?.focus();
+          }}
+          className="sr-only rounded-sm border border-accent bg-surface px-3 py-1.5 text-xs font-medium text-ink shadow-2 focus:not-sr-only focus:fixed focus:left-2 focus:top-2 focus:z-50"
+        >
+          Skip to content
+        </a>
         {topbar}
         <div className="flex min-h-0 min-w-0 flex-1">
           {!compact && nav !== undefined ? nav : null}
@@ -330,7 +343,12 @@ function AppShellInner({
                   minSize={120}
                   className={cn("flex flex-col", bottomExpanded && "invisible")}
                 >
-                  <main id="main-content" className="flex min-h-0 min-w-0 flex-1 flex-col">
+                  <main
+                    ref={mainElRef}
+                    id="main-content"
+                    tabIndex={-1}
+                    className="flex min-h-0 min-w-0 flex-1 flex-col outline-none"
+                  >
                     {children}
                   </main>
                 </ResizablePanel>
