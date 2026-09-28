@@ -168,7 +168,7 @@ export function DocumentManager({
       col.columns([
         col.accessor("title", {
           header: "Document",
-          size: 280,
+          size: 240,
           meta: { grow: true },
           cell: ({ row }) =>
             readableIndex(row.original) ? (
@@ -186,14 +186,14 @@ export function DocumentManager({
         col.accessor((d) => d.latestVersion.version, {
           id: "version",
           header: "Version",
-          size: 80,
+          size: 100,
           meta: { mono: true },
           cell: ({ getValue }) => `v${getValue()}`,
         }),
         col.accessor((d) => d.latestVersion.pageCount ?? rowIndex(d)?.pageCount ?? null, {
           id: "pages",
           header: "Pages",
-          size: 70,
+          size: 90,
           meta: { numeric: true, mono: true },
           cell: ({ getValue }) => getValue() ?? "—",
         }),
@@ -206,7 +206,7 @@ export function DocumentManager({
         col.accessor((d) => rowIndex(d)?.indexVersion ?? null, {
           id: "indexVersion",
           header: "Index #",
-          size: 76,
+          size: 100,
           meta: { mono: true },
           cell: ({ getValue }) => {
             const v = getValue();
@@ -216,7 +216,7 @@ export function DocumentManager({
         col.accessor((d) => rowIndex(d)?.indexModel ?? "", {
           id: "model",
           header: "Model",
-          size: 150,
+          size: 190,
           cell: ({ getValue }) => (
             <span className="block truncate font-mono text-2xs">{getValue() || "—"}</span>
           ),
