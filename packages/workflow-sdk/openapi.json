@@ -46,7 +46,7 @@
     },
     "/v1/ready": {
       "get": {
-        "summary": "Readiness: the database answers",
+        "summary": "Readiness: the database (and Redis, when configured) answers",
         "tags": ["system"],
         "security": [],
         "x-cli": { "noun": "system", "verb": "ready" },

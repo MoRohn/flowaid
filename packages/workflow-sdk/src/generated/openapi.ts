@@ -4674,7 +4674,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Readiness: the database answers */
+    /** Readiness: the database (and Redis, when configured) answers */
     get: {
       parameters: {
         query?: never;
