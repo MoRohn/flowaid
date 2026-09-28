@@ -1048,7 +1048,7 @@ export const documents = pgTable(
     status: text("status", { enum: ["pending", "indexed", "error", "deleted"] })
       .notNull()
       .default("pending"),
-    // v1.2 (0005): the normalised text of inline documents (uploads), so a source can be
+    // v1.2 (0007): the normalised text of inline documents (uploads), so a source can be
     // re-indexed after its pipeline changes; null for documents a loader can fetch again
     content: text("content"),
     error: text("error"),
@@ -1079,7 +1079,7 @@ export const chunks = pgTable(
   (t) => [
     index("chunks_doc_idx").on(t.documentId, t.ordinal),
     index("chunks_source_idx").on(t.sourceId),
-    // HNSW needs a fixed dimension: partial expression indexes per dimension live in 0005
+    // HNSW needs a fixed dimension: partial expression indexes per dimension live in 0007
     index("chunks_tsv_gin").using("gin", t.tsv),
     index("chunks_meta_gin").using("gin", t.metadata),
   ],

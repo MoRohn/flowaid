@@ -59,7 +59,7 @@ import type {
 
 /* ───────────────────────── custom types ───────────────────────── */
 // Unsized: sources choose their embedding model, so vectors of different dimensions share the
-// table; migration 0005 adds a partial HNSW index per common dimension (see DATABASE.md).
+// table; migration 0007 adds a partial HNSW index per common dimension (see DATABASE.md).
 const vector = customType<{ data: number[]; driverData: string }>({
   dataType() {
     return "vector";
@@ -585,7 +585,7 @@ export const runEvents = pgTable(
     check("run_events_payload_size", sql`pg_column_size(${t.payload}) < 262144`),
   ],
 );
-// RUN_EVENTS_PARTITIONED=true: migration 0003 converts to PARTITION BY RANGE (at), monthly partitions created 3 months ahead by the sweep job.
+// RUN_EVENTS_PARTITIONED=true: migration 0002 converts to PARTITION BY RANGE (at), monthly partitions created 3 months ahead by the sweep job.
 
 export const nodeRuns = pgTable(
   "node_runs",
@@ -1060,7 +1060,7 @@ export const documents = pgTable(
     status: text("status", { enum: ["pending", "indexed", "error", "deleted"] })
       .notNull()
       .default("pending"),
-    // v1.2 (0005): the normalised text of inline documents (uploads), so a source can be
+    // v1.2 (0007): the normalised text of inline documents (uploads), so a source can be
     // re-indexed after its pipeline changes; null for documents a loader can fetch again
     content: text("content"),
     error: text("error"),
@@ -1091,7 +1091,7 @@ export const chunks = pgTable(
   (t) => [
     index("chunks_doc_idx").on(t.documentId, t.ordinal),
     index("chunks_source_idx").on(t.sourceId),
-    // HNSW needs a fixed dimension: partial expression indexes per dimension live in 0005
+    // HNSW needs a fixed dimension: partial expression indexes per dimension live in 0007
     index("chunks_tsv_gin").using("gin", t.tsv),
     index("chunks_meta_gin").using("gin", t.metadata),
   ],
@@ -1511,4 +1511,4 @@ Workspace deletion cascades everything through foreign keys; S3 objects are remo
 
 ## Migration set for the first slice
 
-`0000_init.sql` (the pgvector extension, all tables, enums, indexes), `0001_rls.sql` (`ENABLE` + `FORCE` RLS policies, roles and grants; policies active when `DB_RLS=true`, the compose default), `0002_partition_run_events.sql` (conditional on `RUN_EVENTS_PARTITIONED`, plus `flowaid_ensure_run_events_partitions()`), `0003_chunks_generated_tsv.sql` (generated `tsv` column), `0004_run_replay.sql`, `0005_knowledge_dims.sql` (unsized `chunks.embedding` with a partial HNSW index per common dimension, `documents.content` and `documents.error`); numbered by drizzle-kit's journal, seeds: `seed_environments.sql` is applied per workspace by the API on workspace creation (`dev`, `staging`, `prod` with `prod.protected = true`), `seed_templates.ts` loads the three demo templates with their `required_resources`. First boot (`apps/api` bootstrap): owner user, default workspace `default`, environments, templates (ARCHITECTURE.md §8).
+`0000_init.sql` (the pgvector extension, all tables, enums, indexes), `0001_rls.sql` (`ENABLE` + `FORCE` RLS policies, roles and grants; policies active when `DB_RLS=true`, the compose default), `0002_partition_run_events.sql` (conditional on `RUN_EVENTS_PARTITIONED`, plus `flowaid_ensure_run_events_partitions()`), `0003_chunks_generated_tsv.sql` (generated `tsv` column), `0004_run_replay.sql`, `0005_delegated_nodes.sql`, `0006_alert_deliveries.sql`, `0007_knowledge_dims.sql` (unsized `chunks.embedding` with a partial HNSW index per common dimension, `documents.content` and `documents.error`), `0008_plugin_location.sql`, `0009_saved_views.sql`; numbered by drizzle-kit's journal, seeds: `seed_environments.sql` is applied per workspace by the API on workspace creation (`dev`, `staging`, `prod` with `prod.protected = true`), `seed_templates.ts` loads the three demo templates with their `required_resources`. First boot (`apps/api` bootstrap): owner user, default workspace `default`, environments, templates (ARCHITECTURE.md §8).
