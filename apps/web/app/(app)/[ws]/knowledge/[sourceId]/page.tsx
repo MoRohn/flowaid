@@ -39,6 +39,7 @@ import {
   countsLine,
   documentTone,
   indexingErrorFix,
+  isPageIndexKind,
   isUploadKind,
   mimeOf,
   sourceTone,
@@ -48,6 +49,8 @@ import {
   type QueryResult,
   type SearchMode,
 } from "~/knowledge/model";
+import { readConfig, OPTIMIZE_LABEL } from "~/knowledge/pageindex/model";
+import { PageIndexSource } from "~/knowledge/pageindex/PageIndexSource";
 import { useSession } from "~/session";
 import { AppFrame, PageBody } from "~/shell/AppFrame";
 import { errorMessage } from "~/shell/states";
@@ -320,6 +323,19 @@ function Playground({ source }: { source: KnowledgeSource }) {
   );
 }
 
+/** "PageIndex documents (PDF) · 3 documents · ollama/qwen2.5:3b · Flash · Keep sections" */
+function pageIndexLine(src: KnowledgeSource): string {
+  const c = readConfig(src.config);
+  const parts = [KIND_LABEL[src.kind], countsLine(src)];
+  if (c)
+    parts.push(
+      `${c.indexModel.provider}/${c.indexModel.model}`,
+      c.mode === "standard" ? "Standard (built by the model)" : "Flash (layout-based)",
+      OPTIMIZE_LABEL[c.optimize].replace(" (default)", ""),
+    );
+  return parts.join(" · ");
+}
+
 export default function KnowledgeSourcePage({ params }: { params: Promise<{ sourceId: string }> }) {
   const { sourceId } = use(params);
   const s = useSession();
@@ -329,7 +345,8 @@ export default function KnowledgeSourcePage({ params }: { params: Promise<{ sour
   const [deleting, setDeleting] = useState(false);
   const [viewing, setViewing] = useState<KnowledgeDocument | null>(null);
   const confirmDoc = useConfirm<KnowledgeDocument>();
-  const busy = (x?: KnowledgeSource) => x?.status === "syncing" || x?.status === "new";
+  const busy = (x?: KnowledgeSource) =>
+    x !== undefined && !isPageIndexKind(x.kind) && (x.status === "syncing" || x.status === "new");
 
   const source = useQuery({
     queryKey: ["knowledge-source", s.ws, sourceId],
@@ -344,6 +361,8 @@ export default function KnowledgeSourcePage({ params }: { params: Promise<{ sour
       ),
     refetchInterval: (q) =>
       busy(source.data) || q.state.data?.items.some((d) => d.status === "pending") ? 2000 : false,
+    // PageIndex documents have their own routes (the document manager)
+    enabled: source.data !== undefined && !isPageIndexKind(source.data.kind),
   });
   const invalidate = [
     ["knowledge-source", s.ws, sourceId],
@@ -449,18 +468,14 @@ export default function KnowledgeSourcePage({ params }: { params: Promise<{ sour
     >
       <PageBody>
         <QueryView query={source}>
-          {(src) => (
-            <>
-              <PageHeader
-                title={src.name}
-                description={`${KIND_LABEL[src.kind]} · ${countsLine(src)} · ${
-                  src.pipeline.embedding
-                    ? `${src.pipeline.embedding.provider}/${src.pipeline.embedding.model}`
-                    : "keyword search only"
-                }`}
-                actions={
-                  canWrite ? (
-                    <>
+          {(src) =>
+            isPageIndexKind(src.kind) ? (
+              <>
+                <PageHeader
+                  title={src.name}
+                  description={pageIndexLine(src)}
+                  actions={
+                    canWrite ? (
                       <Button
                         variant="ghost"
                         leadingIcon={<Trash2 strokeWidth={1.75} />}
@@ -468,106 +483,133 @@ export default function KnowledgeSourcePage({ params }: { params: Promise<{ sour
                       >
                         Delete
                       </Button>
-                      <Button
-                        leadingIcon={<RefreshCw strokeWidth={1.75} />}
-                        loading={sync.isPending}
-                        disabled={src.status === "syncing"}
-                        onClick={() => sync.mutate(undefined)}
-                      >
-                        Sync now
-                      </Button>
-                      {isUploadKind(src.kind) ? (
+                    ) : null
+                  }
+                />
+                <div className="mt-5">
+                  <PageIndexSource sourceId={src.id} canWrite={canWrite} />
+                </div>
+              </>
+            ) : (
+              <>
+                <PageHeader
+                  title={src.name}
+                  description={`${KIND_LABEL[src.kind]} · ${countsLine(src)} · ${
+                    src.pipeline.embedding
+                      ? `${src.pipeline.embedding.provider}/${src.pipeline.embedding.model}`
+                      : "keyword search only"
+                  }`}
+                  actions={
+                    canWrite ? (
+                      <>
                         <Button
-                          variant="primary"
-                          leadingIcon={<Upload strokeWidth={1.75} />}
-                          onClick={() => setUploading(true)}
+                          variant="ghost"
+                          leadingIcon={<Trash2 strokeWidth={1.75} />}
+                          onClick={() => setDeleting(true)}
                         >
-                          Add documents
+                          Delete
                         </Button>
-                      ) : null}
-                    </>
-                  ) : null
-                }
-              />
-              <div className="mt-3 flex flex-wrap items-center gap-2 text-2xs text-ink-3">
-                <Badge tone={sourceTone(src.status)} dot className="capitalize">
-                  {src.status}
-                </Badge>
-                {src.lastSyncAt ? (
-                  <span>
-                    Last synced <RelativeTime date={src.lastSyncAt} />
-                  </span>
-                ) : (
-                  <span>Never synced</span>
-                )}
-                {src.stats.lastRun ? (
-                  <span className="font-mono">
-                    · {src.stats.lastRun.indexed} indexed, {src.stats.lastRun.unchanged} unchanged,{" "}
-                    {src.stats.lastRun.deleted} removed
-                    {src.stats.lastRun.failed ? `, ${src.stats.lastRun.failed} failed` : ""}
-                  </span>
-                ) : null}
-              </div>
-              {src.lastError ? (
-                <div className="mt-3">
-                  <Notice tone={src.status === "error" ? "danger" : "warn"}>
-                    <p>{src.lastError}</p>
-                    <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
-                      {indexingErrorFix(src.lastError) === "credentials" ? (
-                        <a className="font-medium underline" href={`/${s.ws}/credentials`}>
-                          Add or fix the provider&apos;s key under Credentials
-                        </a>
-                      ) : null}
-                      {canWrite ? (
-                        <button
-                          type="button"
-                          className="font-medium underline disabled:opacity-60"
-                          disabled={sync.isPending}
+                        <Button
+                          leadingIcon={<RefreshCw strokeWidth={1.75} />}
+                          loading={sync.isPending}
+                          disabled={src.status === "syncing"}
                           onClick={() => sync.mutate(undefined)}
                         >
-                          {sync.isPending ? "Retrying…" : "Retry indexing"}
-                        </button>
-                      ) : null}
-                    </p>
-                  </Notice>
+                          Sync now
+                        </Button>
+                        {isUploadKind(src.kind) ? (
+                          <Button
+                            variant="primary"
+                            leadingIcon={<Upload strokeWidth={1.75} />}
+                            onClick={() => setUploading(true)}
+                          >
+                            Add documents
+                          </Button>
+                        ) : null}
+                      </>
+                    ) : null
+                  }
+                />
+                <div className="mt-3 flex flex-wrap items-center gap-2 text-2xs text-ink-3">
+                  <Badge tone={sourceTone(src.status)} dot className="capitalize">
+                    {src.status}
+                  </Badge>
+                  {src.lastSyncAt ? (
+                    <span>
+                      Last synced <RelativeTime date={src.lastSyncAt} />
+                    </span>
+                  ) : (
+                    <span>Never synced</span>
+                  )}
+                  {src.stats.lastRun ? (
+                    <span className="font-mono">
+                      · {src.stats.lastRun.indexed} indexed, {src.stats.lastRun.unchanged}{" "}
+                      unchanged, {src.stats.lastRun.deleted} removed
+                      {src.stats.lastRun.failed ? `, ${src.stats.lastRun.failed} failed` : ""}
+                    </span>
+                  ) : null}
                 </div>
-              ) : null}
-              <div className="mt-5 flex flex-col gap-5">
-                <Section title={`Documents (${src.documents})`}>
-                  <DataTable
-                    columns={columns}
-                    data={documents.data?.items ?? []}
-                    getRowId={(d) => d.id}
-                    loading={documents.isPending}
-                    error={
-                      documents.isError
-                        ? {
-                            message: errorMessage(documents.error),
-                            onRetry: () => void documents.refetch(),
+                {src.lastError ? (
+                  <div className="mt-3">
+                    <Notice tone={src.status === "error" ? "danger" : "warn"}>
+                      <p>{src.lastError}</p>
+                      <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+                        {indexingErrorFix(src.lastError) === "credentials" ? (
+                          <a className="font-medium underline" href={`/${s.ws}/credentials`}>
+                            Add or fix the provider&apos;s key under Credentials
+                          </a>
+                        ) : null}
+                        {canWrite ? (
+                          <button
+                            type="button"
+                            className="font-medium underline disabled:opacity-60"
+                            disabled={sync.isPending}
+                            onClick={() => sync.mutate(undefined)}
+                          >
+                            {sync.isPending ? "Retrying…" : "Retry indexing"}
+                          </button>
+                        ) : null}
+                      </p>
+                    </Notice>
+                  </div>
+                ) : null}
+                <div className="mt-5 flex flex-col gap-5">
+                  <Section title={`Documents (${src.documents})`}>
+                    <DataTable
+                      columns={columns}
+                      data={documents.data?.items ?? []}
+                      getRowId={(d) => d.id}
+                      loading={documents.isPending}
+                      error={
+                        documents.isError
+                          ? {
+                              message: errorMessage(documents.error),
+                              onRetry: () => void documents.refetch(),
+                            }
+                          : null
+                      }
+                      emptyState={
+                        <EmptyState
+                          size="sm"
+                          icon={<FileText strokeWidth={1.5} />}
+                          title="No documents yet"
+                          description={
+                            isUploadKind(src.kind)
+                              ? "Add files or paste text; they are chunked and indexed in the background."
+                              : "Sync the source to fetch its documents."
                           }
-                        : null
-                    }
-                    emptyState={
-                      <EmptyState
-                        size="sm"
-                        icon={<FileText strokeWidth={1.5} />}
-                        title="No documents yet"
-                        description={
-                          isUploadKind(src.kind)
-                            ? "Add files or paste text; they are chunked and indexed in the background."
-                            : "Sync the source to fetch its documents."
-                        }
-                      />
-                    }
-                    itemLabel={["document", "documents"]}
-                    aria-label="Documents"
-                  />
-                </Section>
-                <Playground source={src} />
-              </div>
-              <UploadDialog source={src} open={uploading} onOpenChange={setUploading} />
-            </>
-          )}
+                        />
+                      }
+                      itemLabel={["document", "documents"]}
+                      aria-label="Documents"
+                    />
+                  </Section>
+                  <Playground source={src} />
+                </div>
+                <UploadDialog source={src} open={uploading} onOpenChange={setUploading} />
+              </>
+            )
+          }
         </QueryView>
       </PageBody>
       {viewing ? <ChunksDialog doc={viewing} onClose={() => setViewing(null)} /> : null}
@@ -587,7 +629,11 @@ export default function KnowledgeSourcePage({ params }: { params: Promise<{ sour
         open={deleting}
         onOpenChange={setDeleting}
         title={`Delete ${x?.name ?? "this source"}?`}
-        description="Its documents and chunks are deleted. Workflows that search it will find nothing."
+        description={
+          x && isPageIndexKind(x.kind)
+            ? "Its PDFs and their indexes are deleted and stop answering at once. Workflows that read it will find nothing."
+            : "Its documents and chunks are deleted. Workflows that search it will find nothing."
+        }
         variant="danger"
         confirmLabel="Delete source"
         loading={removeSource.isPending}
