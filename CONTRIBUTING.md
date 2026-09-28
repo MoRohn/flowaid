@@ -27,16 +27,38 @@ pnpm typecheck && pnpm lint && pnpm test
 
 Useful commands:
 
-| Command                             | What it does                                                                       |
-| ----------------------------------- | ---------------------------------------------------------------------------------- |
-| `pnpm test`                         | All package tests (Vitest, through Turborepo)                                      |
-| `pnpm --filter @flowaid/<pkg> test` | One package's tests                                                                |
-| `pnpm boundaries`                   | The dependency-graph check: `boundaries.json` against every package and the design |
-| `pnpm format` / `pnpm format:check` | Prettier                                                                           |
-| `pnpm env:check`                    | `.env.example` and `packages/env/README.md` match the environment schema           |
-| `pnpm start`                        | Preflight, install, build, then the UI playground at http://127.0.0.1:5178         |
-| `pnpm preflight`                    | Check Node.js, pnpm, dependencies and the playground port                          |
-| `pnpm check`                        | Every CI gate in one command                                                       |
+| Command                             | What it does                                                                                                       |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `pnpm test`                         | All package tests (Vitest, through Turborepo)                                                                      |
+| `pnpm --filter @flowaid/<pkg> test` | One package's tests                                                                                                |
+| `pnpm boundaries`                   | The dependency-graph check: `boundaries.json` against every package and the design                                 |
+| `pnpm format` / `pnpm format:check` | Prettier                                                                                                           |
+| `pnpm env:check`                    | `.env.example` and `packages/env/README.md` match the environment schema                                           |
+| `pnpm start`                        | Preflight, install, build, then the whole stack on this computer (`--playground` serves the UI playground instead) |
+| `pnpm preflight`                    | Check Node.js, pnpm, dependencies and the playground port                                                          |
+| `pnpm check`                        | Every CI gate in one command                                                                                       |
+
+### PostgreSQL and Redis suites
+
+The database, api, worker and core-node tests include suites that need a real PostgreSQL 16 with
+pgvector, and the queue and event-bus suites need Redis. **They skip silently when their
+variable is unset**, so `pnpm test` can pass without running them; CI's `integration` job always
+runs them. To run them locally, start disposable servers (never point these variables at a
+server that holds data: every suite creates and drops its own database):
+
+```sh
+docker run -d --rm --name flowaid-test-pg -e POSTGRES_PASSWORD=postgres -p 127.0.0.1:55432:5432 \
+  pgvector/pgvector:0.8.6-pg16
+docker run -d --rm --name flowaid-test-redis -p 127.0.0.1:56379:6379 redis:7.4.11-alpine
+
+export FLOWAID_TEST_DATABASE_URL=postgres://postgres:postgres@127.0.0.1:55432/postgres
+export FLOWAID_TEST_REDIS_URL=redis://127.0.0.1:56379
+pnpm --filter @flowaid/database --filter @flowaid/workflow-runtime --filter @flowaid/api \
+  --filter @flowaid/worker --filter @flowaid/nodes-core test
+```
+
+`FLOWAID_TEST_DATABASE_URL` is a superuser connection; `FLOWAID_TEST_REDIS_URL` suites use a
+unique key prefix per run. `docker rm -f flowaid-test-pg flowaid-test-redis` removes both.
 
 ## Rules every change follows
 

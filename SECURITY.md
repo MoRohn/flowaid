@@ -33,6 +33,27 @@ While FlowAId is 0.x, only the latest minor release receives fixes. Published im
 (`ghcr.io/morohn/flowaid-*`) carry signed build provenance; verify them as described in
 [docs/RELEASING.md](docs/RELEASING.md#verifying-an-image) before you deploy.
 
+## Local mode trust boundary
+
+In local mode (`FLOWAID_AUTH_MODE=local`, or `auto` with loopback `FLOWAID_BASE_URL` and
+`FLOWAID_WEB_URL`, which is how `pnpm start` runs) FlowAId has no sign-in: whoever can reach
+it on this computer is its owner. The boundary is the computer itself:
+
+- The api hands out the automatic owner session (`POST /v1/auth/local`) only to a request that
+  comes from a loopback address, whose every `X-Forwarded-For` hop is loopback, whose `Host`
+  (or `X-Forwarded-Host`) and `Origin` are local names (`localhost`, `*.localhost`, `127.x`,
+  `[::1]`) and that carries `X-Requested-With: flowaid`. The Host and Origin checks stop other
+  websites from reaching it through DNS rebinding; the header forces a CORS preflight.
+- `FLOWAID_BASE_URL` and `FLOWAID_WEB_URL` must be loopback URLs while the mode is `local`;
+  configuration validation refuses anything else.
+- **Bind to loopback only.** `pnpm start` binds to `127.0.0.1` by default. Anything that makes
+  FlowAId reachable from another computer (`--host 0.0.0.0`, a non-loopback `HOST`, a published
+  port, a reverse proxy or tunnel) must run in password mode (`FLOWAID_AUTH_MODE=password`),
+  as the compose stack does. A change that enforces this at startup is in progress; until it
+  lands, it is your responsibility.
+- Other local users and processes on the same computer are inside the boundary. Do not run
+  local mode on a shared machine.
+
 ## Operating securely
 
 - Set a strong `FLOWAID_MASTER_KEY` (or a backed-up `FLOWAID_MASTER_KEY_FILE`) and explicit `FLOWAID_JWT_PRIVATE_KEY`/`FLOWAID_JWT_PUBLIC_KEY`; never reuse the example values in production.
