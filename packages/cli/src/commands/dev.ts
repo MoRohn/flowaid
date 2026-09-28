@@ -27,7 +27,7 @@ export function registerDev(program: Command, io: CliIO): void {
     .description("start the local stack (docker compose) and open the web app")
     .option("--down", "stop the stack instead")
     .option("--no-open", "do not open the browser")
-    .option("--web-url <url>", "the web app URL to open", "http://localhost:3001")
+    .option("--web-url <url>", "the web app URL to open", "http://localhost:3000")
     .action(async (o: { down?: boolean; open: boolean; webUrl: string }) => {
       const root = findComposeRoot(io.cwd);
       if (!root) throw new Error("docker/compose.yml not found here or in a parent directory");
@@ -39,7 +39,7 @@ export function registerDev(program: Command, io: CliIO): void {
       );
       if (code !== 0) throw new Error(`docker compose exited with ${code}`);
       if (o.down) return;
-      io.out(`FlowAId is up: ${o.webUrl} (API http://localhost:3000, reference at /docs).`);
+      io.out(`FlowAId is up: ${o.webUrl} (API http://localhost:3001, reference at /docs).`);
       if (o.open) {
         const opener =
           process.platform === "darwin"

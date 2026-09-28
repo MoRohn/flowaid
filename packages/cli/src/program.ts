@@ -33,7 +33,7 @@ export function createProgram(io: CliIO): Command {
     .description("FlowAId command line: every API operation, plus local runs and the dev stack")
     // `--version` belongs to subcommands (`workflow export --version 3`); the CLI's own is -V.
     .version(CLI_VERSION, "-V, --cli-version", "print the CLI version")
-    .option("--api-url <url>", "API origin (env FLOWAID_API_URL; default http://localhost:3000)")
+    .option("--api-url <url>", "API origin (env FLOWAID_API_URL; default http://localhost:3001)")
     .option("--api-key <key>", "API key (env FLOWAID_API_KEY, or the key saved by login)")
     .option("--workspace <slug>", "workspace slug or id (env FLOWAID_WORKSPACE)")
     .option("-o, --output <format>", "json | yaml")

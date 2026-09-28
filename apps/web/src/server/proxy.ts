@@ -18,7 +18,7 @@ const HOP_BY_HOP = new Set([
 ]);
 
 export function apiOrigin(): string {
-  return (process.env.FLOWAID_API_INTERNAL_URL ?? "http://localhost:3000").replace(/\/$/, "");
+  return (process.env.FLOWAID_API_INTERNAL_URL ?? "http://localhost:3001").replace(/\/$/, "");
 }
 
 /**

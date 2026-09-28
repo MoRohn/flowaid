@@ -256,7 +256,7 @@ FlowAId command line: every API operation, plus local runs and the dev stack
 
 Options:
   -V, --cli-version                 print the CLI version
-  --api-url <url>                   API origin (env FLOWAID_API_URL; default http://localhost:3000)
+  --api-url <url>                   API origin (env FLOWAID_API_URL; default http://localhost:3001)
   --api-key <key>                   API key (env FLOWAID_API_KEY, or the key saved by login)
   --workspace <slug>                workspace slug or id (env FLOWAID_WORKSPACE)
   -o, --output <format>             json | yaml
