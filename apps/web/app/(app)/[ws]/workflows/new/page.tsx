@@ -23,7 +23,7 @@ import {
 import { PageHeader } from "@flowaid/ui/shell";
 import { ApiError, get, post } from "~/api/client";
 import { advisorAvailability } from "~/builder/advisor";
-import { planFromGenerated, type GeneratedWorkflow } from "~/builder/aiPlan";
+import { planFromGenerated, provenanceLine, type GeneratedWorkflow } from "~/builder/aiPlan";
 import { useSession } from "~/session";
 import { AppFrame, PageBody } from "~/shell/AppFrame";
 import { useExternalImport } from "~/importer/ExternalImport";
@@ -142,17 +142,21 @@ export default function NewWorkflowPage() {
           <AIBuilderPanel
             className="mt-6"
             title="Describe it"
+            // one blocking request, so "generating" rather than "streaming"; Apply is "saving"
             status={
-              generate.isPending || applyGenerated.isPending
-                ? "streaming"
-                : aiError
-                  ? "error"
-                  : plan
-                    ? "done"
-                    : "idle"
+              generate.isPending
+                ? "generating"
+                : applyGenerated.isPending
+                  ? "saving"
+                  : aiError
+                    ? "error"
+                    : plan
+                      ? "done"
+                      : "idle"
             }
             {...(aiError ? { error: aiError } : {})}
             plan={plan}
+            {...(generated?.definition ? { provenance: provenanceLine(generated) } : {})}
             {...(prompt ? { prompt } : {})}
             onSubmit={(p) => {
               setPrompt(p);
@@ -243,7 +247,8 @@ export default function NewWorkflowPage() {
               </CardDescription>
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
-              <label className="text-sm text-accent underline-offset-2 hover:underline">
+              {/* the input is visually hidden: its keyboard focus ring is drawn on the label */}
+              <label className="cursor-pointer self-start rounded-xs px-0.5 text-sm text-accent underline-offset-2 hover:underline has-[:focus-visible]:underline has-[:focus-visible]:shadow-(--focus)">
                 <input
                   type="file"
                   accept=".json,.yaml,.yml,application/json,text/yaml"
