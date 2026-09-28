@@ -17,7 +17,6 @@ import {
   ReactFlow,
   ReactFlowProvider,
   SelectionMode,
-  getNodesBounds,
   useNodesInitialized,
   useReactFlow,
   useStore,
@@ -474,7 +473,7 @@ function FlowCanvasInner({
       const pane = wrapperRef.current?.getBoundingClientRect();
       const top = flow.getNodes().filter((n) => !n.parentId);
       if (!pane || top.length === 0) return;
-      const next = openingViewport(getNodesBounds(top), pane, flow.getZoom());
+      const next = openingViewport(flow.getNodesBounds(top), pane, flow.getZoom());
       if (next) void flow.setViewport(next);
     });
     return () => window.cancelAnimationFrame(id);
@@ -832,14 +831,14 @@ function FlowCanvasInner({
   // --- selection toolbar position ---------------------------------------
   const toolbarPos = useMemo(() => {
     if (selectedNodes.length < 2) return null;
-    const b = getNodesBounds(selectedNodes);
+    const b = flow.getNodesBounds(selectedNodes);
     const left = b.x * zoom + vx + (b.width * zoom) / 2;
     const top = b.y * zoom + vy - 12;
     return {
       left: Math.max(200, Math.min(left, Math.max(200, paneWidth - 200))),
       top: Math.max(44, top),
     };
-  }, [selectedNodes, zoom, vx, vy, paneWidth]);
+  }, [flow, selectedNodes, zoom, vx, vy, paneWidth]);
 
   const handleConnect = useCallback(
     (c: Connection) => {
