@@ -148,7 +148,8 @@ export class PageIndexServiceClient {
       payload = JSON.stringify(body.json);
     } else if (body?.bytes) {
       headers["content-type"] = "application/vnd.flowaid.pageindex-job";
-      payload = body.bytes;
+      // a copy backed by a plain ArrayBuffer (BodyInit does not take a view over a shared buffer)
+      payload = body.bytes.slice();
     }
     let res: Response;
     try {
