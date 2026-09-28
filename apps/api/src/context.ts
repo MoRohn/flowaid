@@ -29,7 +29,6 @@ export interface ApiConfig {
   sseMaxStreamsPerPrincipal: number;
   featuresDisabled: readonly string[];
   hasRedis: boolean;
-  hasOidc: boolean;
   /** Development and tests only: outbound calls may reach private addresses. Never in production. */
   allowPrivateNetwork: boolean;
   /** Local artifact storage shared with the worker (`<data>/artifacts`); null when unavailable. */
@@ -88,7 +87,6 @@ export function configFromEnv(env: Env): ApiConfig {
     sseMaxStreamsPerPrincipal: Number(env.FLOWAID_SSE_MAX_STREAMS_PER_PRINCIPAL ?? 20),
     featuresDisabled: env.FLOWAID_FEATURES_DISABLED ?? [],
     hasRedis: env.flags.hasRedis,
-    hasOidc: env.flags.hasOidc,
     allowPrivateNetwork: false,
     artifactsDir: `${String(env.FLOWAID_MASTER_KEY_FILE ?? "/data/master.key").replace(/\/[^/]*$/, "")}/artifacts`,
     s3:
@@ -128,7 +126,6 @@ export function defaultConfig(over: Partial<ApiConfig> = {}): ApiConfig {
     sseMaxStreamsPerPrincipal: 20,
     featuresDisabled: [],
     hasRedis: false,
-    hasOidc: false,
     allowPrivateNetwork: false,
     artifactsDir: null,
     s3: null,

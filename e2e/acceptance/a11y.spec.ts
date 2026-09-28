@@ -19,11 +19,30 @@ const ROUTES = [
   "settings",
 ];
 
+/**
+ * Waits until the page has settled: nothing is marked busy and the rendered markup is the same in
+ * two samples in a row. Live streams keep the network busy, so "networkidle" never comes.
+ */
+async function settled(page: Page): Promise<void> {
+  await page.waitForLoadState("load");
+  let previous = "";
+  await expect
+    .poll(
+      async () => {
+        const busy = await page.locator('[aria-busy="true"]').count();
+        const current = `${busy}:${(await page.locator("body").innerHTML()).length}`;
+        const same = current === previous && current.startsWith("0:");
+        previous = current;
+        return same;
+      },
+      { intervals: [250], timeout: 15_000, message: "the page settles" },
+    )
+    .toBe(true);
+}
+
 /** The route's violations, one line per rule with up to five offending nodes. */
 async function audit(page: Page): Promise<string[]> {
-  // live streams keep the network busy, so wait for the page to settle instead of "networkidle"
-  await page.waitForLoadState("load");
-  await page.waitForTimeout(1_000);
+  await settled(page);
   const { violations } = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
     .analyze();

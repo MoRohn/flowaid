@@ -51,8 +51,6 @@ export interface EnvFlags {
   readonly masterKeyAutogenerate: boolean;
   /** First-boot owner credentials are configured. */
   readonly hasAdminBootstrap: boolean;
-  /** `OIDC_ISSUER`, `OIDC_CLIENT_ID` and `OIDC_CLIENT_SECRET` are set: single sign-on is on. */
-  readonly hasOidc: boolean;
   /** `DATABASE_ADMIN_URL` is set: migrations use the owner connection. */
   readonly hasDatabaseAdminUrl: boolean;
   /** `FLOWAID_PROVIDER_FIXTURES` is `record` or `replay`. */
@@ -189,10 +187,6 @@ export function deriveFlags(vars: EnvVars): EnvFlags {
     masterKeyAutogenerate: !isProduction || vars.FLOWAID_MASTER_KEY_AUTOGENERATE,
     hasAdminBootstrap:
       vars.FLOWAID_ADMIN_EMAIL !== undefined && vars.FLOWAID_ADMIN_PASSWORD !== undefined,
-    hasOidc:
-      vars.OIDC_ISSUER !== undefined &&
-      vars.OIDC_CLIENT_ID !== undefined &&
-      vars.OIDC_CLIENT_SECRET !== undefined,
     hasDatabaseAdminUrl: vars.DATABASE_ADMIN_URL !== undefined,
     providerFixturesEnabled: vars.FLOWAID_PROVIDER_FIXTURES !== "off",
     mcpStdioEnabled: vars.MCP_STDIO_ENABLED,

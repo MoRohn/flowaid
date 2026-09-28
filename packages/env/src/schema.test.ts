@@ -88,7 +88,6 @@ describe("EnvSchema", () => {
     expect(env.FLOWAID_ALLOW_INSECURE_HTTP).toBe(false);
     expect(env.FLOWAID_ALLOW_CROSS_SITE).toBe(false);
     expect(env.FLOWAID_MASTER_KEY_AUTOGENERATE).toBe(false);
-    expect(env.OIDC_ISSUER).toBeUndefined();
     expect(env.SANDBOX_MODE).toBe("isolated-vm");
     expect(env.MCP_STDIO_ENABLED).toBe(false);
     expect(env.FLOWAID_PLUGIN_DIR).toBe(".flowaid/plugins");
@@ -147,11 +146,6 @@ describe("EnvSchema", () => {
             "S3_ACCESS_KEY",
             "S3_SECRET_KEY",
           ] as const) {
-            input[key] = ENV_VAR_DOCS[key].example;
-          }
-        }
-        if (name.startsWith("OIDC_")) {
-          for (const key of ["OIDC_ISSUER", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET"] as const) {
             input[key] = ENV_VAR_DOCS[key].example;
           }
         }
@@ -359,12 +353,6 @@ describe("EnvSchema", () => {
     expect(s3.get("S3_SECRET_KEY")?.[0]).toContain("S3_SECRET_KEY");
     expect(s3.has("S3_ENDPOINT")).toBe(false);
 
-    const oidc = issuesFor({ ...MINIMAL, OIDC_ISSUER: "https://login.example.com" });
-    expect(oidc.get("OIDC_CLIENT_ID")?.[0]).toContain("required when OIDC_ISSUER is set");
-    expect(oidc.get("OIDC_CLIENT_SECRET")?.[0]).toContain("OIDC needs all of");
-    const claim = issuesFor({ ...MINIMAL, OIDC_ROLE_CLAIM: "roles" });
-    expect(claim.get("OIDC_ROLE_CLAIM")?.[0]).toContain("without OIDC_ISSUER");
-
     // Both master key sources may be set: the variable wins and the file path is ignored
     // (compose always sets the file path and passes FLOWAID_MASTER_KEY through when present).
     const master = issuesFor({
@@ -438,14 +426,6 @@ describe("production rules", () => {
         );
       }
     }
-    const oidc = {
-      ...PRODUCTION,
-      OIDC_ISSUER: "http://login.example.com",
-      OIDC_CLIENT_ID: "flowaid",
-      OIDC_CLIENT_SECRET: "s3cret",
-    };
-    expect(firstIssue(oidc, "OIDC_ISSUER")).toContain("must be https://");
-    expect(issuesFor({ ...oidc, FLOWAID_ALLOW_INSECURE_HTTP: "1" }).size).toBe(0);
   });
 
   it("reject the documented, quick-start and commonly guessed admin passwords", () => {

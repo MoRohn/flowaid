@@ -1,4 +1,4 @@
-# FlowAId status — 2026-09-27
+# FlowAId status — 2026-09-28
 
 This file records where everything stands so work can restart from a known state. The
 repository is published at [github.com/MoRohn/flowaid](https://github.com/MoRohn/flowaid); CI
@@ -31,7 +31,7 @@ and E2E run on every push to `main`.
 | `workflow-core`                                                      | contracts, FlowExpr, templates, schema checker (0.3.8, RFC-0021)                                   | 2,665 |
 | `workflow-compiler`                                                  | 8 passes, 94 diagnostics, diff, migrate                                                            | 177   |
 | `workflow-runtime`                                                   | scheduler, orchestrator, replay, run actions, drivers                                              | 89    |
-| `database`                                                           | 47 tables, migrations 0000–0008 with RLS, run store, queue, event bus                              | 56    |
+| `database`                                                           | 48 tables, migrations 0000–0009 with RLS, run store, queue, event bus                              | 56    |
 | `nodes-core`                                                         | 60 nodes and the templates                                                                         | 153   |
 | `providers`, `provider-typesafe`, `-openai`, `-anthropic`, `-ollama` | registry, pricing, failover, routing, rerank, record/replay; TypeSafe Jev and generation providers | 163   |
 | `advisor`                                                            | cost optimiser, AI builder, AI critic                                                              | 22    |

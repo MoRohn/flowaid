@@ -506,7 +506,6 @@ function optionalStdioCommands(
 // ── cross-field rules ─────────────────────────────────────────────────────────────
 
 const S3_VARS = ["S3_ENDPOINT", "S3_BUCKET", "S3_ACCESS_KEY", "S3_SECRET_KEY"] as const;
-const OIDC_VARS = ["OIDC_ISSUER", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET"] as const;
 
 /** One cross-variable problem. */
 export interface CrossFieldIssue {
@@ -675,20 +674,6 @@ export function crossFieldIssues(vars: Partial<Record<EnvVarName, unknown>>): Cr
       }
     }
   }
-  const oidcSet = OIDC_VARS.filter((key) => has(key));
-  if (oidcSet.length > 0 && oidcSet.length < OIDC_VARS.length) {
-    for (const key of OIDC_VARS) {
-      if (!has(key)) {
-        issues.push({
-          path: key,
-          message: `is required when ${oidcSet.join(", ")} ${oidcSet.length === 1 ? "is" : "are"} set (OIDC needs all of ${OIDC_VARS.join(", ")})`,
-        });
-      }
-    }
-  }
-  if (has("OIDC_ROLE_CLAIM") && !has("OIDC_ISSUER")) {
-    issues.push({ path: "OIDC_ROLE_CLAIM", message: "has no effect without OIDC_ISSUER" });
-  }
   issues.push(...masterKeyIssues(has, str, isDefault));
   if (has("FLOWAID_ADMIN_EMAIL") !== has("FLOWAID_ADMIN_PASSWORD")) {
     issues.push({
@@ -741,10 +726,7 @@ export function crossFieldIssues(vars: Partial<Record<EnvVarName, unknown>>): Cr
     });
   }
 
-  for (const name of ["FLOWAID_BASE_URL", "FLOWAID_WEB_URL", "OIDC_ISSUER"] as const) {
-    if (name === "OIDC_ISSUER" && !has(name)) {
-      continue;
-    }
+  for (const name of ["FLOWAID_BASE_URL", "FLOWAID_WEB_URL"] as const) {
     const url = urlOf(has(name) ? vars[name] : ENV_VAR_DOCS[name].default);
     if (url !== undefined && url.protocol === "http:" && !isLoopbackHost(url.hostname)) {
       if (!allowInsecureHttp) {
@@ -903,11 +885,6 @@ export const EnvSchema = z
     AZURE_CLIENT_ID: optionalString("AZURE_CLIENT_ID"),
     AZURE_CLIENT_SECRET: optionalString("AZURE_CLIENT_SECRET"),
     GOOGLE_APPLICATION_CREDENTIALS: optionalString("GOOGLE_APPLICATION_CREDENTIALS"),
-
-    OIDC_ISSUER: optionalUrl("OIDC_ISSUER", /^https?$/, "http:// or https://"),
-    OIDC_CLIENT_ID: optionalString("OIDC_CLIENT_ID"),
-    OIDC_CLIENT_SECRET: optionalString("OIDC_CLIENT_SECRET"),
-    OIDC_ROLE_CLAIM: optionalString("OIDC_ROLE_CLAIM"),
 
     SANDBOX_MODE: enumWithDefault("SANDBOX_MODE", SANDBOX_MODES),
     MCP_STDIO_ENABLED: boolWithDefault("MCP_STDIO_ENABLED"),

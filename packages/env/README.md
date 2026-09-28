@@ -47,7 +47,6 @@ env.flags.hasRedis; // boolean
 | `hasMasterKeyInEnv` | `FLOWAID_MASTER_KEY` is set (otherwise the key file is used). |
 | `masterKeyAutogenerate` | The file provider may create a missing `FLOWAID_MASTER_KEY_FILE`: always outside production, in production only with `FLOWAID_MASTER_KEY_AUTOGENERATE=true`. |
 | `hasAdminBootstrap` | `FLOWAID_ADMIN_EMAIL` and `FLOWAID_ADMIN_PASSWORD` are set. |
-| `hasOidc` | `OIDC_ISSUER`, `OIDC_CLIENT_ID` and `OIDC_CLIENT_SECRET` are set (`features.oidc`). |
 | `hasDatabaseAdminUrl` | `DATABASE_ADMIN_URL` is set: migrations use the owner connection. |
 | `providerFixturesEnabled` | `FLOWAID_PROVIDER_FIXTURES` is `record` or `replay`. |
 | `mcpStdioEnabled` | `MCP_STDIO_ENABLED` is true. |
@@ -59,7 +58,6 @@ env.flags.hasRedis; // boolean
 * `FLOWAID_ADMIN_EMAIL` and `FLOWAID_ADMIN_PASSWORD` must be set together.
 * The four `S3_*` connection variables are all-or-nothing.
 * `FLOWAID_MASTER_KEY` takes precedence over `FLOWAID_MASTER_KEY_FILE`; both may be set (the compose stack always sets the file path and passes the variable through when present) and the file is then ignored.
-* `OIDC_ISSUER`, `OIDC_CLIENT_ID` and `OIDC_CLIENT_SECRET` are all-or-nothing; `OIDC_ROLE_CLAIM` needs them.
 * `PROMETHEUS_PORT` must differ from `PORT`.
 * `FLOWAID_ADMIN_PASSWORD` is 12 to 256 characters.
 
@@ -71,7 +69,7 @@ its documented override, so a first deploy cannot run an unsafe configuration by
 | Refused | Override |
 |---|---|
 | `CORS_ORIGINS` containing `*` | none: list the web app's origin |
-| `http:` `FLOWAID_BASE_URL`, `FLOWAID_WEB_URL` or `OIDC_ISSUER` on a non-loopback host | `FLOWAID_ALLOW_INSECURE_HTTP=true` |
+| `http:` `FLOWAID_BASE_URL` or `FLOWAID_WEB_URL` on a non-loopback host | `FLOWAID_ALLOW_INSECURE_HTTP=true` |
 | `FLOWAID_ADMIN_PASSWORD` equal to its documented example or quick-start value, or in `ADMIN_PASSWORD_DENY_LIST` | none: choose a real password |
 | No `FLOWAID_JWT_PRIVATE_KEY`/`FLOWAID_JWT_PUBLIC_KEY` | `FLOWAID_JWT_KEYS_DIR` set explicitly (a persistent directory shared by every api replica) |
 | No `FLOWAID_MASTER_KEY` and `FLOWAID_MASTER_KEY_FILE` at its default | `FLOWAID_MASTER_KEY_FILE` set explicitly, or `FLOWAID_MASTER_KEY_AUTOGENERATE=true` to create it on first boot |
@@ -134,7 +132,7 @@ lists them empty for you to generate (`openssl rand -hex 16`).
 | `FLOWAID_API_INTERNAL_URL` | no | — | URL the web app's server side uses to reach the api over the deployment's private network (compose: `http://api:3000`). Unset means `FLOWAID_BASE_URL`. Example: `http://api:3000`. |
 | `FLOWAID_TRUST_PROXY` | no | `false` | Reverse proxies whose `X-Forwarded-*` headers are trusted (Fastify `trustProxy`): `false` trusts none, `true` trusts every hop (only when the api is not reachable directly), or a comma-separated list of IPs, CIDRs or the names `loopback`, `linklocal`, `uniquelocal`. Client IPs feed rate limits and audit logs. |
 | `FLOWAID_SSE_MAX_STREAMS_PER_PRINCIPAL` | no | `20` | Maximum concurrent SSE streams (run events, evaluations) one principal may hold open; the next one is refused with 429 `RATE_LIMIT_ERROR`. The per-workspace cap is ten times this value. |
-| `FLOWAID_FEATURES_DISABLED` | no | — | Comma-separated feature keys (`FeatureKey`, API.md §7) the operator turns off: `GET /v1/me` reports them as false and the web app hides their navigation. Unset disables nothing. Values: `workflows`, `runs`, `human_tasks`, `templates`, `integrations_mcp`, `integrations_openapi`, `integrations_providers`, `integrations_plugins`, `knowledge`, `evaluations`, `credentials`, `settings_audit`, `settings_notifications`, `agents`, `ai_builder`, `advisor`, `code_export`, `langchain`, `oidc`, `schedules`, `mcp_exposures`, `dashboard`. Example: `agents,ai_builder`. |
+| `FLOWAID_FEATURES_DISABLED` | no | — | Comma-separated feature keys (`FeatureKey`, API.md §7) the operator turns off: `GET /v1/me` reports them as false and the web app hides their navigation. Unset disables nothing. Values: `workflows`, `runs`, `human_tasks`, `templates`, `integrations_mcp`, `integrations_openapi`, `integrations_providers`, `integrations_plugins`, `knowledge`, `evaluations`, `credentials`, `settings_audit`, `settings_notifications`, `agents`, `ai_builder`, `advisor`, `code_export`, `langchain`, `schedules`, `mcp_exposures`, `dashboard`. Example: `agents,ai_builder`. |
 
 ### Database (PostgreSQL 16 + pgvector)
 
@@ -181,15 +179,6 @@ lists them empty for you to generate (`openssl rand -hex 16`).
 | `AZURE_CLIENT_SECRET` | no | — | Client secret of the service principal; requires `AZURE_TENANT_ID` and `AZURE_CLIENT_ID`. Example: `Q~abc...`. Secret. |
 | `GOOGLE_APPLICATION_CREDENTIALS` | no | — | Path of a service-account key file for Cloud KMS (the `gcp-kms` master key) and Secret Manager (`gcp-sm:` references). Unset uses the metadata server's service account (GCE, GKE, Cloud Run). Example: `/var/run/secrets/gcp/flowaid.json`. |
 | `FLOWAID_SECRET_<NAME>` | no | — | Family of variables, not a setting: credentials with `storage: external` and `externalRef` `env:FLOWAID_SECRET_<NAME>` resolve their value from the matching variable at use time (ARCHITECTURE.md §10.6). Every variable whose name matches `FLOWAID_SECRET_[A-Z0-9_]+` is collected into `env.secretRefs`; no other variable is ever resolvable this way. Example: `<value>`. Secret. A family of variables, not a setting. |
-
-### Single sign-on (OIDC)
-
-| Variable | Required | Default | Description |
-|---|---|---|---|
-| `OIDC_ISSUER` | no | — | Issuer URL of the OpenID Connect provider (`/.well-known/openid-configuration` is discovered from it). Setting it enables `features.oidc` and the `/v1/auth/oidc/*` routes; `OIDC_CLIENT_ID` and `OIDC_CLIENT_SECRET` are then required. Must be `https:` in production unless `FLOWAID_ALLOW_INSECURE_HTTP=true`. Example: `https://login.example.com/realms/flowaid`. |
-| `OIDC_CLIENT_ID` | no | — | Client id registered with the OIDC provider for the flowaid web app. Example: `flowaid`. |
-| `OIDC_CLIENT_SECRET` | no | — | Client secret matching `OIDC_CLIENT_ID`, used for the authorization-code exchange (with PKCE). Example: `<client secret>`. Secret. |
-| `OIDC_ROLE_CLAIM` | no | — | ID-token claim whose value (`owner`, `admin`, `editor` or `viewer`, or a list containing one) sets the workspace role on every OIDC login. Unset keeps roles managed in flowaid; new SSO users join as `viewer`. Example: `flowaid_role`. |
 
 ### Execution, sandbox and plugins
 

@@ -34,6 +34,9 @@ the generated master key file (`/data/master.key`), the auto-generated JWT key p
 (`/data/keys`), run artifacts and code-export packages (`/data/artifacts`) and installed
 plugins (`/data/plugins`), and is mounted by `api` and `worker` only. Back up `flowaid-data`
 and `postgres-data`: without the master key stored credentials cannot be decrypted.
+[docs/operations/BACKUP_AND_RESTORE.md](../docs/operations/BACKUP_AND_RESTORE.md) gives the
+commands and the restore order; [UPGRADES.md](../docs/operations/UPGRADES.md) and the
+[RUNBOOK.md](../docs/operations/RUNBOOK.md) cover upgrades and day-to-day operation.
 
 ## Configuration
 
@@ -183,4 +186,5 @@ docker compose -f docker/compose.yml -f docker/compose.scale.yml -f docker/compo
 
 `docker/compose.test.ts` checks that the overlay touches nothing but `image` and `pull_policy`.
 Upgrading is a new `FLOWAID_IMAGE_TAG` and `up -d`: the api applies pending migrations before
-it listens.
+it listens. Back up first and stop the workers; [UPGRADES.md](../docs/operations/UPGRADES.md)
+has the steps and the rollback.

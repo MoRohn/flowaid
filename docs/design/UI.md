@@ -6,9 +6,7 @@ Next.js 16 App Router, React 19, `@xyflow/react` 12, Tailwind 4, shadcn-style pr
 
 ```
 app/
-  (auth)/login                         email/password; OIDC button only when features.oidc
-  (auth)/oidc/callback                 registered only when features.oidc
-  (auth)/invite/[token] · password/forgot · password/reset/[token]
+  (auth)/login                         email/password (password mode only; local mode signs in by itself)
   review                               external reviewer page (no shell); the token arrives in the URL fragment (#t=…), is read client-side and sent as Authorization: Bearer; renders ExternalReviewView only (never run internals)
   (app)/[ws]/                          shell: left nav + top bar; workspace from slug; FEATURES from GET /v1/me
     page.tsx                           dashboard (metrics overview)
