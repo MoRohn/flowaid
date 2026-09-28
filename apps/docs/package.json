@@ -16,7 +16,7 @@
   "dependencies": {
     "@flowaid/nodes-core": "workspace:*",
     "@flowaid/workflow-core": "workspace:*",
-    "marked": "18.0.12"
+    "marked": "18.0.14"
   },
   "devDependencies": {
     "@flowaid/config": "workspace:*",
