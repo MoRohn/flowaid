@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { installDomStubs } from "@/primitives/testStubs";
 import type { DecisionResult, RunView } from "@/types";
@@ -178,6 +178,34 @@ describe("RunsTable", () => {
     await user.click(screen.getByRole("button", { name: "Actions for run_live" }));
     await user.click(await screen.findByRole("menuitem", { name: "Cancel run" }));
     expect(onCancel).toHaveBeenCalledWith(runs[1]);
+  });
+
+  it("renders the run id as a link when rows have an href, without double-opening", () => {
+    const onOpen = vi.fn();
+    const runs = [run({ id: "run_done", status: "completed", nodeRuns: [] })];
+    render(
+      <RunsTable
+        runs={runs}
+        onOpen={onOpen}
+        rowHref={(r) => `/ws/runs/${r.id}`}
+        showColumnMenu={false}
+        showDensityToggle={false}
+      />,
+    );
+    const link = screen.getByRole("link", { name: "run_done" });
+    expect(link).toHaveAttribute("href", "/ws/runs/run_done");
+    const plain = new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 });
+    link.dispatchEvent(plain);
+    // the link routes through onOpen once; the row's own click handler skips links
+    expect(onOpen).toHaveBeenCalledTimes(1);
+    expect(plain.defaultPrevented).toBe(true);
+    const modified = new MouseEvent("click", { bubbles: true, cancelable: true, metaKey: true });
+    link.dispatchEvent(modified);
+    expect(onOpen).toHaveBeenCalledTimes(1);
+    expect(modified.defaultPrevented).toBe(false);
+    // the rest of the row still opens the run
+    fireEvent.click(screen.getByText("completed", { exact: false }));
+    expect(onOpen).toHaveBeenCalledTimes(2);
   });
 });
 
