@@ -94,6 +94,8 @@ async function main(): Promise<void> {
         ),
     }),
     ...(smtp ? { smtp } : {}),
+    // a publish nobody listens to proves Redis answers (/v1/ready bounds the wait)
+    ...(redisUrl ? { pingRedis: () => bus.publish("ready.ping", null) } : {}),
   };
   const boot = await firstBoot(db, {
     ...(env.FLOWAID_ADMIN_EMAIL ? { adminEmail: String(env.FLOWAID_ADMIN_EMAIL) } : {}),
