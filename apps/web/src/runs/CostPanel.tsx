@@ -19,7 +19,13 @@ export function CostPanel({
   run: RunView;
   onSelect?: (nodeRun: NodeRunView) => void;
 }) {
-  const usage = summarizeUsage(run.nodeRuns);
+  // providers that metered nothing (flow and data nodes) are noise in a cost breakdown
+  const usage = summarizeUsage(run.nodeRuns).filter(
+    (u) =>
+      u.costUsd > 0 ||
+      u.inputTokens + u.outputTokens > 0 ||
+      u.decisionCalls + u.modelCalls + u.toolCalls > 0,
+  );
   const rows = nodeCostRows(run.nodeRuns);
   if (rows.length === 0 && !run.costUsd)
     return (

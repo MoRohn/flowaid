@@ -16,6 +16,8 @@ export const Kbd = forwardRef<HTMLElement, KbdProps>(function Kbd(
       className={cn(
         "inline-flex select-none items-center justify-center rounded-xs border border-border bg-surface-2 font-mono font-medium leading-none text-ink-3 tabular",
         size === "sm" ? "h-4 min-w-4 px-0.5 text-2xs" : "h-4.5 min-w-4.5 px-1 text-2xs",
+        // touch screens have no keyboard to press these on
+        "[@media(hover:none)_and_(pointer:coarse)]:hidden",
         className,
       )}
       {...rest}

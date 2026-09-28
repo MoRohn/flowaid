@@ -1,5 +1,5 @@
 import { forwardRef, type HTMLAttributes, type ReactNode } from "react";
-import { ExternalLink, GitFork, Play, Square, UserCheck } from "lucide-react";
+import { Crosshair, ExternalLink, GitFork, Play, RotateCw, Square, UserCheck } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { ORIGIN_LABEL } from "@/lib/categories";
 import { formatCost, formatMs, formatTokens } from "@/lib/format";
@@ -18,6 +18,10 @@ export interface RunHeaderProps extends HTMLAttributes<HTMLDivElement> {
   onOpenInBuilder?: (run: RunView) => void;
   /** Opens the pending review; shown in the waiting banner. */
   onOpenReview?: (run: RunView) => void;
+  /** Selects the node that failed the run; shown in the error banner. */
+  onShowFailedNode?: (nodeRun: NodeRunView) => void;
+  /** Retries the failed node in place; shown in the error banner when the error is retryable. */
+  onRetryFailedNode?: (nodeRun: NodeRunView) => void;
   /** Extra actions rendered before the built-in ones. */
   actions?: ReactNode;
   /** Pending cancel (spinner on the Cancel button). */
@@ -33,6 +37,13 @@ function isActive(status: RunView["status"]): boolean {
     status === "waiting" ||
     status === "waiting_for_human"
   );
+}
+
+/** The node run that failed the run: the one the error names, else the last failed one. */
+export function failedNode(run: RunView): NodeRunView | undefined {
+  const failed = run.nodeRuns.filter((n) => n.status === "failed");
+  const named = run.error?.nodeId;
+  return (named ? failed.findLast((n) => n.nodeId === named) : undefined) ?? failed.at(-1);
 }
 
 function waitingNode(run: RunView): NodeRunView | undefined {
@@ -77,6 +88,8 @@ export const RunHeader = forwardRef<HTMLDivElement, RunHeaderProps>(function Run
     onCancel,
     onOpenInBuilder,
     onOpenReview,
+    onShowFailedNode,
+    onRetryFailedNode,
     actions,
     cancelling = false,
     className,
@@ -87,6 +100,7 @@ export const RunHeader = forwardRef<HTMLDivElement, RunHeaderProps>(function Run
   const active = isActive(run.status);
   const nowMs = useNow(active, 1000, now);
   const waiting = run.status === "waiting_for_human" ? waitingNode(run) : undefined;
+  const failed = run.error ? failedNode(run) : undefined;
   const startedIso = run.startedAt ?? run.createdAt;
   const elapsed =
     run.durationMs ?? (run.startedAt ? Math.max(0, nowMs - Date.parse(run.startedAt)) : undefined);
@@ -140,25 +154,33 @@ export const RunHeader = forwardRef<HTMLDivElement, RunHeaderProps>(function Run
             </Button>
           ) : null}
           {onFork ? (
-            <Button
-              variant="secondary"
-              size="sm"
-              leadingIcon={<GitFork />}
-              onClick={() => onFork(run)}
-            >
-              Fork
-            </Button>
+            <Tooltip content="New run from this one: pick a version, edit the input">
+              <Button
+                variant="secondary"
+                size="sm"
+                leadingIcon={<GitFork />}
+                onClick={() => onFork(run)}
+              >
+                Fork
+              </Button>
+            </Tooltip>
           ) : null}
           {onReplay ? (
-            <Button
-              variant="secondary"
-              size="sm"
-              leadingIcon={<Play />}
-              onClick={() => onReplay(run)}
-              disabled={active}
+            <Tooltip
+              content={
+                active ? "Replay once the run ends" : "Run the same version with the same input"
+              }
             >
-              Replay
-            </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                leadingIcon={<Play />}
+                onClick={() => onReplay(run)}
+                disabled={active}
+              >
+                Replay
+              </Button>
+            </Tooltip>
           ) : null}
           {onCancel && active ? (
             <Button
@@ -212,12 +234,48 @@ export const RunHeader = forwardRef<HTMLDivElement, RunHeaderProps>(function Run
       </dl>
 
       {run.error ? (
-        <p className="flex items-start gap-2 rounded-sm border border-danger/30 bg-danger-soft px-3 py-2 text-xs text-danger-text">
-          <Badge tone="danger" size="sm" mono>
-            {run.error.code}
-          </Badge>
-          <span className="min-w-0 break-words">{run.error.message}</span>
-        </p>
+        <div
+          role="alert"
+          className="flex flex-col gap-2 rounded-sm border border-danger/30 bg-danger-soft px-3 py-2 text-xs text-danger-text sm:flex-row sm:items-start sm:gap-3"
+        >
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
+            <span className="flex flex-wrap items-center gap-2">
+              <span className="font-medium text-ink">
+                {failed ? `${failed.nodeName} failed` : "The run failed"}
+              </span>
+              <Badge tone="danger" size="sm" mono>
+                {run.error.code}
+              </Badge>
+            </span>
+            <span className="min-w-0 [overflow-wrap:anywhere]">{run.error.message}</span>
+          </div>
+          {failed && (onShowFailedNode || onRetryFailedNode) ? (
+            <span className="flex shrink-0 items-center gap-1.5">
+              {onShowFailedNode ? (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  leadingIcon={<Crosshair />}
+                  onClick={() => onShowFailedNode(failed)}
+                >
+                  Show node
+                </Button>
+              ) : null}
+              {onRetryFailedNode && run.error.retryable !== false ? (
+                <Tooltip content="Runs the node again and continues this run from its result">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    leadingIcon={<RotateCw />}
+                    onClick={() => onRetryFailedNode(failed)}
+                  >
+                    Retry {failed.nodeName}
+                  </Button>
+                </Tooltip>
+              ) : null}
+            </span>
+          ) : null}
+        </div>
       ) : null}
 
       {run.status === "waiting_for_human" ? (

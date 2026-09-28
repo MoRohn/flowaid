@@ -237,6 +237,26 @@ describe("needsLayout", () => {
     def.layout.nodes.b = { x: 520, y: 400 };
     expect(needsLayout(def)).toBe(false);
   });
+
+  it("lays out containers whose children were placed with absolute positions", async () => {
+    const { needsLayout } = await import("./model");
+    const def = fresh();
+    def.nodes.push(loop("loop"), task("inner", "loop"));
+    def.layout = {
+      nodes: {
+        ...Object.fromEntries(def.nodes.map((n, i) => [n.id, { x: i * 260, y: i * 90 }])),
+        loop: { x: 300, y: 200 },
+        inner: { x: 20, y: 60 },
+      },
+    };
+    // the container has no size yet
+    expect(needsLayout(def)).toBe(true);
+    def.layout.nodes.loop = { x: 300, y: 200, w: 400, h: 200 };
+    expect(needsLayout(def)).toBe(false);
+    // a child placed on the canvas, outside its frame
+    def.layout.nodes.inner = { x: 580, y: 500 };
+    expect(needsLayout(def)).toBe(true);
+  });
 });
 
 describe("runErrorMessage", () => {

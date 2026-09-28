@@ -7,6 +7,8 @@ export {
   isCanvasShortcutTarget,
   CANVAS_MIN_ZOOM,
   CANVAS_MAX_ZOOM,
+  CANVAS_READABLE_ZOOM,
+  openingViewport,
   CANVAS_SNAP,
   decorateCanvasEdge,
   type FlowCanvasProps,

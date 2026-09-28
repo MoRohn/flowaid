@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { applyAutoLayout, autoLayout, estimateNodeHeight, findBackEdges } from "./autoLayout";
+import {
+  applyAutoLayout,
+  autoLayout,
+  estimateNodeHeight,
+  findBackEdges,
+  placeLayer,
+} from "./autoLayout";
 import { CONTAINER_HEADER_HEIGHT, CONTAINER_PADDING } from "@/node";
 import { researchAgentDependencies, researchAgentNodes } from "@/node/researchAgent";
 import { SAMPLE_EDGES, SAMPLE_NODES, toCanvasNodes } from "./sampleWorkflow";
@@ -228,5 +234,79 @@ describe("autoLayout with containers (compound)", () => {
     );
     expect(res.positions.size).toBe(3);
     expect(res.sizes.size).toBe(0);
+  });
+});
+
+describe("long edges", () => {
+  // ticket → judge → route; route → approve → done; route → done (skips approve's layer)
+  const nodes = ["ticket", "judge", "route", "approve", "done"].map((id) => ({
+    id,
+    width: 232,
+    height: id === "approve" ? 120 : 96,
+  }));
+  const edges = [
+    { source: "ticket", target: "judge" },
+    { source: "judge", target: "route" },
+    { source: "route", target: "approve" },
+    { source: "route", target: "done" },
+    { source: "approve", target: "done" },
+  ];
+  const { positions, layers } = autoLayout(nodes, edges);
+  const at = (id: string) => positions.get(id) ?? { x: 0, y: 0 };
+  const size = (id: string) => nodes.find((n) => n.id === id) ?? { width: 0, height: 0 };
+
+  it("keeps lanes out of the result", () => {
+    expect(positions.size).toBe(5);
+    expect(layers.flat().sort()).toEqual(["approve", "done", "judge", "route", "ticket"]);
+  });
+
+  it("routes an edge that skips a layer beside the card in that layer, not through it", () => {
+    const r = at("route");
+    const d = at("done");
+    const a = at("approve");
+    // the straight line from route's right middle to done's left middle, at approve's middle x
+    const x0 = r.x + 232;
+    const y0 = r.y + size("route").height / 2;
+    const x1 = d.x;
+    const y1 = d.y + size("done").height / 2;
+    const xm = a.x + 116;
+    const ym = y0 + ((y1 - y0) * (xm - x0)) / (x1 - x0);
+    const inside = ym > a.y && ym < a.y + size("approve").height;
+    expect(inside, `edge at y=${ym} crosses approve ${a.y}..${a.y + 120}`).toBe(false);
+  });
+});
+
+describe("ordering-only edges", () => {
+  it("order the layers without a lane or a pull on the target", () => {
+    const nodes = ["a", "b", "c"].map((id) => ({ id, width: 232, height: 96 }));
+    const chain = [
+      { source: "a", target: "b" },
+      { source: "b", target: "c" },
+    ];
+    const plain = autoLayout(nodes, chain);
+    const withData = autoLayout(nodes, [...chain, { source: "a", target: "c", lane: false }]);
+    expect(withData.layers).toEqual(plain.layers);
+    expect([...withData.positions]).toEqual([...plain.positions]);
+  });
+});
+
+describe("placeLayer", () => {
+  it("never overlaps and lets higher-priority nodes keep their place", () => {
+    const tops = placeLayer(["card", "lane"], [{ h: 100 }, { h: 24 }], [0, 10], 40, (id) =>
+      id === "lane" ? 2 : 1,
+    );
+    expect(tops[1]).toBe(10);
+    expect((tops[0] ?? 0) + 100 + 40).toBeLessThanOrEqual(tops[1] ?? 0);
+  });
+
+  it("stacks nodes that want the same place in order", () => {
+    const tops = placeLayer(
+      ["a", "b", "c"],
+      [{ h: 50 }, { h: 50 }, { h: 50 }],
+      [0, 0, 0],
+      10,
+      () => 1,
+    );
+    expect(tops).toEqual([0, 60, 120]);
   });
 });
