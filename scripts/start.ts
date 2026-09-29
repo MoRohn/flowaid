@@ -11,14 +11,18 @@
  * 4. Database: DATABASE_URL when set, otherwise a pgvector Postgres container (`flowaid-dev-db`,
  *    loopback only, data in the `flowaid-dev-db` volume).
  * 5. Builds what the apps import, then starts the API, the worker and the web app with prefixed
- *    logs, waits for /v1/ready and prints where to sign in. Ctrl+C stops everything.
+ *    logs, waits for /v1/ready and prints where to sign in.
+ * 6. On a desktop: opens FlowAId in its own window and shows its menu bar (tray) icon, whose menu
+ *    opens the window again or quits (scripts/desktop.ts). The app's own Close window and Quit
+ *    FlowAId reach this launcher through the API (scripts/control.ts). Ctrl+C also stops
+ *    everything.
  *
  * `--prod` runs the production builds (Next's standalone server, compiled API and worker) instead of watch
  * mode; `--playground` serves the @flowaid/ui component playground instead of the stack.
  *
  * Runs on plain Node (native type stripping) so it works before `pnpm install`.
  */
-import { spawn, spawnSync, type ChildProcess } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import {
   appendFileSync,
@@ -46,6 +50,27 @@ import {
   useColor,
   type CheckResult,
 } from "./preflight.ts";
+import { startControl, platformName } from "./control.ts";
+import {
+  AppWindow,
+  desktopAvailable,
+  findAppBrowser,
+  notify,
+  openInDefaultBrowser,
+  startTray,
+  type Activity,
+  type Tray,
+} from "./desktop.ts";
+import { spawnGuarded, type Guarded } from "./guard.ts";
+import {
+  endLeftovers,
+  readInstance,
+  removeInstance,
+  runningLauncher,
+  writeInstance,
+  type InstanceProcess,
+  type InstanceRecord,
+} from "./instance.ts";
 import { DEFAULT_API_PORT, DEFAULT_WEB_PORT } from "./ports.ts";
 
 const HELP = `Usage: ./flowaid [options]   (or: pnpm start [options])
@@ -61,7 +86,9 @@ Options
                       reaches this computer, as does 127.0.0.1)
   --database-url <u>  Use this Postgres instead of a Docker container (or set DATABASE_URL)
   --prod              Run production builds instead of watch mode
-  --open              Open the browser once the web app is ready
+  --no-open           Don't open FlowAId's window once it is ready (it opens on a desktop, in an
+                      app window of its own when Chrome, Edge, Brave or Chromium is installed)
+  --no-tray           Don't show the menu bar (tray) icon that reopens the window or quits
   --verify            Run every CI gate (pnpm check) before starting
   --skip-install      Never install dependencies, even when they are missing or stale
   --pageindex         Also run the PageIndex service for PDF document indexes (needs Python 3.10+;
@@ -86,7 +113,9 @@ try {
       domain: { type: "string", default: DEFAULT_DOMAIN },
       "database-url": { type: "string" },
       prod: { type: "boolean", default: false },
-      open: { type: "boolean", default: false },
+      // unset: on a desktop (not CI, not over SSH); --open / --no-open decide
+      open: { type: "boolean" },
+      tray: { type: "boolean" },
       verify: { type: "boolean", default: false },
       "skip-install": { type: "boolean", default: false },
       playground: { type: "boolean", default: false },
@@ -94,6 +123,7 @@ try {
       "pageindex-port": { type: "string", default: "8765" },
       help: { type: "boolean", short: "h", default: false },
     },
+    allowNegative: true,
   });
 } catch (error) {
   console.error(`${(error as Error).message}\n\n${HELP}`);
@@ -158,12 +188,26 @@ const heading = (text: string) => {
   console.log(`\n${paint(1, `[${step}/${TOTAL}] ${text}`)}`);
 };
 
+const WINDOWS = process.platform === "win32";
+
+/**
+ * A package's command as a script for this Node to run (`node …/next/dist/bin/next`), instead of
+ * its node_modules/.bin shim: on Windows that shim is a .cmd file, which needs cmd.exe.
+ */
+const pkgBin = (dir: string, pkg: string, entry: string) =>
+  join(ROOT, dir, "node_modules", pkg, entry);
+
+/** An argument as cmd.exe must see it: quoted when it has spaces (C:\Users\Jane Doe\…). */
+const cmdArg = (a: string) => (/[\s"]/.test(a) ? `"${a.replaceAll('"', '\\"')}"` : a);
+
 function run(command: string, args: readonly string[], env?: NodeJS.ProcessEnv): Promise<number> {
+  // Windows finds pnpm, py and friends (.cmd, .exe) through a shell; a full path runs directly
+  const shell = WINDOWS && !/[\\/]/.test(command);
   return new Promise((resolve) => {
-    const child = spawn(command, args, {
+    const child = spawn(command, shell ? args.map(cmdArg) : args, {
       cwd: ROOT,
       stdio: "inherit",
-      shell: process.platform === "win32",
+      shell,
       ...(env ? { env } : {}),
     });
     child.once("error", () => resolve(127));
@@ -211,21 +255,25 @@ function localSecrets(): { values: Record<string, string>; created: boolean } {
 
 const PAGEINDEX_DIR = join(ROOT, "apps/pageindex");
 
-/** A Python 3.10+ interpreter: FLOWAID_PYTHON, else the newest python3.x on PATH. */
-function findPython(): string | null {
-  const candidates = [
-    process.env.FLOWAID_PYTHON,
-    "python3.13",
-    "python3.12",
-    "python3.11",
-    "python3.10",
-    "python3",
-  ].filter((c): c is string => Boolean(c));
+/**
+ * A Python 3.10+ interpreter, as a command and its leading arguments: FLOWAID_PYTHON, else the
+ * newest python3.x on PATH, or on Windows the `py` launcher and `python`.
+ */
+function findPython(): string[] | null {
+  const candidates: string[][] = [
+    ...(process.env.FLOWAID_PYTHON ? [[process.env.FLOWAID_PYTHON]] : []),
+    ...(WINDOWS
+      ? [["py", "-3"], ["python"], ["python3"]]
+      : [["python3.13"], ["python3.12"], ["python3.11"], ["python3.10"], ["python3"]]),
+  ];
   return (
     candidates.find(
-      (cmd) =>
-        spawnSync(cmd, ["-c", "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)"])
-          .status === 0,
+      ([cmd, ...pre]) =>
+        spawnSync(
+          cmd as string,
+          [...pre, "-c", "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)"],
+          { windowsHide: true },
+        ).status === 0,
     ) ?? null
   );
 }
@@ -246,10 +294,19 @@ async function ensurePageIndexVenv(): Promise<string> {
   }
   const base = findPython();
   if (!base)
-    fail(
-      "--pageindex needs Python 3.10 or newer (python3.10 … python3.13 on PATH, or set FLOWAID_PYTHON)",
+    return fail(
+      WINDOWS
+        ? "--pageindex needs Python 3.10 or newer (install it from python.org, which adds the py launcher, or set FLOWAID_PYTHON)"
+        : "--pageindex needs Python 3.10 or newer (python3.10 … python3.13 on PATH, or set FLOWAID_PYTHON)",
     );
-  await mustRun("PageIndex virtualenv created", base as string, ["-m", "venv", "--clear", venv]);
+  const [pythonCmd, ...pythonPre] = base as [string, ...string[]];
+  await mustRun("PageIndex virtualenv created", pythonCmd, [
+    ...pythonPre,
+    "-m",
+    "venv",
+    "--clear",
+    venv,
+  ]);
   await mustRun("PageIndex packages installed (pinned, hash-checked)", python, [
     "-m",
     "pip",
@@ -330,8 +387,20 @@ async function ensureDockerDatabase(password: string): Promise<string> {
 
 // ─── processes ───────────────────────────────────────────────────────────────────────────────
 
-const children: ChildProcess[] = [];
+/** each process runs under a guard (scripts/guard.ts), which ends its tree with the launcher */
+const guards: Guarded[] = [];
 let stopping = false;
+/** run before the processes stop: close the app window, remove the icon, stop the control channel */
+const cleanups: (() => void)[] = [];
+
+// .flowaid/launcher.json: this launcher and what it started (scripts/instance.ts)
+const INSTANCE = join(ROOT, ".flowaid/launcher.json");
+let instance: InstanceRecord | null = null;
+function recordProcess(p: InstanceProcess): void {
+  if (!instance || stopping) return;
+  instance.processes.push(p);
+  writeInstance(INSTANCE, instance);
+}
 
 function start(
   name: string,
@@ -340,13 +409,10 @@ function start(
   args: string[],
   cwd: string,
   env: NodeJS.ProcessEnv,
+  /** ipc: stop gracefully on Windows with the flowaid:shutdown message (the API and worker) */
+  o: { ipc?: boolean } = {},
 ) {
-  const child = spawn(command, args, {
-    cwd,
-    env,
-    stdio: ["ignore", "pipe", "pipe"],
-    shell: process.platform === "win32",
-  });
+  const g = spawnGuarded(command, args, { cwd, env, ipc: o.ipc === true && WINDOWS });
   const tag = paint(code, name.padEnd(6));
   const pipe = (stream: NodeJS.ReadableStream, out: NodeJS.WriteStream) => {
     let rest = "";
@@ -356,37 +422,63 @@ function start(
       for (const line of lines) if (line.trim()) out.write(`${tag} ${line}\n`);
     });
   };
-  if (child.stdout) pipe(child.stdout, process.stdout);
-  if (child.stderr) pipe(child.stderr, process.stderr);
-  child.once("exit", (exitCode) => {
+  if (g.process.stdout) pipe(g.process.stdout, process.stdout);
+  if (g.process.stderr) pipe(g.process.stderr, process.stderr);
+  g.process.once("exit", (exitCode) => {
     if (stopping) return;
     console.error(
       `\n${paint(31, "✗")} ${name} exited (${exitCode ?? "signal"}); stopping the others.`,
     );
     shutdown(exitCode ?? 1);
   });
-  children.push(child);
-  return child;
+  guards.push(g);
+  if (g.process.pid !== undefined)
+    recordProcess({ name: `${name} guard`, pid: g.process.pid, match: "scripts/guard.ts" });
+  // its own command line names its entry point (src/main.ts, dist/main.js, server.js, …)
+  const match = args.find((a) => /(?:\.m?[jt]s|flowaid_pageindex)$/.test(a)) ?? command;
+  void g.pid.then((pid) => {
+    if (pid !== null) recordProcess({ name, pid, match });
+  });
+  return g;
+}
+
+function finish(code: number): never {
+  if (instance) removeInstance(INSTANCE);
+  process.exit(code);
 }
 
 function shutdown(code = 0) {
-  if (stopping) return;
+  if (stopping) {
+    // a second Ctrl+C: don't wait for running steps to finish, but leave nothing behind
+    for (const g of guards) g.kill();
+    setTimeout(() => finish(code), 5000).unref();
+    return;
+  }
   stopping = true;
-  for (const c of children) c.kill("SIGTERM");
-  const hard = setTimeout(() => {
-    for (const c of children) c.kill("SIGKILL");
-    process.exit(code);
-  }, 10_000);
-  hard.unref();
-  let left = children.filter((c) => c.exitCode === null).length;
-  if (left === 0) process.exit(code);
-  for (const c of children)
-    c.once("exit", () => {
+  for (const cleanup of cleanups.splice(0))
+    try {
+      cleanup();
+    } catch {
+      /* stopping anyway */
+    }
+  for (const g of guards) g.stop();
+  // the worker lets running node executions finish for up to 30 s
+  setTimeout(() => {
+    for (const g of guards) g.kill();
+  }, 32_000).unref();
+  setTimeout(() => finish(code), 40_000).unref();
+  let left = guards.filter((g) => g.process.exitCode === null).length;
+  if (left === 0) finish(code);
+  for (const g of guards)
+    g.process.once("exit", () => {
       left -= 1;
-      if (left <= 0) process.exit(code);
+      if (left <= 0) finish(code);
     });
 }
-for (const signal of ["SIGINT", "SIGTERM"] as const) process.on(signal, () => shutdown(0));
+// Ctrl+C, a kill, the terminal closing (SIGHUP; on Windows also the console window closing),
+// and Ctrl+Break on Windows all stop FlowAId the same way
+for (const signal of ["SIGINT", "SIGTERM", "SIGHUP", ...(WINDOWS ? ["SIGBREAK"] : [])] as const)
+  process.on(signal as NodeJS.Signals, () => shutdown(0));
 
 async function waitFor(url: string, timeoutMs: number): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
@@ -402,21 +494,39 @@ async function waitFor(url: string, timeoutMs: number): Promise<boolean> {
   return false;
 }
 
-function openBrowser(url: string) {
-  const cmd =
-    process.platform === "darwin" ? "open" : process.platform === "win32" ? "start" : "xdg-open";
-  spawn(cmd, [url], {
-    stdio: "ignore",
-    detached: true,
-    shell: process.platform === "win32",
-  }).unref();
-}
-
 // ─── main ────────────────────────────────────────────────────────────────────────────────────
 
 console.log(
   `\n${paint(1, "FlowAId")} · ${opts.playground ? "UI playground" : `local stack${opts.prod ? " (production builds)" : ""}`}`,
 );
+
+// One FlowAId per checkout: open the running one's window, or end what a crashed run left behind
+if (!opts.playground) {
+  const previous = readInstance(INSTANCE);
+  const running = runningLauncher(previous);
+  if (running) {
+    console.log(`\n${paint(32, "→")} FlowAId is already running at ${paint(1, running.webUrl)}`);
+    if (opts.open !== false) {
+      try {
+        const res = await fetch(`${running.control.url}/window/open`, {
+          method: "POST",
+          headers: { authorization: `Bearer ${running.control.token}` },
+          signal: AbortSignal.timeout(5000),
+        });
+        if (res.ok) ok("opened its window");
+      } catch {
+        warn(`its launcher (pid ${running.pid}) did not answer; open the address yourself`);
+      }
+    }
+    console.log("  Quit it from its menu bar icon or in the app, then start it again.\n");
+    process.exit(0);
+  }
+  if (previous) {
+    const ended = endLeftovers(previous);
+    if (ended.length > 0) warn(`stopped what an earlier FlowAId left running: ${ended.join(", ")}`);
+    removeInstance(INSTANCE);
+  }
+}
 
 heading("Preflight");
 const fileEnv = { ...readEnvFile(join(ROOT, ".env")), ...readEnvFile(join(ROOT, ".env.local")) };
@@ -490,18 +600,14 @@ if (opts.playground) {
     ]);
   heading(opts.prod ? "Serve the production build" : "Start the dev server");
   const UI_DIR = join(ROOT, "packages/ui");
-  const vite = join(
-    UI_DIR,
-    "node_modules/.bin",
-    process.platform === "win32" ? "vite.cmd" : "vite",
-  );
   const url = `http://${browserHost}:${webPort}`;
   console.log(`${paint(32, "→")} ${paint(1, url)}   (Ctrl+C to stop)\n`);
   start(
     "ui",
     36,
-    vite,
+    process.execPath,
     [
+      pkgBin("packages/ui", "vite", "bin/vite.js"),
       ...(opts.prod ? ["preview"] : []),
       "--config",
       "playground/vite.config.ts",
@@ -510,7 +616,7 @@ if (opts.playground) {
       "--port",
       String(webPort),
       "--strictPort",
-      ...(opts.open ? ["--open"] : []),
+      ...(opts.open === true ? ["--open"] : []),
     ],
     UI_DIR,
     process.env,
@@ -613,11 +719,64 @@ if (opts.playground) {
         "fixtures/providers",
     ),
   };
-  const bin = (dir: string, name: string) =>
-    join(ROOT, dir, "node_modules/.bin", process.platform === "win32" ? `${name}.cmd` : name);
   const api = join(ROOT, "apps/api");
   const worker = join(ROOT, "apps/worker");
   const web = join(ROOT, "apps/web");
+  // FlowAId's window and icon (on a desktop), and the channel through which the app's Close window
+  // and Quit FlowAId reach this launcher: its URL and a token for this launch go to the API only
+  const desktop = desktopAvailable(process.env, process.platform);
+  const appWindow =
+    (opts.open ?? desktop)
+      ? new AppWindow({
+          url: webUrl,
+          browser: desktop ? findAppBrowser(process.env, process.platform) : null,
+          profileDir: join(data, "window"),
+          onStart: (guardPid, pid) => {
+            recordProcess({ name: "window guard", pid: guardPid, match: "scripts/guard.ts" });
+            recordProcess({ name: "window", pid, match: join(data, "window") });
+          },
+        })
+      : null;
+  let tray: Tray | null = null;
+  // the latest background activity the API reported, for the icon (and approvals' notifications)
+  let activity: Activity | null = null;
+  const launcherToken = randomBytes(32).toString("hex");
+  const control = await startControl({
+    token: launcherToken,
+    handlers: {
+      status: () => ({
+        window: appWindow?.kind ?? "none",
+        tray: tray !== null,
+        platform: platformName(process.platform),
+      }),
+      closeWindow: () => appWindow?.close() ?? false,
+      openWindow: () => (appWindow ? appWindow.open() : openInDefaultBrowser(webUrl)),
+      quit: () => {
+        console.log(`\n${paint(1, "Quit FlowAId")}: stopping…`);
+        shutdown(0);
+      },
+      activity: (next) => {
+        // a new approval while FlowAId may be in the background (Windows: the icon's balloon);
+        // not the ones already waiting when FlowAId started
+        if (activity && next.approvals > activity.approvals && tray)
+          notify("FlowAId", `${next.approvals} approval${next.approvals === 1 ? "" : "s"} waiting`);
+        activity = next;
+        tray?.update(next);
+      },
+    },
+  });
+  cleanups.push(() => void control.close());
+  if (appWindow) cleanups.push(() => appWindow.close());
+  instance = {
+    pid: process.pid,
+    startedAt: new Date().toISOString(),
+    webUrl,
+    apiUrl,
+    control: { url: control.url, token: launcherToken },
+    processes: [],
+  };
+  writeInstance(INSTANCE, instance);
+
   if (pageIndexPython) {
     // only what the service needs: never the master key, database or provider keys
     start("pidx", 35, pageIndexPython, ["-m", "flowaid_pageindex"], PAGEINDEX_DIR, {
@@ -632,25 +791,43 @@ if (opts.playground) {
       fail("the PageIndex service did not become ready (see the pidx lines above)");
     ok(`PageIndex service ready on http://127.0.0.1:${pageIndexPort}`);
   }
+  // Windows has no SIGTERM: the API and worker run in one process each (no watcher), so their
+  // guards can ask them to stop over IPC and they finish what they are doing
+  const nodeApp = (dir: string): [string, string[]] =>
+    opts.prod
+      ? [process.execPath, ["dist/main.js"]]
+      : WINDOWS
+        ? [process.execPath, ["--conditions=development", "--import", "tsx", "src/main.ts"]]
+        : [
+            process.execPath,
+            [
+              pkgBin(dir, "tsx", "dist/cli.mjs"),
+              "watch",
+              "--conditions=development",
+              "src/main.ts",
+            ],
+          ];
+  const [apiCmd, apiArgs] = nodeApp("apps/api");
   start(
     "api",
     34,
-    opts.prod ? process.execPath : bin("apps/api", "tsx"),
-    opts.prod ? ["dist/main.js"] : ["watch", "--conditions=development", "src/main.ts"],
+    apiCmd,
+    apiArgs,
     api,
-    { ...env, HOST: host, PORT: String(apiPort) },
+    {
+      ...env,
+      HOST: host,
+      PORT: String(apiPort),
+      FLOWAID_LAUNCHER_URL: control.url,
+      FLOWAID_LAUNCHER_TOKEN: launcherToken,
+    },
+    { ipc: true },
   );
   if (!(await waitFor(`http://127.0.0.1:${apiPort}/v1/ready`, 120_000)))
     fail("the API did not become ready (see the api lines above)");
   ok(`API ready on ${apiUrl}`);
-  start(
-    "worker",
-    33,
-    opts.prod ? process.execPath : bin("apps/worker", "tsx"),
-    opts.prod ? ["dist/main.js"] : ["watch", "--conditions=development", "src/main.ts"],
-    worker,
-    env,
-  );
+  const [workerCmd, workerArgs] = nodeApp("apps/worker");
+  start("worker", 33, workerCmd, workerArgs, worker, env, { ipc: true });
   if (opts.prod) {
     // the standalone server is what the Docker image runs; it serves static files from beside it
     const standalone = join(web, ".next/standalone/apps/web");
@@ -665,8 +842,15 @@ if (opts.playground) {
     start(
       "web",
       36,
-      bin("apps/web", "next"),
-      ["dev", "--port", String(webPort), "--hostname", host],
+      process.execPath,
+      [
+        pkgBin("apps/web", "next", "dist/bin/next"),
+        "dev",
+        "--port",
+        String(webPort),
+        "--hostname",
+        host,
+      ],
       web,
       {
         ...env,
@@ -678,7 +862,7 @@ if (opts.playground) {
   if (!(await waitFor(`http://127.0.0.1:${webPort}/login`, 180_000)))
     fail("the web app did not start (see the web lines above)");
 
-  console.log(`\n${paint(32, "→")} ${paint(1, webUrl)}   (Ctrl+C to stop)`);
+  console.log(`\n${paint(32, "→")} ${paint(1, webUrl)}   (Quit FlowAId in the app, or Ctrl+C)`);
   // local mode (loopback URLs, the default): this computer opens the app without signing in
   const local = authModeOf(env) === "local";
   if (local) console.log("  opens without a sign-in on this computer");
@@ -688,7 +872,45 @@ if (opts.playground) {
     );
   console.log(`  API ${apiUrl} · docs ${apiUrl}/docs\n`);
   writeFileSync(join(data, "signed-in"), "");
-  if (opts.open) openBrowser(webUrl);
+  if (opts.tray ?? desktop) {
+    const started = startTray({
+      url: webUrl,
+      cacheDir: join(data, "tray"),
+      env: process.env,
+      onCommand: (command) => {
+        if (command === "quit") {
+          console.log(`\n${paint(1, "Quit FlowAId")} (menu bar): stopping…`);
+          shutdown(0);
+        } else if (appWindow) appWindow.open();
+        else openInDefaultBrowser(webUrl);
+      },
+    });
+    if ("tray" in started) {
+      tray = started.tray;
+      const stop = started.tray;
+      cleanups.push(() => stop.stop());
+      if (activity) stop.update(activity);
+      if (stop.pid !== undefined)
+        recordProcess({
+          name: "icon",
+          pid: stop.pid,
+          match: WINDOWS ? "tray-windows.ps1" : "flowaid-tray",
+        });
+      ok(
+        process.platform === "darwin"
+          ? "FlowAId is in the menu bar: reopen the window or quit from its icon"
+          : "FlowAId is in the notification area: reopen the window or quit from its icon",
+      );
+    } else warn(`no menu bar icon: ${started.error}`);
+  }
+  if (appWindow) {
+    appWindow.open();
+    ok(
+      appWindow.kind === "app"
+        ? "opened FlowAId in its own window"
+        : "opened FlowAId in your browser",
+    );
+  }
 }
 
 /** FLOWAID_AUTH_MODE as the api resolves it (`auto`: local when both URLs are loopback). */

@@ -234,6 +234,22 @@ the PDF itself as the body (at most 50 MiB, its own raw parser; every other rout
 deleting a `pageindex` source revokes its documents, removes their upstream indexes and files,
 and only then deletes the row.
 
+### 3.11 Desktop: Close window and Quit FlowAId
+
+When `./flowaid` (`pnpm start`) starts FlowAId on this computer, it gives the API its control
+channel (`FLOWAID_LAUNCHER_URL`/`FLOWAID_LAUNCHER_TOKEN`: 127.0.0.1 and a token generated for
+each launch; `scripts/control.ts`), and `features.desktop` is true. These routes are session-only
+(API keys are refused) and need the `admin` scope; both mutations are audited.
+
+| route                           | answer                                                                                                                                                                                                                                                              |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /v1/desktop`               | `{ window: "app" \| "browser" \| "none", tray, platform, activity: { runs, approvals } }`: FlowAId's own app window, a default-browser tab or none; whether the menu bar icon is showing; what runs in the background across workspaces (what Quit would interrupt) |
+| `POST /v1/desktop/window/close` | `{ closed }`: the launcher closed FlowAId's app window (FlowAId keeps running in the menu bar). `false`: a browser tab, which the page closes itself                                                                                                                |
+| `POST /v1/desktop/quit`         | `202 { stopping: true }`: the launcher answers, then stops the web app, the worker and the API (`application.quit`)                                                                                                                                                 |
+
+Without a launcher (Docker Compose, a server) they answer `409 DESKTOP_UNAVAILABLE`; a launcher
+that does not answer is `503 LAUNCHER_UNAVAILABLE`.
+
 ## 4. Running a workflow
 
 ```ts
@@ -350,11 +366,12 @@ export const FeatureKeySchema = z.enum([
   "schedules",
   "mcp_exposures",
   "dashboard",
+  "desktop",
 ]);
 export type FeatureKey = z.infer<typeof FeatureKeySchema>;
 // features = FEATURES_SHIPPED (release constant) minus FLOWAID_FEATURES_DISABLED (env csv), then runtime conditions:
 // langchain ⇔ the bundled plugin row is enabled; code_export ⇔ FLOWAID_EXPORT_MODE resolves (npm, or vendored with FLOWAID_VENDOR_DIR present);
-// schedules ⇔ the scheduler job is enabled; dashboard ⇔ the metrics routes ship (P6-04); knowledge/agents/ai_builder/advisor stay false until their packages ship.
+// schedules ⇔ the scheduler job is enabled; dashboard ⇔ the metrics routes ship (P6-04); desktop ⇔ ./flowaid started the API (FLOWAID_LAUNCHER_URL, §3.11); knowledge/agents/ai_builder/advisor stay false until their packages ship.
 export const JobSchema = z.object({
   id: z.uuid(),
   kind: z.enum(["export.package"]),

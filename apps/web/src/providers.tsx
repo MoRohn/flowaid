@@ -4,6 +4,10 @@ import { useState, type ReactNode } from "react";
 import { ThemeProvider } from "@flowaid/ui/theme";
 import { Toaster, TooltipProvider } from "@flowaid/ui/primitives";
 import { ApiError } from "~/api/client";
+import { recordAppWindow } from "~/shell/appWindow";
+
+// before the root page's redirect drops the launcher's #flowaid-window
+recordAppWindow();
 
 export function Providers({ children }: { children: ReactNode }) {
   const [client] = useState(

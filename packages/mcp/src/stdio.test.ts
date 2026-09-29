@@ -14,7 +14,8 @@ const FIXTURE = join(dirname(fileURLToPath(import.meta.url)), "../fixtures/stdio
 const policy: StdioPolicy = {
   enabled: true,
   allowedCommands: [
-    { command: NODE, argsPattern: "\\S+/fixtures/stdio-server\\.mjs" },
+    // either separator: the fixture's path is C:\…\fixtures\… on Windows
+    { command: NODE, argsPattern: "\\S+[\\\\/]fixtures[\\\\/]stdio-server\\.mjs" },
     { command: "/usr/bin/python3" },
     { command: "/usr/local/bin/npx" },
     { command: "/bin/sh" },
@@ -119,6 +120,48 @@ describe("stdio policy", () => {
 
   it("requires absolute commands", () => {
     expect(() => validateStdioConfig({ command: "python3" })).toThrow(/absolute/);
+    expect(() => validateStdioConfig({ command: "server.exe" })).toThrow(/absolute/);
+  });
+
+  describe("on Windows", () => {
+    it("accepts an absolute executable path, including Program Files (x86)", () => {
+      for (const command of [
+        "C:\\Program Files\\Acme\\mcp-server.exe",
+        "C:\\Program Files (x86)\\Acme\\mcp-server.exe",
+        "D:/tools/mcp-server.exe",
+      ])
+        expect(() => validateStdioConfig({ command }), command).not.toThrow();
+    });
+
+    it("refuses shells and package runners by name, whatever the extension or case", () => {
+      for (const command of [
+        "C:\\Windows\\System32\\cmd.exe",
+        "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\PowerShell.EXE",
+        "C:\\Program Files\\PowerShell\\7\\pwsh.exe",
+        "C:\\Windows\\System32\\wsl.exe",
+        "C:\\Windows\\System32\\mshta.exe",
+      ])
+        expect(() => validateStdioConfig({ command }), command).toThrow(/shells/);
+      expect(() => validateStdioConfig({ command: "C:\\Program Files\\nodejs\\npx.exe" })).toThrow(
+        /package runners/,
+      );
+    });
+
+    it("refuses scripts that Windows would run through a shell", () => {
+      for (const command of [
+        "C:\\tools\\server.cmd",
+        "C:\\tools\\server.BAT",
+        "C:\\tools\\server.ps1",
+      ])
+        expect(() => validateStdioConfig({ command }), command).toThrow(/not a script/);
+    });
+
+    it("still refuses shell metacharacters and parent directories", () => {
+      expect(() => validateStdioConfig({ command: "C:\\tools\\a&b.exe" })).toThrow(
+        /metacharacters/,
+      );
+      expect(() => validateStdioConfig({ command: "C:\\tools\\..\\cmd.exe" })).toThrow(/absolute/);
+    });
   });
 });
 

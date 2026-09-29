@@ -37,6 +37,7 @@
     "test:acceptance": "playwright test",
     "eval:assistant": "pnpm --filter @flowaid/api eval:assistant",
     "eval:pageindex": "pnpm --filter @flowaid/api eval:pageindex",
+    "smoke:desktop": "node --disable-warning=ExperimentalWarning scripts/desktop-smoke.ts",
     "pageindex:test": "node --disable-warning=ExperimentalWarning scripts/python-test.ts apps/pageindex",
     "flowaid": "tsx --conditions=development packages/cli/src/main.ts",
     "prepare": "node --disable-warning=ExperimentalWarning scripts/install-hooks.ts",
