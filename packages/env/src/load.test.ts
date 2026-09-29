@@ -330,6 +330,7 @@ describe("secret-safe serialisation", () => {
         "VAULT_TOKEN",
         "AZURE_CLIENT_SECRET",
         "FLOWAID_PAGEINDEX_TOKEN",
+        "FLOWAID_LAUNCHER_TOKEN",
       ].sort(),
     );
   });

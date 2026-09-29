@@ -469,7 +469,8 @@ export interface StdioCommandRule {
 const stdioCommandRule = z.string().transform((entry, ctx): StdioCommandRule => {
   const eq = entry.indexOf("=");
   const command = eq === -1 ? entry : entry.slice(0, eq);
-  if (!command.startsWith("/") || command.includes("..")) {
+  // /usr/bin/… or, on Windows, C:\… (the same rule as @flowaid/mcp's isAbsoluteCommand)
+  if (!(command.startsWith("/") || /^[A-Za-z]:[\\/]/.test(command)) || command.includes("..")) {
     ctx.addIssue({
       code: "custom",
       message: `command ${JSON.stringify(command)} must be an absolute path`,
@@ -677,6 +678,29 @@ export function crossFieldIssues(vars: Partial<Record<EnvVarName, unknown>>): Cr
       message: "must be at least 32 characters (generate one with `openssl rand -hex 32`)",
     });
   }
+  // the launcher's control channel (./flowaid): both or neither, on this computer, with a real secret
+  if (has("FLOWAID_LAUNCHER_URL") !== has("FLOWAID_LAUNCHER_TOKEN")) {
+    issues.push({
+      path: has("FLOWAID_LAUNCHER_URL") ? "FLOWAID_LAUNCHER_TOKEN" : "FLOWAID_LAUNCHER_URL",
+      message: "FLOWAID_LAUNCHER_URL and FLOWAID_LAUNCHER_TOKEN must be set together",
+    });
+  }
+  if (has("FLOWAID_LAUNCHER_URL")) {
+    let hostname = "";
+    try {
+      hostname = new URL(str("FLOWAID_LAUNCHER_URL")).hostname;
+    } catch {
+      /* the URL schema reports it */
+    }
+    if (hostname && !["127.0.0.1", "localhost", "[::1]"].includes(hostname))
+      issues.push({
+        path: "FLOWAID_LAUNCHER_URL",
+        message: "must be on this computer (127.0.0.1, localhost or [::1])",
+      });
+  }
+  if (has("FLOWAID_LAUNCHER_TOKEN") && str("FLOWAID_LAUNCHER_TOKEN").length < 32) {
+    issues.push({ path: "FLOWAID_LAUNCHER_TOKEN", message: "must be at least 32 characters" });
+  }
   const s3Set = S3_VARS.filter((key) => has(key));
   if (s3Set.length > 0 && s3Set.length < S3_VARS.length) {
     for (const key of S3_VARS) {
@@ -857,6 +881,8 @@ export const EnvSchema = z
       "http:// or https://",
     ),
     FLOWAID_TRUST_PROXY: trustProxyWithDefault("FLOWAID_TRUST_PROXY"),
+    FLOWAID_LAUNCHER_URL: optionalUrl("FLOWAID_LAUNCHER_URL", /^http$/, "http://"),
+    FLOWAID_LAUNCHER_TOKEN: optionalString("FLOWAID_LAUNCHER_TOKEN"),
     FLOWAID_SSE_MAX_STREAMS_PER_PRINCIPAL: intWithDefault("FLOWAID_SSE_MAX_STREAMS_PER_PRINCIPAL", {
       min: 1,
       max: 10_000,

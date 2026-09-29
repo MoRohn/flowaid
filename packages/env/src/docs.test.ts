@@ -130,6 +130,8 @@ describe("environment variable documentation", () => {
       "FLOWAID_ALLOW_CROSS_SITE",
       "FLOWAID_ALLOW_PRIVATE_NETWORK",
       "FLOWAID_TRUST_PROXY",
+      "FLOWAID_LAUNCHER_URL",
+      "FLOWAID_LAUNCHER_TOKEN",
       "FLOWAID_SSE_MAX_STREAMS_PER_PRINCIPAL",
       "FLOWAID_EXPORT_MODE",
       "FLOWAID_VENDOR_DIR",

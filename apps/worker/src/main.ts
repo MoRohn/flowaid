@@ -1,7 +1,7 @@
 /**
  * The worker entrypoint: environment → database, queue and bus (Redis when configured, else
  * Postgres) → credentials (master key verified) → SafeFetch → sandbox → worker, scheduler and
- * heartbeat. SIGTERM/SIGINT stop consuming, let running node executions finish (bounded), release
+ * heartbeat. SIGTERM/SIGINT (or ./flowaid's `flowaid:shutdown` message on Windows) stop consuming, let running node executions finish (bounded), release
  * leases and exit.
  *
  * `WORKER_POOLS` without `general` starts a pool-only worker instead (the `code` pool's sandbox
@@ -123,8 +123,7 @@ async function main(): Promise<void> {
       await db.close();
       process.exit(0);
     };
-    process.once("SIGTERM", () => void stopPool("SIGTERM"));
-    process.once("SIGINT", () => void stopPool("SIGINT"));
+    onStopRequest((reason) => void stopPool(reason));
     return;
   }
 
@@ -328,8 +327,27 @@ async function main(): Promise<void> {
     await telemetry.shutdown().catch(() => undefined);
     process.exit(0);
   };
-  process.once("SIGTERM", () => void shutdown("SIGTERM"));
-  process.once("SIGINT", () => void shutdown("SIGINT"));
+  onStopRequest((reason) => void shutdown(reason));
+}
+
+/**
+ * A request to stop: SIGTERM or SIGINT, or on Windows (no SIGTERM there) the IPC message
+ * `flowaid:shutdown` from ./flowaid's process guard (scripts/guard.ts). `stop` runs once.
+ */
+function onStopRequest(stop: (reason: string) => void): void {
+  let asked = false;
+  const once = (reason: string) => {
+    if (asked) return;
+    asked = true;
+    stop(reason);
+  };
+  process.once("SIGTERM", () => once("SIGTERM"));
+  process.once("SIGINT", () => once("SIGINT"));
+  // the terminal (or, on Windows, the console window) closing
+  process.once("SIGHUP", () => once("SIGHUP"));
+  process.on("message", (message) => {
+    if (message === "flowaid:shutdown") once("launcher");
+  });
 }
 
 main().catch((error: unknown) => {

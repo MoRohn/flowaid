@@ -3,7 +3,7 @@
  * on the operator's absolute-path allow-list. The child gets a scrubbed environment, a fresh temp
  * working directory and its own process group, which is killed on close, timeout or cancel.
  */
-import { spawn, type ChildProcess } from "node:child_process";
+import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -80,6 +80,11 @@ const SHELLS = new Set([
   "cmd.exe",
   "powershell",
   "pwsh",
+  "wsl",
+  "wscript",
+  "cscript",
+  "mshta",
+  "rundll32",
 ]);
 const PACKAGE_RUNNERS = new Set(["npx", "pnpx", "bunx", "uvx", "pipx"]);
 /** Environment names that change how any process loads code. */
@@ -94,7 +99,19 @@ const SYSTEM_ENV =
 
 export class StdioPolicyError extends ForbiddenError {}
 
-const basename = (p: string) => p.split("/").pop() ?? p;
+/** An absolute executable path: `/usr/bin/…`, or `C:\…` on Windows. */
+export function isAbsoluteCommand(command: string): boolean {
+  return command.startsWith("/") || /^[A-Za-z]:[\\/]/.test(command);
+}
+
+/** The executable's name without its directory or a Windows executable extension. */
+export function commandName(command: string): string {
+  const base = command.split(/[\\/]/).pop() ?? command;
+  return base.replace(/\.(?:exe|com)$/i, "");
+}
+
+/** Where Windows paths differ: backslashes, and `Program Files (x86)`. Never a shell here. */
+const WINDOWS_PATH_META = /[;&|`$<>{}[\]!*?~'"\n\r\t\0]/;
 
 /**
  * Second line of defence after the allow-list: rejects shell metacharacters, shells, package
@@ -103,11 +120,17 @@ const basename = (p: string) => p.split("/").pop() ?? p;
 export function validateStdioConfig(config: StdioServerConfig): void {
   const { command } = config;
   const args = config.args ?? [];
-  if (!command.startsWith("/") || command.includes(".."))
+  if (!isAbsoluteCommand(command) || command.includes(".."))
     throw new StdioPolicyError(`stdio command must be an absolute path: ${command}`);
-  if (SHELL_META.test(command))
+  const windows = !command.startsWith("/");
+  if ((windows ? WINDOWS_PATH_META : SHELL_META).test(command))
     throw new StdioPolicyError("stdio command contains shell metacharacters");
-  const name = basename(command).toLowerCase();
+  // Windows runs .bat and .cmd files through cmd.exe, a shell
+  if (windows && /\.(?:bat|cmd|ps1|vbs|js|wsf)$/i.test(command))
+    throw new StdioPolicyError(
+      "stdio command must be an executable (.exe), not a script run by a shell",
+    );
+  const name = commandName(command).toLowerCase();
   if (SHELLS.has(name)) throw new StdioPolicyError(`shells cannot be stdio servers (${name})`);
   if (PACKAGE_RUNNERS.has(name))
     throw new StdioPolicyError(
@@ -292,6 +315,14 @@ export class PolicyStdioTransport implements Transport {
 
 function killGroup(pid: number, signal: NodeJS.Signals): void {
   if (pid <= 0) return;
+  // Windows has no process groups or SIGTERM: end the server and everything it started
+  if (process.platform === "win32") {
+    spawnSync("taskkill", ["/pid", String(pid), "/T", "/F"], {
+      stdio: "ignore",
+      windowsHide: true,
+    });
+    return;
+  }
   try {
     process.kill(-pid, signal);
   } catch {

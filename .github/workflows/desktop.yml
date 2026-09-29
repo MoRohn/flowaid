@@ -1,0 +1,137 @@
+name: Desktop
+
+# FlowAId on the desktops it runs on, Windows and macOS alike: the launcher (./flowaid,
+# flowaid.cmd), its process guards, the menu bar / notification-area icon, and the whole lifecycle
+# (start, one instance per checkout, Quit, a killed launcher, orphans) against a real PostgreSQL
+# with pgvector. Linux runs the same launcher in the CI and E2E workflows.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: true
+  TURBO_TELEMETRY_DISABLED: 1
+
+jobs:
+  launcher:
+    name: launcher (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Launcher, guard, control channel, instance record (unit and real-process tests)
+        run: pnpm exec vitest run scripts/
+
+      - name: MCP stdio policy and process-tree ends, env validation
+        run: pnpm turbo run test --filter=@flowaid/mcp --filter=@flowaid/env --output-logs=errors-only
+
+      - name: Notification-area icon (self-test)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $out = powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass `
+            -File scripts/desktop/tray-windows.ps1 -Url http://flowaid.localhost:3000 -ParentPid $PID -SelfTest
+          $out
+          if ($LASTEXITCODE -ne 0 -or -not ($out -contains "open") -or -not ($out -contains "self-test ok")) { exit 1 }
+
+      - name: Menu bar icon (compile and self-test)
+        if: runner.os == 'macOS'
+        run: |
+          xcrun swiftc -O -swift-version 5 scripts/desktop/tray-macos.swift -o "$RUNNER_TEMP/flowaid-tray"
+          out=$("$RUNNER_TEMP/flowaid-tray" http://flowaid.localhost:3000 --self-test)
+          echo "$out"
+          grep -qx open <<<"$out" && grep -qx "self-test ok" <<<"$out"
+
+      - name: flowaid.cmd from Command Prompt, PowerShell 7 and Windows PowerShell
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $cmd = cmd /c "flowaid --help"
+          $pwsh = pwsh -NoProfile -Command ".\flowaid --help"
+          $winps = powershell.exe -NoProfile -Command ".\flowaid --help"
+          foreach ($o in @($cmd, $pwsh, $winps)) {
+            if (-not (($o -join "`n") -match "Usage: ./flowaid")) { $o; exit 1 }
+          }
+          "flowaid --help works in cmd, pwsh and powershell"
+
+      - name: ./flowaid
+        if: runner.os == 'macOS'
+        run: |
+          ./flowaid --help | grep -q "Usage: ./flowaid"
+
+  lifecycle:
+    name: lifecycle (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # The runner's PostgreSQL, with pgvector 0.8.6 (the version compose runs) built by MSVC
+      - name: PostgreSQL with pgvector (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          PGPASSWORD: root
+        run: |
+          $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
+          git clone --quiet --depth 1 --branch v0.8.6 https://github.com/pgvector/pgvector.git "$env:RUNNER_TEMP\pgvector"
+          cmd /c "call `"$vs\VC\Auxiliary\Build\vcvars64.bat`" >nul && cd /d `"$env:RUNNER_TEMP\pgvector`" && set `"PGROOT=$env:PGROOT`" && nmake /NOLOGO /F Makefile.win && nmake /NOLOGO /F Makefile.win install"
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          Get-Service postgresql* | Set-Service -StartupType Manual
+          Get-Service postgresql* | Start-Service
+          & "$env:PGBIN\createdb.exe" -U postgres flowaid
+          "DATABASE_URL=postgres://postgres:root@127.0.0.1:5432/flowaid" >> $env:GITHUB_ENV
+
+      - name: PostgreSQL with pgvector (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install --quiet postgresql@17 pgvector
+          brew services start postgresql@17
+          for i in $(seq 1 30); do "$(brew --prefix postgresql@17)/bin/pg_isready" -q && break; sleep 1; done
+          "$(brew --prefix postgresql@17)/bin/createdb" flowaid
+          echo "DATABASE_URL=postgres://$(whoami)@127.0.0.1:5432/flowaid" >> "$GITHUB_ENV"
+
+      - name: Start, one instance, Quit, a killed launcher, orphans
+        run: pnpm smoke:desktop
+
+      - name: Launcher record and logs
+        if: failure()
+        shell: bash
+        run: cat .flowaid/launcher.json 2>/dev/null || echo "no launcher record"

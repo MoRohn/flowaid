@@ -144,6 +144,10 @@ describe("EnvSchema", () => {
           input.FLOWAID_PAGEINDEX_URL = ENV_VAR_DOCS.FLOWAID_PAGEINDEX_URL.example;
           input.FLOWAID_PAGEINDEX_TOKEN = ENV_VAR_DOCS.FLOWAID_PAGEINDEX_TOKEN.example;
         }
+        if (name === "FLOWAID_LAUNCHER_URL" || name === "FLOWAID_LAUNCHER_TOKEN") {
+          input.FLOWAID_LAUNCHER_URL = ENV_VAR_DOCS.FLOWAID_LAUNCHER_URL.example;
+          input.FLOWAID_LAUNCHER_TOKEN = ENV_VAR_DOCS.FLOWAID_LAUNCHER_TOKEN.example;
+        }
         if (name.startsWith("S3_") && !["S3_REGION", "S3_FORCE_PATH_STYLE"].includes(name)) {
           for (const key of [
             "S3_ENDPOINT",
@@ -302,6 +306,13 @@ describe("EnvSchema", () => {
       { command: "/usr/local/bin/mcp-fs", argsPattern: "^/srv/data(/|$)" },
       { command: "/usr/bin/mcp-git" },
     ]);
+    // Windows executables are absolute paths too
+    expect(
+      EnvSchema.parse({
+        ...MINIMAL,
+        FLOWAID_MCP_STDIO_ALLOWED_COMMANDS: "C:\\Program Files (x86)\\Acme\\mcp-fs.exe",
+      }).FLOWAID_MCP_STDIO_ALLOWED_COMMANDS,
+    ).toEqual([{ command: "C:\\Program Files (x86)\\Acme\\mcp-fs.exe" }]);
     expect(
       firstIssue(
         { ...MINIMAL, FLOWAID_MCP_STDIO_ALLOWED_COMMANDS: "mcp-fs" },
@@ -361,6 +372,36 @@ describe("EnvSchema", () => {
       FLOWAID_PAGEINDEX_TOKEN: "short",
     });
     expect(shortToken.get("FLOWAID_PAGEINDEX_TOKEN")?.[0]).toContain("at least 32 characters");
+
+    const token = "t".repeat(64);
+    const launcher = issuesFor({ ...MINIMAL, FLOWAID_LAUNCHER_URL: "http://127.0.0.1:50123" });
+    expect(launcher.get("FLOWAID_LAUNCHER_TOKEN")?.[0]).toContain("must be set together");
+    // the control channel stops the application: never anywhere but this computer
+    const remote = issuesFor({
+      ...MINIMAL,
+      FLOWAID_LAUNCHER_URL: "http://10.0.0.5:50123",
+      FLOWAID_LAUNCHER_TOKEN: token,
+    });
+    expect(remote.get("FLOWAID_LAUNCHER_URL")?.[0]).toContain("must be on this computer");
+    const https = issuesFor({
+      ...MINIMAL,
+      FLOWAID_LAUNCHER_URL: "https://127.0.0.1:50123",
+      FLOWAID_LAUNCHER_TOKEN: token,
+    });
+    expect(https.get("FLOWAID_LAUNCHER_URL")?.[0]).toContain("http://");
+    const launcherShort = issuesFor({
+      ...MINIMAL,
+      FLOWAID_LAUNCHER_URL: "http://localhost:50123",
+      FLOWAID_LAUNCHER_TOKEN: "short",
+    });
+    expect(launcherShort.get("FLOWAID_LAUNCHER_TOKEN")?.[0]).toContain("at least 32 characters");
+    expect(
+      issuesFor({
+        ...MINIMAL,
+        FLOWAID_LAUNCHER_URL: "http://[::1]:50123",
+        FLOWAID_LAUNCHER_TOKEN: token,
+      }).size,
+    ).toBe(0);
 
     const s3 = issuesFor({ ...MINIMAL, S3_ENDPOINT: "http://minio:9000", S3_BUCKET: "b" });
     expect(s3.get("S3_ACCESS_KEY")?.[0]).toContain("required when S3_ENDPOINT, S3_BUCKET are set");

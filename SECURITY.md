@@ -53,6 +53,18 @@ it on this computer is its owner. The boundary is the computer itself:
   lands, it is your responsibility.
 - Other local users and processes on the same computer are inside the boundary. Do not run
   local mode on a shared machine.
+- **Close window and Quit FlowAId.** `./flowaid` listens on `127.0.0.1` at a port the OS picks
+  for the API's `/v1/desktop` requests, and checks a bearer token generated for each launch that
+  only the API receives (`FLOWAID_LAUNCHER_URL`/`TOKEN`; configuration validation refuses a
+  non-loopback URL). The routes accept a session with the `admin` scope and the CSRF header,
+  never an API key, and both mutations are audited. The menu bar helper only prints `open` or
+  `quit` to the launcher, and exits with it. The API reports only counts to the launcher (runs in
+  progress, approvals waiting) for the icon.
+- **The launcher record.** `.flowaid/launcher.json` (owner-only, like `.flowaid/dev.env`) holds
+  the running launcher's pid, its control channel's URL and token, and the pids it started. A
+  second `./flowaid` uses it to open the running instance's window. After a crash, the next start
+  ends a recorded pid only while that process's command line still matches what FlowAId started,
+  so a program that reused the pid is left alone.
 
 ## Private network access
 

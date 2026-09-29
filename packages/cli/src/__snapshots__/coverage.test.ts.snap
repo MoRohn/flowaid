@@ -49,6 +49,10 @@ deployment
 deployment deploy <id> <environmentId> {--version-id --variable-overrides --body --out}
 deployment list <id> {--out}
 deployment rollback <id> <environmentId> {--to-version-id --body --out}
+desktop
+desktop close-window {--out}
+desktop quit {--out}
+desktop status {--out}
 dev {--down --no-open --web-url}
 environment
 environment create {--name --variables --protected --body --out}
@@ -282,6 +286,7 @@ Commands:
   credential|credentials            credential operations
   dataset|datasets                  dataset operations
   deployment|deployments            deployment operations
+  desktop|desktops                  desktop operations
   environment|environments          environment operations
   evaluation|evaluations            evaluation operations
   event|events                      event operations

@@ -1,6 +1,7 @@
 /**
  * The api entrypoint: environment → migrations (as the owner role) → first boot → server. Prints the
- * generated owner password once, and shuts down gracefully on SIGTERM/SIGINT.
+ * generated owner password once, and shuts down gracefully on SIGTERM/SIGINT (or, started by
+ * ./flowaid on Windows, its `flowaid:shutdown` message).
  */
 import { PgEventBus, PgQueueDriver, createDatabaseFromEnv, migrate } from "@flowaid/database";
 import { BullMqQueueDriver, RedisEventBus } from "@flowaid/workflow-runtime";
@@ -16,6 +17,7 @@ import { JwtKeys } from "./auth/jwt.js";
 import { firstBoot } from "./bootstrap/firstBoot.js";
 import { apiSafeFetch, configFromEnv, type ApiContext } from "./context.js";
 import { buildServer } from "./server.js";
+import { LauncherClient, startActivityReports } from "./services/desktop.js";
 import { setupTelemetry, startMetricsListener } from "@flowaid/observability";
 import { createAlertDispatcher, smtpFromEnv } from "./services/alerts.js";
 
@@ -117,8 +119,15 @@ async function main(): Promise<void> {
       );
   }
   await app.listen({ host: String(env.HOST ?? "0.0.0.0"), port: Number(env.PORT ?? 3001) });
+  // started by ./flowaid: its menu bar icon shows what runs while the window is closed
+  const stopReports = ctx.config.launcher
+    ? startActivityReports(ctx.db, new LauncherClient(ctx.config.launcher), {
+        onError: (error) => app.log.debug({ err: error }, "activity report to the launcher failed"),
+      })
+    : () => undefined;
   const stop = async (signal: string) => {
     app.log.info({ signal }, "shutting down");
+    stopReports();
     await app.close();
     await hub.close();
     await queue.close();
@@ -127,8 +136,27 @@ async function main(): Promise<void> {
     await telemetry.shutdown().catch(() => undefined);
     process.exit(0);
   };
-  process.once("SIGTERM", () => void stop("SIGTERM"));
-  process.once("SIGINT", () => void stop("SIGINT"));
+  onStopRequest((reason) => void stop(reason));
+}
+
+/**
+ * A request to stop: SIGTERM or SIGINT, or on Windows (no SIGTERM there) the IPC message
+ * `flowaid:shutdown` from ./flowaid's process guard (scripts/guard.ts). `stop` runs once.
+ */
+function onStopRequest(stop: (reason: string) => void): void {
+  let asked = false;
+  const once = (reason: string) => {
+    if (asked) return;
+    asked = true;
+    stop(reason);
+  };
+  process.once("SIGTERM", () => once("SIGTERM"));
+  process.once("SIGINT", () => once("SIGINT"));
+  // the terminal (or, on Windows, the console window) closing
+  process.once("SIGHUP", () => once("SIGHUP"));
+  process.on("message", (message) => {
+    if (message === "flowaid:shutdown") once("launcher");
+  });
 }
 
 main().catch((error: unknown) => {

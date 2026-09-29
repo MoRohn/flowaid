@@ -578,7 +578,8 @@
                           "langchain",
                           "schedules",
                           "mcp_exposures",
-                          "dashboard"
+                          "dashboard",
+                          "desktop"
                         ]
                       },
                       "additionalProperties": { "type": "boolean" },
@@ -605,7 +606,8 @@
                         "langchain",
                         "schedules",
                         "mcp_exposures",
-                        "dashboard"
+                        "dashboard",
+                        "desktop"
                       ]
                     },
                     "authMode": { "type": "string", "enum": ["local", "password"] }
@@ -8884,6 +8886,102 @@
                     }
                   },
                   "required": ["computedAt", "window", "baseline", "attention", "insights"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/desktop": {
+      "get": {
+        "summary": "What the launcher manages (FlowAId's window, its menu bar icon) and what runs in the background",
+        "tags": ["desktop"],
+        "x-cli": { "noun": "desktop", "verb": "status" },
+        "x-auth": "session",
+        "x-scopes": ["admin"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "window": { "type": "string", "enum": ["app", "browser", "none"] },
+                    "tray": { "type": "boolean" },
+                    "platform": {
+                      "type": "string",
+                      "enum": ["macos", "windows", "linux", "other"]
+                    },
+                    "activity": {
+                      "type": "object",
+                      "properties": {
+                        "runs": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "approvals": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "required": ["runs", "approvals"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["window", "tray", "platform", "activity"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/desktop/window/close": {
+      "post": {
+        "summary": "Close FlowAId's window; FlowAId keeps running in the menu bar",
+        "tags": ["desktop"],
+        "x-cli": { "noun": "desktop", "verb": "close-window" },
+        "x-auth": "session",
+        "x-scopes": ["admin"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "closed": { "type": "boolean" } },
+                  "required": ["closed"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/desktop/quit": {
+      "post": {
+        "summary": "Quit FlowAId: stop the web app, the worker and the API",
+        "tags": ["desktop"],
+        "x-cli": { "noun": "desktop", "verb": "quit" },
+        "x-auth": "session",
+        "x-scopes": ["admin"],
+        "responses": {
+          "202": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "stopping": { "type": "boolean", "enum": [true] } },
+                  "required": ["stopping"],
                   "additionalProperties": false
                 }
               }

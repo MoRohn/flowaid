@@ -1,6 +1,6 @@
 /** Everything a route needs, built once in `buildServer` (tests build it over a test database). */
 import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import type { Database } from "@flowaid/database";
 import type { CredentialService } from "@flowaid/credentials";
 import type { QueueDriver, SafeFetch } from "@flowaid/workflow-core";
@@ -46,6 +46,8 @@ export interface ApiConfig {
   vendorAvailable: boolean;
   /** The PageIndex service (FLOWAID_PAGEINDEX_URL/TOKEN); null turns PageIndex off. */
   pageIndex: { url: string; token: string } | null;
+  /** The `./flowaid` launcher's control channel (FLOWAID_LAUNCHER_URL/TOKEN); null: no desktop actions. */
+  launcher: { url: string; token: string } | null;
   /** Plugins (ARCHITECTURE.md §3.5): the allow-list, the npm registry, and whether local installs are accepted. */
   plugins: { allowList: readonly string[]; registry: string; allowLocal: boolean };
 }
@@ -97,7 +99,11 @@ export function configFromEnv(env: Env): ApiConfig {
     featuresDisabled: env.FLOWAID_FEATURES_DISABLED ?? [],
     hasRedis: env.flags.hasRedis,
     allowPrivateNetwork: env.FLOWAID_ALLOW_PRIVATE_NETWORK,
-    artifactsDir: `${String(env.FLOWAID_MASTER_KEY_FILE ?? "/data/master.key").replace(/\/[^/]*$/, "")}/artifacts`,
+    // beside the master key, in the platform's own path form (C:\…\.flowaid\artifacts on Windows)
+    artifactsDir: join(
+      dirname(String(env.FLOWAID_MASTER_KEY_FILE ?? "/data/master.key")),
+      "artifacts",
+    ),
     s3:
       env.S3_ENDPOINT && env.S3_BUCKET && env.S3_ACCESS_KEY && env.S3_SECRET_KEY
         ? {
@@ -116,6 +122,10 @@ export function configFromEnv(env: Env): ApiConfig {
     pageIndex:
       env.FLOWAID_PAGEINDEX_URL && env.FLOWAID_PAGEINDEX_TOKEN
         ? { url: String(env.FLOWAID_PAGEINDEX_URL), token: env.FLOWAID_PAGEINDEX_TOKEN }
+        : null,
+    launcher:
+      env.FLOWAID_LAUNCHER_URL && env.FLOWAID_LAUNCHER_TOKEN
+        ? { url: String(env.FLOWAID_LAUNCHER_URL), token: env.FLOWAID_LAUNCHER_TOKEN }
         : null,
     plugins: {
       allowList: env.FLOWAID_PLUGIN_ALLOWED_SCOPES,
@@ -160,6 +170,7 @@ export function defaultConfig(over: Partial<ApiConfig> = {}): ApiConfig {
     exportMode: "npm",
     vendorAvailable: false,
     pageIndex: null,
+    launcher: null,
     plugins: { allowList: ["@flowaid"], registry: "https://registry.npmjs.org", allowLocal: false },
     ...over,
   };
