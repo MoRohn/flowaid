@@ -1,5 +1,14 @@
 # @flowaid/provider-anthropic
 
+## 0.5.0
+
+### Patch Changes
+
+- Updated dependencies [702ab83]
+  - @flowaid/workflow-core@0.5.0
+  - @flowaid/providers@0.5.0
+  - @flowaid/shared@0.5.0
+
 ## 0.4.0
 
 ### Patch Changes

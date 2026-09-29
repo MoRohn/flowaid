@@ -1,6 +1,6 @@
 {
   "name": "@flowaid/importer",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
   "description": "The FlowAId importer: turns external flow exports (agent flows and LangChain chat flows) into FlowAId workflow definitions with a migration report (ARCHITECTURE.md §10.9).",
   "license": "Apache-2.0",

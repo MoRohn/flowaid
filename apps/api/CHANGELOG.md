@@ -1,5 +1,36 @@
 # @flowaid/api
 
+## 0.5.0
+
+### Patch Changes
+
+- Updated dependencies [702ab83]
+  - @flowaid/nodes-core@0.5.0
+  - @flowaid/workflow-core@0.5.0
+  - @flowaid/advisor@0.5.0
+  - @flowaid/codegen@0.5.0
+  - @flowaid/credentials@0.5.0
+  - @flowaid/database@0.5.0
+  - @flowaid/evaluation@0.5.0
+  - @flowaid/importer@0.5.0
+  - @flowaid/knowledge@0.5.0
+  - @flowaid/mcp@0.5.0
+  - @flowaid/observability@0.5.0
+  - @flowaid/openapi-tools@0.5.0
+  - @flowaid/pageindex@0.5.0
+  - @flowaid/plugins@0.5.0
+  - @flowaid/provider-anthropic@0.5.0
+  - @flowaid/provider-ollama@0.5.0
+  - @flowaid/provider-openai@0.5.0
+  - @flowaid/provider-typesafe@0.5.0
+  - @flowaid/providers@0.5.0
+  - @flowaid/storage@0.5.0
+  - @flowaid/workflow-compiler@0.5.0
+  - @flowaid/workflow-runtime@0.5.0
+  - @flowaid/env@0.5.0
+  - @flowaid/insights@0.5.0
+  - @flowaid/shared@0.5.0
+
 ## 0.4.0
 
 ### Minor Changes
