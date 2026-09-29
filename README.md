@@ -43,7 +43,7 @@ that one runtime.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/templates-dark.webp">
-  <img alt="The Templates page opening with Business flows: Expense approval (finance), IT help desk routing (IT operations), Refund request handling (customer service) and Sales lead qualification (sales), each marked Ready to run with the TypeSafe API key, followed by more templates" src="docs/assets/screenshots/templates-light.webp">
+  <img alt="The Business flows section of the Templates page: Expense approval (finance), IT help desk routing (IT operations), Refund request handling (customer service) and Sales lead qualification (sales), each with a preview of its graph, what it does, and Ready to run with the TypeSafe API key" src="docs/assets/screenshots/templates-light.webp">
 </picture>
 
 > [!NOTE]
@@ -97,13 +97,39 @@ plain rules, a person when one is needed, and a clear outcome.
 | **IT help desk routing**     | IT operations    | Sets category, priority (P1–P4), team and response time; escalates security incidents to the on-call             | `majorIncidentUsers`                      |
 | **Refund request handling**  | Customer service | Checks the refund policy and fraud risk; refunds, declines or sends to an agent, with the reply for the customer | `autoRefundLimit`, `returnWindowDays`     |
 
-What you create is yours: the workflow panel renames it, describes it and edits its settings
-(limits, windows, scores) with validation next to each field, and every step, option, rule and
-reply can be changed on the canvas.
+What you create is yours: click the empty canvas to rename it and edit its settings (limits,
+windows, scores) with validation next to each field, and select any step to change its options,
+rules or replies.
+
+Each screenshot below is a real run, captured in the builder: the decision's answer and
+probability on the canvas, the branch that was taken in green, and the paths that were not taken
+dimmed.
+
+**Expense approval.** A $38.50 taxi claim is within policy, low risk and under the
+auto-approve limit, so it is approved without a manager; larger or riskier claims wait for the
+_Manager approval_ step.
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/business-flow-dark.webp">
-  <img alt="The builder with Refund request handling after a run: the canvas shows the decision answered eligible at 0.98 and the refund taken automatically; the workflow panel on the right shows the name, description and the Auto refund limit and Return window days settings; the Output tab reports Completed: 5 steps ran without errors, with the reply to the customer" src="docs/assets/screenshots/business-flow-light.webp">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/flow-expense-approval-dark.webp">
+  <img alt="The Expense approval flow after a run: Expense claim, Check against policy (within policy: yes), Apply the limits, Approve automatically? taking the auto branch to Approved by policy, while Manager approval and its approved, rejected and expired outcomes are skipped" src="docs/assets/screenshots/flow-expense-approval-light.webp">
+</picture>
+
+**IT help desk routing.** A VPN outage affecting 30 people is triaged P1 urgent, the
+priority and response time are set, and it is not a security incident, so it goes to the
+Network team's queue.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/flow-it-helpdesk-routing-dark.webp">
+  <img alt="The IT help desk routing flow after a run: Help desk ticket, Triage the ticket (P1 urgent), Adjust priority, Team and SLA, Security incident? taking the queue branch to Assign to team queue, with Escalate to security on-call not taken" src="docs/assets/screenshots/flow-it-helpdesk-routing-light.webp">
+</picture>
+
+**Refund request handling.** A cracked mug is eligible under the refund policy, low risk
+and under the refund limit, so it is refunded automatically with the reply to the customer;
+other requests are declined by policy or go to _Agent review_.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/flow-refund-requests-dark.webp">
+  <img alt="The Refund request handling flow after a run: Refund request, Assess the request (eligible: yes), Apply the limits, Decide automatically? taking the refund branch to Refund automatically, with Decline (outside policy), Agent review and its outcomes not taken" src="docs/assets/screenshots/flow-refund-requests-light.webp">
 </picture>
 
 More templates cover support triage with safety checks, GitHub issue triage over MCP, a

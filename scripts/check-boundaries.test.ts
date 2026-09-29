@@ -601,6 +601,7 @@ describe("package eslint.config.js files", () => {
     });
   }
 
+  // eight ESLint configurations resolved in turn: a cold CI runner can take longer than 5 s
   it("bans process.env everywhere except in packages/env (and packages/cli)", async () => {
     const shared = await resolvedRules("packages/shared", "src/index.ts");
     const sharedRule = shared["no-restricted-syntax"];
@@ -635,7 +636,7 @@ describe("package eslint.config.js files", () => {
       2,
     );
     expect(severityOf((await root("apps/api/src/server.ts"))["no-restricted-syntax"])).toBe(2);
-  });
+  }, 30_000);
 
   it("applies the React preset (react-hooks + jsx-a11y) to packages/ui", async () => {
     const rules = await resolvedRules("packages/ui", "src/index.ts");

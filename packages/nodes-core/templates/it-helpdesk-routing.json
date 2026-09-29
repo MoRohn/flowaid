@@ -164,7 +164,7 @@
       "kind": "task",
       "type": "flowaid.data.transform",
       "typeVersion": "1.0.0",
-      "name": "Raise for major incidents",
+      "name": "Adjust priority",
       "description": "The triage priority as a level 0 (P4) to 3 (P1), raised to P1 when many people are affected.",
       "config": {
         "expr": "start.affected_users >= $vars.majorIncidentUsers ? 3 : round(triage.answers.priority.value)",
@@ -180,7 +180,7 @@
       "kind": "task",
       "type": "flowaid.data.transform",
       "typeVersion": "1.0.0",
-      "name": "Set team and response time",
+      "name": "Team and SLA",
       "description": "Maps the category to a team and the priority level to a response time in hours.",
       "config": {
         "expr": "{ priority: level.result >= 3 ? 'P1' : level.result >= 2 ? 'P2' : level.result >= 1 ? 'P3' : 'P4', hours: level.result >= 3 ? 2 : level.result >= 2 ? 8 : level.result >= 1 ? 24 : 72, team: triage.answers.category.value == 'access' ? 'Identity and access' : triage.answers.category.value == 'hardware' ? 'Desktop support' : triage.answers.category.value == 'software' ? 'Application support' : triage.answers.category.value == 'network' ? 'Network team' : 'Security' }",
@@ -288,7 +288,7 @@
       "id": "howto",
       "kind": "note",
       "name": "How to make it yours",
-      "text": "Change majorIncidentUsers in the workflow panel (click the empty canvas). Team names and response times live in \"Set team and response time\"; categories in \"Triage the ticket\"."
+      "text": "Change majorIncidentUsers in the workflow panel (click the empty canvas). Team names and response times live in \"Team and SLA\"; categories in \"Triage the ticket\"."
     }
   ],
   "edges": [
