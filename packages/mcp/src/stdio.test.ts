@@ -14,7 +14,8 @@ const FIXTURE = join(dirname(fileURLToPath(import.meta.url)), "../fixtures/stdio
 const policy: StdioPolicy = {
   enabled: true,
   allowedCommands: [
-    { command: NODE, argsPattern: "\\S+/fixtures/stdio-server\\.mjs" },
+    // either separator: the fixture's path is C:\…\fixtures\… on Windows
+    { command: NODE, argsPattern: "\\S+[\\\\/]fixtures[\\\\/]stdio-server\\.mjs" },
     { command: "/usr/bin/python3" },
     { command: "/usr/local/bin/npx" },
     { command: "/bin/sh" },
