@@ -25,3 +25,5 @@ Clearer step settings in the builder.
   the old picker whose `input.*` / `nodes.*` insertions did not compile.
 - Unsaved edits in Settings and workflow settings survive switching tabs; tabs with unsaved
   edits carry a dot, sections have Discard, and leaving the page asks first.
+- The mouse wheel zooms the canvas toward the pointer instead of panning it; pan with space-drag,
+  the middle or right button, or the minimap.

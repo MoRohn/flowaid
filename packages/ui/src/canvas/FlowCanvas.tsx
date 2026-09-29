@@ -902,7 +902,10 @@ function FlowCanvasInner({
           selectionKeyCode="Shift"
           panOnDrag={[1, 2]}
           panActivationKeyCode="Space"
-          panOnScroll
+          // the mouse wheel zooms (toward the pointer); pan by dragging with space held, the
+          // middle or right button, or the minimap
+          zoomOnScroll
+          panOnScroll={false}
           zoomOnPinch
           zoomOnDoubleClick={false}
           // Delete/Backspace is a registered canvas shortcut (listed in the shortcuts dialog).
@@ -1083,7 +1086,7 @@ function FlowCanvasInner({
  * inspector (`onOpenInspector`) · ⌘0 fit · ⌘+ / ⌘− zoom · ⌘K or / palette · ⇧L auto
  * layout. Every one is registered through the shortcut registry (group "Canvas"), so
  * `KeyboardShortcutsDialog` lists it. Mouse: drag selects, ⇧ adds, space or middle
- * button pans, wheel pans, pinch zooms, right-click opens the palette.
+ * button pans, wheel zooms toward the pointer, pinch zooms, right-click opens the palette.
  *
  * Containers: loop/foreach nodes render as resizable frames and their body nodes
  * (`node.parent`) sit inside them (`toFlowNode` sets `parentId` + `extent: 'parent'`).

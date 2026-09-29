@@ -815,7 +815,7 @@ export default function CanvasGallery() {
       <Section
         id="workflow"
         title="Workflow canvas · support triage"
-        caption="Thirteen nodes laid out by autoLayout, with control edges from the definition and data edges from the bindings (template and expression references dotted). Play run steps a simulated RunView through the graph every 700 ms: edges into the running node flow, fired control edges tint green, pruned ones fade, decision cards fill in their distributions and the human node waits. Right-click, ⌘K or / opens the palette; drag on the pane selects; space or middle button pans."
+        caption="Thirteen nodes laid out by autoLayout, with control edges from the definition and data edges from the bindings (template and expression references dotted). Play run steps a simulated RunView through the graph every 700 ms: edges into the running node flow, fired control edges tint green, pruned ones fade, decision cards fill in their distributions and the human node waits. Right-click, ⌘K or / opens the palette; drag on the pane selects; the wheel zooms; space or middle button pans."
       >
         <WorkflowExample />
       </Section>
