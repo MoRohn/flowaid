@@ -1,6 +1,6 @@
 {
   "name": "@flowaid/ui",
-  "version": "0.1.0",
+  "version": "0.4.0",
   "private": true,
   "description": "FlowAId React component library: primitives, decision visualizations, canvas nodes, trace viewer, inspector and forms.",
   "license": "Apache-2.0",

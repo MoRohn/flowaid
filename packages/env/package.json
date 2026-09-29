@@ -1,6 +1,6 @@
 {
   "name": "@flowaid/env",
-  "version": "0.1.0",
+  "version": "0.4.0",
   "private": true,
   "description": "Zod schema for every flowaid environment variable, loadEnv() with aggregated readable errors, and feature flags derived from what is configured. The only package that reads process.env.",
   "license": "Apache-2.0",
