@@ -1,5 +1,11 @@
 # @flowaid/workflow-core
 
+## 0.6.0
+
+### Patch Changes
+
+- @flowaid/shared@0.6.0
+
 ## 0.5.0
 
 ### Patch Changes

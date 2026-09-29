@@ -1,5 +1,12 @@
 # @flowaid/codegen
 
+## 0.6.0
+
+### Patch Changes
+
+- @flowaid/workflow-core@0.6.0
+  - @flowaid/workflow-sdk@0.6.0
+
 ## 0.5.0
 
 ### Patch Changes

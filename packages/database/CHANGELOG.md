@@ -1,5 +1,14 @@
 # @flowaid/database
 
+## 0.6.0
+
+### Patch Changes
+
+- Updated dependencies [e67dd32]
+  - @flowaid/env@0.6.0
+  - @flowaid/shared@0.6.0
+  - @flowaid/workflow-core@0.6.0
+
 ## 0.5.0
 
 ### Patch Changes

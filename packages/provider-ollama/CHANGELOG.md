@@ -1,5 +1,13 @@
 # @flowaid/provider-ollama
 
+## 0.6.0
+
+### Patch Changes
+
+- @flowaid/providers@0.6.0
+  - @flowaid/shared@0.6.0
+  - @flowaid/workflow-core@0.6.0
+
 ## 0.5.0
 
 ### Patch Changes
