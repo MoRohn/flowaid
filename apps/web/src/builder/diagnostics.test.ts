@@ -47,3 +47,30 @@ describe("presentDiagnostic", () => {
     expect(shown.hint).toMatch(/needs a key/);
   });
 });
+
+describe("presentDiagnostic for template placeholders", () => {
+  it("sends a knowledge placeholder to the node and the Knowledge page", () => {
+    const d: Diagnostic = {
+      code: "E_TOOL_UNRESOLVED",
+      severity: "error",
+      message:
+        "Choose the knowledge source for Documents › Source IDs › item 1: this node came from a template and still holds the placeholder $template.knowledge.documents",
+      location: { nodeId: "generate_1", path: "/nodes/1/config/documents/sourceIds/0" },
+    };
+    const shown = presentDiagnostic(d, def());
+    expect(shown.remedy).toBe("knowledge");
+    expect(shown.hint).toMatch(/knowledge source/);
+  });
+});
+
+describe("presentDiagnostic at a node's config root", () => {
+  it("names just the node, not “› config”", () => {
+    const d: Diagnostic = {
+      code: "E_CONFIG_INVALID",
+      severity: "error",
+      message: "Threshold is required",
+      location: { nodeId: "generate_1", path: "/nodes/1/config" },
+    };
+    expect(presentDiagnostic(d, def()).where).toBe("Generate text");
+  });
+});

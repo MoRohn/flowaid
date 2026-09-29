@@ -48,7 +48,12 @@ export interface BuilderState {
   /** bumps when the definition changes from outside the forms (undo, redo, reload, JSON edits): forms remount */
   epoch: number;
 
-  addNode(node: WorkflowNode, position: { x: number; y: number }): string;
+  /** Adds a node; with `after`, also a control edge from that node's port to it (one undo step). */
+  addNode(
+    node: WorkflowNode,
+    position: { x: number; y: number },
+    after?: { node: string; port: string },
+  ): string;
   removeNodes(ids: string[]): void;
   updateNode(id: string, recipe: (n: Draft<WorkflowNode>) => void, label?: string): void;
   setNodeConfig(id: string, config: Record<string, unknown>): void;
@@ -141,12 +146,24 @@ export function createBuilderStore(init: {
       notice: null,
       epoch: 0,
 
-      addNode(node, position) {
-        mutate(`Add ${node.name}`, (d) => {
-          d.nodes.push(node);
-          d.layout ??= { nodes: {} };
-          d.layout.nodes[node.id] = { x: Math.round(position.x), y: Math.round(position.y) };
-        });
+      addNode(node, position, after) {
+        const from = after ? findNode(get().definition, after.node) : undefined;
+        const connect =
+          from && after && node.kind !== "input" && node.kind !== "note" ? after : undefined;
+        mutate(
+          connect && from ? `Add ${node.name} after ${from.name}` : `Add ${node.name}`,
+          (d) => {
+            d.nodes.push(node);
+            d.layout ??= { nodes: {} };
+            d.layout.nodes[node.id] = { x: Math.round(position.x), y: Math.round(position.y) };
+            if (connect)
+              d.edges.push({
+                id: uniqueEdgeId(d, connect.node, connect.port, node.id),
+                from: { node: connect.node, port: connect.port },
+                to: { node: node.id },
+              });
+          },
+        );
         set({ selection: { nodes: [node.id], edges: [] } });
         return node.id;
       },

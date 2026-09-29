@@ -14,7 +14,7 @@ export interface PresentedDiagnostic {
   /** What to do next, when the code says. */
   hint?: string;
   /** Which kind of fix the builder can offer. */
-  remedy?: "node" | "credential" | "integration";
+  remedy?: "node" | "credential" | "integration" | "knowledge";
 }
 
 const HINTS: Partial<
@@ -38,17 +38,28 @@ const HINTS: Partial<
 function where(d: Diagnostic, def: WorkflowDefinition): string | undefined {
   const path = d.location.path;
   if (path && /^\/(nodes|edges)\//.test(path))
-    return describePointer(path, def).replace(" › config.", " › ");
+    return describePointer(path, def)
+      .replace(" › config.", " › ")
+      .replace(/ › config$/, "");
   const nodeId = d.location.nodeId;
   if (nodeId) return def.nodes.find((n) => n.id === nodeId)?.name ?? nodeId;
   return undefined;
 }
 
+/** A template placeholder for a knowledge source is chosen on the node, from the Knowledge page. */
+const KNOWLEDGE_PLACEHOLDER = {
+  hint: "Open the node and choose a knowledge source under Documents. No sources yet? Add one on the Knowledge page first.",
+  remedy: "knowledge" as const,
+};
+
 export function presentDiagnostic(d: Diagnostic, def: WorkflowDefinition): PresentedDiagnostic {
   const path = d.location.path;
   const message =
     path && d.message.startsWith(`${path}: `) ? d.message.slice(path.length + 2) : d.message;
-  const known = HINTS[d.code];
+  const known =
+    d.code === "E_TOOL_UNRESOLVED" && d.message.includes("$template.knowledge.")
+      ? KNOWLEDGE_PLACEHOLDER
+      : HINTS[d.code];
   const loc = where(d, def);
   return {
     message,

@@ -386,21 +386,28 @@ export function explainStep(
 
 /** The workflow as a short story: its steps in the order they sit on the canvas. */
 export function explainWorkflow(def: WorkflowDefinition): {
-  steps: { id: string; name: string; summary: string }[];
+  steps: { id: string; name: string; kind: WorkflowNode["kind"]; summary: string }[];
   outcomes: string[];
   settings: string[];
+  /** The settings as parts, for a layout that shows the current value on its own. */
+  variables: { name: string; value?: string; description?: string }[];
 } {
   const pos = (n: Node) => def.layout?.nodes[n.id] ?? { x: 0, y: 0 };
   const steps = def.nodes
     .filter((n) => n.kind !== "note" && n.kind !== "output")
     .sort((a, b) => pos(a).x - pos(b).x || pos(a).y - pos(b).y)
-    .map((n) => ({ id: n.id, name: n.name, summary: explainStep(n, def).summary }));
+    .map((n) => ({ id: n.id, name: n.name, kind: n.kind, summary: explainStep(n, def).summary }));
   const outcomes = def.nodes.filter((n) => n.kind === "output").map((n) => n.name);
   const settings = def.variables.map(
     (v) =>
       `${cap(words(v.name))}${v.default !== undefined ? ` (now ${JSON.stringify(v.default)})` : ""}${v.description ? `: ${v.description}` : ""}`,
   );
-  return { steps, outcomes, settings };
+  const variables = def.variables.map((v) => ({
+    name: cap(words(v.name)),
+    ...(v.default !== undefined ? { value: JSON.stringify(v.default) } : {}),
+    ...(v.description ? { description: v.description } : {}),
+  }));
+  return { steps, outcomes, settings, variables };
 }
 
 // ── runs ───────────────────────────────────────────────────────────────────────────────────────

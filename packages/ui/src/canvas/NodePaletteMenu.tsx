@@ -44,6 +44,12 @@ export interface NodePaletteMenuProps {
   catalog: NodeDefinitionView[];
   /** Recently used kinds, most recent first. */
   recent?: string[];
+  /**
+   * Steps predicted to come next, best first, each with a short reason. Shown above everything
+   * else while the search is empty; `suggestionsFor` names the step they follow.
+   */
+  suggestions?: { kind: string; reason: string }[];
+  suggestionsFor?: string;
   onPick: (def: NodeDefinitionView) => void;
   /** Receives the current search text so the builder can start from it. */
   onAskBuilder?: (query: string) => void;
@@ -67,6 +73,8 @@ export function NodePaletteMenu({
   anchor,
   catalog,
   recent = [],
+  suggestions = [],
+  suggestionsFor,
   onPick,
   onAskBuilder,
   placeholder = "Search nodes…",
@@ -81,15 +89,29 @@ export function NodePaletteMenu({
     const recentDefs = recent
       .map((k) => byKind.get(k))
       .filter((d): d is NodeDefinitionView => d !== undefined);
-    const out: Array<{ id: string; heading: string; items: NodeDefinitionView[] }> = [];
-    if (recentDefs.length > 0)
-      out.push({ id: "recent", heading: "Recent", items: recentDefs.slice(0, 5) });
+    const out: Array<{
+      id: string;
+      heading: string;
+      items: NodeDefinitionView[];
+      reasons?: Map<string, string>;
+    }> = [];
+    const suggested = suggestions.filter((sg) => byKind.has(sg.kind));
+    if (suggested.length > 0 && !query.trim())
+      out.push({
+        id: "suggested",
+        heading: suggestionsFor ? `Suggested after ${suggestionsFor}` : "Suggested",
+        items: suggested.map((sg) => byKind.get(sg.kind) as NodeDefinitionView),
+        reasons: new Map(suggested.map((sg) => [sg.kind, sg.reason])),
+      });
+    const shown = new Set(suggested.map((sg) => sg.kind));
+    const fresh = recentDefs.filter((d) => query.trim() || !shown.has(d.kind));
+    if (fresh.length > 0) out.push({ id: "recent", heading: "Recent", items: fresh.slice(0, 5) });
     for (const cat of NODE_CATEGORIES) {
       const items = catalog.filter((d) => d.category === cat);
       if (items.length > 0) out.push({ id: cat, heading: CATEGORY_LABEL[cat], items });
     }
     return out;
-  }, [catalog, recent]);
+  }, [catalog, recent, suggestions, suggestionsFor, query]);
 
   const pick = (def: NodeDefinitionView) => {
     onPick(def);
@@ -148,6 +170,7 @@ export function NodePaletteMenu({
               >
                 {group.items.map((def) => {
                   const Icon = CATEGORY_ICON[def.category];
+                  const reason = group.reasons?.get(def.kind);
                   return (
                     <Cmdk.Item
                       key={`${group.id}:${def.kind}`}
@@ -173,13 +196,27 @@ export function NodePaletteMenu({
                       </span>
                       <span className="flex min-w-0 flex-1 flex-col leading-tight">
                         <span className="truncate">{def.name}</span>
-                        <span className="mt-0.5 truncate text-2xs text-ink-3">
-                          {def.description}
+                        {reason ? (
+                          <span className="mt-0.5 flex min-w-0 items-center gap-1 text-2xs text-accent-text">
+                            <Sparkles
+                              className="size-2.5 shrink-0"
+                              strokeWidth={2}
+                              aria-hidden="true"
+                            />
+                            <span className="truncate">{reason}</span>
+                          </span>
+                        ) : (
+                          <span className="mt-0.5 truncate text-2xs text-ink-3">
+                            {def.description}
+                          </span>
+                        )}
+                      </span>
+                      {/* a suggestion's reason needs the room more than its type name */}
+                      {reason ? null : (
+                        <span className="max-w-[42%] shrink truncate font-mono text-2xs text-ink-3">
+                          {def.provider ?? def.kind}
                         </span>
-                      </span>
-                      <span className="max-w-[42%] shrink truncate font-mono text-2xs text-ink-3">
-                        {def.provider ?? def.kind}
-                      </span>
+                      )}
                     </Cmdk.Item>
                   );
                 })}

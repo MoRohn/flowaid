@@ -66,7 +66,7 @@
         "nodeId": "intent",
         "path": "/nodes/1/config"
       },
-      "message": "config: unknown field 'bogus'",
+      "message": "'bogus' is not a setting this node has; remove it. Known settings: instructions, options.",
       "severity": "error"
     }
   ],
@@ -863,7 +863,7 @@
         "nodeId": "kb",
         "path": "/nodes/11/config/serverId"
       },
-      "message": "'serverId' still holds the template placeholder $template.mcp.kb; choose the resource to use",
+      "message": "Choose the MCP server for Server ID: this node came from a template and still holds the placeholder $template.mcp.kb",
       "severity": "error"
     },
     {

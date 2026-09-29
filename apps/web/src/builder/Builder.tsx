@@ -60,6 +60,7 @@ import {
   STRUCTURAL_KINDS,
   bindingDataEdges,
   categoryOf,
+  defaultControlOuts,
   manifestOf,
   needsLayout,
   newNode,
@@ -67,6 +68,14 @@ import {
   project,
 } from "./model";
 import { createBuilderStore, type BuilderStore } from "./store";
+import {
+  freeControlPort,
+  lastStep,
+  placeNewStep,
+  readRecentKinds,
+  rememberRecentKind,
+  suggestNext,
+} from "./quickAdd";
 import { useCompiler } from "./useCompiler";
 import { useLiveRun } from "./useLiveRun";
 import { describeInputIssue, describeRunError, type RunStartError } from "./errors";
@@ -447,12 +456,32 @@ function BuilderView({
     ],
     [catalog],
   );
+  // Quick add: a new step follows the selected one (placed beside it and connected from its
+  // first free port); otherwise it goes where asked, moved clear of other steps.
+  const [recentKinds, setRecentKinds] = useState<string[]>(readRecentKinds);
   const addNode = useCallback(
     (def: NodeDefinitionView, position: { x: number; y: number }) => {
-      const node = newNode(store.getState().definition, def.kind, catalog, (schema) =>
-        withDefaults(schema as never, {}),
+      const st = store.getState();
+      const d = st.definition;
+      const sel = st.selection.nodes.length === 1 ? st.selection.nodes[0] : undefined;
+      const after = sel ? d.nodes.find((n) => n.id === sel) : undefined;
+      const node = newNode(
+        d,
+        def.kind,
+        catalog,
+        (schema) => withDefaults(schema as never, {}),
+        after?.parent,
       );
-      if (node) store.getState().addNode(node, position);
+      if (!node) return;
+      const port = after
+        ? freeControlPort(d, after, defaultControlOuts(after, catalog))
+        : undefined;
+      st.addNode(
+        node,
+        placeNewStep(d, position, after),
+        after && port ? { node: after.id, port } : undefined,
+      );
+      setRecentKinds((prev) => rememberRecentKind(prev, def.kind));
     },
     [store, catalog],
   );
@@ -564,6 +593,15 @@ function BuilderView({
   const [publishOpen, setPublishOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const selectedId = selection.nodes.length === 1 ? selection.nodes[0] : undefined;
+  // what to suggest in the palette: after the selected step, else after the last step
+  const suggestAfter = useMemo(
+    () => (selectedId ? definition.nodes.find((n) => n.id === selectedId) : lastStep(definition)),
+    [definition, selectedId],
+  );
+  const suggestions = useMemo(
+    () => suggestNext(definition, suggestAfter, palette, recentKinds),
+    [definition, suggestAfter, palette, recentKinds],
+  );
   const selectedNode = selectedId ? definition.nodes.find((n) => n.id === selectedId) : undefined;
   const selectedView = selectedId ? projection.nodes.find((n) => n.id === selectedId) : undefined;
   const selectedRun =
@@ -660,6 +698,10 @@ function BuilderView({
           {shown.remedy === "integration" ? (
             <Button size="sm" variant="ghost" asChild>
               <Link href={`/${s.ws}/integrations`}>Integrations</Link>
+            </Button>
+          ) : shown.remedy === "knowledge" ? (
+            <Button size="sm" variant="ghost" asChild>
+              <Link href={`/${s.ws}/knowledge`}>Knowledge</Link>
             </Button>
           ) : null}
           {nodeId ? (
@@ -933,7 +975,15 @@ function BuilderView({
                   followRun: runView.status === "running" || runView.status === "queued",
                 }
               : {})}
-            {...(!readOnly ? { catalog: palette, onAddNode: addNode } : {})}
+            {...(!readOnly
+              ? {
+                  catalog: palette,
+                  onAddNode: addNode,
+                  recentKinds,
+                  suggestions,
+                  ...(suggestAfter ? { suggestionsFor: suggestAfter.name } : {}),
+                }
+              : {})}
             onSetParent={(ids, parent, positions) =>
               store.getState().setParent(ids, parent, positions)
             }

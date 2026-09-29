@@ -1,13 +1,42 @@
 "use client";
 /**
- * The Guide's docked panel. It does not cover the page with an overlay or trap focus, so a person
- * can keep it open while they click through the steps it describes.
+ * The Guide's panel. It does not cover the page with an overlay or trap focus, so a person can
+ * keep it open while they click through the steps it describes. On wide screens it docks beside
+ * the page (the page makes room, see AppFrame); on narrower ones it floats over the right edge as
+ * a card, so the canvas and tables keep their full width.
  */
+import { useCallback, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowLeft, Compass, ExternalLink, MessageSquareText } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  BookOpenText,
+  Boxes,
+  CircleCheck,
+  Clock,
+  Compass,
+  ExternalLink,
+  Flag,
+  GitBranch,
+  GitMerge,
+  Lightbulb,
+  ListOrdered,
+  MessageSquareText,
+  Play,
+  Repeat,
+  Route,
+  SlidersHorizontal,
+  Sparkles,
+  UserCheck,
+  Workflow,
+  type LucideIcon,
+} from "lucide-react";
 import {
   Button,
+  CollapsibleContent,
+  CollapsibleRoot,
+  CollapsibleTrigger,
   Sheet,
   SheetBody,
   SheetContent,
@@ -15,6 +44,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@flowaid/ui/primitives";
+import type { WorkflowNode } from "@flowaid/workflow-core";
 import { useAssistant } from "~/assistant/AssistantProvider";
 import { useSession } from "~/session";
 import { HELP } from "~/shell/help";
@@ -29,18 +59,135 @@ import {
 } from "./pages";
 import type { GuideContext } from "./GuideProvider";
 
+/** Width of the Guide; AppFrame reserves the same when it docks. */
+export const GUIDE_WIDTH = 380;
+
 function guideFor(pathname: string, context: GuideContext | null): PageGuide | undefined {
   if (context?.kind === "builder") return BUILDER_GUIDE;
   if (context?.kind === "run") return RUN_GUIDE;
   return PAGE_GUIDES[sectionOf(pathname)];
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+// ── which sections are open, remembered per browser ──────────────────────────────────────────
+
+const SECTIONS_KEY = "flowaid:guide-sections";
+
+function readSections(): Record<string, boolean> {
+  try {
+    const raw = window.localStorage.getItem(SECTIONS_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === "object" ? (parsed as Record<string, boolean>) : {};
+  } catch {
+    return {}; // storage blocked or garbled: every section uses its default
+  }
+}
+
+function useSections() {
+  const [open, setOpen] = useState<Record<string, boolean>>(() =>
+    typeof window === "undefined" ? {} : readSections(),
+  );
+  const toggle = useCallback((id: string, next: boolean) => {
+    setOpen((prev) => {
+      const updated = { ...prev, [id]: next };
+      try {
+        window.localStorage.setItem(SECTIONS_KEY, JSON.stringify(updated));
+      } catch {
+        // storage blocked: the change still applies while the page is open
+      }
+      return updated;
+    });
+  }, []);
+  return { open, toggle };
+}
+
+type Sections = ReturnType<typeof useSections>;
+
+function Section({
+  id,
+  title,
+  icon: Icon,
+  meta,
+  defaultOpen = true,
+  sections,
+  children,
+}: {
+  id: string;
+  title: string;
+  icon: LucideIcon;
+  meta?: ReactNode;
+  defaultOpen?: boolean;
+  sections: Sections;
+  children: ReactNode;
+}) {
+  const open = sections.open[id] ?? defaultOpen;
   return (
-    <section className="flex flex-col gap-2" aria-label={title}>
-      <h3 className="text-eyebrow">{title}</h3>
-      {children}
-    </section>
+    <CollapsibleRoot open={open} onOpenChange={(next) => sections.toggle(id, next)} asChild>
+      <section aria-label={title} className="flex flex-col">
+        <CollapsibleTrigger
+          className="h-8 gap-2 px-1.5 text-[13px] font-semibold text-ink"
+          {...(meta !== undefined ? { meta } : {})}
+        >
+          <span className="flex items-center gap-2">
+            <Icon className="size-3.5 shrink-0 text-accent-text" strokeWidth={1.75} aria-hidden />
+            {title}
+          </span>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="flex flex-col gap-3 px-1.5 pb-1 pt-2">{children}</div>
+        </CollapsibleContent>
+      </section>
+    </CollapsibleRoot>
+  );
+}
+
+/** Numbered steps with round badges, easier to follow than a bare `1.` list. */
+function Steps({ items }: { items: readonly string[] }) {
+  return (
+    <ol className="m-0 flex list-none flex-col gap-2.5 p-0">
+      {items.map((item, i) => (
+        <li key={item} className="flex gap-2.5 text-sm leading-snug text-ink-2">
+          <span
+            aria-hidden
+            className="mt-px flex size-5 shrink-0 items-center justify-center rounded-full border border-border bg-surface-2 font-mono text-2xs text-ink-2 tabular"
+          >
+            {i + 1}
+          </span>
+          <span className="min-w-0">{item}</span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function Bullets({
+  items,
+  icon: Icon = CircleCheck,
+}: {
+  items: readonly string[];
+  icon?: LucideIcon;
+}) {
+  return (
+    <ul className="m-0 flex list-none flex-col gap-2 p-0">
+      {items.map((item) => (
+        <li key={item} className="flex gap-2 text-sm leading-snug text-ink-2">
+          <Icon className="mt-0.5 size-3.5 shrink-0 text-ink-3" strokeWidth={1.75} aria-hidden />
+          <span className="min-w-0">{item}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function Tip({ children }: { children: ReactNode }) {
+  return (
+    <p className="m-0 flex gap-2 rounded-sm border border-border bg-surface-2 px-2.5 py-2 text-xs leading-snug text-ink-2">
+      <Lightbulb
+        className="mt-px size-3.5 shrink-0 text-warn-text"
+        strokeWidth={1.75}
+        aria-hidden
+      />
+      <span>{children}</span>
+    </p>
   );
 }
 
@@ -56,44 +203,64 @@ export function GuidePanel({
   const s = useSession();
   const pathname = usePathname();
   const assistant = useAssistant();
+  const sections = useSections();
   const guide = guideFor(pathname, context);
   const href = (to: string) => (/^https?:/.test(to) ? to : to ? `/${s.ws}/${to}` : `/${s.ws}`);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange} modal={false}>
       <SheetContent
-        width={400}
+        width={GUIDE_WIDTH}
         noOverlay
-        // below the top bar, so Run, Publish and the Guide button stay in reach
-        className="top-11"
         aria-label="Guide"
+        // Narrow screens: a floating card below the top bar, over the page's right edge.
+        // Wide screens (where AppFrame makes room): docked full height beside the page.
+        className={
+          "bottom-3 right-3 top-14 rounded-md border shadow-3 " +
+          "min-[1680px]:bottom-0 min-[1680px]:right-0 min-[1680px]:top-11 min-[1680px]:rounded-none min-[1680px]:border-y-0 min-[1680px]:border-r-0 min-[1680px]:shadow-none"
+        }
         // the page stays usable while the Guide is open
         onInteractOutside={(e) => e.preventDefault()}
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
-        <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
-            <Compass className="size-4 text-accent" strokeWidth={1.75} aria-hidden />
-            Guide{guide ? <span className="font-normal text-ink-3">· {guide.title}</span> : null}
-          </SheetTitle>
-          <SheetDescription>
+        <SheetHeader className="gap-2 px-4 pb-3.5 pt-3.5">
+          <div className="flex items-center gap-2.5">
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-sm bg-accent-soft text-accent-text">
+              <Compass className="size-4" strokeWidth={1.75} aria-hidden />
+            </span>
+            <span className="flex min-w-0 flex-col">
+              <span className="text-2xs font-medium uppercase tracking-wider text-ink-3">
+                Guide
+              </span>
+              <SheetTitle className="truncate text-[15px]">
+                {guide?.title ?? "This page"}
+              </SheetTitle>
+            </span>
+          </div>
+          <SheetDescription className="text-[13px] leading-snug text-ink-2">
             {guide?.purpose ?? "Plain-language help for the page you are on and what to do next."}
           </SheetDescription>
         </SheetHeader>
 
-        <SheetBody className="flex flex-col gap-6">
-          {context?.kind === "builder" ? <BuilderHelp context={context} /> : null}
-          {context?.kind === "run" ? <RunHelp context={context} /> : null}
+        <SheetBody className="flex flex-col gap-1 divide-y divide-border px-3 py-2 [&>*]:py-2">
+          {context?.kind === "builder" ? (
+            <BuilderHelp context={context} sections={sections} />
+          ) : null}
+          {context?.kind === "run" ? <RunHelp context={context} sections={sections} /> : null}
 
           {guide ? (
-            <Section title="How to use this page">
-              <ol className="m-0 flex list-decimal flex-col gap-1.5 pl-5 text-sm text-ink-2">
-                {guide.steps.map((step) => (
-                  <li key={step}>{step}</li>
-                ))}
-              </ol>
+            <Section
+              id="how"
+              title="How to use this page"
+              icon={ListOrdered}
+              meta={guide.steps.length}
+              // on the builder and run pages the page's own story comes first
+              defaultOpen={!context}
+              sections={sections}
+            >
+              <Steps items={guide.steps} />
               {guide.actions.length ? (
-                <div className="flex flex-wrap gap-1.5 pt-1">
+                <div className="flex flex-wrap gap-1.5">
                   {guide.actions.map((a) => (
                     <Button key={a.label} size="sm" variant="secondary" asChild>
                       <Link href={href(a.to)}>{a.label}</Link>
@@ -105,73 +272,134 @@ export function GuidePanel({
           ) : null}
 
           {guide?.terms.length ? (
-            <Section title="Words you will see">
-              <dl className="m-0 flex flex-col gap-2.5">
+            <Section
+              id="terms"
+              title="Words you will see"
+              icon={BookOpenText}
+              meta={guide.terms.length}
+              defaultOpen={false}
+              sections={sections}
+            >
+              <dl className="m-0 flex flex-col gap-2">
                 {guide.terms.map((id) => (
-                  <div key={id}>
-                    <dt className="text-sm font-medium text-ink">{GLOSSARY[id]?.term}</dt>
-                    <dd className="m-0 text-sm text-ink-2">{GLOSSARY[id]?.meaning}</dd>
+                  <div
+                    key={id}
+                    className="rounded-sm border border-border bg-surface-2 px-2.5 py-2"
+                  >
+                    <dt className="text-[13px] font-medium text-ink">{GLOSSARY[id]?.term}</dt>
+                    <dd className="m-0 mt-0.5 text-xs leading-snug text-ink-2">
+                      {GLOSSARY[id]?.meaning}
+                    </dd>
                   </div>
                 ))}
               </dl>
             </Section>
           ) : null}
-
-          <Section title="More help">
-            <div className="flex flex-col gap-1.5">
-              {assistant?.available ? (
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  className="self-start"
-                  leadingIcon={<MessageSquareText strokeWidth={1.75} />}
-                  onClick={() => assistant.setOpen(true)}
-                >
-                  Ask a question in your own words
-                </Button>
-              ) : null}
-              <a
-                className="inline-flex items-center gap-1 text-sm text-accent-text hover:underline"
-                href={HELP.gettingStarted}
-                target="_blank"
-                rel="noreferrer"
-              >
-                Read the getting started guide
-                <ExternalLink className="size-3.5" strokeWidth={1.75} aria-hidden />
-              </a>
-            </div>
-          </Section>
         </SheetBody>
+
+        <footer className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-t border-border bg-surface-2 px-4 py-2.5">
+          {assistant?.available ? (
+            <Button
+              size="sm"
+              variant="secondary"
+              leadingIcon={<MessageSquareText strokeWidth={1.75} />}
+              onClick={() => assistant.setOpen(true)}
+            >
+              Ask a question
+            </Button>
+          ) : null}
+          <a
+            className="inline-flex items-center gap-1 text-xs text-accent-text hover:underline"
+            href={HELP.gettingStarted}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Getting started guide
+            <ExternalLink className="size-3" strokeWidth={1.75} aria-hidden />
+          </a>
+        </footer>
       </SheetContent>
     </Sheet>
   );
 }
 
-function StoryList({ lines }: { lines: string[] }) {
+const KIND_ICON: Partial<Record<WorkflowNode["kind"], LucideIcon>> = {
+  input: Play,
+  output: Flag,
+  task: Sparkles,
+  branch: GitBranch,
+  join: GitMerge,
+  loop: Repeat,
+  foreach: Repeat,
+  subflow: Workflow,
+  wait: Clock,
+  human: UserCheck,
+};
+
+/** The workflow as a vertical path: one row per step, joined by a line. */
+function Timeline({
+  steps,
+  onSelect,
+}: {
+  steps: { id: string; name: string; kind: WorkflowNode["kind"]; summary: string }[];
+  onSelect?: (id: string) => void;
+}) {
   return (
-    <ol className="m-0 flex list-decimal flex-col gap-1.5 pl-5 text-sm text-ink">
-      {lines.map((line, i) => (
-        <li key={i}>{line}</li>
-      ))}
+    <ol className="m-0 flex list-none flex-col p-0">
+      {steps.map((st, i) => {
+        const Icon = KIND_ICON[st.kind] ?? Boxes;
+        const last = i === steps.length - 1;
+        return (
+          <li key={st.id} className="relative flex gap-2.5 pb-3 last:pb-0">
+            {!last ? (
+              <span aria-hidden className="absolute bottom-0 left-[11px] top-6 w-px bg-border" />
+            ) : null}
+            <span
+              aria-hidden
+              className="relative flex size-6 shrink-0 items-center justify-center rounded-full border border-border bg-surface-2 text-ink-2"
+            >
+              <Icon className="size-3" strokeWidth={1.75} />
+            </span>
+            <span className="flex min-w-0 flex-col gap-0.5 pt-0.5">
+              {onSelect ? (
+                <button
+                  type="button"
+                  className="self-start text-left text-[13px] font-medium text-accent-text hover:underline focus-visible:underline"
+                  onClick={() => onSelect(st.id)}
+                >
+                  {st.name}
+                </button>
+              ) : (
+                <span className="text-[13px] font-medium text-ink">{st.name}</span>
+              )}
+              <span className="text-xs leading-snug text-ink-2">{st.summary}</span>
+            </span>
+          </li>
+        );
+      })}
     </ol>
   );
 }
 
-function BuilderHelp({ context }: { context: Extract<GuideContext, { kind: "builder" }> }) {
+function BuilderHelp({
+  context,
+  sections,
+}: {
+  context: Extract<GuideContext, { kind: "builder" }>;
+  sections: Sections;
+}) {
   const { definition, selected, manifest } = context;
   if (selected && selected.kind !== "note") {
     const step = explainStep(selected, definition, manifest);
+    const Icon = KIND_ICON[selected.kind] ?? Boxes;
     return (
-      <Section title={`This step: ${selected.name}`}>
-        <p className="text-sm text-ink">{step.summary}</p>
-        {step.details.length ? (
-          <ul className="m-0 flex list-disc flex-col gap-1.5 pl-5 text-sm text-ink-2">
-            {step.details.map((d) => (
-              <li key={d}>{d}</li>
-            ))}
-          </ul>
-        ) : null}
-        {step.change ? <p className="text-sm text-ink-3">{step.change}</p> : null}
+      <Section id="step" title="This step" icon={Icon} sections={sections}>
+        <div className="rounded-sm border border-border bg-surface-2 px-3 py-2.5">
+          <p className="m-0 text-[13px] font-semibold text-ink">{selected.name}</p>
+          <p className="m-0 mt-1 text-sm leading-snug text-ink-2">{step.summary}</p>
+        </div>
+        {step.details.length ? <Bullets items={step.details} /> : null}
+        {step.change ? <Tip>{step.change}</Tip> : null}
         {context.onClearStep ? (
           <Button
             size="sm"
@@ -191,58 +419,84 @@ function BuilderHelp({ context }: { context: Extract<GuideContext, { kind: "buil
   return (
     <>
       {story.length ? (
-        <Section title="The last run, in plain words">
-          <StoryList lines={story} />
+        <Section id="last-run" title="The last run" icon={Route} sections={sections}>
+          <Steps items={story} />
         </Section>
       ) : null}
-      <Section title="How this workflow works">
-        <ol className="m-0 flex list-decimal flex-col gap-2 pl-5 text-sm">
-          {flow.steps.map((st) => (
-            <li key={st.id}>
-              {context.onSelectStep ? (
-                <button
-                  type="button"
-                  className="font-medium text-accent-text hover:underline"
-                  onClick={() => context.onSelectStep?.(st.id)}
-                >
-                  {st.name}
-                </button>
-              ) : (
-                <span className="font-medium text-ink">{st.name}</span>
-              )}
-              <span className="text-ink-2">: {st.summary}</span>
-            </li>
-          ))}
-        </ol>
+      <Section
+        id="flow"
+        title="How this workflow works"
+        icon={Workflow}
+        meta={flow.steps.length}
+        sections={sections}
+      >
+        <Timeline
+          steps={flow.steps}
+          {...(context.onSelectStep ? { onSelect: context.onSelectStep } : {})}
+        />
         {flow.outcomes.length ? (
-          <p className="text-sm text-ink-2">
-            It can end in: <span className="text-ink">{flow.outcomes.join(" · ")}</span>
-          </p>
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-ink-3">It can end in</span>
+            <div className="flex flex-wrap gap-1.5">
+              {flow.outcomes.map((o) => (
+                <span
+                  key={o}
+                  className="inline-flex items-center gap-1 rounded-xs border border-border bg-surface-2 px-1.5 py-1 text-xs text-ink"
+                >
+                  <Flag className="size-3 text-ink-3" strokeWidth={1.75} aria-hidden />
+                  {o}
+                </span>
+              ))}
+            </div>
+          </div>
         ) : null}
       </Section>
-      {flow.settings.length ? (
-        <Section title="Settings you can change">
-          <ul className="m-0 flex list-disc flex-col gap-1.5 pl-5 text-sm text-ink-2">
-            {flow.settings.map((x) => (
-              <li key={x}>{x}</li>
+      {flow.variables.length ? (
+        <Section
+          id="settings"
+          title="Settings you can change"
+          icon={SlidersHorizontal}
+          meta={flow.variables.length}
+          sections={sections}
+        >
+          <ul className="m-0 flex list-none flex-col gap-2 p-0">
+            {flow.variables.map((v) => (
+              <li
+                key={v.name}
+                className="flex flex-col gap-1 rounded-sm border border-border bg-surface-2 px-2.5 py-2"
+              >
+                <span className="flex items-center justify-between gap-2">
+                  <span className="text-[13px] font-medium text-ink">{v.name}</span>
+                  {v.value !== undefined ? (
+                    <span className="max-w-[45%] truncate rounded-xs bg-surface-3 px-1.5 py-0.5 font-mono text-2xs text-ink">
+                      {v.value}
+                    </span>
+                  ) : null}
+                </span>
+                {v.description ? (
+                  <span className="text-xs leading-snug text-ink-2">{v.description}</span>
+                ) : null}
+              </li>
             ))}
           </ul>
-          <p className="text-sm text-ink-3">Click the empty canvas to change them.</p>
+          <Tip>Click an empty spot on the canvas to change these for the whole workflow.</Tip>
         </Section>
       ) : null}
     </>
   );
 }
 
-function RunHelp({ context }: { context: Extract<GuideContext, { kind: "run" }> }) {
+function RunHelp({
+  context,
+  sections,
+}: {
+  context: Extract<GuideContext, { kind: "run" }>;
+  sections: Sections;
+}) {
   // the page itself tells the story; the Guide says what to do with it
   return (
-    <Section title="What you can do next">
-      <ul className="m-0 flex list-disc flex-col gap-1.5 pl-5 text-sm text-ink">
-        {nextForRun(context.run).map((line) => (
-          <li key={line}>{line}</li>
-        ))}
-      </ul>
+    <Section id="run-next" title="What you can do next" icon={CircleCheck} sections={sections}>
+      <Bullets items={nextForRun(context.run)} icon={ArrowRight} />
     </Section>
   );
 }

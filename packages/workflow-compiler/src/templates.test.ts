@@ -80,3 +80,37 @@ describe("template knowledge-assistant-langchain-rag", () => {
     expect(result.diagnostics.map((d) => d.code)).toContain("E_UNKNOWN_NODE_TYPE");
   });
 });
+
+/** A template made without choosing its resources names what to choose, never a schema regex. */
+describe("templates with unresolved placeholders", () => {
+  it.each(templates)("%s reports each placeholder once, in words", (name) => {
+    const raw = readFileSync(join(NODES_CORE, "templates", `${name}.json`), "utf8");
+    const count = raw.match(/"\$template\.[a-z]+\.[A-Za-z0-9_-]+"/g)?.length ?? 0;
+    const result = compile(JSON.parse(raw) as unknown, { catalog });
+    const errors = result.diagnostics.filter((d) => d.severity === "error");
+    const placeholders = errors.filter((d) =>
+      /still holds the placeholder \$template\./.test(d.message),
+    );
+    expect(placeholders.length).toBeGreaterThanOrEqual(count > 0 ? 1 : 0);
+    for (const d of errors) {
+      expect(d.message).not.toMatch(/must match pattern|\[0-9a-fA-F\]/);
+      expect(d.message).not.toMatch(/^config\//);
+    }
+  });
+
+  it("pageindex-agent asks for the knowledge source by name", () => {
+    const definition = read("templates", "pageindex-agent.json");
+    const result = compile(definition, { catalog });
+    const errors = result.diagnostics.filter((d) => d.severity === "error");
+    expect(errors).toEqual([
+      expect.objectContaining({
+        code: "E_TOOL_UNRESOLVED",
+        message:
+          "Choose the knowledge source for Documents › Source IDs › item 1: this node came from a template and still holds the placeholder $template.knowledge.documents",
+        location: expect.objectContaining({
+          path: expect.stringMatching(/\/config\/documents\/sourceIds\/0$/),
+        }),
+      }),
+    ]);
+  });
+});

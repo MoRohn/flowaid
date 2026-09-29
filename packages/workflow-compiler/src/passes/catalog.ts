@@ -8,7 +8,7 @@
  * The literal remainder is validated against `configSchema`.
  */
 import Ajv2020Module from "ajv/dist/2020.js";
-import type { ErrorObject, ValidateFunction } from "ajv";
+import type { ValidateFunction } from "ajv";
 import { z } from "zod";
 import {
   DecisionQuestionSchema,
@@ -28,6 +28,7 @@ import {
   type WorkflowNode,
 } from "@flowaid/workflow-core";
 import type { CompileContext, NodeInfo } from "../context.js";
+import { describeConfigError, labelOf, reportable } from "../configErrors.js";
 import { nodePath } from "../diagnostics.js";
 import {
   DATE_TIME_SCHEMA,
@@ -49,7 +50,13 @@ const TEMPLATE_SENTINEL = /^\$template\.[a-z]+\.[A-Za-z0-9_-]+$/;
 
 // ajv is CommonJS: under NodeNext the default import is `module.exports`, whose `default` is the class.
 const Ajv2020 = Ajv2020Module.default;
-const ajv = new Ajv2020({ strict: false, allErrors: true, validateFormats: false });
+// `verbose` puts the offending value and schema on each error, for messages that quote them.
+const ajv = new Ajv2020({
+  strict: false,
+  allErrors: true,
+  validateFormats: false,
+  verbose: true,
+});
 const validators = new Map<string, ValidateFunction | Error>();
 
 /** Compiles (once per manifest version) the config validator; an invalid configSchema yields its error. */
@@ -67,17 +74,33 @@ function configValidator(manifest: NodeManifest, schema: JsonSchema): ValidateFu
   return validator;
 }
 
-function describeAjvError(error: ErrorObject): string {
-  const at = `config${error.instancePath}`;
-  if (error.keyword === "additionalProperties") {
-    const extra = (error.params as { additionalProperty?: string }).additionalProperty;
-    return `${at}: unknown field '${extra ?? "?"}'`;
-  }
-  if (error.keyword === "required") {
-    const missing = (error.params as { missingProperty?: string }).missingProperty;
-    return `${at}: missing required field '${missing ?? "?"}'`;
-  }
-  return `${at}: ${error.message ?? error.keyword}`;
+/** What a `$template.<kind>.<key>` placeholder asks the person to choose. */
+const PLACEHOLDER_NOUN: Record<string, string> = {
+  knowledge: "the knowledge source",
+  mcp: "the MCP server",
+  openapi: "the API toolset",
+  workflow: "the workflow",
+  credential: "the credential",
+};
+
+/** The message for a template placeholder left in a node's config. */
+export function placeholderMessage(sentinel: string, label: string): string {
+  const kind = /^\$template\.([a-z]+)\./.exec(sentinel)?.[1] ?? "";
+  const noun = PLACEHOLDER_NOUN[kind] ?? "the resource";
+  return `Choose ${noun} for ${label}: this node came from a template and still holds the placeholder ${sentinel}`;
+}
+
+/** Pointers (relative to `value`) of every template placeholder inside it, in document order. */
+function placeholdersIn(value: JsonValue, pointer = ""): { pointer: string; sentinel: string }[] {
+  if (typeof value === "string")
+    return TEMPLATE_SENTINEL.test(value) ? [{ pointer, sentinel: value }] : [];
+  if (Array.isArray(value))
+    return value.flatMap((item, i) => placeholdersIn(item, `${pointer}/${i}`));
+  if (isPlainObject(value))
+    return Object.entries(value).flatMap(([k, v]) =>
+      placeholdersIn(v, `${pointer}/${escapePointerToken(k)}`),
+    );
+  return [];
 }
 
 function blankInfo(node: WorkflowNode, index: number): NodeInfo {
@@ -375,6 +398,7 @@ function splitConfig(
   const properties = isPlainObject(schema.properties) ? schema.properties : {};
   const literal: Record<string, JsonValue> = {};
   const moved = new Set<string>();
+  const placeholders: string[] = [];
   for (const [key, value] of Object.entries(node.config)) {
     const prop = properties[key];
     const hints =
@@ -410,12 +434,23 @@ function splitConfig(
     if (typeof value === "string" && TEMPLATE_SENTINEL.test(value)) {
       diagnostics.add(
         "E_TOOL_UNRESOLVED",
-        `'${key}' still holds the template placeholder ${value}; choose the resource to use`,
+        placeholderMessage(value, labelOf(pointer, schema)),
         { nodeId: node.id, path: `${path}${pointer}` },
         { fix: { title: "Choose the resource", patch: [] } },
       );
       moved.add(key);
       continue;
+    }
+    // A placeholder deeper in (a list of source ids, a nested object) is reported the same way;
+    // the schema errors it causes are not, so the person sees what to do instead of a regex.
+    for (const found of placeholdersIn(value, pointer)) {
+      diagnostics.add(
+        "E_TOOL_UNRESOLVED",
+        placeholderMessage(found.sentinel, labelOf(found.pointer, schema)),
+        { nodeId: node.id, path: `${path}${found.pointer}` },
+        { fix: { title: "Choose the resource", patch: [] } },
+      );
+      placeholders.push(found.pointer);
     }
     literal[key] = value;
   }
@@ -437,7 +472,8 @@ function splitConfig(
   }
   if (!validator(literal)) {
     for (const error of validator.errors ?? []) {
-      diagnostics.add("E_CONFIG_INVALID", describeAjvError(error), {
+      if (!reportable(error, placeholders)) continue;
+      diagnostics.add("E_CONFIG_INVALID", describeConfigError(error, schema), {
         nodeId: node.id,
         path: `${path}${error.instancePath}`,
       });

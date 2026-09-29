@@ -78,8 +78,9 @@ export function AppFrame({
   return (
     <AppShell
       storageKey={storageKey}
-      // on wide screens the open Guide sits beside the page instead of over it
-      {...(guide?.open ? { className: "lg:[&>[data-shell-body]]:pr-[400px]" } : {})}
+      // where there is room the open Guide sits beside the page instead of over it; narrower
+      // screens keep the page's full width and the Guide floats as a card (GuidePanel)
+      {...(guide?.open ? { className: "min-[1680px]:[&>[data-shell-body]]:pr-[380px]" } : {})}
       topbar={
         <TopBar
           breadcrumbs={links.map((c, i) => ({

@@ -127,6 +127,10 @@ export interface FlowCanvasProps {
   catalog?: NodeDefinitionView[];
   /** Recently used kinds for the palette, most recent first. */
   recentKinds?: string[];
+  /** Steps predicted to come next, shown first in the palette (see NodePaletteMenu). */
+  suggestions?: { kind: string; reason: string }[];
+  /** The name of the step the suggestions follow. */
+  suggestionsFor?: string;
   onAddNode?: (def: NodeDefinitionView, position: CanvasPoint) => void;
   onAskBuilder?: (query: string, position: CanvasPoint) => void;
   onStartFromTemplate?: () => void;
@@ -253,6 +257,8 @@ function FlowCanvasInner({
   followRun = false,
   catalog,
   recentKinds,
+  suggestions,
+  suggestionsFor,
   onAddNode,
   onAskBuilder,
   onStartFromTemplate,
@@ -1033,6 +1039,8 @@ function FlowCanvasInner({
             anchor={palette?.screen ?? null}
             catalog={catalog}
             recent={recentKinds}
+            {...(suggestions ? { suggestions } : {})}
+            {...(suggestionsFor ? { suggestionsFor } : {})}
             onPick={(def) => {
               if (palette) onAddNode?.(def, palette.flow);
             }}
