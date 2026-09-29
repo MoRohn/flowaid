@@ -1,0 +1,551 @@
+{
+  "$schema": "https://flowaid.dev/schemas/workflow/v1",
+  "id": "e8b2f5a3-1c69-4d07-a3f4-5d8c2b0e9a71",
+  "name": "Refund request handling",
+  "description": "Checks a refund request against your refund policy, refunds small clear cases, declines requests outside the policy and sends the rest to an agent, with the reply for the customer. The refund limit and return window are settings you can change.",
+  "inputs": {
+    "type": "object",
+    "required": ["customer_email", "order_id", "order_total", "days_since_delivery", "reason"],
+    "properties": {
+      "customer_email": {
+        "type": "string",
+        "title": "Customer email",
+        "description": "For example: alex@example.com.",
+        "minLength": 3
+      },
+      "order_id": {
+        "type": "string",
+        "title": "Order number",
+        "description": "For example: 10482.",
+        "minLength": 1
+      },
+      "order_total": {
+        "type": "number",
+        "title": "Order total (USD)",
+        "description": "What the customer paid. For example: 39.90.",
+        "minimum": 0
+      },
+      "days_since_delivery": {
+        "type": "integer",
+        "title": "Days since delivery",
+        "description": "0 if it has not arrived.",
+        "minimum": 0
+      },
+      "reason": {
+        "type": "string",
+        "title": "Customer's reason",
+        "description": "In their words. For example: The mug arrived cracked.",
+        "minLength": 1,
+        "maxLength": 4000
+      }
+    }
+  },
+  "outputs": {
+    "type": "object",
+    "required": ["decision", "reason", "decided_by", "reply"],
+    "properties": {
+      "decision": {
+        "type": "string",
+        "enum": ["refunded", "declined", "pending"]
+      },
+      "reason": {
+        "type": "string"
+      },
+      "decided_by": {
+        "type": "string",
+        "enum": ["policy", "agent"]
+      },
+      "reply": {
+        "type": "string"
+      }
+    }
+  },
+  "secrets": [
+    {
+      "name": "TYPESAFE_API_KEY",
+      "credentialType": "typesafe.api_key",
+      "required": false,
+      "description": "Optional: without a credential bound here, runs use the TYPESAFE_API_KEY set on the server."
+    }
+  ],
+  "variables": [
+    {
+      "name": "autoRefundLimit",
+      "schema": {
+        "type": "number",
+        "minimum": 0
+      },
+      "default": 50,
+      "description": "Eligible, low-risk refunds at or under this order total (USD) are paid without a person."
+    },
+    {
+      "name": "returnWindowDays",
+      "schema": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "default": 30,
+      "description": "How many days after delivery a customer may return an item because they changed their mind."
+    }
+  ],
+  "execution": {
+    "timeoutMs": 259200000,
+    "maxCostUsd": 0.05,
+    "decisions": {
+      "primary": {
+        "provider": "typesafe",
+        "model": "jev-latest"
+      }
+    }
+  },
+  "nodes": [
+    {
+      "id": "start",
+      "kind": "input",
+      "name": "Refund request"
+    },
+    {
+      "id": "assess",
+      "kind": "task",
+      "type": "flowaid.decision.batch",
+      "typeVersion": "1.0.0",
+      "name": "Assess the request",
+      "description": "One TypeSafe call: why they want a refund, whether the policy allows it, and how risky it looks.",
+      "config": {
+        "questions": {
+          "reason": {
+            "kind": "choice",
+            "instructions": "Why does the customer want a refund?",
+            "options": {
+              "damaged": "Arrived damaged or broken",
+              "wrong_item": "Wrong item or size sent",
+              "not_as_described": "Not as described or not working",
+              "late": "Arrived very late or never arrived",
+              "changed_mind": "No longer wanted",
+              "other": "Anything else"
+            }
+          },
+          "eligible": {
+            "kind": "boolean",
+            "instructions": "Refund policy: damaged, wrong, faulty or not-as-described items and late or missing deliveries are always refundable; a change of mind is refundable only when days_since_delivery is at most return_window_days. Does the policy allow this refund?",
+            "criteria": {
+              "true": "The policy allows a refund",
+              "false": "Outside the refund policy"
+            }
+          },
+          "risk": {
+            "kind": "score",
+            "instructions": "How likely is this request to be abusive or fraudulent (inconsistent story, threats, pressure, repeated claims)?",
+            "levels": ["None", "Low", "Moderate", "High", "Very high"]
+          }
+        }
+      },
+      "inputs": {
+        "state": {
+          "kind": "object",
+          "fields": {
+            "order_total": {
+              "kind": "ref",
+              "ref": {
+                "kind": "port",
+                "node": "start",
+                "port": "order_total"
+              }
+            },
+            "days_since_delivery": {
+              "kind": "ref",
+              "ref": {
+                "kind": "port",
+                "node": "start",
+                "port": "days_since_delivery"
+              }
+            },
+            "reason": {
+              "kind": "ref",
+              "ref": {
+                "kind": "port",
+                "node": "start",
+                "port": "reason"
+              }
+            },
+            "return_window_days": {
+              "kind": "ref",
+              "ref": {
+                "kind": "var",
+                "name": "returnWindowDays"
+              }
+            }
+          }
+        }
+      },
+      "credentials": {
+        "typesafe": "TYPESAFE_API_KEY"
+      }
+    },
+    {
+      "id": "limits",
+      "kind": "task",
+      "type": "flowaid.data.transform",
+      "typeVersion": "1.0.0",
+      "name": "Apply the limits",
+      "description": "Refund automatically only when eligible, low risk and within the limit; decline automatically only when clearly outside the policy.",
+      "config": {
+        "expr": "{ refund: assess.answers.eligible.value && assess.answers.risk.value < 1.5 && start.order_total <= $vars.autoRefundLimit, decline: !assess.answers.eligible.value && assess.answers.risk.value < 1.5 }",
+        "output": {
+          "type": "object",
+          "required": ["refund", "decline"],
+          "properties": {
+            "refund": {
+              "type": "boolean"
+            },
+            "decline": {
+              "type": "boolean"
+            }
+          }
+        }
+      },
+      "inputs": {},
+      "credentials": {}
+    },
+    {
+      "id": "route",
+      "kind": "branch",
+      "name": "Decide automatically?",
+      "cases": [
+        {
+          "port": "refund",
+          "when": "limits.result.refund"
+        },
+        {
+          "port": "decline",
+          "when": "limits.result.decline"
+        }
+      ],
+      "defaultPort": "review"
+    },
+    {
+      "id": "agent",
+      "kind": "human",
+      "name": "Agent review",
+      "mode": {
+        "type": "approval"
+      },
+      "title": {
+        "kind": "template",
+        "source": "Refund ${{ start.order_total }} for order {{ start.order_id }} ({{ assess.answers.reason.value }})?"
+      },
+      "context": {
+        "customer": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "start",
+            "port": "customer_email"
+          }
+        },
+        "reason": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "start",
+            "port": "reason"
+          }
+        },
+        "days_since_delivery": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "start",
+            "port": "days_since_delivery"
+          }
+        },
+        "assessment": {
+          "kind": "ref",
+          "ref": {
+            "kind": "port",
+            "node": "assess",
+            "port": "answers"
+          }
+        }
+      },
+      "expiresInMs": 172800000,
+      "onExpire": "route"
+    },
+    {
+      "id": "out_refund",
+      "kind": "output",
+      "name": "Refund automatically",
+      "outcome": "refunded",
+      "value": {
+        "kind": "object",
+        "fields": {
+          "decision": {
+            "kind": "literal",
+            "value": "refunded"
+          },
+          "reason": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "assess",
+              "port": "answers",
+              "path": "/reason/value"
+            }
+          },
+          "decided_by": {
+            "kind": "literal",
+            "value": "policy"
+          },
+          "reply": {
+            "kind": "template",
+            "source": "Hi, we're sorry about your order {{ start.order_id }}. We've refunded ${{ start.order_total }}; it should reach you within 5 business days."
+          }
+        }
+      }
+    },
+    {
+      "id": "out_decline",
+      "kind": "output",
+      "name": "Decline (outside policy)",
+      "outcome": "declined",
+      "value": {
+        "kind": "object",
+        "fields": {
+          "decision": {
+            "kind": "literal",
+            "value": "declined"
+          },
+          "reason": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "assess",
+              "port": "answers",
+              "path": "/reason/value"
+            }
+          },
+          "decided_by": {
+            "kind": "literal",
+            "value": "policy"
+          },
+          "reply": {
+            "kind": "template",
+            "source": "Hi, thanks for getting in touch about order {{ start.order_id }}. Our policy allows returns for a change of mind within {{ $vars.returnWindowDays }} days of delivery, so we can't refund this one. Reply if anything was wrong with the item."
+          }
+        }
+      }
+    },
+    {
+      "id": "out_approved",
+      "kind": "output",
+      "name": "Refund (approved by an agent)",
+      "outcome": "refunded",
+      "value": {
+        "kind": "object",
+        "fields": {
+          "decision": {
+            "kind": "literal",
+            "value": "refunded"
+          },
+          "reason": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "assess",
+              "port": "answers",
+              "path": "/reason/value"
+            }
+          },
+          "decided_by": {
+            "kind": "literal",
+            "value": "agent"
+          },
+          "reply": {
+            "kind": "template",
+            "source": "Hi, we've approved a refund of ${{ start.order_total }} for order {{ start.order_id }}; it should reach you within 5 business days."
+          }
+        }
+      }
+    },
+    {
+      "id": "out_rejected",
+      "kind": "output",
+      "name": "Decline (by an agent)",
+      "outcome": "declined",
+      "value": {
+        "kind": "object",
+        "fields": {
+          "decision": {
+            "kind": "literal",
+            "value": "declined"
+          },
+          "reason": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "assess",
+              "port": "answers",
+              "path": "/reason/value"
+            }
+          },
+          "decided_by": {
+            "kind": "literal",
+            "value": "agent"
+          },
+          "reply": {
+            "kind": "template",
+            "source": "Hi, we've looked at your request for order {{ start.order_id }} and can't offer a refund this time. Reply to this email and a person will help."
+          }
+        }
+      }
+    },
+    {
+      "id": "out_pending",
+      "kind": "output",
+      "name": "Not answered in 2 days",
+      "outcome": "pending",
+      "value": {
+        "kind": "object",
+        "fields": {
+          "decision": {
+            "kind": "literal",
+            "value": "pending"
+          },
+          "reason": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "assess",
+              "port": "answers",
+              "path": "/reason/value"
+            }
+          },
+          "decided_by": {
+            "kind": "literal",
+            "value": "agent"
+          },
+          "reply": {
+            "kind": "literal",
+            "value": "Hi, thanks for your patience; we're still looking at your request and will reply soon."
+          }
+        }
+      }
+    },
+    {
+      "id": "howto",
+      "kind": "note",
+      "name": "How to make it yours",
+      "text": "Change autoRefundLimit and returnWindowDays in the workflow panel (click the empty canvas). Edit the policy in \"Assess the request\" and the customer replies in each outcome."
+    }
+  ],
+  "edges": [
+    {
+      "id": "c_refund",
+      "from": {
+        "node": "route",
+        "port": "refund"
+      },
+      "to": {
+        "node": "out_refund"
+      }
+    },
+    {
+      "id": "c_decline",
+      "from": {
+        "node": "route",
+        "port": "decline"
+      },
+      "to": {
+        "node": "out_decline"
+      }
+    },
+    {
+      "id": "c_review",
+      "from": {
+        "node": "route",
+        "port": "review"
+      },
+      "to": {
+        "node": "agent"
+      }
+    },
+    {
+      "id": "c_ok",
+      "from": {
+        "node": "agent",
+        "port": "approved"
+      },
+      "to": {
+        "node": "out_approved"
+      }
+    },
+    {
+      "id": "c_no",
+      "from": {
+        "node": "agent",
+        "port": "rejected"
+      },
+      "to": {
+        "node": "out_rejected"
+      }
+    },
+    {
+      "id": "c_late",
+      "from": {
+        "node": "agent",
+        "port": "expired"
+      },
+      "to": {
+        "node": "out_pending"
+      }
+    }
+  ],
+  "layout": {
+    "nodes": {
+      "start": {
+        "x": 0,
+        "y": 140
+      },
+      "assess": {
+        "x": 280,
+        "y": 100
+      },
+      "limits": {
+        "x": 580,
+        "y": 120
+      },
+      "route": {
+        "x": 860,
+        "y": 120
+      },
+      "out_refund": {
+        "x": 1160,
+        "y": 0
+      },
+      "out_decline": {
+        "x": 1160,
+        "y": 120
+      },
+      "agent": {
+        "x": 1160,
+        "y": 260
+      },
+      "out_approved": {
+        "x": 1460,
+        "y": 180
+      },
+      "out_rejected": {
+        "x": 1460,
+        "y": 300
+      },
+      "out_pending": {
+        "x": 1460,
+        "y": 420
+      },
+      "howto": {
+        "x": 0,
+        "y": 360
+      }
+    }
+  }
+}

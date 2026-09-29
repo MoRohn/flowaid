@@ -24,7 +24,9 @@ import { PageHeader } from "@flowaid/ui/shell";
 import { ApiError, get, post } from "~/api/client";
 import { advisorAvailability } from "~/builder/advisor";
 import { planFromGenerated, provenanceLine, type GeneratedWorkflow } from "~/builder/aiPlan";
+import type { TemplateRow } from "~/admin/types";
 import { useSession } from "~/session";
+import { businessArea, splitBusinessFlows } from "~/templates/business";
 import { AppFrame, PageBody } from "~/shell/AppFrame";
 import { useExternalImport } from "~/importer/ExternalImport";
 import { looksLikeExternalExport, parseJson } from "~/importer/report";
@@ -227,15 +229,18 @@ export default function NewWorkflowPage() {
               <LayoutTemplate className="size-5 text-ink-3" strokeWidth={1.5} aria-hidden />
               <CardTitle>From a template</CardTitle>
               <CardDescription>
-                Working workflows for triage, research and documents. Each says what it needs; the
-                Message triage starter runs with only a TypeSafe key.
+                Complete business flows for finance, sales, IT and customer service, plus triage,
+                research and document templates. Each says what it needs.
               </CardDescription>
             </CardHeader>
             <CardBody>
               {s.features.templates ? (
-                <Button asChild variant="secondary">
-                  <Link href={`/${s.ws}/templates`}>Browse templates</Link>
-                </Button>
+                <div className="flex flex-col gap-3">
+                  <BusinessFlowPicks ws={s.ws} />
+                  <Button asChild variant="secondary" className="self-start">
+                    <Link href={`/${s.ws}/templates`}>Browse all templates</Link>
+                  </Button>
+                </div>
               ) : (
                 <p className="text-sm text-ink-3">Templates are not enabled on this server.</p>
               )}
@@ -304,5 +309,35 @@ export default function NewWorkflowPage() {
         </div>
       </PageBody>
     </AppFrame>
+  );
+}
+
+/** The business flows as one-click starting points (each opens its template dialog). */
+function BusinessFlowPicks({ ws }: { ws: string }) {
+  const templates = useQuery({
+    queryKey: ["templates", ws],
+    queryFn: () => get<TemplateRow[]>("/v1/templates"),
+    staleTime: 5 * 60_000,
+  });
+  const { business } = splitBusinessFlows(templates.data ?? []);
+  if (!business.length) return null;
+  return (
+    <div className="flex flex-col gap-1.5">
+      <p className="text-xs font-medium text-ink">Business flows, ready to run</p>
+      <ul className="m-0 flex list-none flex-col gap-1 p-0">
+        {business.map((t) => (
+          <li key={t.id}>
+            <Link
+              href={`/${ws}/templates?use=${encodeURIComponent(t.slug)}`}
+              className="flex flex-col rounded-sm border border-border px-2.5 py-1.5 hover:bg-surface-3 focus-visible:shadow-(--focus) focus-visible:outline-none"
+            >
+              <span className="text-2xs text-ink-3">{businessArea(t)}</span>
+              <span className="text-xs font-medium text-ink">{t.name}</span>
+              <span className="text-2xs text-ink-2">{t.description}</span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

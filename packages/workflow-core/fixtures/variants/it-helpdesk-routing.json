@@ -1,0 +1,352 @@
+{
+  "$schema": "https://flowaid.dev/schemas/workflow/v1",
+  "id": "c41e7b92-0d3a-4f6c-8e25-9b7a1f4d2c63",
+  "name": "IT help desk routing",
+  "description": "Categorises a help desk ticket, sets its priority and response time, assigns the team and escalates security incidents to the security on-call. The major-incident size is a setting you can change.",
+  "inputs": {
+    "type": "object",
+    "required": ["requester", "subject", "description", "affected_users"],
+    "properties": {
+      "requester": {
+        "type": "string",
+        "title": "Requester",
+        "description": "Who reported it. For example: sam@company.example.",
+        "minLength": 1
+      },
+      "subject": {
+        "type": "string",
+        "title": "Subject",
+        "description": "For example: Can't connect to VPN from home.",
+        "minLength": 1,
+        "maxLength": 200
+      },
+      "description": {
+        "type": "string",
+        "title": "Description",
+        "description": "What is happening, in their words.",
+        "minLength": 1,
+        "maxLength": 4000
+      },
+      "affected_users": {
+        "type": "integer",
+        "title": "People affected",
+        "description": "How many people have the problem.",
+        "minimum": 1,
+        "default": 1
+      }
+    }
+  },
+  "outputs": {
+    "type": "object",
+    "required": ["team", "priority", "respond_within_hours", "escalated"],
+    "properties": {
+      "team": {
+        "type": "string"
+      },
+      "priority": {
+        "type": "string"
+      },
+      "respond_within_hours": {
+        "type": "number"
+      },
+      "escalated": {
+        "type": "boolean"
+      }
+    }
+  },
+  "secrets": [
+    {
+      "name": "TYPESAFE_API_KEY",
+      "credentialType": "typesafe.api_key",
+      "required": false,
+      "description": "Optional: without a credential bound here, runs use the TYPESAFE_API_KEY set on the server."
+    }
+  ],
+  "variables": [
+    {
+      "name": "majorIncidentUsers",
+      "schema": {
+        "type": "integer",
+        "minimum": 1
+      },
+      "default": 25,
+      "description": "When at least this many people are affected, the ticket becomes P1 whatever it is about."
+    }
+  ],
+  "execution": {
+    "timeoutMs": 60000,
+    "maxCostUsd": 0.05,
+    "decisions": {
+      "primary": {
+        "provider": "typesafe",
+        "model": "jev-latest"
+      }
+    }
+  },
+  "nodes": [
+    {
+      "id": "start",
+      "kind": "input",
+      "name": "Help desk ticket"
+    },
+    {
+      "id": "triage",
+      "kind": "task",
+      "type": "flowaid.decision.batch",
+      "typeVersion": "1.0.0",
+      "name": "Triage the ticket",
+      "description": "One TypeSafe call: what kind of problem, how urgent, and whether it is a security incident.",
+      "config": {
+        "questions": {
+          "category": {
+            "kind": "choice",
+            "instructions": "What kind of IT problem is this?",
+            "options": {
+              "access": "Passwords, sign-in, accounts, permissions",
+              "hardware": "Laptops, monitors, printers, phones",
+              "software": "Applications, installs, licences, errors",
+              "network": "Wi-Fi, VPN, internet, email delivery",
+              "security": "Phishing, malware, lost devices, suspicious activity"
+            }
+          },
+          "priority": {
+            "kind": "score",
+            "instructions": "How urgent is this for the business?",
+            "levels": ["P4 low", "P3 normal", "P2 high", "P1 urgent"]
+          },
+          "incident": {
+            "kind": "boolean",
+            "instructions": "Is this a possible security incident (phishing clicked, malware, stolen or lost device, account compromise, data exposure)?",
+            "criteria": {
+              "true": "Possible security incident",
+              "false": "Not a security incident"
+            }
+          }
+        }
+      },
+      "inputs": {
+        "state": {
+          "kind": "object",
+          "fields": {
+            "subject": {
+              "kind": "ref",
+              "ref": {
+                "kind": "port",
+                "node": "start",
+                "port": "subject"
+              }
+            },
+            "description": {
+              "kind": "ref",
+              "ref": {
+                "kind": "port",
+                "node": "start",
+                "port": "description"
+              }
+            },
+            "affected_users": {
+              "kind": "ref",
+              "ref": {
+                "kind": "port",
+                "node": "start",
+                "port": "affected_users"
+              }
+            }
+          }
+        }
+      },
+      "credentials": {
+        "typesafe": "TYPESAFE_API_KEY"
+      }
+    },
+    {
+      "id": "level",
+      "kind": "task",
+      "type": "flowaid.data.transform",
+      "typeVersion": "1.0.0",
+      "name": "Raise for major incidents",
+      "description": "The triage priority as a level 0 (P4) to 3 (P1), raised to P1 when many people are affected.",
+      "config": {
+        "expr": "start.affected_users >= $vars.majorIncidentUsers ? 3 : round(triage.answers.priority.value)",
+        "output": {
+          "type": "number"
+        }
+      },
+      "inputs": {},
+      "credentials": {}
+    },
+    {
+      "id": "sla",
+      "kind": "task",
+      "type": "flowaid.data.transform",
+      "typeVersion": "1.0.0",
+      "name": "Set team and response time",
+      "description": "Maps the category to a team and the priority level to a response time in hours.",
+      "config": {
+        "expr": "{ priority: level.result >= 3 ? 'P1' : level.result >= 2 ? 'P2' : level.result >= 1 ? 'P3' : 'P4', hours: level.result >= 3 ? 2 : level.result >= 2 ? 8 : level.result >= 1 ? 24 : 72, team: triage.answers.category.value == 'access' ? 'Identity and access' : triage.answers.category.value == 'hardware' ? 'Desktop support' : triage.answers.category.value == 'software' ? 'Application support' : triage.answers.category.value == 'network' ? 'Network team' : 'Security' }",
+        "output": {
+          "type": "object",
+          "required": ["priority", "hours", "team"],
+          "properties": {
+            "priority": {
+              "type": "string"
+            },
+            "hours": {
+              "type": "number"
+            },
+            "team": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "inputs": {},
+      "credentials": {}
+    },
+    {
+      "id": "route",
+      "kind": "branch",
+      "name": "Security incident?",
+      "cases": [
+        {
+          "port": "security",
+          "when": "triage.answers.incident.value || triage.answers.category.value == 'security'"
+        }
+      ],
+      "defaultPort": "queue"
+    },
+    {
+      "id": "out_security",
+      "kind": "output",
+      "name": "Escalate to security on-call",
+      "outcome": "escalated",
+      "value": {
+        "kind": "object",
+        "fields": {
+          "team": {
+            "kind": "literal",
+            "value": "Security on-call"
+          },
+          "priority": {
+            "kind": "literal",
+            "value": "P1"
+          },
+          "respond_within_hours": {
+            "kind": "literal",
+            "value": 1
+          },
+          "escalated": {
+            "kind": "literal",
+            "value": true
+          }
+        }
+      }
+    },
+    {
+      "id": "out_queue",
+      "kind": "output",
+      "name": "Assign to team queue",
+      "outcome": "queued",
+      "value": {
+        "kind": "object",
+        "fields": {
+          "team": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "sla",
+              "port": "result",
+              "path": "/team"
+            }
+          },
+          "priority": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "sla",
+              "port": "result",
+              "path": "/priority"
+            }
+          },
+          "respond_within_hours": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "sla",
+              "port": "result",
+              "path": "/hours"
+            }
+          },
+          "escalated": {
+            "kind": "literal",
+            "value": false
+          }
+        }
+      }
+    },
+    {
+      "id": "howto",
+      "kind": "note",
+      "name": "How to make it yours",
+      "text": "Change majorIncidentUsers in the workflow panel (click the empty canvas). Team names and response times live in \"Set team and response time\"; categories in \"Triage the ticket\"."
+    }
+  ],
+  "edges": [
+    {
+      "id": "c_security",
+      "from": {
+        "node": "route",
+        "port": "security"
+      },
+      "to": {
+        "node": "out_security"
+      }
+    },
+    {
+      "id": "c_queue",
+      "from": {
+        "node": "route",
+        "port": "queue"
+      },
+      "to": {
+        "node": "out_queue"
+      }
+    }
+  ],
+  "layout": {
+    "nodes": {
+      "start": {
+        "x": 0,
+        "y": 100
+      },
+      "triage": {
+        "x": 280,
+        "y": 60
+      },
+      "level": {
+        "x": 580,
+        "y": 20
+      },
+      "sla": {
+        "x": 580,
+        "y": 180
+      },
+      "route": {
+        "x": 880,
+        "y": 80
+      },
+      "out_security": {
+        "x": 1180,
+        "y": 0
+      },
+      "out_queue": {
+        "x": 1180,
+        "y": 160
+      },
+      "howto": {
+        "x": 0,
+        "y": 300
+      }
+    }
+  }
+}

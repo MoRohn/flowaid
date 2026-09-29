@@ -33,12 +33,16 @@ describeDb("identity and access (Postgres)", () => {
     expect((await t.db.admin`select slug from workspaces`).map((w) => w.slug)).toEqual(["default"]);
     const tpl = await t.db.admin`select slug, required_resources from templates order by slug`;
     expect(tpl.map((x) => x.slug)).toEqual([
+      "expense-approval",
       "github-issue-triage",
       "github-issue-triage.retrieval",
+      "it-helpdesk-routing",
+      "lead-qualification",
       "message-triage",
       "pageindex-agent",
       "pageindex-compare",
       "pageindex-document-qa",
+      "refund-requests",
       "research-agent",
       "support-triage",
     ]);

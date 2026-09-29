@@ -1,0 +1,8 @@
+{
+  "$comment": "Resources this template needs bound on instantiate: each `$template.<kind>.<key>` sentinel in the definition is replaced by the chosen resource id. `tools` are the signatures the template calls, used to type-check it before binding.",
+  "id": "refund-requests",
+  "name": "Refund request handling",
+  "category": "customer-service",
+  "description": "Checks a refund request against the refund policy, refunds small clear cases, declines ineligible ones and sends the rest for review.",
+  "requiredResources": []
+}

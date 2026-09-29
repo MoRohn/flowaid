@@ -183,12 +183,16 @@ describeDb("workflows, versions and deployments (Postgres)", () => {
   it("creates from a template; unbound tool sentinels block publish with diagnostics", async () => {
     const templates = (await call(t.app, jar, "GET", "/v1/templates")).json();
     expect(templates.map((x: { slug: string }) => x.slug).sort()).toEqual([
+      "expense-approval",
       "github-issue-triage",
       "github-issue-triage.retrieval",
+      "it-helpdesk-routing",
+      "lead-qualification",
       "message-triage",
       "pageindex-agent",
       "pageindex-compare",
       "pageindex-document-qa",
+      "refund-requests",
       "research-agent",
       "support-triage",
     ]);

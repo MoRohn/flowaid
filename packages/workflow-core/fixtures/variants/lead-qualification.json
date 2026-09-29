@@ -1,0 +1,444 @@
+{
+  "$schema": "https://flowaid.dev/schemas/workflow/v1",
+  "id": "2a9d6e41-8c07-4b3f-b5e2-6f1c0d9a7e38",
+  "name": "Sales lead qualification",
+  "description": "Qualifies an inbound lead from your contact form, scores it 0\u2013100 and routes it to sales, nurture, support or discard with the next step for each. The score needed for sales is a setting you can change.",
+  "inputs": {
+    "type": "object",
+    "required": ["name", "email", "company", "company_size", "message"],
+    "properties": {
+      "name": {
+        "type": "string",
+        "title": "Name",
+        "description": "The person who filled in the form. For example: Priya Shah.",
+        "minLength": 1
+      },
+      "email": {
+        "type": "string",
+        "title": "Email",
+        "description": "Their work email. For example: priya@northwind.example.",
+        "minLength": 3
+      },
+      "company": {
+        "type": "string",
+        "title": "Company",
+        "description": "For example: Northwind Traders.",
+        "minLength": 1
+      },
+      "company_size": {
+        "type": "string",
+        "title": "Company size",
+        "description": "Number of employees.",
+        "enum": ["1-10", "11-50", "51-200", "201-1000", "1000+"]
+      },
+      "message": {
+        "type": "string",
+        "title": "Message",
+        "description": "What they wrote. For example: We need approval workflows for 40 people, can we get pricing this week?",
+        "minLength": 1,
+        "maxLength": 4000
+      }
+    }
+  },
+  "outputs": {
+    "type": "object",
+    "required": ["route", "intent", "score", "next_step"],
+    "properties": {
+      "route": {
+        "type": "string",
+        "enum": ["sales", "nurture", "support", "discard"]
+      },
+      "intent": {
+        "type": "string"
+      },
+      "score": {
+        "type": "number"
+      },
+      "next_step": {
+        "type": "string"
+      }
+    }
+  },
+  "secrets": [
+    {
+      "name": "TYPESAFE_API_KEY",
+      "credentialType": "typesafe.api_key",
+      "required": false,
+      "description": "Optional: without a credential bound here, runs use the TYPESAFE_API_KEY set on the server."
+    }
+  ],
+  "variables": [
+    {
+      "name": "salesScore",
+      "schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100
+      },
+      "default": 60,
+      "description": "Leads that want to buy and score at least this much (0\u2013100) go straight to sales; the rest are nurtured."
+    }
+  ],
+  "execution": {
+    "timeoutMs": 60000,
+    "maxCostUsd": 0.05,
+    "decisions": {
+      "primary": {
+        "provider": "typesafe",
+        "model": "jev-latest"
+      }
+    }
+  },
+  "nodes": [
+    {
+      "id": "start",
+      "kind": "input",
+      "name": "Inbound lead"
+    },
+    {
+      "id": "qualify",
+      "kind": "task",
+      "type": "flowaid.decision.batch",
+      "typeVersion": "1.0.0",
+      "name": "Qualify the lead",
+      "description": "One TypeSafe call: what they want, how well they fit, and whether they talk about budget or timing.",
+      "config": {
+        "questions": {
+          "intent": {
+            "kind": "choice",
+            "instructions": "What does this person want?",
+            "options": {
+              "buy": "Pricing, a demo, a trial or to buy soon",
+              "evaluating": "Researching options, no clear timeline",
+              "support": "An existing customer asking for help",
+              "spam": "Spam, job seekers, vendors pitching their own services"
+            }
+          },
+          "fit": {
+            "kind": "score",
+            "instructions": "How well does this company fit a business software product sold to teams (size, role, need)?",
+            "levels": ["Poor fit", "Weak", "Possible", "Good", "Excellent"]
+          },
+          "budget": {
+            "kind": "boolean",
+            "instructions": "Does the message mention budget, pricing approval, a number of seats or a purchase timeline?",
+            "criteria": {
+              "true": "Mentions budget or timing",
+              "false": "No budget or timing"
+            }
+          }
+        }
+      },
+      "inputs": {
+        "state": {
+          "kind": "object",
+          "fields": {
+            "name": {
+              "kind": "ref",
+              "ref": {
+                "kind": "port",
+                "node": "start",
+                "port": "name"
+              }
+            },
+            "company": {
+              "kind": "ref",
+              "ref": {
+                "kind": "port",
+                "node": "start",
+                "port": "company"
+              }
+            },
+            "company_size": {
+              "kind": "ref",
+              "ref": {
+                "kind": "port",
+                "node": "start",
+                "port": "company_size"
+              }
+            },
+            "message": {
+              "kind": "ref",
+              "ref": {
+                "kind": "port",
+                "node": "start",
+                "port": "message"
+              }
+            }
+          }
+        }
+      },
+      "credentials": {
+        "typesafe": "TYPESAFE_API_KEY"
+      }
+    },
+    {
+      "id": "score",
+      "kind": "task",
+      "type": "flowaid.data.transform",
+      "typeVersion": "1.0.0",
+      "name": "Score the lead",
+      "description": "A 0\u2013100 score: fit counts most, budget or timing and buying intent add to it.",
+      "config": {
+        "expr": "round(min(100, qualify.answers.fit.value * 20 + (qualify.answers.budget.value ? 10 : 0) + (qualify.answers.intent.value == 'buy' ? 10 : 0)))",
+        "output": {
+          "type": "number"
+        }
+      },
+      "inputs": {},
+      "credentials": {}
+    },
+    {
+      "id": "route",
+      "kind": "branch",
+      "name": "Where does it go?",
+      "cases": [
+        {
+          "port": "discard",
+          "when": "qualify.answers.intent.value == 'spam'"
+        },
+        {
+          "port": "support",
+          "when": "qualify.answers.intent.value == 'support'"
+        },
+        {
+          "port": "sales",
+          "when": "qualify.answers.intent.value == 'buy' && score.result >= $vars.salesScore"
+        }
+      ],
+      "defaultPort": "nurture"
+    },
+    {
+      "id": "out_sales",
+      "kind": "output",
+      "name": "Send to sales",
+      "outcome": "sales",
+      "value": {
+        "kind": "object",
+        "fields": {
+          "route": {
+            "kind": "literal",
+            "value": "sales"
+          },
+          "intent": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "qualify",
+              "port": "answers",
+              "path": "/intent/value"
+            }
+          },
+          "score": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "score",
+              "port": "result"
+            }
+          },
+          "next_step": {
+            "kind": "template",
+            "source": "Call {{ start.name }} at {{ start.company }} within one business day."
+          }
+        }
+      }
+    },
+    {
+      "id": "out_nurture",
+      "kind": "output",
+      "name": "Nurture",
+      "outcome": "nurture",
+      "value": {
+        "kind": "object",
+        "fields": {
+          "route": {
+            "kind": "literal",
+            "value": "nurture"
+          },
+          "intent": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "qualify",
+              "port": "answers",
+              "path": "/intent/value"
+            }
+          },
+          "score": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "score",
+              "port": "result"
+            }
+          },
+          "next_step": {
+            "kind": "literal",
+            "value": "Add to the nurture email sequence and review again in 30 days."
+          }
+        }
+      }
+    },
+    {
+      "id": "out_support",
+      "kind": "output",
+      "name": "Hand to support",
+      "outcome": "support",
+      "value": {
+        "kind": "object",
+        "fields": {
+          "route": {
+            "kind": "literal",
+            "value": "support"
+          },
+          "intent": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "qualify",
+              "port": "answers",
+              "path": "/intent/value"
+            }
+          },
+          "score": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "score",
+              "port": "result"
+            }
+          },
+          "next_step": {
+            "kind": "template",
+            "source": "Open a support ticket for {{ start.email }}."
+          }
+        }
+      }
+    },
+    {
+      "id": "out_discard",
+      "kind": "output",
+      "name": "Discard",
+      "outcome": "discard",
+      "value": {
+        "kind": "object",
+        "fields": {
+          "route": {
+            "kind": "literal",
+            "value": "discard"
+          },
+          "intent": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "qualify",
+              "port": "answers",
+              "path": "/intent/value"
+            }
+          },
+          "score": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "score",
+              "port": "result"
+            }
+          },
+          "next_step": {
+            "kind": "literal",
+            "value": "No follow-up."
+          }
+        }
+      }
+    },
+    {
+      "id": "howto",
+      "kind": "note",
+      "name": "How to make it yours",
+      "text": "Change salesScore in the workflow panel (click the empty canvas). Edit what counts as a good fit in \"Qualify the lead\", and the scoring formula in \"Score the lead\"."
+    }
+  ],
+  "edges": [
+    {
+      "id": "c_sales",
+      "from": {
+        "node": "route",
+        "port": "sales"
+      },
+      "to": {
+        "node": "out_sales"
+      }
+    },
+    {
+      "id": "c_nurture",
+      "from": {
+        "node": "route",
+        "port": "nurture"
+      },
+      "to": {
+        "node": "out_nurture"
+      }
+    },
+    {
+      "id": "c_support",
+      "from": {
+        "node": "route",
+        "port": "support"
+      },
+      "to": {
+        "node": "out_support"
+      }
+    },
+    {
+      "id": "c_discard",
+      "from": {
+        "node": "route",
+        "port": "discard"
+      },
+      "to": {
+        "node": "out_discard"
+      }
+    }
+  ],
+  "layout": {
+    "nodes": {
+      "start": {
+        "x": 0,
+        "y": 140
+      },
+      "qualify": {
+        "x": 280,
+        "y": 100
+      },
+      "score": {
+        "x": 580,
+        "y": 120
+      },
+      "route": {
+        "x": 860,
+        "y": 100
+      },
+      "out_sales": {
+        "x": 1160,
+        "y": 0
+      },
+      "out_nurture": {
+        "x": 1160,
+        "y": 120
+      },
+      "out_support": {
+        "x": 1160,
+        "y": 240
+      },
+      "out_discard": {
+        "x": 1160,
+        "y": 360
+      },
+      "howto": {
+        "x": 0,
+        "y": 340
+      }
+    }
+  }
+}

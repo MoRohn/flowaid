@@ -1,0 +1,8 @@
+{
+  "$comment": "Resources this template needs bound on instantiate: each `$template.<kind>.<key>` sentinel in the definition is replaced by the chosen resource id. `tools` are the signatures the template calls, used to type-check it before binding.",
+  "id": "lead-qualification",
+  "name": "Sales lead qualification",
+  "category": "sales",
+  "description": "Qualifies an inbound lead, scores it and routes it to sales, nurture, support or discard.",
+  "requiredResources": []
+}

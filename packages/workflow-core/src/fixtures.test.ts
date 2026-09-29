@@ -31,6 +31,10 @@ const VARIANTS: Record<string, unknown> = {
   "pageindex-compare": readJson("variants", "pageindex-compare.json"),
   "pageindex-agent": readJson("variants", "pageindex-agent.json"),
   "message-triage": readJson("variants", "message-triage.json"),
+  "expense-approval": readJson("variants", "expense-approval.json"),
+  "lead-qualification": readJson("variants", "lead-qualification.json"),
+  "it-helpdesk-routing": readJson("variants", "it-helpdesk-routing.json"),
+  "refund-requests": readJson("variants", "refund-requests.json"),
 };
 /** Returns a fresh deep copy of a fixture document. */
 function loadRaw(name: string): unknown {

@@ -72,6 +72,7 @@ import { useLiveRun } from "./useLiveRun";
 import { describeInputIssue, describeRunError, type RunStartError } from "./errors";
 import { diagnosticNodeId, presentDiagnostic } from "./diagnostics";
 import { RunResult } from "./RunResult";
+import { WorkflowPanel } from "./WorkflowPanel";
 import { NodeInspector } from "./NodeInspector";
 import { PublishDialog } from "./PublishDialog";
 import { RunTab, missingRequired } from "./RunTab";
@@ -569,6 +570,19 @@ function BuilderView({
     URL.revokeObjectURL(a.href);
   };
 
+  // the workflow's name (lists, runs) and the definition's name move together
+  const renameWorkflow = (name: string) => {
+    const next = name.trim().slice(0, 120);
+    if (!next || next === title) return;
+    setTitle(next);
+    store.getState().updateDefinition((d) => {
+      d.name = next;
+    }, "Rename workflow");
+    void patch(`/v1/workflows/${workflow.id}`, { name: next })
+      .then(() => qc.invalidateQueries({ queryKey: ["workflows", s.ws] }))
+      .catch((e: unknown) => toast.error(e instanceof Error ? e.message : "Rename failed"));
+  };
+
   const inspector =
     selectedNode && selectedView ? (
       <Inspector
@@ -592,13 +606,20 @@ function BuilderView({
         />
       </Inspector>
     ) : (
-      <div className="p-4">
-        <EmptyState
-          size="sm"
-          title="Nothing selected"
-          description="Select a node to configure it, or press + to add one."
-        />
-      </div>
+      <WorkflowPanel
+        definition={definition}
+        store={store}
+        readOnly={readOnly}
+        name={title}
+        {...(!readOnly ? { onRename: renameWorkflow } : {})}
+        onDescribe={(description) =>
+          void patch(`/v1/workflows/${workflow.id}`, { description })
+            .then(() => qc.invalidateQueries({ queryKey: ["workflows", s.ws] }))
+            .catch((e: unknown) =>
+              toast.error(e instanceof Error ? e.message : "Could not save the description"),
+            )
+        }
+      />
     );
 
   const describeProblem = (d: Diagnostic) => {
@@ -787,24 +808,7 @@ function BuilderView({
         { label: "Workflows", href: `/${s.ws}/workflows` },
         { label: title },
       ]}
-      {...(!readOnly
-        ? {
-            // the workflow's name (lists, runs) and the definition's name move together
-            onRename: (name: string) => {
-              const next = name.trim().slice(0, 120);
-              if (!next || next === title) return;
-              setTitle(next);
-              store.getState().updateDefinition((d) => {
-                d.name = next;
-              }, "Rename workflow");
-              void patch(`/v1/workflows/${workflow.id}`, { name: next })
-                .then(() => qc.invalidateQueries({ queryKey: ["workflows", s.ws] }))
-                .catch((e: unknown) =>
-                  toast.error(e instanceof Error ? e.message : "Rename failed"),
-                );
-            },
-          }
-        : {})}
+      {...(!readOnly ? { onRename: renameWorkflow } : {})}
       saveState={saveState}
       {...(saveError ? { saveError } : {})}
       onRun={() => setBottomTab("run")}

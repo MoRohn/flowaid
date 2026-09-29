@@ -20,7 +20,7 @@ import {
   Select,
   SelectItem,
 } from "@flowaid/ui/primitives";
-import { TemplateGallery } from "@flowaid/ui/builder";
+import { TemplateGallery, type WorkflowTemplateView } from "@flowaid/ui/builder";
 import { PageHeader } from "@flowaid/ui/shell";
 import type { NodeManifest } from "@flowaid/workflow-core";
 import { get, post } from "~/api/client";
@@ -29,6 +29,7 @@ import { templateResourceSlots, templateToView } from "~/admin/logic";
 import type { McpServer, TemplateRow } from "~/admin/types";
 import { Notice, QueryView, useMutate } from "~/admin/ui";
 import { useSession } from "~/session";
+import { businessArea, splitBusinessFlows } from "~/templates/business";
 import { templateNeeds, type TemplateNeed, type WorkspaceResources } from "~/templates/readiness";
 import { AppFrame, PageBody } from "~/shell/AppFrame";
 import { HELP } from "~/shell/help";
@@ -277,6 +278,7 @@ function Templates() {
           view: {
             ...templateToView(t, categoryOf),
             ...(have ? { needs: templateNeeds(t, have) } : {}),
+            ...(businessArea(t) ? { useCase: businessArea(t) } : {}),
           },
         }))
         // what can run now comes first
@@ -310,8 +312,9 @@ function Templates() {
                   description="This server has no templates installed."
                 />
               ) : (
-                <TemplateGallery
-                  templates={views}
+                <TemplateSections
+                  rows={rows}
+                  views={views}
                   onUse={(v) => {
                     if (canWrite) setUsing(rows.find((t) => t.id === v.id) ?? null);
                   }}
@@ -327,5 +330,48 @@ function Templates() {
         onClose={closeDialog}
       />
     </AppFrame>
+  );
+}
+
+/**
+ * Business flows get their own short list at the top (complete workflows for everyday operations);
+ * every other template follows in the searchable gallery.
+ */
+function TemplateSections({
+  rows,
+  views,
+  onUse,
+}: {
+  rows: readonly TemplateRow[];
+  views: WorkflowTemplateView[];
+  onUse: (v: WorkflowTemplateView) => void;
+}) {
+  const { business } = splitBusinessFlows(rows);
+  const ids = new Set(business.map((t) => t.id));
+  const featured = views.filter((v) => ids.has(v.id));
+  const rest = views.filter((v) => !ids.has(v.id));
+  if (featured.length === 0) return <TemplateGallery templates={views} onUse={onUse} />;
+  return (
+    <div className="flex flex-col gap-8">
+      <section aria-labelledby="business-flows" className="flex flex-col gap-3">
+        <div>
+          <h2 id="business-flows" className="text-base font-semibold text-ink">
+            Business flows
+          </h2>
+          <p className="max-w-[70ch] text-xs text-ink-2">
+            Complete workflows for everyday operations, built end to end: input, decisions, rules,
+            people when needed, and the outcome. Create one and it is yours: rename it, change its
+            settings (limits, windows, scores) in the workflow panel, and edit any step or wording.
+          </p>
+        </div>
+        <TemplateGallery templates={featured} onUse={onUse} toolbar={false} />
+      </section>
+      <section aria-labelledby="more-templates" className="flex flex-col gap-3">
+        <h2 id="more-templates" className="text-base font-semibold text-ink">
+          More templates
+        </h2>
+        <TemplateGallery templates={rest} onUse={onUse} />
+      </section>
+    </div>
   );
 }

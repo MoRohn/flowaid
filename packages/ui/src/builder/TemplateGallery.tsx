@@ -28,6 +28,8 @@ export interface WorkflowTemplateView {
   decisionCount?: number;
   /** What it needs before it can run, and whether the workspace has it; omit when unknown. */
   needs?: { label: string; ready: boolean }[];
+  /** The business area it serves ("Finance"), shown above the name. */
+  useCase?: string;
 }
 
 export interface TemplateGalleryProps extends HTMLAttributes<HTMLDivElement> {
@@ -41,6 +43,8 @@ export interface TemplateGalleryProps extends HTMLAttributes<HTMLDivElement> {
   onCategoryChange?: (category: NodeCategory | "all") => void;
   /** Column width floor for the responsive grid, in px. */
   minCardWidth?: number;
+  /** Show the search and category filter (default true); a short featured list can hide it. */
+  toolbar?: boolean;
 }
 
 /** Case-insensitive search across name, description, tags and category labels; category filter narrows to templates that use it. */
@@ -82,6 +86,7 @@ export const TemplateGallery = forwardRef<HTMLDivElement, TemplateGalleryProps>(
       defaultCategory = "all",
       onCategoryChange,
       minCardWidth = 260,
+      toolbar = true,
       className,
       ...rest
     },
@@ -102,36 +107,38 @@ export const TemplateGallery = forwardRef<HTMLDivElement, TemplateGalleryProps>(
 
     return (
       <div ref={ref} className={cn("flex min-w-0 flex-col gap-3", className)} {...rest}>
-        <div className="flex flex-wrap items-center gap-2">
-          <SearchInput
-            value={q}
-            onValueChange={setQ}
-            placeholder="Search templates"
-            aria-label="Search templates"
-            className="w-full sm:w-64"
-          />
-          <div className="contain-inline-size min-w-0 flex-1 basis-60 overflow-x-auto py-0.5">
-            <ToggleGroup
-              type="single"
-              size="sm"
-              value={cat}
-              onValueChange={(v) => {
-                if (v) setCat(v as NodeCategory | "all");
-              }}
-              aria-label="Filter by category"
-            >
-              <ToggleGroupItem value="all">All</ToggleGroupItem>
-              {categories.map((c) => (
-                <ToggleGroupItem key={c} value={c}>
-                  {CATEGORY_LABEL[c]}
-                </ToggleGroupItem>
-              ))}
-            </ToggleGroup>
+        {toolbar ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <SearchInput
+              value={q}
+              onValueChange={setQ}
+              placeholder="Search templates"
+              aria-label="Search templates"
+              className="w-full sm:w-64"
+            />
+            <div className="contain-inline-size min-w-0 flex-1 basis-60 overflow-x-auto py-0.5">
+              <ToggleGroup
+                type="single"
+                size="sm"
+                value={cat}
+                onValueChange={(v) => {
+                  if (v) setCat(v as NodeCategory | "all");
+                }}
+                aria-label="Filter by category"
+              >
+                <ToggleGroupItem value="all">All</ToggleGroupItem>
+                {categories.map((c) => (
+                  <ToggleGroupItem key={c} value={c}>
+                    {CATEGORY_LABEL[c]}
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
+            </div>
+            <span className="ml-auto font-mono text-2xs text-ink-3 tabular">
+              {visible.length} of {templates.length}
+            </span>
           </div>
-          <span className="ml-auto font-mono text-2xs text-ink-3 tabular">
-            {visible.length} of {templates.length}
-          </span>
-        </div>
+        ) : null}
 
         {visible.length === 0 ? (
           <EmptyState
@@ -166,6 +173,7 @@ export const TemplateGallery = forwardRef<HTMLDivElement, TemplateGalleryProps>(
                     <MiniGraph nodes={t.nodes} edges={t.edges} label={`${t.name} preview`} />
                   </div>
                   <div className="flex flex-1 flex-col gap-2 p-3">
+                    {t.useCase ? <p className="text-eyebrow">{t.useCase}</p> : null}
                     <h3 className="text-sm font-semibold leading-tight tracking-tight text-ink">
                       {t.name}
                     </h3>

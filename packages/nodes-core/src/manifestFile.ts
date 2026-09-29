@@ -4,10 +4,18 @@
  */
 import type { NodeManifest } from "@flowaid/workflow-core";
 import file from "../manifest.json" with { type: "json" };
+import expenseApproval from "../templates/expense-approval.json" with { type: "json" };
+import expenseApprovalResources from "../templates/expense-approval.resources.json" with { type: "json" };
 import githubIssueTriage from "../templates/github-issue-triage.json" with { type: "json" };
 import githubIssueTriageResources from "../templates/github-issue-triage.resources.json" with { type: "json" };
 import githubIssueTriageRetrieval from "../templates/github-issue-triage.retrieval.json" with { type: "json" };
 import githubIssueTriageRetrievalResources from "../templates/github-issue-triage.retrieval.resources.json" with { type: "json" };
+import itHelpdeskRouting from "../templates/it-helpdesk-routing.json" with { type: "json" };
+import itHelpdeskRoutingResources from "../templates/it-helpdesk-routing.resources.json" with { type: "json" };
+import leadQualification from "../templates/lead-qualification.json" with { type: "json" };
+import leadQualificationResources from "../templates/lead-qualification.resources.json" with { type: "json" };
+import refundRequests from "../templates/refund-requests.json" with { type: "json" };
+import refundRequestsResources from "../templates/refund-requests.resources.json" with { type: "json" };
 import messageTriage from "../templates/message-triage.json" with { type: "json" };
 import messageTriageResources from "../templates/message-triage.resources.json" with { type: "json" };
 import pageindexAgent from "../templates/pageindex-agent.json" with { type: "json" };
@@ -44,6 +52,11 @@ export interface CoreTemplate {
 export const coreTemplates: readonly CoreTemplate[] = [
   // the starter first: it runs with only a TypeSafe key
   [messageTriage, messageTriageResources],
+  // business flows: complete, runnable end to end with only a TypeSafe key
+  [expenseApproval, expenseApprovalResources],
+  [leadQualification, leadQualificationResources],
+  [itHelpdeskRouting, itHelpdeskRoutingResources],
+  [refundRequests, refundRequestsResources],
   [supportTriage, supportTriageResources],
   [githubIssueTriage, githubIssueTriageResources],
   [githubIssueTriageRetrieval, githubIssueTriageRetrievalResources],

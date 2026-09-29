@@ -28,6 +28,23 @@ the Run tab and press **Run draft**. It needs only TypeSafe: either `TYPESAFE_AP
 `.env.local` or a TypeSafe credential. The Output tab says whether the run completed, and the
 trace shows each decision's probabilities.
 
+## Start from a business flow
+
+_Templates → Business flows_ (or _New workflow → From a template_) has four complete workflows
+for everyday operations. Each runs end to end with only the TypeSafe key:
+
+| Flow                     | Area             | What it does                                                                                                        | Settings you can change                   |
+| ------------------------ | ---------------- | ------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| Expense approval         | Finance          | Checks a claim against the spending policy; approves small compliant claims, sends the rest to a manager to approve | `autoApproveLimit`, `receiptRequiredOver` |
+| Sales lead qualification | Sales            | Scores an inbound lead 0–100 and routes it to sales, nurture, support or discard, with the next step                | `salesScore`                              |
+| IT help desk routing     | IT operations    | Sets category, priority (P1–P4), team and response time; escalates security incidents                               | `majorIncidentUsers`                      |
+| Refund request handling  | Customer service | Checks the refund policy and fraud risk; refunds, declines or sends to an agent, with the reply to the customer     | `autoRefundLimit`, `returnWindowDays`     |
+
+Creating one gives you your own workflow. Click the empty canvas to open the workflow panel:
+rename it, describe it, and change its settings (limits, windows, scores), which every step reads
+as `$vars.<name>`. Select any step to change its wording, options or logic, and add or remove
+steps as usual. Approvals wait under _Human tasks_ until someone answers them.
+
 To build one yourself:
 
 1. **Start a workflow**: _Workflows → New workflow → Blank_, or start from a template. Each template

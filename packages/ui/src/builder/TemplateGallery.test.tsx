@@ -85,4 +85,17 @@ describe("TemplateGallery", () => {
     expect(screen.getByText(/OpenAI API key \(to set up\)/)).toBeInTheDocument();
     expect(screen.getByText(/TypeSafe API key \(ready\)/)).toBeInTheDocument();
   });
+
+  it("shows the business area and can hide the search for a short featured list", () => {
+    const [first] = BUILDER_SAMPLE_TEMPLATES as [(typeof BUILDER_SAMPLE_TEMPLATES)[number]];
+    render(
+      <TemplateGallery
+        templates={[{ ...first, useCase: "Finance" }]}
+        onUse={() => undefined}
+        toolbar={false}
+      />,
+    );
+    expect(screen.getByText("Finance")).toBeInTheDocument();
+    expect(screen.queryByRole("searchbox", { name: "Search templates" })).toBeNull();
+  });
 });
