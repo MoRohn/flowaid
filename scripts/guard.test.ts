@@ -119,9 +119,10 @@ describe("the process guard", () => {
     const code = await new Promise<number | null>((r) => guarded.process.once("exit", r));
     expect(code).toBe(3);
     const grand = Number(readFileSync(join(dir, "grand"), "utf8"));
-    // Windows keeps no process group to sweep; there the launcher's stop reaches the tree
+    // Windows keeps no process group to sweep (there the launcher's stop reaches the tree), so
+    // only macOS and Linux promise it; whatever is left here is cleaned up
     if (!WINDOWS) expect(await until(() => !alive(grand))).toBe(true);
-    else process.kill(grand);
+    else if (alive(grand)) process.kill(grand);
   });
 });
 

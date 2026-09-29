@@ -13,7 +13,7 @@
  * "Left running": a process whose command line names this checkout, or a listener on its ports.
  */
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { connect } from "node:net";
 import { join, resolve } from "node:path";
 
@@ -265,9 +265,33 @@ hardKill(rec.pid);
 for (const g of guards) hardKill(g.pid);
 await fourth.exited;
 await sleep(2000);
-const orphans = rec.processes.filter((p) => !p.name.endsWith(" guard") && alive(p.pid));
-if (orphans.length === 0) fail("expected orphans after killing the guards; none were left");
-ok(`left orphans on purpose: ${orphans.map((p) => p.name).join(", ")}`);
+let orphans: { name: string; pid: number }[] = rec.processes.filter(
+  (p) => !p.name.endsWith(" guard") && alive(p.pid),
+);
+if (orphans.length > 0) ok(`left orphans on purpose: ${orphans.map((p) => p.name).join(", ")}`);
+else if (!WINDOWS) fail("expected orphans after killing the guards; none were left");
+else {
+  // Windows ends a Node process's children with it (libuv's job object), so killing the guards
+  // leaves nothing; a stand-in for what could survive (a detached api) checks the next start
+  // still finds, verifies and ends it
+  await nothingLeft(rec, "after the guards were killed (Windows ends their children too)", 30_000);
+  const standIn = spawn(
+    process.execPath,
+    ["-e", "setInterval(() => {}, 1000)", join(ROOT, "apps/api/src/main.ts")],
+    { detached: true, stdio: "ignore", windowsHide: true },
+  );
+  standIn.unref();
+  const pid = standIn.pid ?? 0;
+  const stale = JSON.parse(readFileSync(INSTANCE, "utf8")) as Rec & {
+    processes: { name: string; pid: number; match: string }[];
+  };
+  stale.processes.push({ name: "api", pid, match: "src/main.ts" });
+  writeFileSync(INSTANCE, JSON.stringify(stale));
+  await sleep(500);
+  if (!alive(pid)) fail("the stand-in did not start");
+  orphans = [{ name: "api", pid }];
+  ok(`left a stand-in orphan (pid ${pid}) in the stale record`);
+}
 const fifth = launch("fifth");
 const fresh = await ready(fifth, "fifth start");
 if (!fifth.output().includes("stopped what an earlier FlowAId left running"))

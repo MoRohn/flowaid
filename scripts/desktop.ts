@@ -16,7 +16,7 @@
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, posix } from "node:path";
 import { createInterface } from "node:readline";
 
 import { spawnGuarded, type Guarded } from "./guard.ts";
@@ -36,8 +36,9 @@ export function desktopAvailable(env: NodeJS.ProcessEnv, platform: Platform): bo
 export function appBrowserCandidates(env: NodeJS.ProcessEnv, platform: Platform): string[] {
   if (platform === "darwin") {
     const apps = ["Google Chrome", "Microsoft Edge", "Brave Browser", "Chromium"];
-    const dirs = ["/Applications", join(env.HOME ?? "", "Applications")];
-    return dirs.flatMap((d) => apps.map((a) => join(d, `${a}.app`, "Contents/MacOS", a)));
+    // the target's own path form, whichever computer computes it
+    const dirs = ["/Applications", posix.join(env.HOME ?? "", "Applications")];
+    return dirs.flatMap((d) => apps.map((a) => posix.join(d, `${a}.app`, "Contents/MacOS", a)));
   }
   if (platform === "win32") {
     const roots = [env.PROGRAMFILES, env["PROGRAMFILES(X86)"], env.LOCALAPPDATA].filter(
@@ -60,7 +61,7 @@ export function appBrowserCandidates(env: NodeJS.ProcessEnv, platform: Platform)
     "chromium-browser",
   ];
   const path = (env.PATH ?? "").split(":").filter(Boolean);
-  return names.flatMap((n) => path.map((p) => join(p, n)));
+  return names.flatMap((n) => path.map((p) => posix.join(p, n)));
 }
 
 export function findAppBrowser(
