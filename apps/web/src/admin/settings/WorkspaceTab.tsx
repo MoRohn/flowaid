@@ -1,11 +1,15 @@
 "use client";
-/** Workspace name and `WorkspaceSettingsSchema` (retention, queue limit, budget). */
+/**
+ * Workspace name and `WorkspaceSettingsSchema` (retention, queue limit, budget). Each hint says
+ * what the server actually does with the value today.
+ */
 import { useQuery } from "@tanstack/react-query";
-import { useState, type FormEvent } from "react";
+import type { FormEvent } from "react";
 import { Button, FieldRow, Input, NumberInput } from "@flowaid/ui/primitives";
 import { get, patch } from "~/api/client";
 import { useSession } from "~/session";
 import type { Workspace, WorkspaceSettings } from "../types";
+import { usePreservedDraft } from "../drafts";
 import { Notice, QueryView, Section, useMutate } from "../ui";
 
 type Draft = {
@@ -65,7 +69,8 @@ export function WorkspaceTab() {
 function WorkspaceForm({ w }: { w: Workspace }) {
   const s = useSession();
   const canEdit = s.can("admin");
-  const [draft, setDraft] = useState<Draft>(() => fromWorkspace(w));
+  // kept while another Settings tab is open; leaving the page asks first
+  const { draft, setDraft, dirty, reset } = usePreservedDraft<Draft>("workspace", fromWorkspace(w));
   const save = useMutate(
     (d: Draft) =>
       patch<Workspace>(`/v1/workspaces/${w.id}`, {
@@ -81,7 +86,6 @@ function WorkspaceForm({ w }: { w: Workspace }) {
     },
   );
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setDraft((d) => ({ ...d, [k]: v }));
-  const dirty = JSON.stringify(fromWorkspace(w)) !== JSON.stringify(draft);
   const auditTooShort = draft.auditDays !== null && draft.auditDays < 90;
 
   return (
@@ -114,48 +118,54 @@ function WorkspaceForm({ w }: { w: Workspace }) {
       </Section>
       <Section
         title="Retention"
-        description="Older data is purged nightly. Leave a field empty for the server default."
+        description="How long to keep old data. Leave a field empty for the server default."
       >
-        <div className="grid gap-4 sm:grid-cols-3">
-          <FieldRow label="Runs" htmlFor="ret-runs" hint="1–3650 days">
-            <NumberInput
-              id="ret-runs"
-              value={draft.runsDays}
-              min={1}
-              max={3650}
-              unit="days"
-              disabled={!canEdit}
-              onValueChange={(v) => set("runsDays", v)}
-            />
-          </FieldRow>
-          <FieldRow
-            label="Audit log"
-            htmlFor="ret-audit"
-            hint="90–3650 days"
-            error={auditTooShort ? "At least 90 days" : undefined}
-          >
-            <NumberInput
-              id="ret-audit"
-              value={draft.auditDays}
-              min={90}
-              max={3650}
-              unit="days"
-              invalid={auditTooShort}
-              disabled={!canEdit}
-              onValueChange={(v) => set("auditDays", v)}
-            />
-          </FieldRow>
-          <FieldRow label="Artifacts" htmlFor="ret-art" hint="1–3650 days">
-            <NumberInput
-              id="ret-art"
-              value={draft.artifactsDays}
-              min={1}
-              max={3650}
-              unit="days"
-              disabled={!canEdit}
-              onValueChange={(v) => set("artifactsDays", v)}
-            />
-          </FieldRow>
+        <div className="flex flex-col gap-4">
+          <Notice tone="info">
+            Not applied yet: these values are saved, but the nightly clean-up does not read them.
+            Finished runs keep their data for 90 days (7 with short retention, 400 with long).
+          </Notice>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <FieldRow label="Runs" htmlFor="ret-runs" hint="1–3650 days">
+              <NumberInput
+                id="ret-runs"
+                value={draft.runsDays}
+                min={1}
+                max={3650}
+                unit="days"
+                disabled={!canEdit}
+                onValueChange={(v) => set("runsDays", v)}
+              />
+            </FieldRow>
+            <FieldRow
+              label="Audit log"
+              htmlFor="ret-audit"
+              hint="90–3650 days"
+              error={auditTooShort ? "At least 90 days" : undefined}
+            >
+              <NumberInput
+                id="ret-audit"
+                value={draft.auditDays}
+                min={90}
+                max={3650}
+                unit="days"
+                invalid={auditTooShort}
+                disabled={!canEdit}
+                onValueChange={(v) => set("auditDays", v)}
+              />
+            </FieldRow>
+            <FieldRow label="Artifacts" htmlFor="ret-art" hint="1–3650 days">
+              <NumberInput
+                id="ret-art"
+                value={draft.artifactsDays}
+                min={1}
+                max={3650}
+                unit="days"
+                disabled={!canEdit}
+                onValueChange={(v) => set("artifactsDays", v)}
+              />
+            </FieldRow>
+          </div>
         </div>
       </Section>
       <Section title="Limits">
@@ -163,7 +173,7 @@ function WorkspaceForm({ w }: { w: Workspace }) {
           <FieldRow
             label="Queued runs"
             htmlFor="lim-queue"
-            hint="New runs are refused with 429 above this many queued runs"
+            hint="When this many runs are waiting, new ones are turned away (HTTP 429) until the queue shrinks. Empty uses 1,000."
           >
             <NumberInput
               id="lim-queue"
@@ -177,7 +187,7 @@ function WorkspaceForm({ w }: { w: Workspace }) {
           <FieldRow
             label="Monthly budget"
             htmlFor="lim-budget"
-            hint="Provider spend alert threshold"
+            hint="The workflow advisor uses it to judge whether a workflow's cost per run fits. Runs are not stopped and no alert is sent when spending passes it."
           >
             <NumberInput
               id="lim-budget"
@@ -193,13 +203,12 @@ function WorkspaceForm({ w }: { w: Workspace }) {
         </div>
       </Section>
       {canEdit ? (
-        <div className="flex justify-end gap-2">
-          <Button
-            type="button"
-            variant="ghost"
-            disabled={!dirty}
-            onClick={() => setDraft(fromWorkspace(w))}
-          >
+        <div className="flex items-center justify-end gap-2">
+          <p className="mr-auto text-xs text-ink-3" role="status">
+            {/* a saved form remounts with the new values; the toast confirms the save */}
+            {save.isPending ? "Saving…" : dirty ? "Unsaved changes" : ""}
+          </p>
+          <Button type="button" variant="ghost" disabled={!dirty} onClick={reset}>
             Discard
           </Button>
           <Button

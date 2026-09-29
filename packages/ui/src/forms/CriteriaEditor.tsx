@@ -484,6 +484,8 @@ export const CriteriaEditor = forwardRef<HTMLDivElement, CriteriaEditorProps>(
               </label>
               <Textarea
                 id={`${baseId}-true`}
+                // optional, though the surrounding criteria field is required
+                aria-required={false}
                 autoGrow
                 minRows={2}
                 maxRows={6}
@@ -499,6 +501,8 @@ export const CriteriaEditor = forwardRef<HTMLDivElement, CriteriaEditorProps>(
               </label>
               <Textarea
                 id={`${baseId}-false`}
+                // optional, though the surrounding criteria field is required
+                aria-required={false}
                 autoGrow
                 minRows={2}
                 maxRows={6}

@@ -15,11 +15,13 @@ import {
 import type { ExpressionScope } from "@flowaid/ui";
 import {
   BindingField,
+  type BindingFieldProps,
   CodeEditor,
   type TemplateRef,
   JsonSchemaEditor,
   SchemaForm,
   isBinding,
+  templateRefsFromScope,
 } from "@flowaid/ui/forms";
 import {
   Button,
@@ -39,6 +41,7 @@ import type { BuilderStore } from "./store";
 import type { Projection } from "./model";
 import { useModelViews } from "./models";
 import { CredentialSlots } from "./CredentialSlots";
+import { PolicyEditor } from "./PolicyEditor";
 
 export interface NodeInspectorProps {
   node: WorkflowNode;
@@ -77,13 +80,20 @@ export function expressionScope(
  * workflow's variables. The compiler still decides which of them are upstream.
  */
 export function templateRefs(scope: ExpressionScope): TemplateRef[] {
-  return scope.nodes.flatMap((n) =>
-    n.outputs.map((p) => ({
-      ref: { kind: "port" as const, node: n.id, port: p.id },
-      schema: p.schema ?? {},
-    })),
-  );
+  return templateRefsFromScope(scope);
 }
+
+/** A manifest's default policy number, when it sets one. */
+function manifestNumber(
+  manifest: NodeManifest | undefined,
+  read: (p: Record<string, unknown>) => unknown,
+) {
+  const v = manifest ? read(manifest.defaultPolicy) : undefined;
+  return typeof v === "number" ? v : undefined;
+}
+
+/** What a `BindingField`'s Template mode completes and checks. */
+type TemplateScope = Pick<BindingFieldProps, "templateRefs" | "variables" | "inContainer">;
 
 function toBinding(value: unknown): Binding | undefined {
   if (value === undefined) return undefined;
@@ -111,6 +121,9 @@ export function NodeInspector({
   const parentKind = node.parent
     ? definition.nodes.find((n) => n.id === node.parent)?.kind
     : undefined;
+  const inContainer = parentKind === "loop" || parentKind === "foreach";
+  // what Template mode completes and checks, the same as the config's template fields
+  const templateScope = { templateRefs: refs, variables, inContainer };
 
   return (
     <div className="flex flex-col gap-5">
@@ -158,7 +171,7 @@ export function NodeInspector({
             models={models}
             templateRefs={refs}
             variables={variables}
-            inContainer={parentKind === "loop" || parentKind === "foreach"}
+            inContainer={inContainer}
             disabled={readOnly}
             onChange={(values) => s.setNodeConfig(node.id, values)}
             aria-label={`${node.name} configuration`}
@@ -166,13 +179,20 @@ export function NodeInspector({
           {view && view.inputs.length > 0 ? (
             <section className="flex flex-col gap-3" aria-label="Inputs">
               <h3 className="text-eyebrow">Inputs</h3>
+              <FieldHint>
+                What this step receives. Choose where each input's value comes from.
+              </FieldHint>
               {view.inputs.map((p) => (
-                <div key={p.id} className="flex flex-col gap-1">
+                <div key={p.id} className="flex flex-col gap-1.5">
+                  <Label required={p.required}>{p.label}</Label>
                   <BindingField
-                    label={`${p.label}${p.required ? " *" : ""}`}
+                    label={p.label}
                     value={node.inputs[p.id]}
                     scope={scope}
                     disabled={readOnly}
+                    structured
+                    {...templateScope}
+                    showModeHint
                     onChange={(v) => s.setBinding(node.id, p.id, toBinding(v))}
                   />
                   {p.description ? <FieldHint>{p.description}</FieldHint> : null}
@@ -200,15 +220,22 @@ export function NodeInspector({
 
       {node.kind === "output" ? (
         <>
-          <BindingField
-            label="Value"
-            value={node.value}
-            scope={scope}
-            disabled={readOnly}
-            onChange={(v) =>
-              s.setBinding(node.id, "value", toBinding(v) ?? { kind: "literal", value: null })
-            }
-          />
+          <div className="flex flex-col gap-1.5">
+            <Label>Result</Label>
+            <BindingField
+              label="Result"
+              value={node.value}
+              scope={scope}
+              disabled={readOnly}
+              structured
+              {...templateScope}
+              showModeHint
+              onChange={(v) =>
+                s.setBinding(node.id, "value", toBinding(v) ?? { kind: "literal", value: null })
+              }
+            />
+            <FieldHint>What the run returns when it ends here.</FieldHint>
+          </div>
           <FieldRow>
             <Label htmlFor={`outcome-${node.id}`}>Outcome label</Label>
             <Input
@@ -229,11 +256,23 @@ export function NodeInspector({
                 )
               }
             />
+            <FieldHint>
+              A short name for how the run ended here (for example refunded), recorded with the
+              run's result.
+            </FieldHint>
           </FieldRow>
-          <div className="flex items-center justify-between">
-            <Label htmlFor={`early-${node.id}`}>End the run early</Label>
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex flex-col gap-1">
+              <Label htmlFor={`early-${node.id}`}>End the run early</Label>
+              <FieldHint id={`early-${node.id}-hint`}>
+                {node.earlyExit
+                  ? "On: the run finishes as soon as it reaches this output; steps still running are cancelled."
+                  : "Off: the run also waits for its other paths to finish."}
+              </FieldHint>
+            </div>
             <Switch
               id={`early-${node.id}`}
+              aria-describedby={`early-${node.id}-hint`}
               checked={node.earlyExit}
               disabled={readOnly}
               onCheckedChange={(v) =>
@@ -268,6 +307,7 @@ export function NodeInspector({
           node={node}
           store={store}
           scope={scope}
+          templateScope={templateScope}
           readOnly={readOnly}
         />
       ) : null}
@@ -277,20 +317,48 @@ export function NodeInspector({
           node={node}
           store={store}
           scope={scope}
+          templateScope={templateScope}
           readOnly={readOnly}
         />
       ) : null}
 
-      <Collapsible title="Execution policy" defaultOpen={false}>
-        <JsonField
-          label="Policy"
-          value={node.policy ?? {}}
-          readOnly={readOnly}
-          onValid={(v) =>
-            s.setNodePolicy(node.id, Object.keys(v as object).length ? (v as never) : undefined)
-          }
-          hint="timeoutMs, retry { maxAttempts, backoff }, onError (fail | route | ignore), maxCostUsd, maxTokens, privacy."
-        />
+      <Collapsible
+        title={
+          policySummary(node.policy)
+            ? `Errors & limits · ${policySummary(node.policy)}`
+            : "Errors & limits"
+        }
+        defaultOpen={false}
+      >
+        <div className="flex flex-col gap-4">
+          <PolicyEditor
+            nodeId={node.id}
+            policy={node.policy}
+            defaultTimeoutMs={
+              manifestNumber(manifest, (p) => p.timeoutMs) ??
+              definition.execution.defaultNodeTimeoutMs
+            }
+            defaultAttempts={
+              manifestNumber(
+                manifest,
+                (p) => (p.retry as { maxAttempts?: unknown } | undefined)?.maxAttempts,
+              ) ?? definition.execution.defaultRetry.maxAttempts
+            }
+            readOnly={readOnly}
+            onChange={(v) => s.setNodePolicy(node.id, v as never)}
+          />
+          <Collapsible title="Edit policy as JSON" defaultOpen={false}>
+            <JsonField
+              label="Policy"
+              value={node.policy ?? {}}
+              readOnly={readOnly}
+              onValid={(v) =>
+                s.setNodePolicy(node.id, Object.keys(v as object).length ? (v as never) : undefined)
+              }
+              hint="Also: retry.backoff, retry.retryOn, pool, privacy."
+            />
+          </Collapsible>
+        </div>
       </Collapsible>
       <Collapsible title="Edit as JSON" defaultOpen={false}>
         <JsonField
@@ -316,6 +384,20 @@ export function NodeInspector({
       </Collapsible>
     </div>
   );
+}
+
+/** "retries 3 · 30 s" style summary of what a node overrides, for the collapsed header. */
+export function policySummary(policy: WorkflowNode["policy"]): string {
+  if (!policy) return "";
+  const parts: string[] = [];
+  if (policy.onError === "route") parts.push("failed path");
+  if (policy.onError === "ignore") parts.push("carries on");
+  if (policy.retry && policy.retry.maxAttempts > 1)
+    parts.push(`${policy.retry.maxAttempts} attempts`);
+  if (policy.timeoutMs !== undefined) parts.push(`${policy.timeoutMs / 1000} s`);
+  if (policy.maxCostUsd !== undefined) parts.push(`$${policy.maxCostUsd}`);
+  if (policy.maxTokens !== undefined) parts.push(`${policy.maxTokens} tokens`);
+  return parts.join(" · ");
 }
 
 function BranchEditor({
@@ -460,11 +542,13 @@ function EventWaitEditor({
   node,
   store,
   scope,
+  templateScope,
   readOnly,
 }: {
   node: Extract<WorkflowNode, { kind: "wait" }>;
   store: BuilderStore;
   scope: ExpressionScope;
+  templateScope: TemplateScope;
   readOnly?: boolean | undefined;
 }) {
   const s = store.getState();
@@ -509,8 +593,11 @@ function EventWaitEditor({
           }}
         />
       </FieldRow>
+      <Label>Correlation key</Label>
       <BindingField
         label="Correlation key"
+        showModeHint
+        {...templateScope}
         value={until.correlation}
         scope={scope}
         disabled={readOnly}
@@ -535,18 +622,23 @@ function HumanEditor({
   node,
   store,
   scope,
+  templateScope,
   readOnly,
 }: {
   node: Extract<WorkflowNode, { kind: "human" }>;
   store: BuilderStore;
   scope: ExpressionScope;
+  templateScope: TemplateScope;
   readOnly?: boolean | undefined;
 }) {
   const s = store.getState();
   return (
     <section className="flex flex-col gap-3" aria-label="Review">
+      <Label>Task title</Label>
       <BindingField
         label="Title"
+        showModeHint
+        {...templateScope}
         value={node.title}
         scope={scope}
         disabled={readOnly}
@@ -561,6 +653,7 @@ function HumanEditor({
           )
         }
       />
+      <FieldHint>What the reviewer sees at the top of the task under Human tasks.</FieldHint>
       <FieldRow>
         <Label>Mode</Label>
         <Select

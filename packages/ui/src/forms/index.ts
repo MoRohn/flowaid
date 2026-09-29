@@ -102,6 +102,7 @@ export { BindingField, bindingProblem, type BindingFieldProps } from "./BindingF
 export {
   SecretSlotPicker,
   secretsForSlot,
+  humanizeSlot,
   NO_SECRET_VALUE,
   DECLARE_SECRET_VALUE,
   type SecretSlotPickerProps,
@@ -111,6 +112,7 @@ export {
   ExpressionInput,
   ExpressionTextarea,
   type ExpressionInputProps,
+  type TemplateStatus,
   type ExpressionTextareaProps,
   type ExpressionEditorHandle,
 } from "./ExpressionInput";
@@ -223,11 +225,15 @@ export {
 export { ReorderableList, moveItem, moveOrder, type ReorderableListProps } from "./ReorderableList";
 export {
   TemplateEditor,
+  TemplateInput,
   templateCompletions,
   rangedDiagnostics,
+  useTemplateAssist,
   type TemplateEditorProps,
+  type TemplateInputProps,
   type TemplateRef,
 } from "./TemplateEditor";
+export { checkTemplate, templateRefsFromScope, type TemplateCheck } from "./templateCheck";
 export {
   LevelsList,
   validateLevels,

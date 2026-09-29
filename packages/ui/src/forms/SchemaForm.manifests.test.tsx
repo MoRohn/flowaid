@@ -128,7 +128,7 @@ describe("workflow-core fixture manifests through SchemaForm", () => {
     );
     expect(screen.getByRole("radiogroup", { name: "Threshold source" })).toBeInTheDocument();
     expect(screen.getAllByRole("slider").length).toBeGreaterThan(0);
-    await user.click(screen.getByRole("radio", { name: "Ref" }));
+    await user.click(screen.getByRole("radio", { name: "Reference" }));
     await user.type(
       screen.getByRole("textbox", { name: "Threshold reference" }),
       "$vars.gate_threshold",

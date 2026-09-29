@@ -2,7 +2,7 @@
 /**
  * Building blocks shared by the management surfaces: query-state rendering, mutations with
  * toasts and cache invalidation, `?tab=` syncing, the one-time secret dialog, JSON fields,
- * section cards and downloads.
+ * section cards, downloads and the unsaved-changes guard.
  */
 import {
   useMutation,
@@ -12,7 +12,7 @@ import {
   type UseQueryResult,
 } from "@tanstack/react-query";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { AlertTriangle, ShieldAlert } from "lucide-react";
 import {
   Button,
@@ -35,6 +35,33 @@ import { ErrorPanel, errorMessage } from "~/shell/states";
 import type { MemberRow } from "./types";
 
 // ── data ────────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * While a form has unsaved edits: the browser asks before a reload or closing the window, and
+ * following an in-app link asks first (the draft lives only in the form).
+ */
+export function useLeaveGuard(dirty: boolean): void {
+  useEffect(() => {
+    if (!dirty) return;
+    const beforeUnload = (e: BeforeUnloadEvent) => e.preventDefault();
+    const click = (e: MouseEvent) => {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey) return;
+      const link = e.target instanceof Element ? e.target.closest("a[href]") : null;
+      if (!(link instanceof HTMLAnchorElement) || link.target === "_blank") return;
+      if (new URL(link.href, window.location.href).origin !== window.location.origin) return;
+      if (!window.confirm("You have unsaved changes. Leave this page and discard them?")) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    window.addEventListener("beforeunload", beforeUnload);
+    document.addEventListener("click", click, true);
+    return () => {
+      window.removeEventListener("beforeunload", beforeUnload);
+      document.removeEventListener("click", click, true);
+    };
+  }, [dirty]);
+}
 
 /** Renders loading skeletons, an error panel with retry, or the data. */
 export function QueryView<T>({

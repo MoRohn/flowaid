@@ -29,7 +29,8 @@ export function secretsForSlot(slot: CredentialSlot, secrets: readonly SecretDec
   return secrets.filter((s) => slot.types.includes(s.credentialType));
 }
 
-function humanizeSlot(name: string): string {
+/** A credential slot's display name: `llm` → "LLM", `api_token` → "Api token". */
+export function humanizeSlot(name: string): string {
   // short acronyms (llm, mcp, api) read as such
   if (/^[a-z]{2,3}$/.test(name)) return name.toUpperCase();
   const spaced = name.replace(/_+/g, " ").trim();

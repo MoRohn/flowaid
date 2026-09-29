@@ -8,7 +8,7 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import type { CredentialSlot, WorkflowDefinition, WorkflowNode } from "@flowaid/workflow-core";
-import { SecretSlotPicker } from "@flowaid/ui/forms";
+import { SecretSlotPicker, humanizeSlot } from "@flowaid/ui/forms";
 import {
   Button,
   Dialog,
@@ -167,7 +167,7 @@ export function CredentialSlots({
             .filter((slot) => !node.credentials[slot.name])
             .map((slot) => (
               <Button key={slot.name} size="sm" onClick={() => setDeclaring(slot)}>
-                Add a key for {slots.length > 1 ? slot.name : "this step"}
+                Add a key for {slots.length > 1 ? humanizeSlot(slot.name) : "this step"}
               </Button>
             ))}
         </div>

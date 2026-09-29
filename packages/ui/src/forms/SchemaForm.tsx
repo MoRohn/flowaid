@@ -77,6 +77,7 @@ import {
   SchemaFormEnvironmentContext,
   getWidget,
   isMultilineTemplate,
+  useSchemaFormEnvironment,
   type LoadOptions,
   type SchemaFormEnvironment,
   type SchemaWidget,
@@ -402,6 +403,7 @@ function LeafField({
   hideLabel,
 }: LeafFieldProps) {
   const meta = useMeta();
+  const env = useSchemaFormEnvironment();
   const { control } = useFormContext<SchemaValues>();
   useRegisterPath(name, true);
   const bindable = hints.bindable === true && widgetName !== "binding";
@@ -456,6 +458,9 @@ function LeafField({
             onBlur={field.onBlur}
             label={label}
             scope={meta.scope}
+            {...(env.templateRefs ? { templateRefs: env.templateRefs } : {})}
+            {...(env.variables ? { variables: env.variables } : {})}
+            inContainer={env.inContainer ?? false}
             renderLiteral={renderWidget}
             disabled={meta.disabled}
             invalid={Boolean(error)}

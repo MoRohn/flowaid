@@ -50,8 +50,24 @@ export interface ExpressionInputProps {
   showMessage?: boolean;
   /** Enter (without an open completion) submits, e.g. to close an inline editor. */
   onSubmit?: () => void;
+  /** Extra CodeMirror extensions (completion sources, external diagnostics). */
+  extensions?: Extension;
+  /**
+   * The field's own check, replacing the built-in `input.*` / `nodes.*` / `variables.*` scan
+   * (TemplateEditor and TemplateInput check the compiler's `node.port` grammar).
+   */
+  status?: TemplateStatus;
   "aria-label"?: string;
   "aria-describedby"?: string;
+}
+
+/** What a template editor's own check found: shown in the footer and under the field. */
+export interface TemplateStatus {
+  references: number;
+  /** Problems underlined in the text (unknown references). */
+  issues: number;
+  /** The parse error, when the text does not parse. */
+  error: string | null;
 }
 
 const baseExtensions: Extension = [
@@ -101,6 +117,8 @@ export const ExpressionInput = forwardRef<ExpressionEditorHandle, ExpressionInpu
       referencePicker = true,
       showMessage = true,
       onSubmit,
+      extensions: extra,
+      status,
       "aria-label": ariaLabel,
       "aria-describedby": ariaDescribedBy,
     },
@@ -134,9 +152,11 @@ export const ExpressionInput = forwardRef<ExpressionEditorHandle, ExpressionInpu
         EditorState.readOnly.of(isDisabled || readOnly),
         EditorView.contentAttributes.of(editorControlAttributes(field, ariaLabel, labelId)),
         cmPlaceholder(placeholder),
+        extra ?? [],
       ],
       // field is a fresh object each render; depend on its members.
       [
+        extra,
         scope,
         handleValidate,
         isDisabled,
@@ -190,7 +210,9 @@ export const ExpressionInput = forwardRef<ExpressionEditorHandle, ExpressionInpu
       }
     };
 
-    const firstError = validation?.issues.find((i) => i.severity === "error");
+    const firstError = status
+      ? status.error
+      : (validation?.issues.find((i) => i.severity === "error")?.message ?? null);
     const showInvalid = Boolean(field["aria-invalid"]) || (Boolean(firstError) && !focused);
 
     return (
@@ -230,17 +252,13 @@ export const ExpressionInput = forwardRef<ExpressionEditorHandle, ExpressionInpu
             </div>
           ) : null}
         </div>
-        {showMessage && firstError && !focused ? (
-          <FieldError>{firstError.message}</FieldError>
-        ) : null}
+        {showMessage && firstError && !focused ? <FieldError>{firstError}</FieldError> : null}
       </div>
     );
   },
 );
 
 export interface ExpressionTextareaProps extends Omit<ExpressionInputProps, "onSubmit"> {
-  /** Extra CodeMirror extensions (completion sources, external diagnostics). */
-  extensions?: Extension;
   /** Initial visible height in lines. */
   minRows?: number;
   maxRows?: number;
@@ -269,6 +287,7 @@ export const ExpressionTextarea = forwardRef<ExpressionEditorHandle, ExpressionT
       minRows = 4,
       maxRows = 16,
       extensions: extra,
+      status,
       "aria-label": ariaLabel,
       "aria-describedby": ariaDescribedBy,
     },
@@ -349,11 +368,16 @@ export const ExpressionTextarea = forwardRef<ExpressionEditorHandle, ExpressionT
     );
     useImperativeHandle(ref, () => ({ focus: () => view?.focus(), insert, view }), [view, insert]);
 
-    const firstError = validation?.issues.find((i) => i.severity === "error");
-    // with compiler references (no picker) the legacy scanner sees none of them; count the holes
-    const refCount = referencePicker
-      ? (validation?.references.length ?? 0)
-      : findExpressionRegions(text).length;
+    const firstError = status
+      ? status.error
+      : (validation?.issues.find((i) => i.severity === "error")?.message ?? null);
+    const refCount = status
+      ? status.references
+      : referencePicker
+        ? (validation?.references.length ?? 0)
+        : // without a check of its own the scanner sees no compiler references; count the holes
+          findExpressionRegions(text).length;
+    const issueCount = status ? status.issues : (validation?.issues.length ?? 0);
     const showInvalid = Boolean(field["aria-invalid"]) || (Boolean(firstError) && !focused);
 
     return (
@@ -384,14 +408,14 @@ export const ExpressionTextarea = forwardRef<ExpressionEditorHandle, ExpressionT
           />
           <div className="flex h-7 shrink-0 items-center gap-2 border-t border-border bg-surface-2 pl-2 pr-1 text-2xs text-ink-3">
             {firstError && !focused ? (
-              <span className="min-w-0 truncate text-danger-text">{firstError.message}</span>
+              <span className="min-w-0 truncate text-danger-text">{firstError}</span>
             ) : (
               <span className="min-w-0 truncate font-mono tabular">
                 {refCount === 0
                   ? "No references"
                   : `${refCount} ${refCount === 1 ? "reference" : "references"}`}
-                {validation && validation.issues.length > 0 && focused
-                  ? ` · ${validation.issues.length} ${validation.issues.length === 1 ? "issue" : "issues"}`
+                {issueCount > 0 && (focused || status)
+                  ? ` · ${issueCount} ${issueCount === 1 ? "issue" : "issues"}`
                   : ""}
               </span>
             )}

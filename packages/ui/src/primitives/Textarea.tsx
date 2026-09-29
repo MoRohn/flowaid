@@ -50,6 +50,11 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
     disabled,
     "aria-invalid": invalid,
     "aria-describedby": rest["aria-describedby"],
+    // an explicit aria-required (false for an optional part of a required field) wins
+    "aria-required":
+      rest["aria-required"] === undefined
+        ? undefined
+        : rest["aria-required"] === true || rest["aria-required"] === "true",
   });
 
   const setRef = useCallback(

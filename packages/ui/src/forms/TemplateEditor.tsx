@@ -5,8 +5,12 @@
  *   `$scope.item|index|iteration|carry`, `$run.*` and every FlowExpr function with its arity.
  * - Compiler diagnostics that carry `location.range` are underlined at that range, with the
  *   message on hover and the first error under the field.
+ * - `checkTemplate` counts the references and underlines holes whose step, output or setting
+ *   does not exist; the footer shows the count, the issues and any parse error.
+ *
+ * `TemplateInput` is the single-line form of the same editor.
  */
-import { forwardRef, useMemo } from "react";
+import { forwardRef, useCallback, useMemo, useState } from "react";
 import {
   insertCompletionText,
   type Completion,
@@ -26,10 +30,14 @@ import {
 import type { ExpressionScope } from "@/types";
 import { findExpressionRegions } from "./expression";
 import {
+  ExpressionInput,
   ExpressionTextarea,
   type ExpressionEditorHandle,
+  type ExpressionInputProps,
   type ExpressionTextareaProps,
+  type TemplateStatus,
 } from "./ExpressionInput";
+import { checkTemplate } from "./templateCheck";
 import {
   EMPTY_SCOPE,
   externalDiagnostics,
@@ -37,6 +45,8 @@ import {
   scopeReferences,
   type EditorDiagnostic,
 } from "./expressionExtensions";
+
+const NO_REFS: readonly TemplateRef[] = [];
 
 /** A reference the template may use, with the schema of the value it points at. */
 export interface TemplateRef {
@@ -171,43 +181,126 @@ export function rangedDiagnostics(diagnostics: readonly Diagnostic[] = []): Edit
   );
 }
 
+interface TemplateAssistOptions {
+  refs: readonly TemplateRef[];
+  variables: readonly string[];
+  inContainer: boolean;
+  diagnostics?: readonly Diagnostic[] | undefined;
+}
+
+/**
+ * Completion, underlines and the footer status for template text in the compiler's grammar:
+ * the compiler diagnostics that carry a range plus `checkTemplate`'s own findings.
+ */
+export function useTemplateAssist(
+  text: string,
+  { refs, variables, inContainer, diagnostics }: TemplateAssistOptions,
+): { extensions: Extension; status: TemplateStatus } {
+  const check = useMemo(
+    () => checkTemplate(text, refs, variables, inContainer),
+    [text, refs, variables, inContainer],
+  );
+  const marks = useMemo(
+    () => [...rangedDiagnostics(diagnostics), ...check.diagnostics],
+    [diagnostics, check.diagnostics],
+  );
+  const extensions = useMemo<Extension>(
+    () => [
+      scopeReferences.of(false),
+      externalDiagnostics.of(marks),
+      extraCompletionSource.of(source(refs, variables, inContainer)),
+    ],
+    [refs, variables, inContainer, marks],
+  );
+  const status = useMemo<TemplateStatus>(
+    () => ({
+      references: check.references.length,
+      issues: check.diagnostics.filter((d) => d.severity !== "error").length,
+      error: check.error,
+    }),
+    [check],
+  );
+  return { extensions, status };
+}
+
+/** Keeps the text a controlled-or-uncontrolled editor currently shows, for the checks above. */
+function useCurrentText(
+  value: string | undefined,
+  defaultValue: string | undefined,
+  onChange: ((value: string) => void) | undefined,
+): [string, (value: string) => void] {
+  const [own, setOwn] = useState(defaultValue ?? "");
+  const change = useCallback(
+    (next: string) => {
+      setOwn(next);
+      onChange?.(next);
+    },
+    [onChange],
+  );
+  return [value ?? own, change];
+}
+
+const NO_VARIABLES: readonly string[] = [];
+
+function examplePlaceholder(refs: readonly TemplateRef[], lead: string): string {
+  // the example names a reference this field can really use (the legacy default does not compile)
+  const example = refs.find((r) => r.ref.kind === "port");
+  return `${lead}${
+    example?.ref.kind === "port"
+      ? `, for example {{ ${example.ref.node}.${example.ref.port} }}`
+      : ""
+  }.`;
+}
+
 export const TemplateEditor = forwardRef<ExpressionEditorHandle, TemplateEditorProps>(
   function TemplateEditor(
-    { refs, variables = [], inContainer = false, diagnostics, scope, className, ...props },
+    {
+      refs,
+      variables = NO_VARIABLES,
+      inContainer = false,
+      diagnostics,
+      scope,
+      className,
+      value,
+      defaultValue,
+      onChange,
+      ...props
+    },
     ref,
   ) {
     const useRefs = refs !== undefined;
-    const marks = useMemo(() => rangedDiagnostics(diagnostics), [diagnostics]);
-    const extensions = useMemo<Extension>(
-      () => [
-        scopeReferences.of(!useRefs),
-        externalDiagnostics.of(marks),
-        useRefs ? extraCompletionSource.of(source(refs, variables, inContainer)) : [],
-      ],
-      [useRefs, refs, variables, inContainer, marks],
+    const [text, change] = useCurrentText(value, defaultValue, onChange);
+    const assist = useTemplateAssist(text, {
+      refs: refs ?? NO_REFS,
+      variables,
+      inContainer,
+      diagnostics,
+    });
+    const legacyMarks = useMemo(() => rangedDiagnostics(diagnostics), [diagnostics]);
+    const legacyExtensions = useMemo<Extension>(
+      () => [externalDiagnostics.of(legacyMarks)],
+      [legacyMarks],
     );
     const firstError = diagnostics?.find((d) => d.severity === "error");
-    // the example names a reference this field can really use (the legacy default does not compile)
-    const example = refs?.find((r) => r.ref.kind === "port");
     const placeholder =
       props.placeholder ??
-      (useRefs
-        ? `Write the text. Type {{ to insert a value${
-            example?.ref.kind === "port"
-              ? `, for example {{ ${example.ref.node}.${example.ref.port} }}`
-              : ""
-          }.`
+      (useRefs && refs
+        ? examplePlaceholder(refs, "Write the text. Type {{ to insert a value")
         : undefined);
     return (
       <div className={className} data-widget="template">
         <ExpressionTextarea
           ref={ref}
           {...props}
+          {...(value !== undefined ? { value } : {})}
+          {...(defaultValue !== undefined ? { defaultValue } : {})}
+          onChange={change}
           {...(placeholder !== undefined ? { placeholder } : {})}
           scope={scope ?? EMPTY_SCOPE}
           referencePicker={props.referencePicker ?? !useRefs}
           invalid={props.invalid === true || firstError !== undefined}
-          extensions={extensions}
+          extensions={useRefs ? assist.extensions : legacyExtensions}
+          {...(useRefs ? { status: assist.status } : {})}
         />
         {firstError ? (
           <p className="mt-1 text-xs text-danger-text" role="alert">
@@ -215,6 +308,56 @@ export const TemplateEditor = forwardRef<ExpressionEditorHandle, TemplateEditorP
           </p>
         ) : null}
       </div>
+    );
+  },
+);
+
+export interface TemplateInputProps extends Omit<
+  ExpressionInputProps,
+  "scope" | "extensions" | "status" | "referencePicker"
+> {
+  /** Upstream values the holes may reference. */
+  refs: readonly TemplateRef[];
+  variables?: readonly string[];
+  inContainer?: boolean;
+  diagnostics?: readonly Diagnostic[];
+}
+
+/**
+ * Single-line template field in the compiler's grammar: the same completion, underlines and
+ * checks as `TemplateEditor`, on one line.
+ */
+export const TemplateInput = forwardRef<ExpressionEditorHandle, TemplateInputProps>(
+  function TemplateInput(
+    {
+      refs,
+      variables = NO_VARIABLES,
+      inContainer = false,
+      diagnostics,
+      value,
+      defaultValue,
+      onChange,
+      ...props
+    },
+    ref,
+  ) {
+    const [text, change] = useCurrentText(value, defaultValue, onChange);
+    const assist = useTemplateAssist(text, { refs, variables, inContainer, diagnostics });
+    return (
+      <ExpressionInput
+        ref={ref}
+        {...props}
+        {...(value !== undefined ? { value } : {})}
+        {...(defaultValue !== undefined ? { defaultValue } : {})}
+        onChange={change}
+        placeholder={
+          props.placeholder ?? examplePlaceholder(refs, "Text, with {{ to insert a value")
+        }
+        scope={EMPTY_SCOPE}
+        referencePicker={false}
+        extensions={assist.extensions}
+        status={assist.status}
+      />
     );
   },
 );

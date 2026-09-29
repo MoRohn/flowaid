@@ -36,7 +36,7 @@ import { CriteriaEditor, type DecisionCriteria } from "./CriteriaEditor";
 import { CronEditor } from "./CronEditor";
 import { JsonSchemaEditor } from "./JsonSchemaEditor";
 import { LevelsList } from "./LevelsList";
-import { TemplateEditor, type TemplateRef } from "./TemplateEditor";
+import { TemplateEditor, TemplateInput, type TemplateRef } from "./TemplateEditor";
 import { ExpressionInput, ExpressionTextarea } from "./ExpressionInput";
 import { KeyValueEditor, type KeyValueRow } from "./KeyValueEditor";
 import { ModelPicker } from "./ModelPicker";
@@ -963,9 +963,9 @@ export function isMultilineTemplate(schema: JsonSchema): boolean {
 }
 
 /**
- * `template` fields: text with `{{ expr | filter }}` holes, edited with the
- * expression editor (chips, reference completion over the scope). P1-07's
- * `TemplateEditor` replaces this registration.
+ * `template` fields: text with `{{ expr | filter }}` holes. With the builder's compiler
+ * references (`templateRefs`) multi-line fields use `TemplateEditor` and single-line ones
+ * `TemplateInput`; otherwise the scope-based expression editors.
  */
 export function TemplateWidget({
   schema,
@@ -996,19 +996,28 @@ export function TemplateWidget({
       />
     );
   }
+  if (env.templateRefs) {
+    return (
+      <TemplateInput
+        aria-label={name}
+        refs={env.templateRefs}
+        variables={env.variables ?? []}
+        inContainer={env.inContainer ?? false}
+        value={asString(value)}
+        onChange={onChange}
+        {...(placeholder !== undefined ? { placeholder } : {})}
+        disabled={disabled}
+        invalid={invalid}
+      />
+    );
+  }
   return (
     <ExpressionInput
       aria-label={name}
       scope={env.scope}
       value={asString(value)}
       onChange={onChange}
-      // its picker inserts the legacy roots; with compiler references the field is typed by hand
-      {...(env.templateRefs
-        ? {
-            referencePicker: false,
-            placeholder: placeholder ?? "Text, with {{ node.port }} for a value",
-          }
-        : { placeholder })}
+      placeholder={placeholder}
       disabled={disabled}
       invalid={invalid}
     />
@@ -1110,6 +1119,9 @@ export function BindingWidget({
       label={ariaLabel ?? label}
       alwaysBinding
       scope={env.scope}
+      {...(env.templateRefs ? { templateRefs: env.templateRefs } : {})}
+      {...(env.variables ? { variables: env.variables } : {})}
+      inContainer={env.inContainer ?? false}
       disabled={disabled}
       invalid={invalid}
     />

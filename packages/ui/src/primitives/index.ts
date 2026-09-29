@@ -174,6 +174,7 @@ export {
   type ProgressTone,
 } from "./ProgressBar";
 export { Badge, badgeVariants, type BadgeProps } from "./Badge";
+export { UnsavedMark } from "./UnsavedMark";
 export {
   StatusChip,
   statusLabel,

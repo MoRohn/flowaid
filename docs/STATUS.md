@@ -88,9 +88,10 @@ compiled API, worker and Docker images run plain `node` on `dist`.
   environment. The Message triage starter declares it optional, and keys added from the builder
   are optional when the server has the key. The smallest backend change: let the run-start check
   accept an unbound required secret whose `credentialType` the server has a key for.
-- The node Inputs section's template mode (`BindingField`) still offers the legacy reference picker,
-  whose `input.*` / `nodes.*` / `variables.*` insertions do not compile; config template fields
-  now complete compiler references (`start.message`, `$vars.x`) instead, and single-line ones hide
-  the legacy picker but offer no completion yet.
+- Workspace retention settings (`settings.retention.runsDays` / `auditDays` / `artifactsDays`) are
+  saved but not read: the retention sweep (`packages/database/src/retention.ts`) uses the per-class
+  `RETENTION_DAYS` (standard 90, short 7, long 400). `settings.budgets.monthlyCostUsd` is read only
+  by the workflow advisor; nothing stops runs or alerts when it is passed. Settings → Workspace
+  says so next to the fields.
 - ⌘K opens the node palette only while focus is inside the canvas (elsewhere it opens the
   command menu); the Add node button is reachable with Tab.

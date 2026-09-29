@@ -56,9 +56,24 @@ export function VersionStatusBadge({
   );
 }
 
-/** "Production" → "prod", "Staging" → "stg", "Development" → "dev": the first three letters, lower-cased. */
+const KNOWN_ENVIRONMENTS: Record<string, string> = {
+  production: "prod",
+  prod: "prod",
+  staging: "stg",
+  stage: "stg",
+  development: "dev",
+  dev: "dev",
+  test: "test",
+};
+
+/**
+ * A short, recognisable environment tag: "Production" → "prod", "Staging" → "stg",
+ * "Development" → "dev"; a name of up to four letters stays whole; anything else is its first
+ * three letters. Lower-cased.
+ */
 export function environmentAbbreviation(name: string): string {
-  return name.trim().slice(0, 3).toLowerCase();
+  const key = name.trim().toLowerCase();
+  return KNOWN_ENVIRONMENTS[key] ?? (key.length <= 4 ? key : key.slice(0, 3));
 }
 
 /** One dot per workspace environment, filled when a version is deployed there; protected environments read in the ok tone. */

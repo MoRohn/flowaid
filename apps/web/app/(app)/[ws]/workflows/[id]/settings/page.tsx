@@ -14,12 +14,14 @@ import {
   Textarea,
   ToggleGroup,
   ToggleGroupItem,
+  UnsavedMark,
 } from "@flowaid/ui/primitives";
 import { del, get, patch, put } from "~/api/client";
 import type { WorkflowDetail } from "~/api/types";
 import { WorkflowFrame } from "~/admin/WorkflowFrame";
 import { credentialsForSecret, missingRequiredSecrets, parseTags } from "~/admin/logic";
 import type { Credential, EvaluationSet } from "~/admin/types";
+import { DraftProvider, isTabDirty, useDirtyKeys, usePreservedDraft } from "~/admin/drafts";
 import { Notice, QueryView, Section, useMutate, useQueryTab } from "~/admin/ui";
 import { useSession } from "~/session";
 import { ScheduleList } from "~/admin/triggers/Schedules";
@@ -38,9 +40,16 @@ const NONE = "__none";
 
 function General({ w }: { w: WorkflowDetail }) {
   const s = useSession();
-  const [name, setName] = useState(w.name);
-  const [description, setDescription] = useState(w.description);
-  const [tags, setTags] = useState(w.tags.join(", "));
+  // kept while another settings section is open; leaving the page asks first
+  const { draft, setDraft, dirty, reset } = usePreservedDraft(`general:${w.id}`, {
+    name: w.name,
+    description: w.description,
+    tags: w.tags.join(", "),
+  });
+  const { name, description, tags } = draft;
+  const setName = (v: string) => setDraft((d) => ({ ...d, name: v }));
+  const setDescription = (v: string) => setDraft((d) => ({ ...d, description: v }));
+  const setTags = (v: string) => setDraft((d) => ({ ...d, tags: v }));
   const canWrite = s.can("workflows:write");
   const save = useMutate(
     () =>
@@ -57,10 +66,6 @@ function General({ w }: { w: WorkflowDetail }) {
       ],
     },
   );
-  const dirty =
-    name !== w.name ||
-    description !== w.description ||
-    parseTags(tags).join(",") !== w.tags.join(",");
   return (
     <Section title="General">
       <form
@@ -101,7 +106,7 @@ function General({ w }: { w: WorkflowDetail }) {
           />
         </FieldRow>
         {canWrite ? (
-          <div>
+          <div className="flex items-center gap-2">
             <Button
               type="submit"
               variant="primary"
@@ -110,6 +115,12 @@ function General({ w }: { w: WorkflowDetail }) {
             >
               Save
             </Button>
+            <Button type="button" variant="ghost" disabled={!dirty} onClick={reset}>
+              Discard
+            </Button>
+            <p className="text-xs text-ink-3" role="status">
+              {save.isPending ? "Saving…" : dirty ? "Unsaved changes" : ""}
+            </p>
           </div>
         ) : null}
       </form>
@@ -156,7 +167,10 @@ function EnvSecretsForm({
   const s = useSession();
   const env = s.environments.find((e) => e.id === envId);
   const declared = w.draft.secrets ?? [];
-  const [draft, setDraft] = useState<Record<string, string>>(() => bound.data ?? {});
+  const { draft, setDraft, dirty, reset } = usePreservedDraft<Record<string, string>>(
+    `secrets:${w.id}:${envId}`,
+    bound.data ?? {},
+  );
   const save = useMutate(
     () => put<Record<string, string>>(`/v1/workflows/${w.id}/secrets/${envId}`, draft),
     {
@@ -165,7 +179,6 @@ function EnvSecretsForm({
     },
   );
   const missing = missingRequiredSecrets(declared, draft);
-  const dirty = JSON.stringify(bound.data ?? {}) !== JSON.stringify(draft);
   return (
     <Section
       title={
@@ -183,15 +196,22 @@ function EnvSecretsForm({
         </span>
       }
       actions={
-        <Button
-          size="sm"
-          variant="primary"
-          loading={save.isPending}
-          disabled={!dirty}
-          onClick={() => save.mutate(undefined)}
-        >
-          Save bindings
-        </Button>
+        <>
+          {dirty ? (
+            <Button size="sm" variant="ghost" onClick={reset}>
+              Discard
+            </Button>
+          ) : null}
+          <Button
+            size="sm"
+            variant="primary"
+            loading={save.isPending}
+            disabled={!dirty}
+            onClick={() => save.mutate(undefined)}
+          >
+            Save bindings
+          </Button>
+        </>
       }
     >
       <QueryView query={bound} rows={2}>
@@ -457,6 +477,7 @@ function Danger({ w }: { w: WorkflowDetail }) {
 
 function Settings({ w }: { w: WorkflowDetail }) {
   const [tab, setTab] = useQueryTab<Tab>(TABS);
+  const dirtyKeys = useDirtyKeys();
   return (
     <div className="flex flex-col gap-4">
       <ToggleGroup
@@ -468,6 +489,7 @@ function Settings({ w }: { w: WorkflowDetail }) {
         {TABS.map((t) => (
           <ToggleGroupItem key={t} value={t}>
             {TAB_LABEL[t]}
+            {isTabDirty(dirtyKeys, t) ? <UnsavedMark /> : null}
           </ToggleGroupItem>
         ))}
       </ToggleGroup>
@@ -492,7 +514,10 @@ export default function WorkflowSettingsPage({ params }: { params: Promise<{ id:
     <WorkflowFrame id={id} tab="settings">
       {(w) => (
         <Suspense>
-          <Settings w={w} />
+          {/* unsaved edits survive switching sections */}
+          <DraftProvider>
+            <Settings w={w} />
+          </DraftProvider>
         </Suspense>
       )}
     </WorkflowFrame>

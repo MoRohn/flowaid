@@ -1,7 +1,7 @@
 import { forwardRef, type HTMLAttributes, type ReactNode } from "react";
 import { ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { IconButton, Tabs, TabsList, TabsTrigger } from "@/primitives";
+import { IconButton, Tabs, TabsList, TabsTrigger, UnsavedMark } from "@/primitives";
 
 export interface PageHeaderTab {
   id: string;
@@ -9,6 +9,8 @@ export interface PageHeaderTab {
   count?: number;
   icon?: ReactNode;
   disabled?: boolean;
+  /** The tab holds edits that are not saved yet (a dot after the label). */
+  unsaved?: boolean;
 }
 
 export interface PageHeaderProps extends Omit<HTMLAttributes<HTMLElement>, "title"> {
@@ -97,6 +99,7 @@ export const PageHeader = forwardRef<HTMLElement, PageHeaderProps>(function Page
                     count={t.count}
                     icon={t.icon}
                     disabled={t.disabled}
+                    badge={t.unsaved ? <UnsavedMark /> : undefined}
                     // navigation tabs: the page below is the panel, there is no tabpanel to control
                     aria-controls={undefined}
                   >
