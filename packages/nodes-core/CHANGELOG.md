@@ -1,5 +1,17 @@
 # @flowaid/nodes-core
 
+## 0.6.0
+
+### Patch Changes
+
+- @flowaid/knowledge@0.6.0
+  - @flowaid/mcp@0.6.0
+  - @flowaid/node-sdk@0.6.0
+  - @flowaid/pageindex@0.6.0
+  - @flowaid/providers@0.6.0
+  - @flowaid/shared@0.6.0
+  - @flowaid/workflow-core@0.6.0
+
 ## 0.5.0
 
 ### Minor Changes

@@ -5,6 +5,38 @@ release publishes the `ghcr.io/morohn/flowaid-api`, `-worker` and `-web` images 
 Sections are added by `pnpm version-packages` from the changesets merged since the last release
 (see [docs/operations/RELEASING.md](docs/operations/RELEASING.md)); each package also keeps its own `CHANGELOG.md`.
 
+## 0.6.0 — 2026-09-29
+
+- Clearer errors, a sharper Guide and smarter Add node.
+  - **Config errors in plain words.** `E_CONFIG_INVALID` names the setting by its title, says what it
+    expects and what it holds now ("Max steps must be at most 50; it is the number 90") and never
+    prints a schema regex. A template placeholder left anywhere in a node's config (such as a
+    knowledge source id in a list) is reported once as "Choose the knowledge source…", with a link to
+    Knowledge in the builder, instead of a pattern error or a failure at run time.
+  - **The Guide** docks beside the page only where there is room (1680px and wider) and floats as a
+    card otherwise, so the canvas keeps its width. Collapsible sections, numbered steps, the workflow
+    as a timeline, outcomes as chips and settings with their current values.
+  - **Add node** suggests the steps likely to come next, each with a reason, and remembers recent
+    ones. With a step selected, the new step is placed beside it in free space and connected from its
+    first free port (one undo); otherwise it is moved clear of other steps instead of on top of them.
+- The Guide: plain-language help on every page, for people who are not technical. **Guide** in the
+  top bar (also _Help → Explain this page_ and the command menu) opens a panel beside the page that
+  says what the page is for, what to do next and what its words mean. In the builder it tells the
+  workflow as a short story and explains any step, writing each rule out as a sentence; after a run,
+  the Run result and the run page say what happened in plain words, with how sure each decision was
+  and what a person did. It needs no AI model. On wide screens the page makes room for the panel
+  instead of sitting under it.
+- Docker Compose fixes:
+  - The worker image starts again. `zod` was a development-only dependency of the worker, so the
+    pruned production image lacked it and the worker and sandbox host crashed at start (0.4.0 and
+    0.5.0 images). A repository check now fails when an app's runtime code imports a package that
+    is not a runtime dependency.
+  - Compose defaults to the same address as `./flowaid`, http://flowaid.localhost:3000, and the api
+    and worker also read `.env.local`. `APP_BIND_ADDRESS` publishes web and api on the network
+    while the databases stay on loopback.
+  - Sign-in explains when the browser drops the session over plain http on a network address,
+    and how to fix it (https, or `FLOWAID_ALLOW_INSECURE_HTTP=true` with the public URLs).
+
 ## 0.5.0 — 2026-09-29
 
 - Business flows: four complete workflows to start from, each running end to end with only a TypeSafe

@@ -1,6 +1,6 @@
 {
   "name": "@flowaid/api",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
   "description": "The flowaid HTTP API: Fastify 5 with Zod-typed routes, OpenAPI 3.1, sessions and API keys, workflows, runs with SSE, human tasks, credentials, tools, evaluations and triggers (docs/design/API.md). Never executes nodes.",
   "license": "Apache-2.0",

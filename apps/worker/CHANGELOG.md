@@ -1,5 +1,49 @@
 # @flowaid/worker
 
+## 0.6.0
+
+### Patch Changes
+
+- e67dd32: Docker Compose fixes:
+
+  - The worker image starts again. `zod` was a development-only dependency of the worker, so the
+    pruned production image lacked it and the worker and sandbox host crashed at start (0.4.0 and
+    0.5.0 images). A repository check now fails when an app's runtime code imports a package that
+    is not a runtime dependency.
+  - Compose defaults to the same address as `./flowaid`, http://flowaid.localhost:3000, and the api
+    and worker also read `.env.local`. `APP_BIND_ADDRESS` publishes web and api on the network
+    while the databases stay on loopback.
+  - Sign-in explains when the browser drops the session over plain http on a network address,
+    and how to fix it (https, or `FLOWAID_ALLOW_INSECURE_HTTP=true` with the public URLs).
+
+- Updated dependencies [680d9e3]
+- Updated dependencies [e67dd32]
+  - @flowaid/workflow-compiler@0.6.0
+  - @flowaid/env@0.6.0
+  - @flowaid/codegen@0.6.0
+  - @flowaid/workflow-runtime@0.6.0
+  - @flowaid/credentials@0.6.0
+  - @flowaid/database@0.6.0
+  - @flowaid/observability@0.6.0
+  - @flowaid/evaluation@0.6.0
+  - @flowaid/knowledge@0.6.0
+  - @flowaid/mcp@0.6.0
+  - @flowaid/node-sdk@0.6.0
+  - @flowaid/nodes-core@0.6.0
+  - @flowaid/nodes-langchain@0.6.0
+  - @flowaid/openapi-tools@0.6.0
+  - @flowaid/pageindex@0.6.0
+  - @flowaid/plugins@0.6.0
+  - @flowaid/provider-anthropic@0.6.0
+  - @flowaid/provider-ollama@0.6.0
+  - @flowaid/provider-openai@0.6.0
+  - @flowaid/provider-typesafe@0.6.0
+  - @flowaid/providers@0.6.0
+  - @flowaid/sandbox@0.6.0
+  - @flowaid/shared@0.6.0
+  - @flowaid/storage@0.6.0
+  - @flowaid/workflow-core@0.6.0
+
 ## 0.5.0
 
 ### Patch Changes

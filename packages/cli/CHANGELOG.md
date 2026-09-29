@@ -1,5 +1,25 @@
 # @flowaid/cli
 
+## 0.6.0
+
+### Patch Changes
+
+- Updated dependencies [680d9e3]
+  - @flowaid/workflow-compiler@0.6.0
+  - @flowaid/workflow-runtime@0.6.0
+  - @flowaid/importer@0.6.0
+  - @flowaid/nodes-core@0.6.0
+  - @flowaid/plugins@0.6.0
+  - @flowaid/provider-anthropic@0.6.0
+  - @flowaid/provider-ollama@0.6.0
+  - @flowaid/provider-openai@0.6.0
+  - @flowaid/provider-typesafe@0.6.0
+  - @flowaid/providers@0.6.0
+  - @flowaid/sandbox@0.6.0
+  - @flowaid/shared@0.6.0
+  - @flowaid/workflow-core@0.6.0
+  - @flowaid/workflow-sdk@0.6.0
+
 ## 0.5.0
 
 ### Patch Changes
