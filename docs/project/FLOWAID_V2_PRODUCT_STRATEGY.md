@@ -85,7 +85,7 @@ From the repository (README, SPEC, the local-first decision), not invented:
    sees run metadata, errors, metrics and workflow structure, not node inputs and outputs.
 5. **Measured, not impressed.** Detector false-positive rates are tested on simulated data; the
    assistant's harness is tested on scripted scenarios, including prompt injection. See
-   [FLOWAID_AI_EVALUATION.md](FLOWAID_AI_EVALUATION.md).
+   [FLOWAID_AI_EVALUATION.md](../ai/FLOWAID_AI_EVALUATION.md).
 6. **No ML for show.** No trained models: the data is small per workflow, and classical
    statistics answer the questions with interpretable evidence. Calibration and forecasting wait
    for the data to support them (see the roadmap).
@@ -93,7 +93,7 @@ From the repository (README, SPEC, the local-first decision), not invented:
 ## What V2 deliberately does not do
 
 - **No sign-in features:** invitations, MFA, OIDC and RBAC beyond the existing roles are out of
-  scope ([local-first decision](STATUS.md)).
+  scope ([local-first decision](../STATUS.md)).
 - **No trained predictive models.** "Will this run fail?" has too few examples per workflow on a
   single machine. Change detection with tests gives honest answers now.
 - **No autonomous AI actions.** An assistant that replays, cancels or publishes needs a

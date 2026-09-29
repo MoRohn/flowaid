@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Waits until the CI and E2E jobs have finished on a commit and fails unless every one of them
 # succeeded. The Release workflow runs it before it tags or publishes anything, so a release is
-# only ever cut from a commit that passed both workflows (docs/RELEASING.md).
+# only ever cut from a commit that passed both workflows (docs/operations/RELEASING.md).
 #
 # Usage: wait-for-checks.sh <sha>
 # Env: GH_TOKEN (checks: read), GITHUB_REPOSITORY; optional REQUIRED_CHECKS (newline separated

@@ -1,0 +1,57 @@
+name: Bug report
+description: Something in FlowAId does not work as described
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Security problems go through **Report a vulnerability** on the
+        Security tab, never a public issue (see SECURITY.md). Never paste API keys, credentials
+        or customer data.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The smallest steps that show the problem. A workflow definition (exported JSON) helps.
+      placeholder: |
+        1. Templates → Expense approval → Use template
+        2. Run draft with …
+        3. …
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Error text, request id or run id
+      description: The error shown in the app (request ids appear under refused runs), the run id, or log lines.
+      render: text
+  - type: input
+    id: version
+    attributes:
+      label: FlowAId version or commit
+      placeholder: 0.5.0 or a commit sha
+    validations:
+      required: true
+  - type: dropdown
+    id: how
+    attributes:
+      label: How you run it
+      options:
+        - ./flowaid (desktop, this computer)
+        - pnpm start --prod
+        - Docker Compose
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Operating system and browser
+      placeholder: macOS 15, Chrome 140

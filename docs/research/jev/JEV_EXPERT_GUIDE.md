@@ -6,7 +6,7 @@ A complete study guide to *Jev Engineering for Production Agents: A Practical Ha
 - Source PDF (figures and tables): `docs/research/jev/jev-engineering-for-production-agents.pdf` (12 pages)
 - Verified live API: `docs/design/TYPESAFE_API.md`
 - Handbook index terms (verbatim): "Jev, TypeSafe AI, system one model, decision contract, typed judgment, calibration, confidence routing, agent harness, shadow mode, semantic verification, Choice, Score, Noul."
-- FlowAId design: `docs/design/` (ARCHITECTURE.md, CONTRACTS.ts, UI.md, API.md, DATABASE.md, RFCS.md), `docs/UPGRADE_PLAN.md`
+- FlowAId design: `docs/design/` (ARCHITECTURE.md, CONTRACTS.ts, UI.md, API.md, DATABASE.md, RFCS.md), `docs/project/UPGRADE_PLAN.md`
 
 ## How to read this guide
 

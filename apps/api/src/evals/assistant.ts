@@ -1,7 +1,7 @@
 /**
  * `pnpm eval:assistant`: runs the Ask FlowAId evaluation set (@flowaid/advisor, fixture
  * workspace) against a live generation model and prints a Markdown report
- * (docs/FLOWAID_AI_EVALUATION.md). Nothing touches a database; the questions go to the model.
+ * (docs/ai/FLOWAID_AI_EVALUATION.md). Nothing touches a database; the questions go to the model.
  *
  *   ANTHROPIC_API_KEY=… pnpm eval:assistant                      # claude-sonnet-5
  *   OPENAI_API_KEY=… pnpm eval:assistant -- --provider openai    # gpt-5.5

@@ -1,6 +1,6 @@
 # flowaid — Upgrade plan (full system upgrade)
 
-Generated 2026-09-22 from the 165 verified review findings in `docs/archive/review-2026-09/*.md` (lenses: design-coherence, spec-gap, workflow-core, ui, devops, security, backlog). Machine-readable copy: `docs/upgrade-plan.json` (same ids). Track J (§6) was added on 2026-09-23 from the Jev engineering gap analysis (`docs/design/JEV_ENGINEERING.md`). This plan **replaces** the wave sequencing of `docs/design/IMPLEMENTATION_PLAN.md` (the waves are retired; nothing resumes from them — every phase below is planned fresh from what is on disk today); the work-package definitions (WP-xx) remain the reference for files, done criteria and tests and are cited by the items.
+Generated 2026-09-22 from the 165 verified review findings in `docs/archive/review-2026-09/*.md` (lenses: design-coherence, spec-gap, workflow-core, ui, devops, security, backlog). Machine-readable copy: `docs/project/upgrade-plan.json` (same ids). Track J (§6) was added on 2026-09-23 from the Jev engineering gap analysis (`docs/design/JEV_ENGINEERING.md`). This plan **replaces** the wave sequencing of `docs/design/IMPLEMENTATION_PLAN.md` (the waves are retired; nothing resumes from them — every phase below is planned fresh from what is on disk today); the work-package definitions (WP-xx) remain the reference for files, done criteria and tests and are cited by the items.
 
 ## 1. Executive summary
 
@@ -692,7 +692,7 @@ All 165 findings are resolved by at least one item. Findings covered by more tha
 
 ## 6. Track J — Jev engineering (phase-independent)
 
-Added 2026-09-23 from the Jev engineering gap analysis of `docs/design/JEV_ENGINEERING.md` (§2: every practice of the handbook _Jev Engineering for Production Agents_ checked against the design; 27 gaps, `resolves` ids `jev-*`). The addendum is the authoritative specification these items implement; the contract changes are RFC-0013…0016 in `docs/design/RFCS.md`, and `CONTRACTS.ts` stays frozen until J-08. Machine-readable copy: `docs/upgrade-plan.json` `tracks[0]`.
+Added 2026-09-23 from the Jev engineering gap analysis of `docs/design/JEV_ENGINEERING.md` (§2: every practice of the handbook _Jev Engineering for Production Agents_ checked against the design; 27 gaps, `resolves` ids `jev-*`). The addendum is the authoritative specification these items implement; the contract changes are RFC-0013…0016 in `docs/design/RFCS.md`, and `CONTRACTS.ts` stays frozen until J-08. Machine-readable copy: `docs/project/upgrade-plan.json` `tracks[0]`.
 
 Track J is not a phase: an item starts as soon as its **hard dependencies** (existing items or other J items) are done, whichever phase they belong to; **coordinates with** names items that touch the same files and should be sequenced with it, not waited for. **Buildable now** means every hard dependency is on disk today (`shared`, `env`, `workflow-core` 0.3.0, `ui`): J-01…J-07 live entirely in the new standalone package `@flowaid/jev` (browser-safe, depends only on `@flowaid/workflow-core` + `@flowaid/shared`) and can start today; J-08 follows as soon as RFC-0013…0015 are accepted; J-17 can start its components over today's `@flowaid/ui` exports. Everything else plugs the package into the platform item it extends (P1-01 compiler, P1-02 database, P1-04/P2-02 providers and TypeSafe, P2-01 runtime, P2-04 nodes, P2-07 evaluation, P3 services, P5 web, P6 advisor, agents and knowledge).
 
@@ -1003,7 +1003,7 @@ All 27 gaps of `JEV_ENGINEERING.md` §2.4 are resolved by at least one item.
 
 ## 7. Track L — Lean 4 verified evaluation (phase-independent)
 
-Added 2026-09-23 from `docs/design/LEAN_VERIFICATION.md`, the owner's requirement for an advanced, self-critical evaluation of FlowAId's results using Lean 4 (article and research in `docs/research/lean4/`). The contract changes are RFC-0017 in `docs/design/RFCS.md`. Machine-readable copy: `docs/upgrade-plan.json` `tracks` entry `L`.
+Added 2026-09-23 from `docs/design/LEAN_VERIFICATION.md`, the owner's requirement for an advanced, self-critical evaluation of FlowAId's results using Lean 4 (article and research in `docs/research/lean4/`). The contract changes are RFC-0017 in `docs/design/RFCS.md`. Machine-readable copy: `docs/project/upgrade-plan.json` `tracks` entry `L`.
 
 Like track J, track L is not a phase: an item starts when its hard dependencies are done. **Buildable now** means it needs only what is on disk (`shared`, `workflow-core`, `jev`, `ui`, and the Lean toolchain already verified on this machine in `docs/research/lean4/HANDS_ON.md`). L-01 to L-09 and L-13 can start today; L-08 tests against `@flowaid/jev`, which exists.
 

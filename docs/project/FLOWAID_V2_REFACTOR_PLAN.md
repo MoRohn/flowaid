@@ -68,6 +68,6 @@ Improvements that V2 capabilities lean on.
 
 - Add the failing test first where the behaviour can be reproduced.
 - One logical change per commit; migrations are additive and forward-only (see
-  [operations/UPGRADES.md](operations/UPGRADES.md)).
+  [operations/UPGRADES.md](../operations/UPGRADES.md)).
 - `pnpm check` and the PostgreSQL suites pass after every merge into `v2.0`.
 - No contract (`workflow-core`) change without an RFC entry.

@@ -1,10 +1,12 @@
-# FlowAId status — 2026-09-28
+# FlowAId status — 2026-09-29
 
-This file records where everything stands so work can restart from a known state. **V2** (branch
-`v2.0`, not yet merged) adds insights, Ask FlowAId and the stabilisation work; its audit, with
-what was verified and what is open, is [FLOWAID_V2_FINAL_AUDIT.md](FLOWAID_V2_FINAL_AUDIT.md). The
-repository is published at [github.com/MoRohn/flowaid](https://github.com/MoRohn/flowaid); CI
-and E2E run on every push to `main`.
+This file records where everything stands so work can restart from a known state. **0.4.0** is
+released (V2: insights, Ask FlowAId, PageIndex, the desktop app); its audit, with what was
+verified and what is open, is [project/FLOWAID_V2_FINAL_AUDIT.md](project/FLOWAID_V2_FINAL_AUDIT.md).
+On `main` for the next release: the first-run experience (the Message triage starter, keys added
+from the builder, run feedback) and the four business flows with the builder's workflow panel.
+The repository is published at [github.com/MoRohn/flowaid](https://github.com/MoRohn/flowaid);
+CI, E2E and the desktop checks run on every push to `main`.
 
 ## Gates
 
@@ -15,7 +17,7 @@ and E2E run on every push to `main`.
 | Acceptance journey (`e2e/acceptance`)                          | pass against the production builds with recorded provider replay and secret-canary log checks       |
 | UI accessibility gallery                                       | pass (axe checks over the `@flowaid/ui` gallery and the web pages, CI job `ui-gallery`)             |
 | Docker images (`docker/Dockerfile`)                            | api, worker and web build and boot; `docker compose up` reaches healthy on every service            |
-| Tests                                                          | 5,831 passing locally (14 more need CI's Node 24 isolated-vm or Docker) plus the browser journey    |
+| Tests                                                          | all pass locally and in CI; the per-package counts below are from the V2 audit (2026-09-28)         |
 
 ## Apps
 
@@ -55,7 +57,7 @@ Workspace packages export `types` and `development` conditions to their sources 
 to `dist`: tests, `tsx --conditions=development` and the web build read sources, while the
 compiled API, worker and Docker images run plain `node` on `dist`.
 
-## Upgrade plan (`docs/UPGRADE_PLAN.md`)
+## Upgrade plan (`docs/project/UPGRADE_PLAN.md`)
 
 - **Phases 0–2:** complete, including release automation (changesets, `release.yml` publishing
   multi-arch images to GHCR, lefthook).
@@ -78,7 +80,7 @@ compiled API, worker and Docker images run plain `node` on `dist`.
   (`env:`, `vault:`, `azure-kv:`, `gcp-sm:`) are configured from the environment.
 - V2's open items (live-model evaluation of Ask FlowAId, browser specs for the insights panels
   and the assistant, dashboard filters in the URL, the P2-6 and P3 refactors, a manual
-  screen-reader pass) are listed in [FLOWAID_V2_FINAL_AUDIT.md](FLOWAID_V2_FINAL_AUDIT.md).
+  screen-reader pass) are listed in [project/FLOWAID_V2_FINAL_AUDIT.md](project/FLOWAID_V2_FINAL_AUDIT.md).
 - A run does not start while a workflow's _required_ secret is unbound in its environment, even
   when the server has that provider's key (`apps/api/src/services/runs.ts`, `E_SECRET_UNBOUND`);
   the worker falls back to the server key only for optional secrets. So the built-in templates,

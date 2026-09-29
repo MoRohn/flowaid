@@ -24,4 +24,4 @@ const insights = detectChanges([{ workflowId, workflowName, recent, baseline }])
 | `wilson`, `median`, `normalCdf`, `logGamma` | helpers                                                           |
 
 Validated against reference values and by simulation (false-positive rate and power); the
-numbers are in [docs/FLOWAID_AI_EVALUATION.md](../../docs/FLOWAID_AI_EVALUATION.md) §2.
+numbers are in [docs/ai/FLOWAID_AI_EVALUATION.md](../../docs/ai/FLOWAID_AI_EVALUATION.md) §2.

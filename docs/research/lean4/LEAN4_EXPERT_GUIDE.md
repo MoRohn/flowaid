@@ -52,7 +52,7 @@ Several facts in this guide depend on the version: how `native_decide` axioms ar
 | [LEANMLIR] / [AXON] | arXiv 2407.03685 / arXiv 2605.01660 |
 | [PLAUSIBLE] | https://github.com/leanprover-community/plausible |
 | [ARCH §x] | `docs/design/ARCHITECTURE.md` section x |
-| [PLAN Px-yy] | `docs/UPGRADE_PLAN.md` item |
+| [PLAN Px-yy] | `docs/project/UPGRADE_PLAN.md` item |
 | [HANDS §x / Gn] | `docs/research/lean4/HANDS_ON.md`, section x or gotcha n (measured on v4.34.0) |
 | [REV] | this revision's scratch project on v4.34.0 (a Lake package plus single files compiled with `lean` and `leanc`); the sources are the *verified 4.34.0* snippets in this guide |
 | [EMITC] | [LEANSRC] `src/Lean/Compiler/LCNF/EmitC.lean` (the C emitter, including the generated `main` and module initializers) |

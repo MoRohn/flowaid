@@ -2,7 +2,7 @@
 
 A release is a version of the platform (every `@flowaid/*` package shares it), a `v<version>` tag,
 three container images and a GitHub release. It is automated by
-[`.github/workflows/release.yml`](../.github/workflows/release.yml) and
+[`.github/workflows/release.yml`](../../.github/workflows/release.yml) and
 [changesets](https://github.com/changesets/changesets); nothing is published to npm (the packages
 are private).
 
@@ -19,7 +19,7 @@ Pick the packages you changed, the bump, and write one or two sentences for the 
 `minor` and fixes are `patch`; a breaking change is `minor` and says so in its first words.
 
 The `@flowaid/*` packages are one fixed group, so any bump moves them all to the same version.
-Contract changes follow [RFCS.md](design/RFCS.md) and add a `minor` changeset for
+Contract changes follow [RFCS.md](../design/RFCS.md) and add a `minor` changeset for
 `@flowaid/workflow-core` instead of editing its version by hand.
 
 ## Cutting a release
@@ -30,7 +30,7 @@ Contract changes follow [RFCS.md](design/RFCS.md) and add a `minor` changeset fo
    - `scripts/release-version.ts` keeps the versions that code pins in step (codegen's
      `PACKAGE_VERSIONS`, the node SDK version plugins are checked against, the bundled node
      packages' own versions, `CLI_VERSION`) and adds a `## <version>` section to the root
-     [CHANGELOG.md](../CHANGELOG.md);
+     [CHANGELOG.md](../../CHANGELOG.md);
    - the node package manifests are regenerated.
 2. Review that pull request like any other (CI runs on it when `RELEASE_TOKEN` is set, see
    below) and merge it.
@@ -46,7 +46,7 @@ hyphen (`0.5.0-rc.1`) is published as a pre-release and does not move `latest` o
 
 Nothing is tagged or published from a commit that has not passed CI and E2E. Before the Release
 workflow tags a merge commit (or, for a tag pushed by hand, in its `gate` job before anything is
-built), [`.github/scripts/wait-for-checks.sh`](../.github/scripts/wait-for-checks.sh) polls the
+built), [`.github/scripts/wait-for-checks.sh`](../../.github/scripts/wait-for-checks.sh) polls the
 commit's check runs until the `check`, `test` and `integration` jobs of CI and the
 `acceptance journey` and `ui gallery (axe, console)` jobs of E2E have finished. If every one
 succeeded the release goes ahead; if any failed or was cancelled, or they are still running
@@ -124,7 +124,7 @@ source repository.
 
 ## Contributor hooks
 
-`pnpm install` installs [lefthook](../lefthook.yml) hooks in a git checkout (never in CI or
+`pnpm install` installs [lefthook](../../lefthook.yml) hooks in a git checkout (never in CI or
 Docker builds): pre-commit checks formatting and lints the staged files with their package's
 ESLint config, pre-push runs the dependency boundaries and the root typecheck. Skip them once
 with `--no-verify`, or set `FLOWAID_SKIP_HOOKS=1` before `pnpm install` to not install them.

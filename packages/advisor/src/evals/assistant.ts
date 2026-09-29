@@ -1,5 +1,5 @@
 /**
- * The Ask FlowAId evaluation set (docs/FLOWAID_AI_EVALUATION.md): a fixed, fictional workspace
+ * The Ask FlowAId evaluation set (docs/ai/FLOWAID_AI_EVALUATION.md): a fixed, fictional workspace
  * served by fixture tools, questions with checkable expectations, and a scorer. The same cases
  * run in CI against scripted models (to prove the scorer) and against a live model with
  * `pnpm eval:assistant` (to measure the model and prompt).

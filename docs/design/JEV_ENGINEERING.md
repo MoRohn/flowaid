@@ -1,6 +1,6 @@
 # flowaid — Jev engineering addendum: decision contracts, packets, routing, calibration, receipts
 
-Status: **authoritative addendum** (v1.1, 2026-09-23), proposed for implementation through track **J** of `docs/UPGRADE_PLAN.md` (§6 there; machine-readable `docs/upgrade-plan.json`, `tracks[0]`). It makes the practices of _Jev Engineering for Production Agents: A Practical Handbook on Typed Semantic Decisions_ (September 2026; independent study edition, not affiliated with TypeSafe AI) a first-class part of how flowaid designs, runs, evaluates and explains decisions.
+Status: **authoritative addendum** (v1.1, 2026-09-23), proposed for implementation through track **J** of `docs/project/UPGRADE_PLAN.md` (§6 there; machine-readable `docs/project/upgrade-plan.json`, `tracks[0]`). It makes the practices of _Jev Engineering for Production Agents: A Practical Handbook on Typed Semantic Decisions_ (September 2026; independent study edition, not affiliated with TypeSafe AI) a first-class part of how flowaid designs, runs, evaluates and explains decisions.
 
 Sources, in order of authority for what they cover:
 
@@ -110,7 +110,7 @@ No flowaid component may execute a side effect because a decision _said_ so with
 
 ### 2.1 Method
 
-Every practice of the handbook (§I–§XI, the four figures/code sketches that carry rules, and Tables I–IX) was compared with the design as written in `ARCHITECTURE.md` (§2.8 decision result, §4.4 batch groups, §6 providers, §10.1 human-in-the-loop, §10.4 evaluation, §10.5 observability, §11 demos), `CONTRACTS.ts` (§7 `DecisionResult`, §11 events, §12 diagnostics, §15 `DecisionQuestion`/`DecisionState`), `UI.md`, `API.md`, `DATABASE.md` and `docs/UPGRADE_PLAN.md`. Status values: **aligned** (the design already does it), **partial** (the mechanism exists but misses a required element), **missing**, **conflict** (the design does something the handbook warns against). Gap ids `G-nn` are defined in §2.4 and are the `resolves` ids of the J items.
+Every practice of the handbook (§I–§XI, the four figures/code sketches that carry rules, and Tables I–IX) was compared with the design as written in `ARCHITECTURE.md` (§2.8 decision result, §4.4 batch groups, §6 providers, §10.1 human-in-the-loop, §10.4 evaluation, §10.5 observability, §11 demos), `CONTRACTS.ts` (§7 `DecisionResult`, §11 events, §12 diagnostics, §15 `DecisionQuestion`/`DecisionState`), `UI.md`, `API.md`, `DATABASE.md` and `docs/project/UPGRADE_PLAN.md`. Status values: **aligned** (the design already does it), **partial** (the mechanism exists but misses a required element), **missing**, **conflict** (the design does something the handbook warns against). Gap ids `G-nn` are defined in §2.4 and are the `resolves` ids of the J items.
 
 ### 2.2 Practice-by-practice matrix
 
@@ -3057,7 +3057,7 @@ Prometheus (ARCH §10.5 list gains): `flowaid_jev_decisions_total{contract,versi
 
 ## 20. Delivery: track J and the handbook's playbook
 
-### 20.1 Track J (full text in `docs/UPGRADE_PLAN.md` §6 and `docs/upgrade-plan.json` `tracks[0]`)
+### 20.1 Track J (full text in `docs/project/UPGRADE_PLAN.md` §6 and `docs/project/upgrade-plan.json` `tracks[0]`)
 
 Track J is phase-independent: an item starts as soon as its hard dependencies are done, whichever phase they belong to; _coordinates with_ names items that touch the same files and should be sequenced with it, not waited for. _Buildable now_ means every hard dependency is on disk today (`shared`, `env`, `workflow-core` 0.3.0, `ui`). Items marked _`@flowaid/jev` only_ touch nothing but the new standalone package, which depends only on `@flowaid/workflow-core` and `@flowaid/shared` (§3.3).
 

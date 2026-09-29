@@ -43,7 +43,7 @@ For each workflow and window the API loads:
 
 - **Multiple comparisons.** Benjamini–Hochberg runs across every test in one request: all
   workflows and all four metrics. With many workflows, chance findings stay rare. In simulation
-  the false-positive rate is 3.5%; see [FLOWAID_AI_EVALUATION.md](../FLOWAID_AI_EVALUATION.md) §2.
+  the false-positive rate is 3.5%; see [FLOWAID_AI_EVALUATION.md](../ai/FLOWAID_AI_EVALUATION.md) §2.
 - **Evidence.** Each insight carries the compared values, the sample sizes, Wilson 95% intervals
   for proportions, the effect (points or ratio), the test, and the p- and q-values. The Overview
   shows them under "Evidence".

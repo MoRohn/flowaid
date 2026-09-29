@@ -47,7 +47,7 @@ database 56, runtime 89, api 117, worker 47), and these four documents.
 ### 1.4 Release gate (P0-7, O1)
 
 - **Objective:** no tag or image from a commit whose CI or E2E failed.
-- **Affected:** `.github/workflows/release.yml`, `docs/RELEASING.md`.
+- **Affected:** `.github/workflows/release.yml`, `docs/operations/RELEASING.md`.
 
 ## Phase 2: platform foundation
 
@@ -128,7 +128,7 @@ readiness hardened; queue and worker metrics recorded.
   model, tokens and cost.
 - **Tests and evaluation:** scripted-model scenarios (tool choice, citation validation, injection in
   tool output, budget stop, no provider configured), and a live evaluation set run through a CLI
-  script when a provider key is present. See [FLOWAID_AI_EVALUATION.md](FLOWAID_AI_EVALUATION.md).
+  script when a provider key is present. See [FLOWAID_AI_EVALUATION.md](../ai/FLOWAID_AI_EVALUATION.md).
 
 ### 4.3 AI hardening (P1-5 to P1-7)
 

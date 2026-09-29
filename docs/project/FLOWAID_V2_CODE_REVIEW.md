@@ -7,7 +7,7 @@ The engineering assessment that opens the V2.0 programme. It covers the whole re
 documentation). Every finding below was read in the code; where a claim could not be verified,
 it says so.
 
-It builds on the September system review in [`archive/review-2026-09/`](archive/review-2026-09/),
+It builds on the September system review in [`archive/review-2026-09/`](../archive/review-2026-09),
 whose 165 findings produced [UPGRADE_PLAN.md](UPGRADE_PLAN.md) (phases P0–P6, now complete).
 This review looks at what that work left behind and at what V2 needs.
 

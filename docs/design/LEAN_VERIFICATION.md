@@ -4,7 +4,7 @@ Status: **authoritative addendum** to `ARCHITECTURE.md` (v1.0, 2026-09-23). Prod
 from the owner: _FlowAId must gain an advanced, self-critical evaluation process of its results
 using Lean 4 concepts and strategies._ Contract changes are proposed as RFC-0017 in `RFCS.md`;
 `CONTRACTS.ts` stays frozen until it is accepted. Delivery is track **L** in
-`docs/UPGRADE_PLAN.md` and `docs/upgrade-plan.json`.
+`docs/project/UPGRADE_PLAN.md` and `docs/project/upgrade-plan.json`.
 
 Sources: the owner's article (`docs/research/lean4/lambdaclass-lean4-article.md`, cited
 [ART]), the expert guide (`docs/research/lean4/LEAN4_EXPERT_GUIDE.md`, cited [GUIDE §n]) and

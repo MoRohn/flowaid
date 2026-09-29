@@ -7,7 +7,7 @@ name: Release
 # Nothing is tagged or published until CI (check, test, integration) and E2E (acceptance journey,
 # ui gallery) have passed on the commit being released: .github/scripts/wait-for-checks.sh waits
 # for them and fails the release if any of them did not succeed.
-# docs/RELEASING.md describes the flow and how to verify the images.
+# docs/operations/RELEASING.md describes the flow and how to verify the images.
 
 on:
   push:
@@ -59,7 +59,7 @@ jobs:
 
       # Pull requests opened with the default token do not start CI; one opened with a GitHub App
       # token or a fine-grained PAT in RELEASE_TOKEN does (contents, pull requests and workflows:
-      # read and write on this repository, docs/RELEASING.md). A token that is missing or lacks a
+      # read and write on this repository, docs/operations/RELEASING.md). A token that is missing or lacks a
       # permission never blocks a release: the default token opens the pull request instead.
       - name: Open or update the Version packages pull request (RELEASE_TOKEN)
         id: with-token
@@ -86,7 +86,7 @@ jobs:
           owner=$(gh api user --jq .login 2>/dev/null || echo "an account the API would not name")
           access=$(gh api "repos/$GITHUB_REPOSITORY" --jq '.permissions | to_entries | map("\(.key)=\(.value)") | join(" ")' 2>/dev/null || echo "no access to $GITHUB_REPOSITORY")
           echo "RELEASE_TOKEN belongs to: $owner; on $GITHUB_REPOSITORY: $access"
-          echo "::warning title=RELEASE_TOKEN::The token of $owner could not update the Version packages branch ($access). It must be created by the repository owner, include $GITHUB_REPOSITORY, and have contents, pull requests and workflows read and write (docs/RELEASING.md). Falling back to the default token: CI will not start on that pull request."
+          echo "::warning title=RELEASE_TOKEN::The token of $owner could not update the Version packages branch ($access). It must be created by the repository owner, include $GITHUB_REPOSITORY, and have contents, pull requests and workflows read and write (docs/operations/RELEASING.md). Falling back to the default token: CI will not start on that pull request."
           git reset --hard "$GITHUB_SHA"
           git clean -fd
           git checkout --detach "$GITHUB_SHA"

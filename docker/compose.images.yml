@@ -1,4 +1,4 @@
-# Run the published release images instead of building from source (docs/RELEASING.md):
+# Run the published release images instead of building from source (docs/operations/RELEASING.md):
 #
 #   FLOWAID_IMAGE_TAG=0.4.0 docker compose -f docker/compose.yml -f docker/compose.images.yml up -d
 #

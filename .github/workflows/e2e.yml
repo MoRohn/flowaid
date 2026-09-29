@@ -1,6 +1,6 @@
 name: E2E
 
-# The release gate (docs/UPGRADE_PLAN.md P5-03, P0-20): the acceptance specs in a browser against
+# The release gate (docs/project/UPGRADE_PLAN.md P5-03, P0-20): the acceptance specs in a browser against
 # the production builds that `pnpm start --prod` runs (the web app's standalone server, the compiled
 # API and worker) over Postgres with pgvector: the journey, a TypeSafe decision replayed from
 # fixtures/providers (FLOWAID_PROVIDER_FIXTURES=replay), secret canaries that must never reach the

@@ -3,7 +3,7 @@
 Every release of FlowAId, newest first. The `@flowaid/*` packages share one version; each
 release publishes the `ghcr.io/morohn/flowaid-api`, `-worker` and `-web` images at that version.
 Sections are added by `pnpm version-packages` from the changesets merged since the last release
-(see [docs/RELEASING.md](docs/RELEASING.md)); each package also keeps its own `CHANGELOG.md`.
+(see [docs/operations/RELEASING.md](docs/operations/RELEASING.md)); each package also keeps its own `CHANGELOG.md`.
 
 ## 0.4.0 — 2026-09-29
 
@@ -60,7 +60,7 @@ Sections are added by `pnpm version-packages` from the changesets merged since t
 
 ## Before the first release (2026-09-23 to 2026-09-28)
 
-The work that led to the first beta, by phase of [the upgrade plan](docs/UPGRADE_PLAN.md).
+The work that led to the first beta, by phase of [the upgrade plan](docs/project/UPGRADE_PLAN.md).
 
 ### Phase 0: foundation
 

@@ -81,4 +81,4 @@ These modules of the design (§3.2) are still to come:
 - the testing contract library (`testing/`)
 
 Integration into the compiler, database, providers, runtime, nodes, API and UI is tracked as items
-J-08 to J-22 in [`docs/UPGRADE_PLAN.md`](../../docs/UPGRADE_PLAN.md).
+J-08 to J-22 in [`docs/project/UPGRADE_PLAN.md`](../../docs/project/UPGRADE_PLAN.md).

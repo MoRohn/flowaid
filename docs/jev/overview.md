@@ -180,7 +180,7 @@ governance record before a contract can act.
 ## Implementation status
 
 The design is complete ([`JEV_ENGINEERING.md`](../design/JEV_ENGINEERING.md)). Delivery runs as
-track J of [`docs/UPGRADE_PLAN.md`](../UPGRADE_PLAN.md):
+track J of [`docs/project/UPGRADE_PLAN.md`](../project/UPGRADE_PLAN.md):
 
 - **J-01…J-07, library core built:** the browser-safe library `@flowaid/jev` has schemas, the
   packet builder, bundle planner, routing engine, calibration math, receipts with hash chains,

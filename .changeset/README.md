@@ -6,4 +6,4 @@ sentences written for the release notes.
 
 The `@flowaid/*` packages form one fixed group, so the platform has a single version. Merging to
 `main` opens (or updates) a "Version packages" pull request; merging that one tags `v<version>`,
-publishes the images and creates the GitHub release. See [docs/RELEASING.md](../docs/RELEASING.md).
+publishes the images and creates the GitHub release. See [docs/operations/RELEASING.md](../docs/operations/RELEASING.md).

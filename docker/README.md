@@ -178,7 +178,7 @@ production builds.
 
 Every release publishes the three targets for `linux/amd64` and `linux/arm64` as
 `ghcr.io/morohn/flowaid-api`, `-worker` and `-web`, tagged with the version, with SBOMs and
-signed build provenance ([docs/RELEASING.md](../docs/RELEASING.md)). To run a release instead of
+signed build provenance ([docs/operations/RELEASING.md](../docs/operations/RELEASING.md)). To run a release instead of
 building from source, add the overlay, which changes only where the app images come from:
 
 ```sh

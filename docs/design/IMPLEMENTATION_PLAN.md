@@ -1,6 +1,6 @@
 # flowaid — Implementation plan
 
-> **Sequencing superseded (2026-09-22).** The wave order below is retired: `docs/UPGRADE_PLAN.md` (machine-readable `docs/upgrade-plan.json`) is the authoritative, dependency-ordered phase list for the full system upgrade, and it starts from a fresh Phase 0 rather than resuming any wave. The work-package definitions (files, done criteria, tests) stay authoritative and are referenced by the plan's items; where the plan's item text and a WP paragraph differ, the plan wins.
+> **Sequencing superseded (2026-09-22).** The wave order below is retired: `docs/project/UPGRADE_PLAN.md` (machine-readable `docs/project/upgrade-plan.json`) is the authoritative, dependency-ordered phase list for the full system upgrade, and it starts from a fresh Phase 0 rather than resuming any wave. The work-package definitions (files, done criteria, tests) stay authoritative and are referenced by the plan's items; where the plan's item text and a WP paragraph differ, the plan wins.
 
 Dependency-ordered work packages grouped into waves. Everything inside a wave can run in parallel once the previous wave's blocking packages are done ("needs" lists the exact prerequisites). Each package names its owner package/app, the files it produces, what _done_ means, and the tests that must exist before it is called done. Contracts (`CONTRACTS.ts`) are frozen at the end of Wave 0; changes afterwards go through an RFC in `docs/rfcs/` (template `docs/rfcs/0000-template.md`, index `docs/design/RFCS.md`) and a version bump of `@flowaid/workflow-core`.
 
@@ -208,4 +208,4 @@ Phase 5  WP-19 (15,17,18,02) → WP-20 (19) + WP-21-UI                          
 Phase 6  WP-22 ∥ WP-23 ∥ WP-24 ∥ advisor/AI builder/knowledge/agents/OIDC/MFA/KMS (WP-25…27), each behind its FeatureKey
 ```
 
-Exact items, gates and finding coverage: `docs/UPGRADE_PLAN.md`. The first vertical slice (spec §First vertical slice) is complete when WP-20's Playwright acceptance journey — including the evaluation report and the Download code step — passes from a clean clone with `docker compose up`.
+Exact items, gates and finding coverage: `docs/project/UPGRADE_PLAN.md`. The first vertical slice (spec §First vertical slice) is complete when WP-20's Playwright acceptance journey — including the evaluation report and the Download code step — passes from a clean clone with `docker compose up`.

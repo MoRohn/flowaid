@@ -12,7 +12,7 @@ FlowAId is designed before it is built. The design documents in [`docs/design/`]
 are authoritative, and [`docs/design/CONTRACTS.ts`](docs/design/CONTRACTS.ts) is frozen. A change
 to a contract goes through an RFC ([`docs/design/RFCS.md`](docs/design/RFCS.md), template in
 [`docs/rfcs/0000-template.md`](docs/rfcs/0000-template.md)). Work is planned in
-[`docs/UPGRADE_PLAN.md`](docs/UPGRADE_PLAN.md), and the current state is in
+[`docs/project/UPGRADE_PLAN.md`](docs/project/UPGRADE_PLAN.md), and the current state is in
 [`docs/STATUS.md`](docs/STATUS.md). Pick an item from the plan, or open an issue to discuss a
 change that is not in it.
 
@@ -86,7 +86,7 @@ unique key prefix per run. `docker rm -f flowaid-test-pg flowaid-test-redis` rem
 3. Make `pnpm check` pass (every gate CI runs). `pnpm install` sets up lefthook hooks that check
    formatting and lint on commit, and boundaries and types on push.
 4. Add a changeset (`pnpm changeset`) when users will notice the change: it becomes the release
-   notes ([docs/RELEASING.md](docs/RELEASING.md)).
+   notes ([docs/operations/RELEASING.md](docs/operations/RELEASING.md)).
 5. Update the docs the change affects: the package README, a guide page, `docs/STATUS.md`.
 6. A contract change needs an accepted RFC first.
 

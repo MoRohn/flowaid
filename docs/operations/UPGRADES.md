@@ -23,7 +23,7 @@ FLOWAID_IMAGE_TAG=0.4.0            # or 0.4.0@sha256:<digest> to pin the exact i
 
 `docker/compose.images.yml` has no default for `FLOWAID_IMAGE_TAG` and refuses to start without
 it. The api, worker (also used by `worker-code`) and web images of one release share the tag;
-[RELEASING.md](../RELEASING.md) shows how to verify an image's provenance before you deploy it.
+[RELEASING.md](RELEASING.md) shows how to verify an image's provenance before you deploy it.
 
 ## Upgrade
 

@@ -8,7 +8,7 @@ Ask FlowAId answers questions about a workspace:
 - how a workflow is doing.
 
 It reads through six tools, can change nothing, and every answer cites the records it rests on.
-How it is measured is in [FLOWAID_AI_EVALUATION.md](../FLOWAID_AI_EVALUATION.md).
+How it is measured is in [FLOWAID_AI_EVALUATION.md](FLOWAID_AI_EVALUATION.md).
 
 ## Request flow
 

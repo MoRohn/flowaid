@@ -31,7 +31,7 @@ FlowAId executes workflows that call external services with stored credentials. 
 
 While FlowAId is 0.x, only the latest minor release receives fixes. Published images
 (`ghcr.io/morohn/flowaid-*`) carry signed build provenance; verify them as described in
-[docs/RELEASING.md](docs/RELEASING.md#verifying-an-image) before you deploy.
+[docs/operations/RELEASING.md](docs/operations/RELEASING.md#verifying-an-image) before you deploy.
 
 ## Local mode trust boundary
 

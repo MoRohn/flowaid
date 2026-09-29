@@ -41,7 +41,7 @@ LAN-takeover finding (S1).
 
 ## Findings fixed in V2
 
-Detailed in [FLOWAID_V2_CODE_REVIEW.md](../FLOWAID_V2_CODE_REVIEW.md) §Security, with tests
+Detailed in [FLOWAID_V2_CODE_REVIEW.md](../project/FLOWAID_V2_CODE_REVIEW.md) §Security, with tests
 named in the commits.
 
 - **S1:** local-mode takeover through `--host 0.0.0.0`.

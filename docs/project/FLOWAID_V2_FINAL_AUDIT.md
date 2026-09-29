@@ -32,7 +32,7 @@ Run on 2026-09-28 against the final tree, before this document was committed.
 
 | area              | status   | notes                                                                                                                                                                                                                                                                           |
 | ----------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Architecture      | complete | V2 adds two modules within the existing boundaries: `@flowaid/insights`, which is pure and browser-safe, and the assistant loop in `@flowaid/advisor`. There are no new tables or services. See [architecture/V2_OVERVIEW.md](architecture/V2_OVERVIEW.md).                     |
+| Architecture      | complete | V2 adds two modules within the existing boundaries: `@flowaid/insights`, which is pure and browser-safe, and the assistant loop in `@flowaid/advisor`. There are no new tables or services. See [architecture/V2_OVERVIEW.md](../architecture/V2_OVERVIEW.md).                  |
 | P0 stabilisation  | complete | P0-1 to P0-7, each with a test that failed before the fix: loopback-only local mode, the commit-notice bus, retention, busy triggers, queue dead-letters, streamed pricing, the release gate.                                                                                   |
 | P1 foundational   | complete | P1-1 to P1-12, except P1-12's dashboard filters in the URL (partial, below).                                                                                                                                                                                                    |
 | P2 strategic      | partial  | Done: P2-1 Kish n + Bonferroni, P2-2 McNemar, P2-3 unpriced models, P2-4 MCP env and IPv6, P2-5 CI suites, sleeps and cache. **Open:** P2-6 (move publish, deploy and gate logic from routes into services).                                                                    |
@@ -43,16 +43,16 @@ Run on 2026-09-28 against the final tree, before this document was committed.
 
 ## Product
 
-| capability                                                                 | status   | notes                                                                                                                                                                                                  |
-| -------------------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Needs attention (Overview)                                                 | complete | Open approvals (oldest, expiring within a day) and failing workflows, each a link.                                                                                                                     |
-| What changed (Overview, `GET /v1/insights`)                                | complete | Five kinds of change, with evidence and version attribution stated as coincidence.                                                                                                                     |
-| Ask FlowAId (`POST /v1/assistant/ask`, panel, ⌘K)                          | complete | Six read-only tools, typed and cited statements, limits, audit. On only when the workspace has a generation model.                                                                                     |
-| Honest metrics                                                             | complete | Production origins by default; streamed generations priced on runs and nodes.                                                                                                                          |
-| Private-network opt-in (`FLOWAID_ALLOW_PRIVATE_NETWORK`)                   | complete | One setting for every outbound connection; off by default.                                                                                                                                             |
-| Operations guides                                                          | complete | [Backup and restore](operations/BACKUP_AND_RESTORE.md) (the pg_dump/restore and key-check commands were run against containers), [upgrades](operations/UPGRADES.md), [runbook](operations/RUNBOOK.md). |
-| AI builder inside the builder page (refine an open workflow)               | deferred | Still reachable only from "New workflow" and the API. Needs a diff-and-accept surface on the canvas.                                                                                                   |
-| Assistant actions (replay, publish, approve) with preview and confirmation | deferred | Read-only by design for V2 ([ai/ASSISTANT.md](ai/ASSISTANT.md)).                                                                                                                                       |
+| capability                                                                 | status   | notes                                                                                                                                                                                                           |
+| -------------------------------------------------------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Needs attention (Overview)                                                 | complete | Open approvals (oldest, expiring within a day) and failing workflows, each a link.                                                                                                                              |
+| What changed (Overview, `GET /v1/insights`)                                | complete | Five kinds of change, with evidence and version attribution stated as coincidence.                                                                                                                              |
+| Ask FlowAId (`POST /v1/assistant/ask`, panel, ⌘K)                          | complete | Six read-only tools, typed and cited statements, limits, audit. On only when the workspace has a generation model.                                                                                              |
+| Honest metrics                                                             | complete | Production origins by default; streamed generations priced on runs and nodes.                                                                                                                                   |
+| Private-network opt-in (`FLOWAID_ALLOW_PRIVATE_NETWORK`)                   | complete | One setting for every outbound connection; off by default.                                                                                                                                                      |
+| Operations guides                                                          | complete | [Backup and restore](../operations/BACKUP_AND_RESTORE.md) (the pg_dump/restore and key-check commands were run against containers), [upgrades](../operations/UPGRADES.md), [runbook](../operations/RUNBOOK.md). |
+| AI builder inside the builder page (refine an open workflow)               | deferred | Still reachable only from "New workflow" and the API. Needs a diff-and-accept surface on the canvas.                                                                                                            |
+| Assistant actions (replay, publish, approve) with preview and confirmation | deferred | Read-only by design for V2 ([ai/ASSISTANT.md](../ai/ASSISTANT.md)).                                                                                                                                             |
 
 ## UX and UI
 
@@ -82,16 +82,16 @@ Run on 2026-09-28 against the final tree, before this document was committed.
 
 ## AI
 
-| area              | status   | notes                                                                                                                                                                                                      |
-| ----------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Model abstraction | complete | Existing provider registry. The assistant reuses the workspace's advisor model resolution.                                                                                                                 |
-| Grounding         | complete | Citations are validated against tool results, and uncited claims are downgraded and flagged.                                                                                                               |
-| Tool calling      | complete | Typed (Zod), tenant-scoped, read-only. Errors are sanitised.                                                                                                                                               |
-| Prompt injection  | complete | Shared untrusted-content envelope across agents, knowledge and the assistant. Tested in harness, pg and eval-scorer tests.                                                                                 |
-| Evaluation        | partial  | The harness and scorer are verified in CI. **The live-model run is blocked here** (no provider key). The AI builder has no live evaluation set yet ([FLOWAID_AI_EVALUATION.md](FLOWAID_AI_EVALUATION.md)). |
-| Cost and latency  | complete | Per-question limits ($0.25, 6 rounds); cost, tokens and model in every answer and audit event. Latency is measured by the eval runner; no live number yet.                                                 |
-| Safety of agents  | complete | Pre-turn budget checks; capped, delimited tool output.                                                                                                                                                     |
-| Open              | deferred | AI6: uncalibrated LLM decision probabilities are routed like Jev's during failover. AI7: tool calls record `capability: null`.                                                                             |
+| area              | status   | notes                                                                                                                                                                                                            |
+| ----------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Model abstraction | complete | Existing provider registry. The assistant reuses the workspace's advisor model resolution.                                                                                                                       |
+| Grounding         | complete | Citations are validated against tool results, and uncited claims are downgraded and flagged.                                                                                                                     |
+| Tool calling      | complete | Typed (Zod), tenant-scoped, read-only. Errors are sanitised.                                                                                                                                                     |
+| Prompt injection  | complete | Shared untrusted-content envelope across agents, knowledge and the assistant. Tested in harness, pg and eval-scorer tests.                                                                                       |
+| Evaluation        | partial  | The harness and scorer are verified in CI. **The live-model run is blocked here** (no provider key). The AI builder has no live evaluation set yet ([FLOWAID_AI_EVALUATION.md](../ai/FLOWAID_AI_EVALUATION.md)). |
+| Cost and latency  | complete | Per-question limits ($0.25, 6 rounds); cost, tokens and model in every answer and audit event. Latency is measured by the eval runner; no live number yet.                                                       |
+| Safety of agents  | complete | Pre-turn budget checks; capped, delimited tool output.                                                                                                                                                           |
+| Open              | deferred | AI6: uncalibrated LLM decision probabilities are routed like Jev's during failover. AI7: tool calls record `capability: null`.                                                                                   |
 
 ## ML and data science
 
@@ -108,7 +108,7 @@ Run on 2026-09-28 against the final tree, before this document was committed.
 
 All High and Medium security findings are fixed with tests: S1–S5, B1, B5, AI2 and AI3. Accepted
 risks and open items are listed in
-[security/THREAT_MODEL.md](security/THREAT_MODEL.md#accepted-risks-and-open-items):
+[security/THREAT_MODEL.md](../security/THREAT_MODEL.md#accepted-risks-and-open-items):
 
 - plugins are trusted code;
 - the RLS bypass is a custom setting;
@@ -157,10 +157,10 @@ risks and open items are listed in
 **Created:**
 
 - the six `FLOWAID_*` documents;
-- [architecture/V2_OVERVIEW.md](architecture/V2_OVERVIEW.md);
-- [ai/ASSISTANT.md](ai/ASSISTANT.md);
-- [data/INSIGHTS.md](data/INSIGHTS.md);
-- [security/THREAT_MODEL.md](security/THREAT_MODEL.md);
+- [architecture/V2_OVERVIEW.md](../architecture/V2_OVERVIEW.md);
+- [ai/ASSISTANT.md](../ai/ASSISTANT.md);
+- [data/INSIGHTS.md](../data/INSIGHTS.md);
+- [security/THREAT_MODEL.md](../security/THREAT_MODEL.md);
 - `operations/`, with three guides;
 - `packages/insights/README.md`;
 - a changeset.
@@ -185,7 +185,7 @@ risks and open items are listed in
 
 ## PageIndex document intelligence (added after the V2 audit above)
 
-Specified in [pageindex/ADR.md](pageindex/ADR.md); measured in [pageindex/EVALUATION.md](pageindex/EVALUATION.md).
+Specified in [pageindex/ADR.md](../pageindex/ADR.md); measured in [pageindex/EVALUATION.md](../pageindex/EVALUATION.md).
 Each item below is from the integration brief's acceptance list, with how it was verified.
 
 | #   | acceptance item                                                                                   | status   | how it was verified                                                                                                                                                                                      |

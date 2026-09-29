@@ -32,7 +32,7 @@ page shows where the V2 pieces sit and how they connect.
 | ----------------------------------------------------------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | `packages/insights`                                         | new, browser-safe | Statistical tests and `detectChanges`: pure functions over data the caller loads ([data/INSIGHTS.md](../data/INSIGHTS.md))                |
 | `packages/advisor/src/assistant.ts`                         | new               | The Ask FlowAId loop: tool calls, untrusted wrapping, citation validation, round and spend limits ([ai/ASSISTANT.md](../ai/ASSISTANT.md)) |
-| `packages/advisor/src/evals/`                               | new               | The assistant's evaluation set and scorer ([FLOWAID_AI_EVALUATION.md](../FLOWAID_AI_EVALUATION.md))                                       |
+| `packages/advisor/src/evals/`                               | new               | The assistant's evaluation set and scorer ([FLOWAID_AI_EVALUATION.md](../ai/FLOWAID_AI_EVALUATION.md))                                    |
 | `apps/api/src/services/insights.ts`, `routes/insights.ts`   | new               | `GET /v1/insights`                                                                                                                        |
 | `apps/api/src/services/assistant.ts`, `routes/assistant.ts` | new               | `POST /v1/assistant/ask` and its tools                                                                                                    |
 | `apps/api/src/services/metrics.ts`                          | changed           | Production traffic by default (`origin=all` restores every run)                                                                           |
@@ -52,7 +52,7 @@ page shows where the V2 pieces sit and how they connect.
 ## Runtime changes in V2 (stabilisation)
 
 These are not new features. They are correctness fixes that the new features depend on; the
-details are in [FLOWAID_V2_CODE_REVIEW.md](../FLOWAID_V2_CODE_REVIEW.md) and the git history.
+details are in [FLOWAID_V2_CODE_REVIEW.md](../project/FLOWAID_V2_CODE_REVIEW.md) and the git history.
 
 - **Event bus:** durable commit notices always travel over Postgres LISTEN/NOTIFY. Redis carries
   only live deltas.
