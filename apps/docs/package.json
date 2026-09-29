@@ -1,6 +1,6 @@
 {
   "name": "@flowaid/docs",
-  "version": "0.1.0",
+  "version": "0.4.0",
   "private": true,
   "description": "The FlowAId documentation site: a static site generated from the guides, the design documents, the node manifests and the OpenAPI document.",
   "license": "Apache-2.0",
