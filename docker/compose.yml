@@ -37,8 +37,12 @@
 
 name: flowaid
 
+# .env is also where compose reads its own settings (ports, passwords); .env.local, when present,
+# adds to it and wins, as it does for ./flowaid (provider keys often live there).
 x-env-file: &env-file
   - path: ../.env
+    required: false
+  - path: ../.env.local
     required: false
 
 x-postgres-image: &postgres-image pgvector/pgvector:0.8.6-pg16@sha256:ccc6e83d6e35e931dc7c5def2022729d5a6c370318d099181995567ff1fb4d6b
@@ -60,8 +64,8 @@ x-service-env: &service-env
   FLOWAID_JWT_KEYS_DIR: /data/keys
   FLOWAID_PLUGIN_DIR: /data/plugins
   FLOWAID_VENDOR_DIR: /opt/flowaid/vendor
-  FLOWAID_BASE_URL: ${FLOWAID_BASE_URL:-http://localhost:3001}
-  FLOWAID_WEB_URL: ${FLOWAID_WEB_URL:-http://localhost:3000}
+  FLOWAID_BASE_URL: ${FLOWAID_BASE_URL:-http://flowaid.localhost:3001}
+  FLOWAID_WEB_URL: ${FLOWAID_WEB_URL:-http://flowaid.localhost:3000}
 
 x-worker-security: &worker-security
   security_opt:
@@ -117,11 +121,11 @@ services:
       # a stack other people reach signs in with a password; `local` (no sign-in) is for
       # `pnpm start` on your own computer, and the api container never sees loopback callers
       FLOWAID_AUTH_MODE: ${FLOWAID_AUTH_MODE:-password}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://flowaid.localhost:3000}
       # Owner connection used only for migrations (DATABASE.md).
       DATABASE_ADMIN_URL: postgres://${POSTGRES_USER:-flowaid}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env (openssl rand -hex 16)}@postgres:5432/${POSTGRES_DB:-flowaid}
     ports:
-      - "${BIND_ADDRESS:-127.0.0.1}:${PORT:-3001}:3001"
+      - "${APP_BIND_ADDRESS:-${BIND_ADDRESS:-127.0.0.1}}:${PORT:-3001}:3001"
     volumes:
       - flowaid-data:/data
     networks:
@@ -306,7 +310,7 @@ services:
       dockerfile: docker/Dockerfile
       target: web
       args:
-        NEXT_PUBLIC_FLOWAID_BASE_URL: ${FLOWAID_BASE_URL:-http://localhost:3001}
+        NEXT_PUBLIC_FLOWAID_BASE_URL: ${FLOWAID_BASE_URL:-http://flowaid.localhost:3001}
     image: flowaid/web:local
     environment:
       NODE_ENV: production
@@ -314,9 +318,9 @@ services:
       PORT: "3000"
       # Where the web app's proxy reaches the api (read per request, so one image fits any host).
       FLOWAID_API_INTERNAL_URL: http://api:3001
-      NEXT_PUBLIC_FLOWAID_BASE_URL: ${FLOWAID_BASE_URL:-http://localhost:3001}
+      NEXT_PUBLIC_FLOWAID_BASE_URL: ${FLOWAID_BASE_URL:-http://flowaid.localhost:3001}
     ports:
-      - "${BIND_ADDRESS:-127.0.0.1}:${WEB_PORT:-3000}:3000"
+      - "${APP_BIND_ADDRESS:-${BIND_ADDRESS:-127.0.0.1}}:${WEB_PORT:-3000}:3000"
     networks:
       - edge
     depends_on:

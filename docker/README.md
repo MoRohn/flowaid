@@ -14,13 +14,20 @@ needs. The root `docker-compose.yml` only includes the files in this directory.
 | `web`                   | `flowaid/web` (target `web`)              | 3000                             | Next.js 16 app (standalone server). Browsers talk only to it; it forwards `/v1`, `/hooks` and `/mcp` to the api at request time. On the `edge` network alone, it reaches nothing but `api`.                                                                      |
 | `rustfs`, `rustfs-init` | `rustfs/rustfs:1.0.0@sha256:…`            | 9000 (`--profile s3`)            | Optional S3-compatible artifact store and a one-shot that creates the bucket. See [Object storage](#object-storage-profile-s3).                                                                                                                                  |
 
-The web app is the address people open, http://localhost:3000 (the same port `pnpm start`
-uses); the api is published beside it on 3001. Both containers listen on those same ports
+The web app is the address people open, http://flowaid.localhost:3000 (the same address
+`./flowaid` opens); the api is published beside it on 3001. Both containers listen on those same ports
 inside (the web container on 3000, the api on 3001, reached as `http://api:3001`), so the
 published and in-container numbers agree. `WEB_PORT` and `PORT` in `.env` move only the host
 side of each mapping; compose pins the api's in-container `PORT` to 3001. Unlike `pnpm start`,
 compose does not move to another port when one is taken: `docker compose up` stops with an
 "address already in use" error, and you set `WEB_PORT` or `PORT` in `.env`.
+
+Ports are published on loopback (`BIND_ADDRESS=127.0.0.1`). `APP_BIND_ADDRESS=0.0.0.0` publishes
+only web and api on the network, for opening FlowAId from other devices; set `FLOWAID_WEB_URL`,
+`FLOWAID_BASE_URL` and `CORS_ORIGINS` to that address and use https or
+`FLOWAID_ALLOW_INSECURE_HTTP=true` (see
+[Open it from other devices](../docs/guides/deploying.md#open-it-from-other-devices)). The api
+and worker read `.env` and, when present, `.env.local`.
 
 Every image is pinned to a release tag **and** its `sha256` digest (`docker/compose.test.ts`
 fails on a floating tag); Dependabot proposes bumps.

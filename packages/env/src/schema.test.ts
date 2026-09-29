@@ -59,9 +59,9 @@ describe("EnvSchema", () => {
     expect(env.LOG_LEVEL).toBe("info");
     expect(env.HOST).toBe("127.0.0.1");
     expect(env.PORT).toBe(3001);
-    expect(env.FLOWAID_BASE_URL).toBe("http://localhost:3001");
-    expect(env.FLOWAID_WEB_URL).toBe("http://localhost:3000");
-    expect(env.CORS_ORIGINS).toEqual(["http://localhost:3000"]);
+    expect(env.FLOWAID_BASE_URL).toBe("http://flowaid.localhost:3001");
+    expect(env.FLOWAID_WEB_URL).toBe("http://flowaid.localhost:3000");
+    expect(env.CORS_ORIGINS).toEqual(["http://flowaid.localhost:3000"]);
     expect(env.RATE_LIMIT_MAX).toBe(600);
     expect(env.FLOWAID_API_INTERNAL_URL).toBeUndefined();
     expect(env.FLOWAID_TRUST_PROXY).toBe(false);

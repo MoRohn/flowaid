@@ -2,7 +2,8 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState, type FormEvent } from "react";
 import { Button, FieldError, FieldRow, Input, Label, LogoWordmark } from "@flowaid/ui/primitives";
-import { ApiError, post, setWorkspace, signInLocally } from "~/api/client";
+import { ApiError, api, post, setWorkspace, signInLocally } from "~/api/client";
+import { sessionNotKeptMessage } from "~/auth/cookieHint";
 import { FullPageSpinner } from "~/session";
 
 interface SessionResponse {
@@ -43,6 +44,16 @@ function LoginForm() {
         { email, password },
         { noRefresh: true },
       );
+      // the server accepted the password; check the browser kept the session before moving on
+      const kept = await api("GET", "/v1/me", { noRefresh: true }).then(
+        () => true,
+        (e: unknown) => !(e instanceof ApiError && e.status === 401),
+      );
+      if (!kept) {
+        setError(sessionNotKeptMessage(window.location));
+        setBusy(false);
+        return;
+      }
       router.replace(safeNext ?? (res.workspaces[0] ? `/${res.workspaces[0].slug}` : "/"));
     } catch (err) {
       setError(

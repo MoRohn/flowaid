@@ -147,6 +147,9 @@ const WORKER_CODE_ALLOWED = [
 
 const IMAGE_RE = /^[a-z0-9.\-/]+:[A-Za-z0-9._-]+@sha256:[0-9a-f]{64}$/;
 const PUBLISHED_PORT_RE = /^\$\{BIND_ADDRESS:-127\.0\.0\.1\}:\$\{[A-Z_]+:-\d+\}:\d+$/;
+/** api and web may be shared on the network on their own (APP_BIND_ADDRESS); databases never. */
+const APP_PORT_RE =
+  /^\$\{APP_BIND_ADDRESS:-\$\{BIND_ADDRESS:-127\.0\.0\.1\}\}:\$\{[A-Z_]+:-\d+\}:\d+$/;
 
 describe("compose secret scope", () => {
   it("web has no env_file and only its allowed variables", () => {
@@ -231,7 +234,9 @@ describe("compose exposure", () => {
     for (const [name, svc] of Object.entries(STACK)) {
       for (const port of stringList(svc["ports"])) {
         published.push(`${name}: ${port}`);
-        expect(port, `${name} port`).toMatch(PUBLISHED_PORT_RE);
+        expect(port, `${name} port`).toMatch(
+          name === "api" || name === "web" ? APP_PORT_RE : PUBLISHED_PORT_RE,
+        );
       }
     }
     expect(published.length).toBeGreaterThanOrEqual(5);

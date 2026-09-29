@@ -268,6 +268,10 @@ cp .env.example .env     # set the passwords, FLOWAID_ADMIN_EMAIL and your provi
 docker compose up -d
 ```
 
+It answers on http://flowaid.localhost:3000 on that machine (`WEB_PORT` in `.env` changes the
+port; compose does not move to a free one). To open it from other devices, set the network
+address and URLs in `.env` as
+[Open it from other devices](docs/guides/deploying.md#open-it-from-other-devices) shows.
 Published release images, TLS, backups and scaling are in
 [Deploying FlowAId](docs/guides/deploying.md) and the [operations runbook](docs/operations/RUNBOOK.md).
 

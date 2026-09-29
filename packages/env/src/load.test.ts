@@ -349,7 +349,7 @@ describe("secret-safe serialisation", () => {
       FLOWAID_SECRET_SLACK_TOKEN: REDACTED_PLACEHOLDER,
       FLOWAID_ADMIN_EMAIL: "owner@example.com",
       PORT: "3001",
-      CORS_ORIGINS: "http://localhost:3000",
+      CORS_ORIGINS: "http://flowaid.localhost:3000",
     });
     expect(JSON.stringify({ env })).not.toContain("canary");
     expect(JSON.stringify([env])).not.toContain("canary");

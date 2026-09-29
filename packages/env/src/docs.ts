@@ -202,27 +202,27 @@ const docs = {
     group: "core",
     description:
       "Public URL of the api as seen by browsers, webhook callers and MCP clients. Used to build external review links, webhook URLs and the OpenAPI `servers` entry. In production it must be `https:` unless the host is loopback or `FLOWAID_ALLOW_INSECURE_HTTP=true`.",
-    default: "http://localhost:3001",
+    default: "http://flowaid.localhost:3001",
     required: false,
-    example: "http://localhost:3001",
+    example: "http://flowaid.localhost:3001",
     secret: false,
   },
   FLOWAID_WEB_URL: {
     group: "core",
     description:
       "Public URL of the web app. Used for deep links in notifications and as the default CORS origin. Same production rule as `FLOWAID_BASE_URL`.",
-    default: "http://localhost:3000",
+    default: "http://flowaid.localhost:3000",
     required: false,
-    example: "http://localhost:3000",
+    example: "http://flowaid.localhost:3000",
     secret: false,
   },
   CORS_ORIGINS: {
     group: "core",
     description:
       "Comma-separated list of browser origins allowed to call the api with credentials. `*` is always rejected (the api allows credentialed requests); in production so is an origin cross-site with `FLOWAID_BASE_URL` unless `FLOWAID_ALLOW_CROSS_SITE=true`.",
-    default: "http://localhost:3000",
+    default: "http://flowaid.localhost:3000",
     required: false,
-    example: "http://localhost:3000,https://flowaid.example.com",
+    example: "http://flowaid.localhost:3000,https://flowaid.example.com",
     secret: false,
   },
   RATE_LIMIT_MAX: {
@@ -890,6 +890,16 @@ const docs = {
     default: "6379",
     required: false,
     example: "6379",
+    secret: false,
+    composeOnly: true,
+  },
+  APP_BIND_ADDRESS: {
+    group: "compose",
+    description:
+      "Host interface for the compose `web` and `api` ports only, so FlowAId can be opened from other devices on your network while the databases stay on `BIND_ADDRESS`. Defaults to `BIND_ADDRESS`. On a network, also set `FLOWAID_WEB_URL` and `FLOWAID_BASE_URL` to that address, and use https or `FLOWAID_ALLOW_INSECURE_HTTP=true`.",
+    default: "",
+    required: false,
+    example: "0.0.0.0",
     secret: false,
     composeOnly: true,
   },

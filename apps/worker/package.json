@@ -35,20 +35,21 @@
     "@flowaid/observability": "workspace:*",
     "@flowaid/openapi-tools": "workspace:*",
     "@flowaid/pageindex": "workspace:*",
+    "@flowaid/plugins": "workspace:*",
     "@flowaid/provider-anthropic": "workspace:*",
     "@flowaid/provider-ollama": "workspace:*",
     "@flowaid/provider-openai": "workspace:*",
     "@flowaid/provider-typesafe": "workspace:*",
     "@flowaid/providers": "workspace:*",
     "@flowaid/sandbox": "workspace:*",
-    "@flowaid/plugins": "workspace:*",
     "@flowaid/shared": "workspace:*",
     "@flowaid/storage": "workspace:*",
     "@flowaid/workflow-compiler": "workspace:*",
     "@flowaid/workflow-core": "workspace:*",
     "@flowaid/workflow-runtime": "workspace:*",
     "croner": "10.0.1",
-    "drizzle-orm": "0.45.3"
+    "drizzle-orm": "0.45.3",
+    "zod": "4.6.5"
   },
   "devDependencies": {
     "@flowaid/config": "workspace:*",
@@ -56,7 +57,6 @@
     "eslint": "9.39.5",
     "tsx": "4.23.15",
     "typescript": "5.9.3",
-    "vitest": "4.1.11",
-    "zod": "4.6.5"
+    "vitest": "4.1.11"
   }
 }
