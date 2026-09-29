@@ -23,15 +23,27 @@ port 3001 (when another app holds either port, it moves to the next free one and
 
 ## Build your first workflow
 
-1. **Add your TypeSafe key as a credential**: _Credentials → New credential → TypeSafe API key_.
-2. **Start a workflow**: _Workflows → New workflow → Blank_, or start from a template. If you have
-   an existing flow export, choose _Import an external flow export_ instead (see
+The quickest first run: _Templates → Message triage (starter) → Use template_, type a message in
+the Run tab and press **Run draft**. It needs only TypeSafe: either `TYPESAFE_API_KEY` in
+`.env.local` or a TypeSafe credential. The Output tab says whether the run completed, and the
+trace shows each decision's probabilities.
+
+To build one yourself:
+
+1. **Start a workflow**: _Workflows → New workflow → Blank_, or start from a template. Each template
+   card says what it needs (keys, MCP servers, documents) and whether this workspace has it. If you
+   have an existing flow export, choose _Import an external flow export_ instead (see
    [Importing external flows](importing.md)).
-3. **Add a decision**: press **+** and add **Boolean** from _Decision_, connect the input's
-   `message` port to its `state` input, and write the question in _Instructions_.
-4. **Bind the secret**: _Settings → Secrets_ maps the node's `TYPESAFE_API_KEY` slot to your
-   credential for each environment.
-5. **Run the draft** from the Run tab, then **Publish**.
+2. **Add a decision**: press **Add node** and add **Boolean** from _Decision_. Connect the input's
+   `message` port to its `state` input, and write the question in _Instructions_. In prompt and
+   template fields, type `{{` to insert a value such as `{{ start.message }}`.
+3. **Give the step its key**: select the node and use **Add a key for this step** under
+   _Credentials_. When the server already has that provider's key (for example
+   `TYPESAFE_API_KEY` in `.env.local`), the key is added as optional and runs use the server's
+   key. Otherwise add the key under _Credentials_ and bind it to the secret for each environment
+   in the workflow's _Settings → Secrets_.
+4. **Run the draft** from the Run tab. Anything in the way (an empty required field, a missing
+   key, a problem in the draft) is listed there with a way to reach it. Then **Publish**.
 
 ## Call it
 

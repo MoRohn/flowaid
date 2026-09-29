@@ -35,6 +35,7 @@ describeDb("identity and access (Postgres)", () => {
     expect(tpl.map((x) => x.slug)).toEqual([
       "github-issue-triage",
       "github-issue-triage.retrieval",
+      "message-triage",
       "pageindex-agent",
       "pageindex-compare",
       "pageindex-document-qa",

@@ -266,8 +266,9 @@ function Secrets({ w }: { w: WorkflowDetail }) {
   if (declared.length === 0)
     return (
       <Notice tone="info">
-        This workflow declares no secrets. Declare them in the builder (workflow settings → secrets)
-        to bind credentials per environment.
+        This workflow declares no secrets yet. In the builder, select a step that needs a key (a
+        model, an API call) and use Add a key under Credentials; it then appears here to bind per
+        environment.
       </Notice>
     );
   return (

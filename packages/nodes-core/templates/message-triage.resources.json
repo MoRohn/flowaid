@@ -1,0 +1,8 @@
+{
+  "$comment": "Resources this template needs bound on instantiate: each `$template.<kind>.<key>` sentinel in the definition is replaced by the chosen resource id. `tools` are the signatures the template calls, used to type-check it before binding.",
+  "id": "message-triage",
+  "name": "Message triage (starter)",
+  "description": "Triages a customer message with one batched TypeSafe decision (topic, urgency, person or automation) and routes it; runs with only a TypeSafe key.",
+  "category": "support",
+  "requiredResources": []
+}

@@ -324,19 +324,33 @@ export function diagnosticLocationLabel(d: Diagnostic): string | undefined {
   return loc.bindingPath ?? loc.path ?? (loc.port ? `port ${loc.port}` : undefined) ?? loc.edgeId;
 }
 
+/** How an app presents one diagnostic beyond the compiler's own words. */
+export interface DiagnosticPresentation {
+  /** Where it is, in the person's terms ("Generate text › system"); shown before the message. */
+  where?: string;
+  /** What to do about it, in plain words; shown under the message. */
+  hint?: ReactNode;
+  /** Extra actions beside the quick fix (show the node, add a credential). */
+  actions?: ReactNode;
+}
+
 /** Compiler diagnostics for a node, each with its quick fix when the compiler offered one. */
 export function DiagnosticList({
   diagnostics,
   onApplyFix,
+  describe,
 }: {
   diagnostics: readonly Diagnostic[];
   /** Applies `Diagnostic.fix.patch` (RFC 6902) to the definition; the button appears only with a fix and a handler. */
   onApplyFix?: (diagnostic: Diagnostic) => void;
+  /** Adds a plain-language location, a hint and actions; the code and pointer stay on the meta line. */
+  describe?: (diagnostic: Diagnostic) => DiagnosticPresentation | undefined;
 }) {
   return (
     <ul className="flex flex-col divide-y divide-border rounded-sm border border-border bg-surface">
       {diagnostics.map((d, i) => {
         const where = diagnosticLocationLabel(d);
+        const shown = describe?.(d);
         return (
           <li
             key={`${d.code}-${i}`}
@@ -348,7 +362,13 @@ export function DiagnosticList({
               className={cn("mt-1.5 size-1.5 shrink-0 rounded-full", SEVERITY_CLASS[d.severity])}
             />
             <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-              <span className="text-xs leading-4 text-ink">{d.message}</span>
+              <span className="text-xs leading-4 text-ink">
+                {shown?.where ? <span className="font-medium">{shown.where}: </span> : null}
+                {d.message}
+              </span>
+              {shown?.hint ? (
+                <span className="text-xs leading-4 text-ink-2">{shown.hint}</span>
+              ) : null}
               <span className="flex flex-wrap items-center gap-2 font-mono text-2xs text-ink-3">
                 <span>{d.code}</span>
                 {where ? <span>{where}</span> : null}
@@ -364,15 +384,15 @@ export function DiagnosticList({
                 </ul>
               ) : null}
             </span>
-            {d.fix && onApplyFix ? (
-              <Button
-                size="sm"
-                variant="secondary"
-                className="shrink-0"
-                onClick={() => onApplyFix(d)}
-              >
-                {d.fix.title}
-              </Button>
+            {shown?.actions || (d.fix && onApplyFix) ? (
+              <span className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+                {shown?.actions}
+                {d.fix && onApplyFix ? (
+                  <Button size="sm" variant="secondary" onClick={() => onApplyFix(d)}>
+                    {d.fix.title}
+                  </Button>
+                ) : null}
+              </span>
             ) : null}
           </li>
         );

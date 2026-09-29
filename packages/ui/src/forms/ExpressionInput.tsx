@@ -13,7 +13,7 @@ import { cn } from "@/lib/cn";
 import type { ExpressionScope } from "@/types";
 import { FieldError, useControllableState, useFieldContext, useFieldControl } from "@/primitives";
 import { formsEditorTheme } from "./codemirror";
-import { referenceTemplate, type ExpressionValidation } from "./expression";
+import { findExpressionRegions, referenceTemplate, type ExpressionValidation } from "./expression";
 import {
   expressionExtensions,
   expressionScope,
@@ -350,7 +350,10 @@ export const ExpressionTextarea = forwardRef<ExpressionEditorHandle, ExpressionT
     useImperativeHandle(ref, () => ({ focus: () => view?.focus(), insert, view }), [view, insert]);
 
     const firstError = validation?.issues.find((i) => i.severity === "error");
-    const refCount = validation?.references.length ?? 0;
+    // with compiler references (no picker) the legacy scanner sees none of them; count the holes
+    const refCount = referencePicker
+      ? (validation?.references.length ?? 0)
+      : findExpressionRegions(text).length;
     const showInvalid = Boolean(field["aria-invalid"]) || (Boolean(firstError) && !focused);
 
     return (

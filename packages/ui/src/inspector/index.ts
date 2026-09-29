@@ -53,6 +53,7 @@ export {
   diagnosticLocationLabel,
   INSPECTOR_TABS,
   isInspectorTab,
+  type DiagnosticPresentation,
   type InspectorProps,
   type InspectorTabId,
 } from "./Inspector";

@@ -6,10 +6,11 @@
  * run on the canvas.
  */
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useStore } from "zustand";
-import type { Connection, EdgeChange, NodeChange } from "@xyflow/react";
+import { useReactFlow, type Connection, type EdgeChange, type NodeChange } from "@xyflow/react";
 import { CircleDollarSign, Copy, Download, ListChecks, Rocket, Trash2 } from "lucide-react";
 import type {
   CompileResult,
@@ -19,6 +20,7 @@ import type {
   WorkflowDefinition,
 } from "@flowaid/workflow-core";
 import type { RunView } from "@flowaid/ui";
+import type { Diagnostic } from "@flowaid/workflow-core";
 import {
   FlowCanvas,
   autoLayout,
@@ -67,10 +69,12 @@ import {
 import { createBuilderStore, type BuilderStore } from "./store";
 import { useCompiler } from "./useCompiler";
 import { useLiveRun } from "./useLiveRun";
-import { runErrorMessage } from "./errors";
+import { describeInputIssue, describeRunError, type RunStartError } from "./errors";
+import { diagnosticNodeId, presentDiagnostic } from "./diagnostics";
+import { RunResult } from "./RunResult";
 import { NodeInspector } from "./NodeInspector";
 import { PublishDialog } from "./PublishDialog";
-import { RunTab } from "./RunTab";
+import { RunTab, missingRequired } from "./RunTab";
 import { CostTab, ReviewTab, advisorAvailability, costDiagnostics, useAdvisor } from "./advisor";
 
 const AUTOSAVE_MS = 1000;
@@ -194,7 +198,19 @@ function BuilderView({
     () => s.environments.find((e) => !e.protected)?.id ?? s.environments[0]?.id ?? null,
   );
   const [starting, setStarting] = useState(false);
+  const [runError, setRunError] = useState<RunStartError | null>(null);
+  // the draft's edit counter when the shown run started: a later edit makes its result stale
+  const [runVersion, setRunVersion] = useState<number | null>(null);
   const [bottomTab, setBottomTab] = useState("run");
+  // "Show" on a problem or a failed step: select the node, pan to it, open the inspector
+  const [reveal, setReveal] = useState<{ nodeId: string; n: number } | null>(null);
+  const showNode = useCallback(
+    (nodeId: string) => {
+      store.getState().select({ nodes: [nodeId], edges: [] });
+      setReveal((cur) => ({ nodeId, n: (cur?.n ?? 0) + 1 }));
+    },
+    [store],
+  );
   const advisorOn = advisorAvailability(s.features, !readOnly).advisor;
   const advisor = useAdvisor({ workflowId: workflow.id, store, enabled: advisorOn });
   const problems = useMemo(
@@ -223,7 +239,12 @@ function BuilderView({
   const [seenStatus, setSeenStatus] = useState(liveStatus);
   if (liveStatus !== seenStatus) {
     setSeenStatus(liveStatus);
-    if (liveStatus === "completed" && bottomTab === "trace") setBottomTab("output");
+    const ended =
+      liveStatus === "completed" ||
+      liveStatus === "failed" ||
+      liveStatus === "cancelled" ||
+      liveStatus === "timed_out";
+    if (ended && bottomTab === "trace") setBottomTab("output");
   }
   const runView: RunView | undefined = live
     ? {
@@ -467,9 +488,12 @@ function BuilderView({
   const errors = compiled.diagnostics.filter((d) => d.severity === "error");
   const startRun = useCallback(
     async (input: Record<string, unknown>) => {
+      if (starting) return;
       setStarting(true);
+      setRunError(null);
       try {
         await saveNow();
+        const startedAt = store.getState().version;
         const res = await post<{ run_id: string }>(`/v1/workflows/${workflow.id}/run`, {
           input,
           draft: true,
@@ -477,14 +501,18 @@ function BuilderView({
           ...(envId ? { environmentId: envId } : {}),
         });
         setRunId(res.run_id);
+        setRunVersion(startedAt);
         setBottomTab("trace");
       } catch (e) {
-        toast.error(runErrorMessage(e));
+        const described = describeRunError(e);
+        setRunError(described);
+        setBottomTab("run");
+        toast.error(described.title);
       } finally {
         setStarting(false);
       }
     },
-    [saveNow, workflow.id, envId],
+    [saveNow, workflow.id, envId, starting, store],
   );
 
   // --- keyboard (⌘S save, ⌘Z / ⇧⌘Z undo/redo, ⌘⏎ run) ---
@@ -497,7 +525,20 @@ function BuilderView({
         void saveNow().catch(() => undefined);
       } else if (e.key === "Enter") {
         e.preventDefault();
-        if (!errors.length) void startRun(runInput ?? withDefaults(definition.inputs as never, {}));
+        setBottomTab("run");
+        if (errors.length) return;
+        const input = runInput ?? withDefaults(definition.inputs as never, {});
+        const gaps = missingRequired(definition.inputs, input);
+        if (gaps.length)
+          setRunError({
+            kind: "input",
+            title: "Some required input is empty, so the run did not start.",
+            action: "Fill in the fields below and run again.",
+            items: gaps.map((k) =>
+              describeInputIssue({ message: `must have required property '${k}'` }),
+            ),
+          });
+        else void startRun(input);
       } else if (e.key.toLowerCase() === "z" && !isEditableTarget(e.target)) {
         e.preventDefault();
         if (e.shiftKey) store.getState().redo();
@@ -560,6 +601,42 @@ function BuilderView({
       </div>
     );
 
+  const describeProblem = (d: Diagnostic) => {
+    const shown = presentDiagnostic(d, definition);
+    const nodeId = diagnosticNodeId(d, definition);
+    return {
+      ...(shown.where ? { where: shown.where } : {}),
+      ...(shown.hint ? { hint: shown.hint } : {}),
+      actions: (
+        <>
+          {shown.remedy === "integration" ? (
+            <Button size="sm" variant="ghost" asChild>
+              <Link href={`/${s.ws}/integrations`}>Integrations</Link>
+            </Button>
+          ) : null}
+          {nodeId ? (
+            <Button size="sm" variant="secondary" onClick={() => showNode(nodeId)}>
+              Show node
+            </Button>
+          ) : null}
+        </>
+      ),
+    };
+  };
+  // the compiler's words without a pointer the location already names
+  const readable = (list: readonly Diagnostic[]) =>
+    list.map((d) => ({ ...d, message: presentDiagnostic(d, definition).message }));
+  const blocking = errors.map((d, i) => {
+    const shown = presentDiagnostic(d, definition);
+    const nodeId = diagnosticNodeId(d, definition);
+    return {
+      key: `${d.code}-${i}`,
+      // a known blocker reads as what to do; anything else as the compiler said it
+      text: `${shown.where ? `${shown.where}: ` : ""}${shown.hint ?? shown.message}`,
+      ...(nodeId ? { onShow: () => showNode(nodeId) } : {}),
+    };
+  });
+
   const bottomPanel = (
     <BottomPanel
       value={bottomTab}
@@ -579,9 +656,13 @@ function BuilderView({
               onRun={(input) => void startRun(input)}
               running={starting}
               status={live?.status ?? null}
+              error={runError}
+              secretsHref={`/${s.ws}/workflows/${workflow.id}/settings?tab=secrets`}
+              problems={errors.length ? blocking : []}
+              onShowProblems={() => setBottomTab("problems")}
               disabledReason={
                 errors.length
-                  ? `Fix ${errors.length} error${errors.length > 1 ? "s" : ""} to run the draft.`
+                  ? `Fix ${errors.length} problem${errors.length > 1 ? "s" : ""} in the draft before it can run.`
                   : !s.can("runs:create")
                     ? "You cannot start runs in this workspace."
                     : null
@@ -616,21 +697,26 @@ function BuilderView({
           id: "output",
           label: "Output",
           content: (
-            <div className="h-full overflow-auto p-3">
-              {runView?.error ? (
-                <p className="mb-3 text-sm text-danger">
-                  {runView.error.code}: {runView.error.message}
-                </p>
+            <div className="flex h-full flex-col gap-3 overflow-auto p-3">
+              {runView ? (
+                <RunResult
+                  run={runView}
+                  ws={s.ws}
+                  stale={runVersion !== null && version !== runVersion}
+                  onShowNode={showNode}
+                />
               ) : null}
               {runView?.output !== undefined ? (
                 <JsonView value={runView.output} expandDepth={3} />
-              ) : (
+              ) : !runView ? (
                 <EmptyState
                   size="sm"
                   title="No output yet"
-                  description="The run's final output appears here."
+                  description="Run the draft from the Run tab; what the workflow returns appears here."
                 />
-              )}
+              ) : runView.status === "completed" ? (
+                <p className="text-xs text-ink-3">The run returned no output value.</p>
+              ) : null}
             </div>
           ),
         },
@@ -643,14 +729,15 @@ function BuilderView({
             <div className="h-full overflow-auto p-3">
               {problems.length ? (
                 <DiagnosticList
-                  diagnostics={problems}
+                  diagnostics={readable(problems)}
+                  describe={describeProblem}
                   {...(!readOnly ? { onApplyFix: advisor.applyDiagnosticFix } : {})}
                 />
               ) : (
                 <EmptyState
                   size="sm"
                   title="No problems"
-                  description="The draft compiles cleanly."
+                  description="The draft compiles cleanly and is ready to run."
                 />
               )}
             </div>
@@ -722,9 +809,7 @@ function BuilderView({
       {...(saveError ? { saveError } : {})}
       onRun={() => setBottomTab("run")}
       running={starting || live?.status === "running" || live?.status === "queued"}
-      {...(s.can("workflows:publish")
-        ? { onPublish: () => setPublishOpen(true), publishDisabled: errors.length > 0 }
-        : {})}
+      {...(s.can("workflows:publish") ? { onPublish: () => setPublishOpen(true) } : {})}
       onExportJson={exportJson}
       {...(s.can("workflows:write")
         ? {
@@ -787,15 +872,18 @@ function BuilderView({
           label: "Duplicate workflow",
           icon: <Copy strokeWidth={1.75} />,
           onSelect: () =>
-            void post<{ id: string }>(`/v1/workflows/${workflow.id}/clone`, {}).then((w) =>
-              router.push(`/${s.ws}/workflows/${w.id}`),
-            ),
+            void post<{ id: string }>(`/v1/workflows/${workflow.id}/clone`, {})
+              .then((w) => router.push(`/${s.ws}/workflows/${w.id}`))
+              .catch((e: unknown) =>
+                toast.error(e instanceof Error ? e.message : "Could not duplicate"),
+              ),
         },
       ]}
     >
       <div className="flex h-full flex-col">
         <OpenInspectorOnSelect
           nodeId={selection.nodes.length === 1 ? selection.nodes[0] : undefined}
+          reveal={reveal?.n ?? 0}
         />
         <WorkflowTabs workflowId={workflow.id} active="builder" />
         <div className="min-h-0 flex-1">
@@ -820,7 +908,9 @@ function BuilderView({
             diagnostics={compiled.diagnostics}
             locked={readOnly}
             fitViewOnInit
-          />
+          >
+            <FocusNode request={reveal} />
+          </FlowCanvas>
         </div>
       </div>
 
@@ -902,12 +992,32 @@ function ConflictDialog({
  * Under the compact breakpoint the inspector is a sheet the canvas does not show: selecting a
  * node opens it, so a tap on a node leads somewhere on a phone as it does on a desktop.
  */
-function OpenInspectorOnSelect({ nodeId }: { nodeId: string | undefined }) {
+function OpenInspectorOnSelect({ nodeId, reveal }: { nodeId: string | undefined; reveal: number }) {
   const shell = useAppShellOptional();
   const compact = shell?.compact ?? false;
   const open = shell?.setInspectorOpen;
   useEffect(() => {
     if (compact && nodeId) open?.(true);
   }, [compact, nodeId, open]);
+  // "Show node" opens the inspector even where the person had closed it
+  useEffect(() => {
+    if (reveal > 0) open?.(true);
+  }, [reveal, open]);
+  return null;
+}
+
+/** Pans the canvas to a node someone asked to see (a problem's or a failed step's). */
+function FocusNode({ request }: { request: { nodeId: string; n: number } | null }) {
+  const flow = useReactFlow();
+  useEffect(() => {
+    if (!request) return;
+    const still = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+    void flow.fitView({
+      nodes: [{ id: request.nodeId }],
+      maxZoom: 1,
+      padding: 0.4,
+      duration: still ? 0 : 240,
+    });
+  }, [request, flow]);
   return null;
 }

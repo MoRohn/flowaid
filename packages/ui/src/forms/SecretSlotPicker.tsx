@@ -18,6 +18,8 @@ export interface SecretSlotPickerProps {
   onChange?: (next: Record<string, SecretName>) => void;
   /** "Declare new secret…": the app opens its declare-secret dialog for this slot (and binds the result through `onChange`). */
   onDeclareSecret?: (slot: CredentialSlot) => void;
+  /** Names a credential type in words ("OpenAI API key"); the type id by default. */
+  typeLabel?: (credentialType: string) => string;
   disabled?: boolean;
   className?: string;
 }
@@ -28,6 +30,8 @@ export function secretsForSlot(slot: CredentialSlot, secrets: readonly SecretDec
 }
 
 function humanizeSlot(name: string): string {
+  // short acronyms (llm, mcp, api) read as such
+  if (/^[a-z]{2,3}$/.test(name)) return name.toUpperCase();
   const spaced = name.replace(/_+/g, " ").trim();
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
@@ -45,6 +49,7 @@ export function SecretSlotPicker({
   value,
   onChange,
   onDeclareSecret,
+  typeLabel = (t) => t,
   disabled = false,
   className,
 }: SecretSlotPickerProps) {
@@ -67,16 +72,17 @@ export function SecretSlotPicker({
         const bound = current !== undefined && options.some((s) => s.name === current);
         const unknownBinding = current !== undefined && !bound;
         const missing = slot.required && current === undefined;
+        const accepted = slot.types.map(typeLabel).join(" or ");
         const error = unknownBinding
           ? `${current} is not a declared secret of type ${slot.types.join(" / ")}`
           : missing && options.length === 0
-            ? `Declare a ${slot.types.join(" / ")} secret for this slot`
+            ? "This step needs a key: add one for it"
             : missing
               ? "Choose a secret"
               : undefined;
         const hint = [
           slot.description,
-          `Accepts ${slot.types.join(", ")}`,
+          `Accepts ${accepted}`,
           slot.scopes && slot.scopes.length > 0
             ? `needs scopes ${slot.scopes.join(", ")}`
             : undefined,

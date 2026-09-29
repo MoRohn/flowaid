@@ -1,5 +1,5 @@
 import { forwardRef, useMemo, type HTMLAttributes } from "react";
-import { LayoutTemplate } from "lucide-react";
+import { Check, LayoutTemplate } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { CATEGORY_LABEL, type NodeCategory } from "@/lib/categories";
 import {
@@ -26,6 +26,8 @@ export interface WorkflowTemplateView {
   tags?: string[];
   /** Number of TypeSafe decisions in the template. */
   decisionCount?: number;
+  /** What it needs before it can run, and whether the workspace has it; omit when unknown. */
+  needs?: { label: string; ready: boolean }[];
 }
 
 export interface TemplateGalleryProps extends HTMLAttributes<HTMLDivElement> {
@@ -168,6 +170,7 @@ export const TemplateGallery = forwardRef<HTMLDivElement, TemplateGalleryProps>(
                       {t.name}
                     </h3>
                     <p className="text-xs leading-normal text-ink-2">{t.description}</p>
+                    {t.needs ? <TemplateNeeds needs={t.needs} /> : null}
                     <div className="flex flex-wrap gap-1">
                       {t.categories.map((c) => (
                         <Badge key={c} category={c} size="sm" dot>
@@ -183,7 +186,11 @@ export const TemplateGallery = forwardRef<HTMLDivElement, TemplateGalleryProps>(
                         ? ` · ${t.decisionCount} ${t.decisionCount === 1 ? "decision" : "decisions"}`
                         : ""}
                     </span>
-                    <Button size="sm" onClick={() => onUse(t)}>
+                    <Button
+                      size="sm"
+                      onClick={() => onUse(t)}
+                      aria-label={`Use template ${t.name}`}
+                    >
                       Use template
                     </Button>
                   </div>
@@ -196,3 +203,29 @@ export const TemplateGallery = forwardRef<HTMLDivElement, TemplateGalleryProps>(
     );
   },
 );
+
+/** "Ready to run", or each thing still to set up; the words carry the state, not the colour. */
+function TemplateNeeds({ needs }: { needs: { label: string; ready: boolean }[] }) {
+  const missing = needs.filter((n) => !n.ready);
+  if (missing.length === 0)
+    return (
+      <p className="flex items-center gap-1 text-2xs text-ok-text">
+        <Check className="size-3" strokeWidth={2} aria-hidden="true" />
+        Ready to run{needs.length ? ` · uses ${needs.map((n) => n.label).join(", ")}` : ""}
+      </p>
+    );
+  return (
+    <div className="flex flex-col gap-0.5 text-2xs">
+      <p className="text-ink-2">Needs before it runs:</p>
+      <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
+        {needs.map((n) => (
+          <li key={n.label} className={n.ready ? "text-ink-3" : "text-warn-text"}>
+            <span aria-hidden="true">{n.ready ? "✓ " : "○ "}</span>
+            {n.label}
+            {n.ready ? " (ready)" : " (to set up)"}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}

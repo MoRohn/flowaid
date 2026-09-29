@@ -95,8 +95,9 @@ function copyFor(id: OnboardingStepId, ws: string, firstWorkflow: string | undef
       return {
         title: "Create a workflow",
         description:
-          "Start from a tested template, import a definition you already have, or build on a blank canvas.",
+          "Start from a template, import a definition you already have, or build on a blank canvas. New here? The Message triage starter needs only the TypeSafe key.",
         actions: [
+          { label: "Try the starter", to: `/${ws}/templates?use=message-triage` },
           { label: "Browse templates", to: `/${ws}/templates` },
           { label: "New workflow", to: `/${ws}/workflows/new` },
         ],
@@ -226,7 +227,7 @@ export function GettingStarted() {
         {/* on a phone the progress takes its own line under the title */}
         <div className="order-last flex basis-full flex-col gap-1 sm:order-none sm:w-40 sm:shrink-0 sm:basis-auto">
           <span className="font-mono text-2xs text-ink-3 tabular">
-            {progress.done} of {progress.total} done
+            {progress.done} of {progress.total} required done
           </span>
           <ProgressBar
             value={progress.done / progress.total}

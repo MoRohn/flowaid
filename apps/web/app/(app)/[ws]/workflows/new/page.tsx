@@ -192,8 +192,12 @@ export default function NewWorkflowPage() {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     maxLength={200}
-                    placeholder="Support triage"
+                    placeholder="For example: Support triage"
+                    aria-describedby="wf-name-hint"
                   />
+                  <FieldHint id="wf-name-hint">
+                    Required. You can rename it later from the builder&apos;s title.
+                  </FieldHint>
                 </FieldRow>
                 <FieldRow>
                   <Label htmlFor="wf-desc">Description</Label>
@@ -202,7 +206,7 @@ export default function NewWorkflowPage() {
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     maxLength={4000}
-                    placeholder="optional"
+                    placeholder="Optional: what this workflow is for"
                   />
                 </FieldRow>
                 {blank.error ? (
@@ -223,8 +227,8 @@ export default function NewWorkflowPage() {
               <LayoutTemplate className="size-5 text-ink-3" strokeWidth={1.5} aria-hidden />
               <CardTitle>From a template</CardTitle>
               <CardDescription>
-                Tested decision workflows for triage, research and routing, with their credentials
-                listed up front.
+                Working workflows for triage, research and documents. Each says what it needs; the
+                Message triage starter runs with only a TypeSafe key.
               </CardDescription>
             </CardHeader>
             <CardBody>

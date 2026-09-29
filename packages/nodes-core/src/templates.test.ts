@@ -20,10 +20,11 @@ const names = readdirSync(TEMPLATES)
   .map((f) => f.slice(0, -5));
 
 describe("templates", () => {
-  it("ships the three demos, the retrieval variant of the GitHub triage and the PageIndex templates", () => {
+  it("ships the starter, the three demos, the retrieval variant of the GitHub triage and the PageIndex templates", () => {
     expect(names.sort()).toEqual([
       "github-issue-triage",
       "github-issue-triage.retrieval",
+      "message-triage",
       "pageindex-agent",
       "pageindex-compare",
       "pageindex-document-qa",

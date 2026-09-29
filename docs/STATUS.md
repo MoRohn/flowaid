@@ -79,3 +79,16 @@ compiled API, worker and Docker images run plain `node` on `dist`.
 - V2's open items (live-model evaluation of Ask FlowAId, browser specs for the insights panels
   and the assistant, dashboard filters in the URL, the P2-6 and P3 refactors, a manual
   screen-reader pass) are listed in [FLOWAID_V2_FINAL_AUDIT.md](FLOWAID_V2_FINAL_AUDIT.md).
+- A run does not start while a workflow's _required_ secret is unbound in its environment, even
+  when the server has that provider's key (`apps/api/src/services/runs.ts`, `E_SECRET_UNBOUND`);
+  the worker falls back to the server key only for optional secrets. So the built-in templates,
+  which declare `TYPESAFE_API_KEY` as required, need the key saved as a credential and bound per
+  environment. The Message triage starter declares it optional, and keys added from the builder
+  are optional when the server has the key. The smallest backend change: let the run-start check
+  accept an unbound required secret whose `credentialType` the server has a key for.
+- The node Inputs section's template mode (`BindingField`) still offers the legacy reference picker,
+  whose `input.*` / `nodes.*` / `variables.*` insertions do not compile; config template fields
+  now complete compiler references (`start.message`, `$vars.x`) instead, and single-line ones hide
+  the legacy picker but offer no completion yet.
+- ⌘K opens the node palette only while focus is inside the canvas (elsewhere it opens the
+  command menu); the Add node button is reachable with Tab.

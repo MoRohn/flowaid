@@ -16,6 +16,7 @@ import type { ExpressionScope } from "@flowaid/ui";
 import {
   BindingField,
   CodeEditor,
+  type TemplateRef,
   JsonSchemaEditor,
   SchemaForm,
   isBinding,
@@ -37,6 +38,7 @@ import "~/knowledge/pageindex/widgets";
 import type { BuilderStore } from "./store";
 import type { Projection } from "./model";
 import { useModelViews } from "./models";
+import { CredentialSlots } from "./CredentialSlots";
 
 export interface NodeInspectorProps {
   node: WorkflowNode;
@@ -69,6 +71,20 @@ export function expressionScope(
   };
 }
 
+/**
+ * The references a template field may use, in the compiler's grammar: `<node id>.<port>` for every
+ * other node with outputs (the Input node's fields are `start.<field>` in a new workflow), plus the
+ * workflow's variables. The compiler still decides which of them are upstream.
+ */
+export function templateRefs(scope: ExpressionScope): TemplateRef[] {
+  return scope.nodes.flatMap((n) =>
+    n.outputs.map((p) => ({
+      ref: { kind: "port" as const, node: n.id, port: p.id },
+      schema: p.schema ?? {},
+    })),
+  );
+}
+
 function toBinding(value: unknown): Binding | undefined {
   if (value === undefined) return undefined;
   return isBinding(value) ? value : { kind: "literal", value: value as never };
@@ -90,6 +106,11 @@ export function NodeInspector({
   const s = store.getState();
   const view = projection.nodes.find((n) => n.id === node.id);
   const models = useModelViews();
+  const refs = useMemo(() => templateRefs(scope), [scope]);
+  const variables = useMemo(() => definition.variables.map((v) => v.name), [definition.variables]);
+  const parentKind = node.parent
+    ? definition.nodes.find((n) => n.id === node.parent)?.kind
+    : undefined;
 
   return (
     <div className="flex flex-col gap-5">
@@ -118,6 +139,16 @@ export function NodeInspector({
 
       {node.kind === "task" && manifest ? (
         <>
+          {manifest.credentials.length > 0 ? (
+            <CredentialSlots
+              node={node}
+              slots={manifest.credentials}
+              definition={definition}
+              store={store}
+              readOnly={Boolean(readOnly)}
+              workflowId={s.workflowId}
+            />
+          ) : null}
           <SchemaForm
             key={`${node.id}:config:${epoch}`}
             schema={manifest.configSchema as never}
@@ -125,6 +156,9 @@ export function NodeInspector({
             scope={scope}
             nodeType={manifest.id}
             models={models}
+            templateRefs={refs}
+            variables={variables}
+            inContainer={parentKind === "loop" || parentKind === "foreach"}
             disabled={readOnly}
             onChange={(values) => s.setNodeConfig(node.id, values)}
             aria-label={`${node.name} configuration`}
@@ -144,44 +178,6 @@ export function NodeInspector({
                   {p.description ? <FieldHint>{p.description}</FieldHint> : null}
                 </div>
               ))}
-            </section>
-          ) : null}
-          {manifest.credentials.length > 0 ? (
-            <section className="flex flex-col gap-3" aria-label="Credentials">
-              <h3 className="text-eyebrow">Credentials</h3>
-              {manifest.credentials.map((slot) => {
-                const options = definition.secrets.filter(
-                  (x) => slot.types.length === 0 || slot.types.includes(x.credentialType),
-                );
-                return (
-                  <FieldRow key={slot.name}>
-                    <Label>{slot.name}</Label>
-                    <Select
-                      value={node.credentials[slot.name] ?? ""}
-                      disabled={readOnly}
-                      aria-label={slot.name}
-                      placeholder={
-                        options.length ? "Choose a secret" : "Declare a secret in workflow settings"
-                      }
-                      onValueChange={(v) =>
-                        s.updateNode(
-                          node.id,
-                          (n) => {
-                            if (n.kind === "task") n.credentials[slot.name] = v;
-                          },
-                          "Bind credential",
-                        )
-                      }
-                    >
-                      {options.map((x) => (
-                        <SelectItem key={x.name} value={x.name}>
-                          {x.name}
-                        </SelectItem>
-                      ))}
-                    </Select>
-                  </FieldRow>
-                );
-              })}
             </section>
           ) : null}
         </>

@@ -1002,7 +1002,13 @@ export function TemplateWidget({
       scope={env.scope}
       value={asString(value)}
       onChange={onChange}
-      placeholder={placeholder}
+      // its picker inserts the legacy roots; with compiler references the field is typed by hand
+      {...(env.templateRefs
+        ? {
+            referencePicker: false,
+            placeholder: placeholder ?? "Text, with {{ node.port }} for a value",
+          }
+        : { placeholder })}
       disabled={disabled}
       invalid={invalid}
     />

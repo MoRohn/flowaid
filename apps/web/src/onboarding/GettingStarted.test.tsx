@@ -60,7 +60,7 @@ describe("GettingStarted", () => {
   it("ticks steps off from the workspace and points at the next one", async () => {
     view();
     const list = await screen.findByRole("list");
-    expect(screen.getByText("2 of 6 done")).toBeTruthy();
+    expect(screen.getByText("2 of 6 required done")).toBeTruthy();
     const current = within(list)
       .getAllByRole("listitem")
       .find((li) => li.getAttribute("aria-current") === "step");

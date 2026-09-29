@@ -185,6 +185,7 @@ describeDb("workflows, versions and deployments (Postgres)", () => {
     expect(templates.map((x: { slug: string }) => x.slug).sort()).toEqual([
       "github-issue-triage",
       "github-issue-triage.retrieval",
+      "message-triage",
       "pageindex-agent",
       "pageindex-compare",
       "pageindex-document-qa",

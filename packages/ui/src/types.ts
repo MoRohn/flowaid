@@ -603,6 +603,8 @@ export interface ModelView {
   outputCostPerMTok?: number;
   health?: "healthy" | "degraded" | "down" | "unknown";
   local?: boolean;
+  /** No key for this model's provider is set on the server or saved in the workspace. */
+  needsKey?: boolean;
 }
 
 // ---------------------------------------------------------------------------

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ModelInfo, NodeManifest, WorkflowNode } from "@flowaid/workflow-core";
 import { Catalog, blankDefinition, project } from "./model";
-import { toModelViews } from "./models";
+import { markKeyless, toModelViews } from "./models";
 
 describe("toModelViews", () => {
   it("maps the catalog to picker rows: chat → generation, prices, local, no rerankers", () => {
@@ -92,5 +92,31 @@ describe("node cards for generation policies (RFC-0005)", () => {
     expect(metaOf({ provider: "openai", model: "gpt-6-sol" })).toEqual([
       { label: "model", value: "gpt-6-sol" },
     ]);
+  });
+});
+
+describe("markKeyless", () => {
+  const views = toModelViews([
+    { provider: "openai", model: "gpt-4.1-mini", kind: "chat" },
+    { provider: "anthropic", model: "claude-x", kind: "chat" },
+    { provider: "ollama", model: "llama3", kind: "chat" },
+    { provider: "typesafe", model: "jev-latest", kind: "decision" },
+  ] as never);
+
+  it("marks providers with neither a server key nor a saved credential; local ones never", () => {
+    const marked = markKeyless(views, {
+      server: { typesafe: true },
+      saved: ["anthropic.api_key"],
+    });
+    expect(Object.fromEntries(marked.map((m) => [m.id, m.needsKey ?? false]))).toEqual({
+      "gpt-4.1-mini": true,
+      "claude-x": false,
+      llama3: false,
+      "jev-latest": false,
+    });
+  });
+
+  it("marks nothing while the key state is unknown", () => {
+    expect(markKeyless(views, null).some((m) => m.needsKey)).toBe(false);
   });
 });

@@ -187,11 +187,23 @@ export const TemplateEditor = forwardRef<ExpressionEditorHandle, TemplateEditorP
       [useRefs, refs, variables, inContainer, marks],
     );
     const firstError = diagnostics?.find((d) => d.severity === "error");
+    // the example names a reference this field can really use (the legacy default does not compile)
+    const example = refs?.find((r) => r.ref.kind === "port");
+    const placeholder =
+      props.placeholder ??
+      (useRefs
+        ? `Write the text. Type {{ to insert a value${
+            example?.ref.kind === "port"
+              ? `, for example {{ ${example.ref.node}.${example.ref.port} }}`
+              : ""
+          }.`
+        : undefined);
     return (
       <div className={className} data-widget="template">
         <ExpressionTextarea
           ref={ref}
           {...props}
+          {...(placeholder !== undefined ? { placeholder } : {})}
           scope={scope ?? EMPTY_SCOPE}
           referencePicker={props.referencePicker ?? !useRefs}
           invalid={props.invalid === true || firstError !== undefined}

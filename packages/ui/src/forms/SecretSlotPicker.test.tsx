@@ -51,7 +51,7 @@ describe("SecretSlotPicker", () => {
     );
     const section = screen.getByRole("region", { name: "Credentials" });
     expect(within(section).getByText("Choose a secret")).toBeInTheDocument();
-    await user.click(screen.getByRole("combobox", { name: /Llm/ }));
+    await user.click(screen.getByRole("combobox", { name: /LLM/ }));
     const options = await screen.findAllByRole("option");
     expect(options.map((o) => o.textContent)).toEqual([
       expect.stringContaining("OPENAI_KEY"),
@@ -76,6 +76,19 @@ describe("SecretSlotPicker", () => {
     const form = screen.getByRole("region", { name: "Credentials" });
     const url = screen.getByRole("textbox", { name: "URL" });
     expect(form.compareDocumentPosition(url) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(screen.getByRole("combobox", { name: /Llm/ })).toHaveTextContent("OPENAI_KEY");
+    expect(screen.getByRole("combobox", { name: /LLM/ })).toHaveTextContent("OPENAI_KEY");
+  });
+
+  it("names credential types in words when the app supplies them", () => {
+    render(
+      <SecretSlotPicker
+        slots={[LLM_SLOT]}
+        secrets={[]}
+        value={{}}
+        typeLabel={(t) => (t === "openai.api_key" ? "OpenAI API key" : "Anthropic API key")}
+      />,
+    );
+    expect(screen.getByText(/Accepts OpenAI API key or Anthropic API key/)).toBeInTheDocument();
+    expect(screen.getByText("This step needs a key: add one for it")).toBeInTheDocument();
   });
 });

@@ -56,15 +56,26 @@ export function ConfirmDialog({
   className,
 }: ConfirmDialogProps) {
   const [pending, setPending] = useState(false);
+  // a rejected onConfirm keeps the dialog open and says why, so nothing fails silently
+  const [failure, setFailure] = useState<string | null>(null);
   const busy = loading ?? pending;
 
   const handleConfirm = async () => {
-    const result = onConfirm();
+    setFailure(null);
+    let result: void | Promise<void>;
+    try {
+      result = onConfirm();
+    } catch (e) {
+      setFailure(e instanceof Error && e.message ? e.message : "That did not work.");
+      return;
+    }
     if (result instanceof Promise) {
       setPending(true);
       try {
         await result;
         onOpenChange(false);
+      } catch (e) {
+        setFailure(e instanceof Error && e.message ? e.message : "That did not work.");
       } finally {
         setPending(false);
       }
@@ -75,7 +86,10 @@ export function ConfirmDialog({
 
   const handleOpenChange = (next: boolean) => {
     if (busy) return;
-    if (!next) onCancel?.();
+    if (!next) {
+      setFailure(null);
+      onCancel?.();
+    }
     onOpenChange(next);
   };
 
@@ -113,6 +127,11 @@ export function ConfirmDialog({
           </div>
         </DialogHeader>
         {children ? <DialogBody className="pt-2">{children}</DialogBody> : null}
+        {failure ? (
+          <p role="alert" className="px-4 pb-1 text-xs text-danger-text">
+            {failure}
+          </p>
+        ) : null}
         <DialogFooter className={cn(children ? undefined : "border-t-0 bg-transparent pt-3")}>
           <Button variant="secondary" onClick={() => handleOpenChange(false)} disabled={busy}>
             {cancelLabel}

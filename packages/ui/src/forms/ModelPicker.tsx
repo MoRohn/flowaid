@@ -126,7 +126,15 @@ export const ModelPicker = forwardRef<HTMLButtonElement, ModelPickerProps>(funct
     "aria-describedby": rest["aria-describedby"],
   });
   const list = useMemo(() => filterModelsByKind(models, kind), [models, kind]);
-  const groups = useMemo(() => groupModelsByProvider(list), [list]);
+  // providers with a key first: those models can run now
+  const groups = useMemo(
+    () =>
+      groupModelsByProvider(list)
+        .map((g, i) => ({ g, i, keyless: g.models.every((m) => m.needsKey) }))
+        .sort((a, b) => Number(a.keyless) - Number(b.keyless) || a.i - b.i)
+        .map((x) => x.g),
+    [list],
+  );
   const selected = models.find((m) => m.id === value);
   const total = list.length;
 
@@ -161,6 +169,11 @@ export const ModelPicker = forwardRef<HTMLButtonElement, ModelPickerProps>(funct
             <span className="flex min-w-0 flex-1 items-baseline gap-1.5 truncate">
               <span className="truncate font-mono text-xs">{selected.name}</span>
               <span className="truncate text-2xs text-ink-3">{selected.provider}</span>
+              {selected.needsKey ? (
+                <Badge size="sm" tone="warn" className="ml-auto">
+                  no key
+                </Badge>
+              ) : null}
               {selected.local ? (
                 <Badge size="sm" tone="outline" mono className="ml-auto">
                   local
@@ -228,6 +241,11 @@ export const ModelPicker = forwardRef<HTMLButtonElement, ModelPickerProps>(funct
                           {m.local ? (
                             <Badge size="sm" tone="outline" mono>
                               local
+                            </Badge>
+                          ) : null}
+                          {m.needsKey ? (
+                            <Badge size="sm" tone="warn">
+                              no key
                             </Badge>
                           ) : null}
                         </span>

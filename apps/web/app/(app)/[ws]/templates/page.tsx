@@ -29,15 +29,18 @@ import { templateResourceSlots, templateToView } from "~/admin/logic";
 import type { McpServer, TemplateRow } from "~/admin/types";
 import { Notice, QueryView, useMutate } from "~/admin/ui";
 import { useSession } from "~/session";
+import { templateNeeds, type TemplateNeed, type WorkspaceResources } from "~/templates/readiness";
 import { AppFrame, PageBody } from "~/shell/AppFrame";
 import { HELP } from "~/shell/help";
 import { LearnMore } from "~/shell/LearnMore";
 
 function UseTemplateDialog({
   template,
+  needs,
   onClose,
 }: {
   template: TemplateRow | null;
+  needs: TemplateNeed[];
   onClose: () => void;
 }) {
   const s = useSession();
@@ -64,7 +67,6 @@ function UseTemplateDialog({
       onSuccess: (w) => router.push(`/${s.ws}/workflows/${w.id}`),
     },
   );
-  const secrets = template?.requiredSecrets ?? [];
   return (
     <Dialog
       open={template !== null}
@@ -146,23 +148,38 @@ function UseTemplateDialog({
                 the server in the builder.
               </Notice>
             ) : null}
-            {secrets.length > 0 ? (
+            {needs.length > 0 ? (
               <div>
                 <p className="mb-1.5 text-xs font-medium text-ink">
-                  Secrets to bind before deploying
+                  {needs.every((n) => n.ready)
+                    ? "Everything it needs is set up"
+                    : "What it needs before its runs can succeed"}
                 </p>
-                <ul className="flex flex-wrap gap-1.5" role="list">
-                  {secrets.map((x) => (
-                    <li key={x.name}>
-                      <Badge tone={x.required === false ? "outline" : "neutral"} mono>
-                        {x.name}
-                        {x.credentialType ? (
-                          <span className="ml-1 text-ink-3">{x.credentialType}</span>
-                        ) : null}
-                      </Badge>
+                <ul className="m-0 flex list-none flex-col gap-1 p-0 text-xs" role="list">
+                  {needs.map((n) => (
+                    <li key={n.label} className="flex gap-1.5">
+                      <span
+                        aria-hidden="true"
+                        className={n.ready ? "text-ok-text" : "text-warn-text"}
+                      >
+                        {n.ready ? "✓" : "○"}
+                      </span>
+                      <span>
+                        <span className="text-ink">{n.label}</span>
+                        <span className="text-ink-3">
+                          {" "}
+                          · {n.ready ? "ready" : "to set up"}: {n.detail}
+                        </span>
+                      </span>
                     </li>
                   ))}
                 </ul>
+                {needs.every((n) => n.ready) ? null : (
+                  <p className="mt-1.5 text-2xs text-ink-3">
+                    You can create the workflow now either way; the builder shows what is still
+                    missing.
+                  </p>
+                )}
               </div>
             ) : null}
           </DialogBody>
@@ -221,9 +238,53 @@ function Templates() {
     );
     return (type: string) => m.get(type);
   }, [nodes.data]);
+  const providers = useQuery({
+    queryKey: ["providers", s.ws],
+    queryFn: () => get<{ id: string; configuredOnServer: boolean }[]>("/v1/providers"),
+    staleTime: 60_000,
+  });
+  const credentials = useQuery({
+    queryKey: ["credentials", s.ws],
+    queryFn: () => get<{ type: string }[]>("/v1/credentials"),
+    enabled: s.can("credentials:read"),
+  });
+  const mcp = useQuery({
+    queryKey: ["mcp-servers", s.ws],
+    queryFn: () => get<McpServer[]>("/v1/mcp/servers"),
+    enabled: s.can("mcp:read"),
+  });
+  const knowledge = useQuery({
+    queryKey: ["knowledge-sources", s.ws],
+    queryFn: () => get<unknown[]>("/v1/knowledge/sources"),
+    enabled: s.features.knowledge === true,
+  });
+  // readiness only once the key state is known: "to set up" must not flash while loading
+  const have: WorkspaceResources | null = providers.data
+    ? {
+        keys: {
+          server: Object.fromEntries(providers.data.map((p) => [p.id, p.configuredOnServer])),
+          saved: (credentials.data ?? []).map((c) => c.type),
+        },
+        mcpServers: mcp.data?.length ?? 0,
+        knowledgeSources: knowledge.data?.length ?? 0,
+      }
+    : null;
+  const needsOf = (t: TemplateRow) => (have ? templateNeeds(t, have) : []);
   const views = useMemo(
-    () => (templates.data ?? []).map((t) => templateToView(t, categoryOf)),
-    [templates.data, categoryOf],
+    () =>
+      (templates.data ?? [])
+        .map((t) => ({
+          view: {
+            ...templateToView(t, categoryOf),
+            ...(have ? { needs: templateNeeds(t, have) } : {}),
+          },
+        }))
+        // what can run now comes first
+        .map((x, i) => ({ ...x, i, ready: x.view.needs?.every((n) => n.ready) ?? false }))
+        .sort((a, b) => Number(b.ready) - Number(a.ready) || a.i - b.i)
+        .map((x) => x.view),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `have` is rebuilt from these
+    [templates.data, categoryOf, providers.data, credentials.data, mcp.data, knowledge.data],
   );
 
   return (
@@ -233,9 +294,9 @@ function Templates() {
           title="Templates"
           description={
             <>
-              Production-shaped starting points. Every template compiles and runs as shipped;
-              credentials and servers it needs are listed before you create the workflow.{" "}
-              <LearnMore href={HELP.gettingStarted} label="Getting started" />
+              Working starting points. Each card says what the template needs (keys, servers,
+              documents) and whether this workspace has it; ready ones run as soon as you create
+              them. <LearnMore href={HELP.gettingStarted} label="Getting started" />
             </>
           }
         />
@@ -260,7 +321,11 @@ function Templates() {
           </QueryView>
         </div>
       </PageBody>
-      <UseTemplateDialog template={using ?? linked} onClose={closeDialog} />
+      <UseTemplateDialog
+        template={using ?? linked}
+        needs={(using ?? linked) ? needsOf((using ?? linked) as TemplateRow) : []}
+        onClose={closeDialog}
+      />
     </AppFrame>
   );
 }

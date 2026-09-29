@@ -35,10 +35,10 @@ describe("TemplateGallery", () => {
   it("renders every template with a preview and fires onUse", async () => {
     const onUse = vi.fn();
     render(<TemplateGallery templates={BUILDER_SAMPLE_TEMPLATES} onUse={onUse} />);
-    expect(screen.getAllByRole("button", { name: "Use template" })).toHaveLength(5);
+    expect(screen.getAllByRole("button", { name: /^Use template / })).toHaveLength(5);
     expect(screen.getByRole("img", { name: "Research Agent preview" })).toBeInTheDocument();
     await userEvent.click(
-      screen.getAllByRole("button", { name: "Use template" })[1] as HTMLElement,
+      screen.getAllByRole("button", { name: /^Use template / })[1] as HTMLElement,
     );
     expect(onUse).toHaveBeenCalledWith(expect.objectContaining({ id: "research-agent" }));
   });
@@ -49,9 +49,40 @@ describe("TemplateGallery", () => {
     await userEvent.type(box, "invoice");
     expect(screen.getByText("No templates match")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Clear filters" }));
-    expect(screen.getAllByRole("button", { name: "Use template" })).toHaveLength(5);
+    expect(screen.getAllByRole("button", { name: /^Use template / })).toHaveLength(5);
     await userEvent.type(box, "research");
-    expect(screen.getAllByRole("button", { name: "Use template" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: /^Use template / })).toHaveLength(1);
     expect(screen.getByText("1 of 5")).toBeInTheDocument();
+  });
+
+  it("names each Use template button after its template", () => {
+    render(<TemplateGallery templates={BUILDER_SAMPLE_TEMPLATES} onUse={() => undefined} />);
+    expect(screen.getByRole("button", { name: "Use template Research Agent" })).toBeInTheDocument();
+  });
+
+  it("says what a template needs in words, not colour alone", () => {
+    const [first, second] = BUILDER_SAMPLE_TEMPLATES as [
+      (typeof BUILDER_SAMPLE_TEMPLATES)[number],
+      (typeof BUILDER_SAMPLE_TEMPLATES)[number],
+    ];
+    render(
+      <TemplateGallery
+        templates={[
+          { ...first, needs: [{ label: "TypeSafe API key", ready: true }] },
+          {
+            ...second,
+            needs: [
+              { label: "TypeSafe API key", ready: true },
+              { label: "OpenAI API key", ready: false },
+            ],
+          },
+        ]}
+        onUse={() => undefined}
+      />,
+    );
+    expect(screen.getByText(/Ready to run · uses TypeSafe API key/)).toBeInTheDocument();
+    expect(screen.getByText("Needs before it runs:")).toBeInTheDocument();
+    expect(screen.getByText(/OpenAI API key \(to set up\)/)).toBeInTheDocument();
+    expect(screen.getByText(/TypeSafe API key \(ready\)/)).toBeInTheDocument();
   });
 });

@@ -9,6 +9,8 @@ export class ApiError extends Error {
     readonly code: string,
     message: string,
     readonly details?: unknown,
+    /** The API's `request_id`, for matching a failure to the server log. */
+    readonly requestId?: string,
   ) {
     super(message);
     this.name = "ApiError";
@@ -74,19 +76,21 @@ async function toError(res: Response): Promise<ApiError> {
   let code = `HTTP_${res.status}`;
   let message = res.statusText || "request failed";
   let details: unknown;
+  let requestId: string | undefined;
   try {
     const body = (await res.json()) as {
-      error?: { code?: string; message?: string; details?: unknown };
+      error?: { code?: string; message?: string; details?: unknown; request_id?: string };
     };
     if (body.error) {
       code = body.error.code ?? code;
       message = body.error.message ?? message;
       details = body.error.details;
+      requestId = body.error.request_id;
     }
   } catch {
     /* not JSON */
   }
-  return new ApiError(res.status, code, message, details);
+  return new ApiError(res.status, code, message, details, requestId);
 }
 
 export async function api<T = unknown>(

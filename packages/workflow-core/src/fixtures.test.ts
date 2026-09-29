@@ -30,6 +30,7 @@ const VARIANTS: Record<string, unknown> = {
   "pageindex-document-qa": readJson("variants", "pageindex-document-qa.json"),
   "pageindex-compare": readJson("variants", "pageindex-compare.json"),
   "pageindex-agent": readJson("variants", "pageindex-agent.json"),
+  "message-triage": readJson("variants", "message-triage.json"),
 };
 /** Returns a fresh deep copy of a fixture document. */
 function loadRaw(name: string): unknown {

@@ -42,6 +42,7 @@ import {
 import { BindingField, bindingProblem } from "./BindingField";
 import { ReorderableList } from "./ReorderableList";
 import { SecretSlotPicker, type SecretSlotPickerProps } from "./SecretSlotPicker";
+import type { TemplateRef } from "./TemplateEditor";
 import {
   buildRules,
   defaultValueFor,
@@ -112,6 +113,15 @@ export interface SchemaFormProps {
   secretSlots?: SecretSlotPickerProps;
   /** Per-form widget overrides, keyed like the registry. */
   widgets?: Record<string, SchemaWidget>;
+  /**
+   * Upstream references `template` fields may use, in the compiler's grammar (`node.port`). With
+   * them, template fields complete and check against these instead of the legacy `scope` roots.
+   */
+  templateRefs?: readonly TemplateRef[];
+  /** Workflow variable names offered as `$vars.<name>` in template fields. */
+  variables?: readonly string[];
+  /** The node sits inside a loop or foreach body (`$scope.*` is offered). */
+  inContainer?: boolean;
   id?: string;
   className?: string;
   /** Footer content (actions). Rendered inside the <form>, so submit buttons work. */
@@ -957,6 +967,9 @@ export const SchemaForm = forwardRef<SchemaFormHandle, SchemaFormProps>(function
     loadOptions,
     secretSlots,
     widgets,
+    templateRefs,
+    variables,
+    inContainer,
     id,
     className,
     children,
@@ -1022,6 +1035,9 @@ export const SchemaForm = forwardRef<SchemaFormHandle, SchemaFormProps>(function
       nodeType,
       loadOptions,
       getValues,
+      ...(templateRefs ? { templateRefs } : {}),
+      ...(variables ? { variables } : {}),
+      ...(inContainer !== undefined ? { inContainer } : {}),
     }),
     [
       scope,
@@ -1033,6 +1049,9 @@ export const SchemaForm = forwardRef<SchemaFormHandle, SchemaFormProps>(function
       nodeType,
       loadOptions,
       getValues,
+      templateRefs,
+      variables,
+      inContainer,
     ],
   );
   const meta = useMemo<SchemaFormContextValue>(

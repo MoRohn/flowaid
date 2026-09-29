@@ -8,6 +8,8 @@ import githubIssueTriage from "../templates/github-issue-triage.json" with { typ
 import githubIssueTriageResources from "../templates/github-issue-triage.resources.json" with { type: "json" };
 import githubIssueTriageRetrieval from "../templates/github-issue-triage.retrieval.json" with { type: "json" };
 import githubIssueTriageRetrievalResources from "../templates/github-issue-triage.retrieval.resources.json" with { type: "json" };
+import messageTriage from "../templates/message-triage.json" with { type: "json" };
+import messageTriageResources from "../templates/message-triage.resources.json" with { type: "json" };
 import pageindexAgent from "../templates/pageindex-agent.json" with { type: "json" };
 import pageindexAgentResources from "../templates/pageindex-agent.resources.json" with { type: "json" };
 import pageindexCompare from "../templates/pageindex-compare.json" with { type: "json" };
@@ -40,6 +42,8 @@ export interface CoreTemplate {
 
 /** The built-in templates as data (definitions with `$template.<kind>.<key>` sentinels). */
 export const coreTemplates: readonly CoreTemplate[] = [
+  // the starter first: it runs with only a TypeSafe key
+  [messageTriage, messageTriageResources],
   [supportTriage, supportTriageResources],
   [githubIssueTriage, githubIssueTriageResources],
   [githubIssueTriageRetrieval, githubIssueTriageRetrievalResources],

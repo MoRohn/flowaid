@@ -1,0 +1,239 @@
+{
+  "$schema": "https://flowaid.dev/schemas/workflow/v1",
+  "id": "4b8e2d61-7c3a-4f95-b0d2-9e6a1c5f3b72",
+  "name": "Message triage (starter)",
+  "description": "A first workflow that runs with only a TypeSafe key: one batched decision reads a customer message and answers three questions (which topic, how urgent, does a person need to handle it), then routes the message to a person or to automatic handling. Every answer comes with its probabilities in the trace.",
+  "inputs": {
+    "type": "object",
+    "required": ["message"],
+    "properties": {
+      "message": {
+        "type": "string",
+        "title": "Message",
+        "description": "A customer message, as they wrote it. For example: My card was charged twice for the same order.",
+        "minLength": 1,
+        "maxLength": 4000
+      }
+    }
+  },
+  "outputs": {
+    "type": "object",
+    "required": ["topic", "urgency", "handled_by"],
+    "properties": {
+      "topic": {
+        "type": "string"
+      },
+      "urgency": {
+        "type": "number"
+      },
+      "handled_by": {
+        "type": "string",
+        "enum": ["person", "automation"]
+      }
+    }
+  },
+  "secrets": [
+    {
+      "name": "TYPESAFE_API_KEY",
+      "credentialType": "typesafe.api_key",
+      "required": false,
+      "description": "Optional: without a credential bound here, runs use the TYPESAFE_API_KEY set on the server."
+    }
+  ],
+  "variables": [],
+  "execution": {
+    "timeoutMs": 60000,
+    "maxCostUsd": 0.05,
+    "decisions": {
+      "primary": {
+        "provider": "typesafe",
+        "model": "jev-latest"
+      }
+    }
+  },
+  "nodes": [
+    {
+      "id": "start",
+      "kind": "input",
+      "name": "Message"
+    },
+    {
+      "id": "triage",
+      "kind": "task",
+      "type": "flowaid.decision.batch",
+      "typeVersion": "1.0.0",
+      "name": "Triage the message",
+      "description": "One TypeSafe call answers all three questions about the message.",
+      "config": {
+        "questions": {
+          "topic": {
+            "kind": "choice",
+            "instructions": "What is this message about?",
+            "options": {
+              "billing": "Charges, invoices, refunds, subscriptions",
+              "technical": "Errors, bugs, outages, something not working",
+              "account": "Sign-in, passwords, profile or account settings",
+              "feedback": "Praise, complaints or suggestions",
+              "other": "Anything else"
+            }
+          },
+          "urgency": {
+            "kind": "score",
+            "instructions": "How urgent is this message?",
+            "levels": ["Not urgent", "Low", "Moderate", "High", "Critical"]
+          },
+          "needs_person": {
+            "kind": "boolean",
+            "instructions": "Should a person handle this message rather than an automatic reply (anger, legal threats, safety, money at risk)?",
+            "criteria": {
+              "true": "A person should handle it",
+              "false": "An automatic reply is fine"
+            }
+          }
+        }
+      },
+      "inputs": {
+        "state": {
+          "kind": "object",
+          "fields": {
+            "message": {
+              "kind": "ref",
+              "ref": {
+                "kind": "port",
+                "node": "start",
+                "port": "message"
+              }
+            }
+          }
+        }
+      },
+      "credentials": {
+        "typesafe": "TYPESAFE_API_KEY"
+      }
+    },
+    {
+      "id": "route",
+      "kind": "branch",
+      "name": "Person or automation?",
+      "cases": [
+        {
+          "port": "person",
+          "when": "triage.answers.needs_person.value || triage.answers.urgency.value >= 3.5"
+        }
+      ],
+      "defaultPort": "automation"
+    },
+    {
+      "id": "to_person",
+      "kind": "output",
+      "name": "Hand to a person",
+      "outcome": "person",
+      "value": {
+        "kind": "object",
+        "fields": {
+          "topic": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "triage",
+              "port": "answers",
+              "path": "/topic/value"
+            }
+          },
+          "urgency": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "triage",
+              "port": "answers",
+              "path": "/urgency/value"
+            }
+          },
+          "handled_by": {
+            "kind": "literal",
+            "value": "person"
+          }
+        }
+      }
+    },
+    {
+      "id": "to_automation",
+      "kind": "output",
+      "name": "Handle automatically",
+      "outcome": "automation",
+      "value": {
+        "kind": "object",
+        "fields": {
+          "topic": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "triage",
+              "port": "answers",
+              "path": "/topic/value"
+            }
+          },
+          "urgency": {
+            "kind": "ref",
+            "ref": {
+              "kind": "port",
+              "node": "triage",
+              "port": "answers",
+              "path": "/urgency/value"
+            }
+          },
+          "handled_by": {
+            "kind": "literal",
+            "value": "automation"
+          }
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "c_person",
+      "from": {
+        "node": "route",
+        "port": "person"
+      },
+      "to": {
+        "node": "to_person"
+      }
+    },
+    {
+      "id": "c_automation",
+      "from": {
+        "node": "route",
+        "port": "automation"
+      },
+      "to": {
+        "node": "to_automation"
+      }
+    }
+  ],
+  "layout": {
+    "nodes": {
+      "start": {
+        "x": 0,
+        "y": 80
+      },
+      "triage": {
+        "x": 280,
+        "y": 40
+      },
+      "route": {
+        "x": 600,
+        "y": 60
+      },
+      "to_person": {
+        "x": 920,
+        "y": 0
+      },
+      "to_automation": {
+        "x": 920,
+        "y": 160
+      }
+    }
+  }
+}
