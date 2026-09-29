@@ -9,7 +9,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { FlaskConical, WifiOff } from "lucide-react";
-import type { NodeRunView } from "@flowaid/ui";
+import type { NodeRunView, RunView } from "@flowaid/ui";
+import type { WorkflowDefinition } from "@flowaid/workflow-core";
 import {
   Button,
   EmptyState,
@@ -24,6 +25,8 @@ import { JsonView } from "@flowaid/ui/data";
 import { EventLog, LogViewer, RunHeader, TraceTimeline } from "@flowaid/ui/trace";
 import { get, post } from "~/api/client";
 import type { VersionSummary } from "~/api/types";
+import { explainRun } from "~/guide/explain";
+import { useGuideContext } from "~/guide/GuideProvider";
 import { useSession } from "~/session";
 import { ErrorPanel, errorMessage } from "~/shell/states";
 import { AddToEvaluationDialog } from "./AddToEvaluationDialog";
@@ -278,6 +281,7 @@ export function TraceViewer({ runId }: { runId: string }) {
             ) : undefined
           }
         />
+        <RunStory run={run} {...(definition ? { definition } : {})} />
         {stream.status === "reconnecting" || stream.status === "failed" ? (
           <p className="flex items-center gap-2 text-xs text-warn-text" role="status">
             <WifiOff className="size-3.5" strokeWidth={1.75} />
@@ -405,5 +409,29 @@ export function TraceSkeleton() {
       <Skeleton className="h-8 w-80" />
       <Skeleton className="h-[420px] w-full" />
     </div>
+  );
+}
+
+/** What happened, in plain words, under the header; the Guide shows the same story. */
+function RunStory({ run, definition }: { run: RunView; definition?: WorkflowDefinition }) {
+  useGuideContext(
+    useMemo(
+      () => ({ kind: "run" as const, run, ...(definition ? { definition } : {}) }),
+      [run, definition],
+    ),
+  );
+  const story = explainRun(run, definition);
+  if (!story.length) return null;
+  return (
+    <details open className="rounded-sm border border-border bg-surface-2 px-3 py-2">
+      <summary className="cursor-pointer text-xs font-medium text-ink">
+        What happened, in plain words
+      </summary>
+      <ol className="m-0 mt-1.5 flex list-decimal flex-col gap-0.5 pl-5 text-sm text-ink-2">
+        {story.map((line, i) => (
+          <li key={i}>{line}</li>
+        ))}
+      </ol>
+    </details>
   );
 }

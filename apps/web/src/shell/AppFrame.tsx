@@ -7,10 +7,11 @@
  */
 import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
-import { MessageSquareText, Plus } from "lucide-react";
+import { Compass, MessageSquareText, Plus } from "lucide-react";
 import { AppShell, SideNav, TopBar, UserMenu, type TopBarProps } from "@flowaid/ui/shell";
 import { Button, IconButton } from "@flowaid/ui/primitives";
 import { useAssistant } from "~/assistant/AssistantProvider";
+import { useGuide } from "~/guide/GuideProvider";
 import { useSession } from "~/session";
 import { useDesktop } from "./desktop";
 import { documentTitle, useDocumentTitle, usePendingTasks } from "./frame";
@@ -52,6 +53,7 @@ export function AppFrame({
   const secondary = visibleNav(NAV_SECONDARY, s.features);
   const active = [...items, ...secondary].find((e) => section === e.path)?.id ?? section;
   const assistant = useAssistant();
+  const guide = useGuide();
   const desktop = useDesktop(s);
   const pending = usePendingTasks(s);
   const pendingCount = pending.data?.items.length ?? 0;
@@ -76,6 +78,8 @@ export function AppFrame({
   return (
     <AppShell
       storageKey={storageKey}
+      // on wide screens the open Guide sits beside the page instead of over it
+      {...(guide?.open ? { className: "lg:[&>[data-shell-body]]:pr-[400px]" } : {})}
       topbar={
         <TopBar
           breadcrumbs={links.map((c, i) => ({
@@ -87,6 +91,18 @@ export function AppFrame({
           layoutToggles={Boolean(inspector || bottomPanel)}
           trailing={
             <span className="flex items-center gap-1">
+              {guide ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  aria-pressed={guide.open}
+                  className={guide.open ? "bg-accent-soft text-accent-text" : undefined}
+                  leadingIcon={<Compass strokeWidth={1.75} />}
+                  onClick={() => guide.setOpen(!guide.open)}
+                >
+                  Guide
+                </Button>
+              ) : null}
               {assistant?.available ? (
                 <IconButton label="Ask FlowAId" onClick={() => assistant.setOpen(true)}>
                   <MessageSquareText strokeWidth={1.75} />
@@ -164,7 +180,20 @@ export function AppFrame({
             shortcut: e.shortcut,
             onSelect: () => go(e.path),
           }))}
-          actions={[...commands, ...desktop.commands]}
+          actions={[
+            ...commands,
+            ...(guide
+              ? [
+                  {
+                    id: "guide",
+                    label: guide.open ? "Close the Guide" : "Explain this page (Guide)",
+                    icon: <Compass strokeWidth={1.75} />,
+                    onSelect: () => guide.setOpen(!guide.open),
+                  },
+                ]
+              : []),
+            ...desktop.commands,
+          ]}
           pending={pending.data?.items ?? []}
           {...(assistant?.available ? { onAsk: assistant.ask } : {})}
         />

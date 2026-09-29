@@ -1,6 +1,7 @@
 "use client";
 import { use, type ReactNode } from "react";
 import { AssistantProvider } from "~/assistant/AssistantProvider";
+import { GuideProvider } from "~/guide/GuideProvider";
 import { SessionProvider } from "~/session";
 
 export default function WorkspaceLayout({
@@ -13,7 +14,9 @@ export default function WorkspaceLayout({
   const { ws } = use(params);
   return (
     <SessionProvider ws={ws}>
-      <AssistantProvider>{children}</AssistantProvider>
+      <AssistantProvider>
+        <GuideProvider>{children}</GuideProvider>
+      </AssistantProvider>
     </SessionProvider>
   );
 }

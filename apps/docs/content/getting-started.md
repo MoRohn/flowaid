@@ -28,6 +28,24 @@ the Run tab and press **Run draft**. It needs only TypeSafe: either `TYPESAFE_AP
 `.env.local` or a TypeSafe credential. The Output tab says whether the run completed, and the
 trace shows each decision's probabilities.
 
+## Get help on any page: the Guide
+
+**Guide** in the top bar (also _Help → Explain this page_, or the command menu) opens a panel
+beside the page that explains it in plain words: what the page is for, what to do next, and the
+words you will meet there. It needs no AI model and stays open as you move around.
+
+- **In the builder** it tells the workflow as a short story: each step in order, the ways it can
+  end, and the settings you can change. Click a step (on the canvas or in the Guide) and it
+  explains that step: the questions a decision asks and their possible answers, each rule of a
+  branch as a sentence (“If the eligible answer is yes and the Order total (USD) is at most the
+  auto refund limit setting (now 50), it goes to Refund automatically”), and what a person is
+  asked to approve and how long they have.
+- **After a run** the Run result and the run page say what happened, in plain words: what each
+  decision answered and how sure it was, which way each rule sent it, what a person did, and how
+  it ended. The Guide adds what you can do next.
+
+When _Ask FlowAId_ is set up, the Guide also offers it for questions in your own words.
+
 ## Start from a business flow
 
 _Templates → Business flows_ (or _New workflow → From a template_) has four complete workflows

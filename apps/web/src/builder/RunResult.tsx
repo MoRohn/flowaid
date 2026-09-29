@@ -120,8 +120,11 @@ export function RunResult({
   ws,
   stale,
   onShowNode,
+  story = [],
 }: {
   run: RunView;
+  /** What happened, in plain sentences (`explainRun`); shown under the status. */
+  story?: string[];
   ws: string;
   /** The draft changed after this run started. */
   stale: boolean;
@@ -144,6 +147,16 @@ export function RunResult({
           <span className="break-words">{run.error.message}</span>{" "}
           <span className="font-mono text-2xs text-ink-3">{run.error.code}</span>
         </p>
+      ) : null}
+      {story.length ? (
+        <div className="flex flex-col gap-1 rounded-sm bg-surface px-2.5 py-2">
+          <p className="text-2xs font-medium uppercase tracking-wide text-ink-3">In plain words</p>
+          <ol className="m-0 flex list-decimal flex-col gap-0.5 pl-4 text-xs text-ink">
+            {story.map((line, i) => (
+              <li key={i}>{line}</li>
+            ))}
+          </ol>
+        </div>
       ) : null}
       {summary.next ? <p className="text-xs text-ink-2">{summary.next}</p> : null}
       {stale ? (

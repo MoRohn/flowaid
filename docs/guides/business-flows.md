@@ -28,6 +28,8 @@ something else.
   the reply to a customer.
 - **Who approves.** Select the approval step and set its assignees and how long it waits.
 - Every canvas carries a _How to make it yours_ note that points at the parts people change most.
+- **Not sure what a step does?** Open the **Guide** in the top bar. It explains the whole flow
+  and each step in plain words, with every rule written out as a sentence.
 
 The key: the flows declare `TYPESAFE_API_KEY` as optional, so draft runs use the key set on the
 server (`TYPESAFE_API_KEY` in `.env.local`). To use a different key, save it under

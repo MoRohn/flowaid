@@ -319,7 +319,8 @@ function AppShellInner({
           Skip to content
         </a>
         {topbar}
-        <div className="flex min-h-0 min-w-0 flex-1">
+        {/* data-shell-body: an app can make room here for a panel docked beside the page */}
+        <div data-shell-body className="flex min-h-0 min-w-0 flex-1">
           {!compact && nav !== undefined ? nav : null}
           <ResizablePanelGroup
             orientation="horizontal"

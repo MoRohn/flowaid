@@ -1,11 +1,11 @@
 "use client";
 /**
- * The top bar's help menu: the getting-started checklist, the guides, keyboard shortcuts, where to
+ * The top bar's help menu: the Guide for the page you are on, the getting-started checklist, the guides, keyboard shortcuts, where to
  * report a problem and the running version. Rendered inside `AppShell`, whose "?" dialog it opens.
  */
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { BookOpen, Bug, CircleHelp, Keyboard, ListChecks } from "lucide-react";
+import { BookOpen, Bug, CircleHelp, Compass, Keyboard, ListChecks } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,6 +17,7 @@ import {
 } from "@flowaid/ui/primitives";
 import { useAppShellOptional } from "@flowaid/ui/shell";
 import { get } from "~/api/client";
+import { useGuide } from "~/guide/GuideProvider";
 // the release script versions the app with the rest of the platform
 import pkg from "../../package.json";
 import { HELP } from "./help";
@@ -26,6 +27,7 @@ const openExternal = (url: string) => window.open(url, "_blank", "noopener,noref
 export function HelpMenu({ ws, dashboard }: { ws: string; dashboard: boolean }) {
   const router = useRouter();
   const shell = useAppShellOptional();
+  const guide = useGuide();
   const health = useQuery({
     queryKey: ["health"],
     queryFn: () => get<{ version: string }>("/v1/health"),
@@ -40,6 +42,14 @@ export function HelpMenu({ ws, dashboard }: { ws: string; dashboard: boolean }) 
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-60">
         <DropdownMenuLabel>Help</DropdownMenuLabel>
+        {guide ? (
+          <DropdownMenuItem
+            icon={<Compass strokeWidth={1.75} />}
+            onSelect={() => guide.setOpen(true)}
+          >
+            Explain this page
+          </DropdownMenuItem>
+        ) : null}
         {dashboard ? (
           <DropdownMenuItem
             icon={<ListChecks strokeWidth={1.75} />}

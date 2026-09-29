@@ -73,6 +73,8 @@ import { describeInputIssue, describeRunError, type RunStartError } from "./erro
 import { diagnosticNodeId, presentDiagnostic } from "./diagnostics";
 import { RunResult } from "./RunResult";
 import { WorkflowPanel } from "./WorkflowPanel";
+import { useGuideContext } from "~/guide/GuideProvider";
+import { explainRun } from "~/guide/explain";
 import { NodeInspector } from "./NodeInspector";
 import { PublishDialog } from "./PublishDialog";
 import { RunTab, missingRequired } from "./RunTab";
@@ -212,6 +214,10 @@ function BuilderView({
     },
     [store],
   );
+  const clearSelection = useCallback(
+    () => store.getState().select({ nodes: [], edges: [] }),
+    [store],
+  );
   const advisorOn = advisorAvailability(s.features, !readOnly).advisor;
   const advisor = useAdvisor({ workflowId: workflow.id, store, enabled: advisorOn });
   const problems = useMemo(
@@ -247,27 +253,31 @@ function BuilderView({
       liveStatus === "timed_out";
     if (ended && bottomTab === "trace") setBottomTab("output");
   }
-  const runView: RunView | undefined = live
-    ? {
-        id: live.runId,
-        workflowId: workflow.id,
-        workflowName: title,
-        version: "draft",
-        status: live.status,
-        origin: "ui",
-        createdAt: live.run?.createdAt ?? new Date().toISOString(),
-        nodeRuns: live.folded.nodeRuns,
-        ...(live.run?.startedAt ? { startedAt: live.run.startedAt } : {}),
-        ...(live.run?.endedAt ? { endedAt: live.run.endedAt } : {}),
-        ...(live.folded.output !== undefined
-          ? { output: live.folded.output }
-          : live.run?.output !== undefined && live.run.output !== null
-            ? { output: live.run.output }
-            : {}),
-        ...(live.folded.error ? { error: live.folded.error } : {}),
-        ...(live.folded.costUsd !== undefined ? { costUsd: live.folded.costUsd } : {}),
-      }
-    : undefined;
+  const runView = useMemo<RunView | undefined>(
+    () =>
+      live
+        ? {
+            id: live.runId,
+            workflowId: workflow.id,
+            workflowName: title,
+            version: "draft",
+            status: live.status,
+            origin: "ui",
+            createdAt: live.run?.createdAt ?? new Date().toISOString(),
+            nodeRuns: live.folded.nodeRuns,
+            ...(live.run?.startedAt ? { startedAt: live.run.startedAt } : {}),
+            ...(live.run?.endedAt ? { endedAt: live.run.endedAt } : {}),
+            ...(live.folded.output !== undefined
+              ? { output: live.folded.output }
+              : live.run?.output !== undefined && live.run.output !== null
+                ? { output: live.run.output }
+                : {}),
+            ...(live.folded.error ? { error: live.folded.error } : {}),
+            ...(live.folded.costUsd !== undefined ? { costUsd: live.folded.costUsd } : {}),
+          }
+        : undefined,
+    [live, workflow.id, title],
+  );
 
   // --- projection → XYFlow (measured sizes and selection live in local state) ---
   const projection = useMemo(
@@ -561,6 +571,23 @@ function BuilderView({
       ? [...live.folded.nodeRuns].reverse().find((r) => r.nodeId === selectedId)
       : undefined;
 
+  // the Guide explains the workflow, the selected step and the last run in plain words
+  const selectedManifest = selectedNode ? manifestOf(selectedNode, catalog) : undefined;
+  useGuideContext(
+    useMemo(
+      () => ({
+        kind: "builder" as const,
+        definition,
+        ...(selectedNode ? { selected: selectedNode } : {}),
+        ...(selectedManifest ? { manifest: selectedManifest } : {}),
+        onSelectStep: showNode,
+        onClearStep: clearSelection,
+        ...(runView ? { run: runView } : {}),
+      }),
+      [definition, selectedNode, selectedManifest, showNode, clearSelection, runView],
+    ),
+  );
+
   const exportJson = () => {
     const blob = new Blob([JSON.stringify(definition, null, 2)], { type: "application/json" });
     const a = document.createElement("a");
@@ -722,6 +749,7 @@ function BuilderView({
               {runView ? (
                 <RunResult
                   run={runView}
+                  story={explainRun(runView, definition)}
                   ws={s.ws}
                   stale={runVersion !== null && version !== runVersion}
                   onShowNode={showNode}
