@@ -1,6 +1,6 @@
 {
   "name": "@flowaid/nodes-langchain",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "private": true,
   "description": "LangChain-powered FlowAId nodes (chat, LCEL runnable, bounded ReAct agent with approvals, document loaders, text splitters, embeddings, vector stores, retrievers, output parsers), the langchain:<vendor> providers and the 'Knowledge assistant (LangChain RAG)' template (docs/design/LANGCHAIN.md §3).",
   "license": "Apache-2.0",
@@ -8,7 +8,7 @@
   "sideEffects": false,
   "flowaid": {
     "package": "nodePackage",
-    "sdk": "^0.6.0"
+    "sdk": "^0.7.0"
   },
   "exports": {
     ".": {

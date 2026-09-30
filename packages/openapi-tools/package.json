@@ -1,6 +1,6 @@
 {
   "name": "@flowaid/openapi-tools",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "private": true,
   "description": "OpenAPI 3.0/3.1 import for flowaid: SSRF-safe parsing with bounded external refs, one tool per operation, argument coercion and request execution with auth and Idempotency-Key (ARCHITECTURE.md §10.3).",
   "license": "Apache-2.0",

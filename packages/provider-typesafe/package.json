@@ -1,6 +1,6 @@
 {
   "name": "@flowaid/provider-typesafe",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "private": true,
   "description": "TypeSafe (Jev) System One decision provider for flowaid: the exact request/response mapping of the verified API, typed decisions with full distributions, client-side size guards, rate-limit retries and the error taxonomy (ARCHITECTURE.md §6.3).",
   "license": "Apache-2.0",

@@ -1,5 +1,20 @@
 # @flowaid/workflow-sdk
 
+## 0.7.0
+
+### Minor Changes
+
+- cf29f2c: More list endpoints are paged. `GET /v1/agents`, `/v1/api-keys`, `/v1/credentials`,
+  `/v1/knowledge/sources`, `/v1/notifications`, `/v1/saved-views`, `/v1/workflows/:id/versions` and
+  `/v1/workspaces/:id/members` now answer `{ items, next_cursor }` (keyset pagination with `limit`, at
+  most 200, and `cursor`) instead of a bare array, like the other lists. Callers that read these
+  responses as arrays must read `items` and follow `next_cursor`; the web app reads every page.
+
+### Patch Changes
+
+- @flowaid/shared@0.7.0
+  - @flowaid/workflow-core@0.7.0
+
 ## 0.6.0
 
 ### Patch Changes

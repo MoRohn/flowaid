@@ -1,6 +1,6 @@
 {
   "name": "@flowaid/cli",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "private": true,
   "description": "The flowaid command line: every API operation as a generated noun/verb command (from the OpenAPI x-cli extension), plus login, dev, workflow run (remote with --watch, or embedded with --local), workflow export/package and runs events --follow (API.md \u00a78.3).",
   "license": "Apache-2.0",

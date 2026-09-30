@@ -1,6 +1,6 @@
 {
   "name": "@flowaid/storage",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "private": true,
   "description": "Artifact storage for flowaid: a local directory or any S3-compatible object store (AWS S3, R2, self-hosted), with SigV4-signed requests and presigned downloads over fetch.",
   "license": "Apache-2.0",
