@@ -152,9 +152,16 @@ describeDb("observability: metrics, alerts and trace reviews (Postgres)", () => 
     const page = posted.find((p) => p.body.event === "trace_review.page");
     expect(page?.body).toMatchObject({ severity: "critical", data: { verdict: "PAGE_ON_CALL" } });
 
-    const deliveries = await h.db.app.system((tx) =>
-      tx.select().from(alertDeliveries).where(eq(alertDeliveries.workspaceId, h.workspaceId)),
-    );
+    // the POST lands before the dispatcher records it as sent, so wait for both rows to say so
+    const readDeliveries = () =>
+      h.db.app.system((tx) =>
+        tx.select().from(alertDeliveries).where(eq(alertDeliveries.workspaceId, h.workspaceId)),
+      );
+    await until(async () => {
+      const rows = await readDeliveries();
+      return rows.length === 2 && rows.every((d) => d.status === "sent");
+    }, "both deliveries recorded as sent");
+    const deliveries = await readDeliveries();
     expect(deliveries.map((d) => d.status)).toEqual(["sent", "sent"]);
     expect(new Set(deliveries.map((d) => d.key))).toEqual(
       new Set([`run.failed:${runId}`, `trace_review.page:${runId}`]),

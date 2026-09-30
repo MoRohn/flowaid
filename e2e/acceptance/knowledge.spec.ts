@@ -13,14 +13,19 @@ test("knowledge: create a source, add a document, search it", async ({ page }) =
 
   // The nav shows Knowledge when the API reports the feature.
   await page.getByRole("link", { name: "Knowledge" }).first().click();
-  await expect(page.getByRole("heading", { name: "Knowledge" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Knowledge", exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "New source" }).first().click();
-  await page.getByLabel("Name").fill(NAME);
+  const dialog = page.getByRole("dialog");
+  // every field at once instead of step by step
+  await dialog.getByRole("radio", { name: "All fields" }).click();
+  await dialog.getByRole("textbox", { name: /^Name/ }).fill(NAME);
   // keyword search: no embedding model or key in the acceptance stack
-  await page.getByRole("radio", { name: /Keywords only/ }).check();
-  await page.getByRole("button", { name: "Create source" }).click();
-  await expect(page.getByRole("heading", { name: NAME })).toBeVisible();
+  await dialog.getByRole("radio", { name: /Keywords only/ }).check();
+  await dialog.getByRole("button", { name: "Create source" }).click();
+  // creating says what happens next, then opens the source
+  await page.getByRole("link", { name: `Open ${NAME}` }).click();
+  await expect(page.getByRole("heading", { name: NAME, exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "Add documents" }).click();
   await page.getByLabel("Or paste a document").fill("Refund policy");
@@ -42,5 +47,5 @@ test("knowledge: create a source, add a document, search it", async ({ page }) =
   // Clean up.
   await page.getByRole("button", { name: "Delete", exact: true }).click();
   await page.getByRole("button", { name: "Delete source" }).click();
-  await expect(page.getByRole("heading", { name: "Knowledge" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Knowledge", exact: true })).toBeVisible();
 });

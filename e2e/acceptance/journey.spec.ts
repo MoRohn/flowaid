@@ -47,6 +47,10 @@ test("import → run → external review → publish → API run", async ({ page
 
   // Import the definition as a new workflow; the builder opens with a clean compile.
   await page.goto(`/${ws}/workflows/new`);
+  // the guided form: the name is only needed for Blank, then choose Import
+  await page.getByRole("button", { name: "Skip: Choose how to start" }).click();
+  await page.getByText("The definition already exists").click();
+  await page.getByRole("button", { name: "Next: Import" }).click();
   await page.getByLabel("Definition").click();
   await page.keyboard.insertText(JSON.stringify(DEFINITION, null, 2));
   await page.getByRole("button", { name: "Import", exact: true }).click();

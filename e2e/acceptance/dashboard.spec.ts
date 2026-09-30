@@ -13,7 +13,7 @@ test("the dashboard renders the overview and reacts to its filters", async ({ pa
     .first()
     .click();
   await expect(page).toHaveURL(new RegExp(`/${ws}$`));
-  await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Overview", exact: true })).toBeVisible();
   await expect(page.getByRole("group", { name: "Dashboard filters" })).toBeVisible();
 
   const overview = page.waitForResponse(
