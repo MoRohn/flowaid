@@ -1,6 +1,6 @@
 {
   "name": "@flowaid/codegen",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "private": true,
   "description": "FlowAId code export: a workflow as typed code over the SDK builders (round-trip checked) and as a runnable package — runner, HTTP wrapper, server client, tests, Dockerfile, vendored runtime (CODE_EXPORT.md).",
   "license": "Apache-2.0",

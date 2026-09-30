@@ -1,5 +1,13 @@
 # @flowaid/codegen
 
+## 0.8.0
+
+### Patch Changes
+
+- Updated dependencies [6002722]
+  - @flowaid/workflow-sdk@0.8.0
+  - @flowaid/workflow-core@0.8.0
+
 ## 0.7.0
 
 ### Patch Changes

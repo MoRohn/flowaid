@@ -1,6 +1,6 @@
 {
   "name": "@flowaid/workflow-sdk",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "private": true,
   "description": "The FlowAId TypeScript SDK: the typed Flowaid client (types generated from the API's OpenAPI document), run handles with a resumable SSE transport, and the total workflow builders (API.md §8). Isomorphic: Node 24 and browsers.",
   "license": "Apache-2.0",
