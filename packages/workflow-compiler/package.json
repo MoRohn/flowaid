@@ -1,6 +1,6 @@
 {
   "name": "@flowaid/workflow-compiler",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "private": true,
   "description": "The flowaid workflow compiler: validates a WorkflowDefinition against node manifests and emits an immutable, content-hashed ExecutionPlan with diagnostics (ARCHITECTURE.md §4). Pure, synchronous and browser-safe; depends only on @flowaid/workflow-core and @flowaid/shared.",
   "license": "Apache-2.0",

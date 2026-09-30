@@ -1,5 +1,13 @@
 # @flowaid/advisor
 
+## 0.7.0
+
+### Patch Changes
+
+- @flowaid/shared@0.7.0
+  - @flowaid/workflow-compiler@0.7.0
+  - @flowaid/workflow-core@0.7.0
+
 ## 0.6.0
 
 ### Patch Changes

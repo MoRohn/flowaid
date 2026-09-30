@@ -1,5 +1,36 @@
 # @flowaid/worker
 
+## 0.7.0
+
+### Patch Changes
+
+- Updated dependencies [cf29f2c]
+  - @flowaid/nodes-core@0.7.0
+  - @flowaid/codegen@0.7.0
+  - @flowaid/credentials@0.7.0
+  - @flowaid/database@0.7.0
+  - @flowaid/env@0.7.0
+  - @flowaid/evaluation@0.7.0
+  - @flowaid/knowledge@0.7.0
+  - @flowaid/mcp@0.7.0
+  - @flowaid/node-sdk@0.7.0
+  - @flowaid/nodes-langchain@0.7.0
+  - @flowaid/observability@0.7.0
+  - @flowaid/openapi-tools@0.7.0
+  - @flowaid/pageindex@0.7.0
+  - @flowaid/plugins@0.7.0
+  - @flowaid/provider-anthropic@0.7.0
+  - @flowaid/provider-ollama@0.7.0
+  - @flowaid/provider-openai@0.7.0
+  - @flowaid/provider-typesafe@0.7.0
+  - @flowaid/providers@0.7.0
+  - @flowaid/sandbox@0.7.0
+  - @flowaid/shared@0.7.0
+  - @flowaid/storage@0.7.0
+  - @flowaid/workflow-compiler@0.7.0
+  - @flowaid/workflow-core@0.7.0
+  - @flowaid/workflow-runtime@0.7.0
+
 ## 0.6.0
 
 ### Patch Changes

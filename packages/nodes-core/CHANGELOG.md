@@ -1,5 +1,28 @@
 # @flowaid/nodes-core
 
+## 0.7.0
+
+### Minor Changes
+
+- cf29f2c: Pickers for steps that point at something in the workspace.
+
+  - The Agent step's preset is chosen by name from the workspace's agent presets instead of typed
+    as an id.
+  - MCP tool and MCP prompt steps list the connected servers, then the chosen server's tools or
+    prompts; OpenAPI steps list the imported toolsets, then the chosen toolset's operations. A
+    list that depends on another field says to choose that one first, and a list that fails to
+    load says why and can be refreshed.
+
+### Patch Changes
+
+- @flowaid/knowledge@0.7.0
+  - @flowaid/mcp@0.7.0
+  - @flowaid/node-sdk@0.7.0
+  - @flowaid/pageindex@0.7.0
+  - @flowaid/providers@0.7.0
+  - @flowaid/shared@0.7.0
+  - @flowaid/workflow-core@0.7.0
+
 ## 0.6.0
 
 ### Patch Changes
