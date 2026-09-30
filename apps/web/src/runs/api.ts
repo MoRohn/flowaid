@@ -12,7 +12,9 @@ import type { Catalog, EventPage } from "./types";
 /** `GET /v1/nodes` as a map by type id (changes only with a deploy, so it is cached for long). */
 export function useCatalog(ws: string) {
   return useQuery({
-    queryKey: ["catalog", ws],
+    // its own key: ["catalog", "nodes"] holds the manifest array, this the Map built from it
+    // (under that prefix, so installing a plugin refreshes both)
+    queryKey: ["catalog", "nodes", "by-id", ws],
     queryFn: async (): Promise<Catalog> =>
       new Map((await get<NodeManifest[]>("/v1/nodes")).map((m) => [m.id, m])),
     staleTime: 10 * 60_000,
@@ -22,7 +24,9 @@ export function useCatalog(ws: string) {
 /** Workflow id → name for the whole workspace (≤ 200 workflows per page; enough for labels). */
 export function useWorkflowNames(ws: string) {
   return useQuery({
-    queryKey: ["workflow-names", ws],
+    // not ["workflow-names", ws]: that caches the page itself, and a Map under the same key
+    // broke every page reading `.items` from it after a visit to Runs or Human tasks
+    queryKey: ["workflow-names", ws, "by-id"],
     queryFn: async () => {
       const page = await get<Page<WorkflowSummary>>(
         `/v1/workflows${qs({ limit: 200, archived: true })}`,

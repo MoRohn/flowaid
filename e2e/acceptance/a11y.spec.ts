@@ -112,3 +112,19 @@ test("every side navigation item resolves without a 404", async ({ page }) => {
     await expect(page.getByText(/this page could not be found|^404$/i)).toHaveCount(0);
   }
 });
+
+test("moving between pages in the app never breaks one", async ({ page }) => {
+  // one session, clicking through the nav both ways: pages share a query cache, so a page that
+  // reads another page's cached data in the wrong shape fails only after a visit, not on reload
+  await signIn(page);
+  const nav = page.getByRole("navigation", { name: "Primary" });
+  const labels: string[] = [];
+  for (const item of await nav.locator("[data-nav-item]").all())
+    labels.push(((await item.textContent()) ?? "").trim());
+  for (const label of [...labels, ...[...labels].reverse()]) {
+    await nav.locator("[data-nav-item]", { hasText: label }).first().click();
+    await expect(page.locator("#main-content, main").first()).toBeVisible();
+    await page.waitForLoadState("networkidle");
+    await expect(page.getByText("Could not load this"), label).toHaveCount(0);
+  }
+});
