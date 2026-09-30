@@ -87,7 +87,9 @@ customer.
 ## Put one to work
 
 1. **Try it** from the builder's Run tab: fill in the form and press _Run draft_. The Output tab
-   says how the run ended; the trace shows each answer's probabilities.
+   says how the run ended; the trace shows each answer's probabilities. With a text model set up,
+   _Fill with AI_ writes realistic inputs for you: typical requests, edge cases at the limits the
+   flow checks, or unusual ones, each saying what it tests. Nothing changes until you pick one.
 2. **Publish** a version and deploy it to an environment.
 3. **Call it** from your systems: the REST API, the SDK, a webhook trigger or an MCP tool (see
    [Calling workflows](calling-workflows.md)).

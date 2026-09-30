@@ -133,9 +133,10 @@ Known limits, which are stated in the product as well:
 
 ## 5. Observability of AI calls
 
-| call                 | where it is recorded                                                                                                                           |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| workflow generations | `GENERATION_COMPLETED` events (streamed calls included since V2), `runs.cost_usd`/`usage`, Prometheus, the dashboard and insights              |
-| Ask FlowAId          | audit `assistant.ask`: model, tool names, rounds, stop reason, cost, prompt hash, statement and unverified counts. The question is not stored. |
-| AI builder           | audit `workflow.ai_generate`: model, iterations, cost, prompt hash                                                                             |
-| unpriced models      | `price()` returns `priced: false`, and a warning is logged once per model                                                                      |
+| call                 | where it is recorded                                                                                                                             |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| workflow generations | `GENERATION_COMPLETED` events (streamed calls included since V2), `runs.cost_usd`/`usage`, Prometheus, the dashboard and insights                |
+| Ask FlowAId          | audit `assistant.ask`: model, tool names, rounds, stop reason, cost, prompt hash, statement and unverified counts. The question is not stored.   |
+| AI builder           | audit `workflow.ai_generate`: model, iterations, cost, prompt hash                                                                               |
+| Fill with AI         | audit `workflow.ai_sample_inputs`: model, scenario, samples returned and rejected, iterations, cost, prompt hash. The description is not stored. |
+| unpriced models      | `price()` returns `priced: false`, and a warning is logged once per model                                                                        |

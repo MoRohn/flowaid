@@ -267,7 +267,12 @@ describeDb("metrics and alerts (Postgres)", () => {
     expect(posted[0]?.url).toBe("https://hooks.slack.test/T/B/x");
     expect(String(posted[0]?.body.text)).toContain("was rejected");
 
-    const list = (await call(t.app, jar, "GET", "/v1/alerts/deliveries")).json();
+    // the POST lands before the dispatcher records it as sent: wait for the row to say so
+    let list = (await call(t.app, jar, "GET", "/v1/alerts/deliveries")).json();
+    for (let i = 0; i < 100 && list.items[0]?.status !== "sent"; i++) {
+      await new Promise((r) => setTimeout(r, 20));
+      list = (await call(t.app, jar, "GET", "/v1/alerts/deliveries")).json();
+    }
     expect(list.items).toHaveLength(1);
     expect(list.items[0]).toMatchObject({ event: "webhook.rejected", status: "sent" });
     const rows = await t.db.app.system((tx) =>

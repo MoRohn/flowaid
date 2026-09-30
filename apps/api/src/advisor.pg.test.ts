@@ -151,6 +151,11 @@ describeDb("advisor: AI builder, critic and cost optimizer (Postgres)", () => {
         prompt: "Reply to support tickets",
       });
       expect(res.statusCode).toBe(409);
+      const fill = await call(t.app, jar, "POST", `/v1/workflows/${workflowId}/ai/sample-inputs`, {
+        scenario: "typical",
+      });
+      expect(fill.statusCode).toBe(409);
+      expect(fill.json().error.message).toMatch(/No text model/);
     });
   });
 
@@ -199,6 +204,62 @@ describeDb("advisor: AI builder, critic and cost optimizer (Postgres)", () => {
         select details from audit_events where action = 'workflow.ai_generate'`;
       expect(audit[0]?.details.iterations).toBe(2);
       expect(audit[0]?.details.promptHash).toBe(builderPromptHash());
+    });
+
+    it("writes run inputs that pass the run's own input check, keeping entered values", async () => {
+      requests.length = 0;
+      answers.push({
+        samples: [
+          {
+            title: "Double charge",
+            why: "A billing question.",
+            input: { message: "Charged twice" },
+          },
+          // fails the input schema (message must be a string) and is sent back once
+          { title: "Broken", why: "Wrong type.", input: { message: 42 } },
+        ],
+      });
+      answers.push({
+        samples: [
+          {
+            title: "Double charge",
+            why: "A billing question.",
+            input: { message: "Charged twice" },
+          },
+          { title: "Still broken", why: "Wrong type.", input: { message: 7 } },
+        ],
+      });
+      const res = await call(t.app, jar, "POST", `/v1/workflows/${workflowId}/ai/sample-inputs`, {
+        scenario: "edge",
+        instructions: "a customer charged twice",
+        count: 2,
+      });
+      expect(res.statusCode).toBe(200);
+      const out = res.json();
+      expect(out.samples).toEqual([
+        { title: "Double charge", why: "A billing question.", input: { message: "Charged twice" } },
+      ]);
+      expect(out).toMatchObject({ rejected: 1, model: { provider: "fake", model: "m" } });
+      expect(out.costUsd).toBeCloseTo(0.002);
+      expect(requests[0]?.messages[1]?.content).toContain("a customer charged twice");
+      const repair = requests[1]?.messages.filter((m) => m.role === "user").at(-1);
+      expect(repair?.content).toContain("/message must be string");
+      // nothing about the workflow's secrets reaches the model
+      expect(JSON.stringify(requests)).not.toContain("ANTHROPIC_API_KEY");
+      const audit = await t.db.admin<{ details: { samples: number; rejected: number } }[]>`
+        select details from audit_events where action = 'workflow.ai_sample_inputs'`;
+      expect(audit[0]?.details).toMatchObject({ samples: 1, rejected: 1, scenario: "edge" });
+
+      // values the person entered stay; an unsaved definition from the builder is used as sent
+      answers.push({ samples: [{ title: "T", why: "w", input: { message: "changed" } }] });
+      const kept = await call(t.app, jar, "POST", `/v1/workflows/${workflowId}/ai/sample-inputs`, {
+        current: { message: "Where is my order?" },
+        keep: ["message"],
+        count: 1,
+        definition: { ...definition, name: "Reply (edited)" },
+      });
+      expect(kept.json().samples[0].input).toEqual({ message: "Where is my order?" });
+      expect(requests.at(-1)?.messages[1]?.content).toContain("Reply (edited)");
     });
 
     it("critiques with the rubric and the decision chain's judge", async () => {

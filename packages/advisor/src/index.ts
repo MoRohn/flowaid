@@ -52,3 +52,13 @@ export {
   type CaseResult,
   type EvalReport,
 } from "./evals/assistant.js";
+export {
+  SAMPLE_INPUTS_SYSTEM_PROMPT,
+  sampleInputs,
+  sampleInputsContext,
+  sampleInputsPromptHash,
+  type SampleInput,
+  type SampleInputsRequest,
+  type SampleInputsResult,
+  type SampleScenario,
+} from "./sampleInputs.js";

@@ -54,6 +54,31 @@ describe("NumberInput", () => {
     expect(input).toHaveValue("0.00");
   });
 
+  it("keeps a value exactly as entered with precision null, and steps without float noise", async () => {
+    const user = userEvent.setup();
+    const onValueChange = vi.fn();
+    render(
+      <NumberInput
+        defaultValue={24.99}
+        step={0.1}
+        precision={null}
+        onValueChange={onValueChange}
+        aria-label="Order total"
+      />,
+    );
+    const input = screen.getByRole("spinbutton", { name: "Order total" });
+    expect(input).toHaveValue("24.99");
+    input.focus();
+    await user.keyboard("{ArrowUp}");
+    expect(input).toHaveValue("25.09");
+    expect(onValueChange).toHaveBeenLastCalledWith(25.09);
+    await user.clear(input);
+    await user.type(input, "39.905");
+    await user.tab();
+    expect(onValueChange).toHaveBeenLastCalledWith(39.905);
+    expect(input).toHaveValue("39.905");
+  });
+
   it("lets the user type freely and clamps on blur", async () => {
     const user = userEvent.setup();
     const onValueChange = vi.fn();

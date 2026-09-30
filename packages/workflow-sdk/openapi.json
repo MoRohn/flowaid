@@ -14161,6 +14161,114 @@
         }
       }
     },
+    "/v1/workflows/{id}/ai/sample-inputs": {
+      "post": {
+        "summary": "Write realistic run inputs with AI (nothing is run or saved)",
+        "tags": ["workflows"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "definition": {},
+                  "scenario": {
+                    "default": "typical",
+                    "type": "string",
+                    "enum": ["typical", "edge", "unusual"]
+                  },
+                  "instructions": { "type": "string", "maxLength": 2000 },
+                  "current": {
+                    "type": "object",
+                    "propertyNames": { "type": "string" },
+                    "additionalProperties": {}
+                  },
+                  "keep": {
+                    "maxItems": 200,
+                    "type": "array",
+                    "items": { "type": "string", "maxLength": 200 }
+                  },
+                  "count": { "default": 3, "type": "integer", "minimum": 1, "maximum": 3 }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "x-cli": { "noun": "workflow", "verb": "sample-inputs", "positional": ["id"] },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["runs:create"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "samples": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "title": { "type": "string" },
+                          "why": { "type": "string" },
+                          "input": {
+                            "type": "object",
+                            "propertyNames": { "type": "string" },
+                            "additionalProperties": {}
+                          }
+                        },
+                        "required": ["title", "why", "input"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "rejected": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "model": {
+                      "type": "object",
+                      "properties": {
+                        "provider": { "type": "string" },
+                        "model": { "type": "string" }
+                      },
+                      "required": ["provider", "model"],
+                      "additionalProperties": false
+                    },
+                    "usage": {
+                      "type": "object",
+                      "properties": {
+                        "inputTokens": { "type": "number" },
+                        "outputTokens": { "type": "number" }
+                      },
+                      "required": ["inputTokens", "outputTokens"],
+                      "additionalProperties": false
+                    },
+                    "costUsd": { "type": "number" }
+                  },
+                  "required": ["samples", "rejected", "model", "usage", "costUsd"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/workflow-versions/{id}/export/package": {
       "post": {
         "summary": "Build the code package (zip) of a version; poll GET /v1/jobs/:id",

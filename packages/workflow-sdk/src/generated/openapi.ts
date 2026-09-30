@@ -8889,6 +8889,80 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/workflows/{id}/ai/sample-inputs": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Write realistic run inputs with AI (nothing is run or saved) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            /** @default 3 */
+            count?: number;
+            current?: {
+              [key: string]: unknown;
+            };
+            definition?: unknown;
+            instructions?: string;
+            keep?: string[];
+            /**
+             * @default typical
+             * @enum {string}
+             */
+            scenario?: "typical" | "edge" | "unusual";
+          };
+        };
+      };
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              costUsd: number;
+              model: {
+                model: string;
+                provider: string;
+              };
+              rejected: number;
+              samples: {
+                input: {
+                  [key: string]: unknown;
+                };
+                title: string;
+                why: string;
+              }[];
+              usage: {
+                inputTokens: number;
+                outputTokens: number;
+              };
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/workflows/{id}/clone": {
     parameters: {
       query?: never;

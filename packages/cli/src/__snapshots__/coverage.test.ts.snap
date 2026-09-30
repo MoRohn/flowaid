@@ -241,6 +241,7 @@ workflow optimize <id> {--definition --days --body --out}
 workflow package <id> {--version --out --mode}
 workflow publish <id> {--notes --label --deploy-to --require-evaluation --body --out}
 workflow run <target> {--input --local --watch --sync --environment --version-id --wait --secret --approve}
+workflow sample-inputs <id> {--definition --scenario --instructions --current --keep --count --body --out}
 workflow save-draft <id> {--definition --body --out}
 workflow signature <id> {--environment-id --version-id --out}
 workflow update <id> {--name --slug --description --tags --evaluation-set-id --body --out}

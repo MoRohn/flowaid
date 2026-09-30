@@ -162,6 +162,16 @@ describe("SchemaForm", () => {
     expect(await screen.findByRole("spinbutton", { name: "Timeout" })).toBeInTheDocument();
   });
 
+  it("keeps decimals of a number field that has no step of its own", () => {
+    const schema: JsonSchema = {
+      type: "object",
+      properties: { total: { type: "number", title: "Order total" } },
+    };
+    render(<SchemaForm schema={schema} defaultValues={{ total: 24.99 }} />);
+    // the widget's default 0.1 step used to round this to 25.0
+    expect(screen.getByRole("spinbutton", { name: "Order total" })).toHaveValue("24.99");
+  });
+
   it("renders a free-form map as a key/value editor", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();

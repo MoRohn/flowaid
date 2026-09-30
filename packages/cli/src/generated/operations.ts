@@ -2601,6 +2601,27 @@ export const OPERATIONS: readonly CliOperation[] = [
   },
   {
     noun: "workflow",
+    verb: "sample-inputs",
+    method: "POST",
+    path: "/v1/workflows/{id}/ai/sample-inputs",
+    summary: "Write realistic run inputs with AI (nothing is run or saved)",
+    auth: "session_or_api_key",
+    positional: ["id"],
+    query: [],
+    body: {
+      required: true,
+      properties: [
+        { name: "definition", type: "any", required: false },
+        { name: "scenario", type: "string", required: false, enum: ["typical", "edge", "unusual"] },
+        { name: "instructions", type: "string", required: false },
+        { name: "current", type: "object", required: false },
+        { name: "keep", type: "array", required: false },
+        { name: "count", type: "integer", required: false },
+      ],
+    },
+  },
+  {
+    noun: "workflow",
     verb: "save-draft",
     method: "PUT",
     path: "/v1/workflows/{id}/draft",

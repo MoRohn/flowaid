@@ -145,6 +145,55 @@ describe("AnthropicClient requests", () => {
     });
   });
 
+  it("drops sampling settings a model refuses, once, and remembers that", async () => {
+    const structured = fixture("structured").json;
+    const bodies: Record<string, unknown>[] = [];
+    const http: SafeFetch = (_url, init) => {
+      const body = JSON.parse(typeof init?.body === "string" ? init.body : "{}") as Record<
+        string,
+        unknown
+      >;
+      bodies.push(body);
+      return Promise.resolve(
+        "temperature" in body
+          ? new Response(
+              JSON.stringify({
+                type: "error",
+                error: {
+                  type: "invalid_request_error",
+                  message: "`temperature` is deprecated for this model.",
+                },
+              }),
+              { status: 400 },
+            )
+          : new Response(JSON.stringify(structured), { status: 200 }),
+      );
+    };
+    const c = new AnthropicClient({ model: "claude-refuses-sampling", apiKey: "k", http, catalog });
+    const req = { messages: [{ role: "user" as const, content: "x" }], temperature: 0.2 };
+    await c.generate(req, ctx());
+    expect(bodies.map((b) => "temperature" in b)).toEqual([true, false]);
+    await c.generate(req, ctx());
+    // the next request leaves it out from the start: no wasted call
+    expect(bodies.map((b) => "temperature" in b)).toEqual([true, false, false]);
+  });
+
+  it("does not retry other 400s", async () => {
+    let n = 0;
+    const http: SafeFetch = () => {
+      n++;
+      return Promise.resolve(
+        new Response(JSON.stringify({ error: { message: "max_tokens: too large" } }), {
+          status: 400,
+        }),
+      );
+    };
+    await expect(
+      client(http).generate({ messages: [{ role: "user", content: "x" }], temperature: 0 }, ctx()),
+    ).rejects.toBeDefined();
+    expect(n).toBe(1);
+  });
+
   it("maps 529 to overloaded", async () => {
     const { http } = serve("error-529");
     await expect(

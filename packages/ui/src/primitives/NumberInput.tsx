@@ -23,8 +23,11 @@ export interface NumberInputProps extends Omit<
   min?: number;
   max?: number;
   step?: number;
-  /** Decimal places kept after stepping/clamping; inferred from `step` when omitted. */
-  precision?: number;
+  /**
+   * Decimal places kept after stepping/clamping; inferred from `step` when omitted. `null` keeps
+   * the value exactly as entered (a price of 24.99 stays 24.99 whatever the step).
+   */
+  precision?: number | null;
   size?: "sm" | "md" | "lg";
   invalid?: boolean;
   /** Unit shown after the digits, e.g. "ms", "%", "$". */
@@ -77,10 +80,14 @@ function parseInput(text: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-function format(n: number | null, precision: number): string {
+function format(n: number | null, precision: number | null): string {
   if (n === null) return "";
+  if (precision === null) return String(n);
   return Number.isInteger(n) && precision === 0 ? String(n) : n.toFixed(precision);
 }
+
+/** Decimal places a number is written with (24.99 → 2). */
+const decimalsOf = (n: number | null) => (n === null ? 0 : inferPrecision(n));
 
 /**
  * Numeric field in the mono face with a stepper column. Arrow keys step,
@@ -110,8 +117,9 @@ export const NumberInput = forwardRef<HTMLInputElement, NumberInputProps>(functi
   },
   ref,
 ) {
-  const prec = precision ?? inferPrecision(step);
-  const opts = { min, max, step, precision: prec };
+  const prec = precision === null ? null : (precision ?? inferPrecision(step));
+  // without a fixed precision nothing is rounded, except the float noise stepping adds
+  const opts = { min, max, step, ...(prec === null ? {} : { precision: prec }) };
   const controlled = value !== undefined;
   const [internal, setInternal] = useState<number | null>(defaultValue);
   const current = controlled ? value : internal;
@@ -141,7 +149,14 @@ export const NumberInput = forwardRef<HTMLInputElement, NumberInputProps>(functi
 
   const bump = (delta: number, multiplier = 1) => {
     if (field.disabled || readOnly) return;
-    commit(stepNumber(current, delta, { ...opts, multiplier }), true);
+    commit(
+      stepNumber(current, delta, {
+        ...opts,
+        multiplier,
+        precision: prec ?? Math.max(inferPrecision(step), decimalsOf(current)),
+      }),
+      true,
+    );
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {

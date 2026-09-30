@@ -292,7 +292,8 @@ export function NumberWidget({
       min={min}
       max={max}
       step={step ?? (isInteger ? 1 : 0.1)}
-      precision={isInteger ? 0 : undefined}
+      // a decimal without its own step keeps what was entered: the 0.1 step must not round 24.99
+      precision={isInteger ? 0 : step === undefined ? null : undefined}
       placeholder={placeholder}
       disabled={disabled}
     />

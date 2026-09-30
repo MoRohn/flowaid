@@ -9,11 +9,21 @@
  *   an optional yes/no judge through the workspace's decision chain. A judged critique calls a
  *   model, so it is rate-limited like generation (20 a minute per principal); the rubric alone
  *   is cheap and keeps a looser limit of its own.
+ * - `POST /v1/workflows/:id/ai/sample-inputs { scenario, instructions?, current?, keep?, count }`
+ *   → `{ samples: [{ title, why, input }], … }`: run inputs written from the workflow's input
+ *   schema, steps and settings, each checked as a run's input is. Nothing runs or is saved.
  */
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
-import { CRITIC_CHECKS, critique, generateWorkflow, type Judge } from "@flowaid/advisor";
+import Ajv2020Module from "ajv/dist/2020.js";
+import {
+  CRITIC_CHECKS,
+  critique,
+  generateWorkflow,
+  sampleInputs,
+  type Judge,
+} from "@flowaid/advisor";
 import { compile } from "@flowaid/workflow-compiler";
 import {
   BadRequestError,
@@ -59,6 +69,10 @@ const callCtx = (signal: AbortSignal) => ({
   nodeRunId: uuidv7(),
   idempotencyKey: null,
 });
+
+const Ajv2020 = Ajv2020Module.default;
+/** configured as run input validation is (services/runs.ts) */
+const sampleAjv = new Ajv2020({ strict: false, allErrors: true, validateFormats: false });
 
 /** Model-backed AI calls a principal may make per minute (generation, judged critiques). */
 const AI_CALLS_PER_MINUTE = 20;
@@ -280,6 +294,120 @@ export function aiRoutes(app: FastifyInstance, ctx: ApiContext): void {
         advice,
         checks: [...CRITIC_CHECKS],
         reviewedAt: new Date(ctx.clock.now()).toISOString(),
+      };
+    },
+  );
+
+  r.post(
+    "/v1/workflows/:id/ai/sample-inputs",
+    {
+      config: {
+        auth: "session_or_api_key",
+        // it exists to run the draft: the same scope as starting a run
+        scope: "runs:create",
+        audit: { action: "workflow.ai_sample_inputs", resource: "workflow" },
+        rateLimit: {
+          max: AI_CALLS_PER_MINUTE,
+          timeWindow: 60_000,
+          keyGenerator: (req: FastifyRequest) => `sample-inputs:${principalKey(req)}`,
+        },
+        cli: { noun: "workflow", verb: "sample-inputs", positional: ["id"] },
+      },
+      schema: {
+        tags: ["workflows"],
+        summary: "Write realistic run inputs with AI (nothing is run or saved)",
+        params: IdParams,
+        body: z.object({
+          /** the definition being edited (unsaved changes); the saved draft otherwise */
+          definition: z.unknown().optional(),
+          scenario: z.enum(["typical", "edge", "unusual"]).default("typical"),
+          instructions: z.string().max(2000).optional(),
+          /** values already entered; `keep` names the ones every sample repeats */
+          current: z.record(z.string(), z.unknown()).optional(),
+          keep: z.array(z.string().max(200)).max(200).optional(),
+          count: z.int().min(1).max(3).default(3),
+        }),
+        response: {
+          200: z.object({
+            samples: z.array(
+              z.object({
+                title: z.string(),
+                why: z.string(),
+                input: z.record(z.string(), z.unknown()),
+              }),
+            ),
+            rejected: z.int(),
+            model: z.object({ provider: z.string(), model: z.string() }),
+            usage: z.object({ inputTokens: z.number(), outputTokens: z.number() }),
+            costUsd: z.number(),
+          }),
+        },
+      },
+    },
+    async (req) => {
+      const p = req.principal;
+      if (!p) throw new ForbiddenError("no principal");
+      const model = await advisorModel(ctx, p.workspaceId);
+      if (!model)
+        throw new ConflictError(
+          "No text model is available to write inputs: add an OpenAI, Anthropic or Ollama key, or set the workspace's advisorModel",
+        );
+      const definition = await ctx.db.tenant(p.workspaceId, async (tx) => {
+        const w = await visibleWorkflow(tx, p, req.params.id);
+        return parseDefinition(withId(req.body.definition ?? w.draft, w.id));
+      });
+      const properties = (definition.inputs as { properties?: object }).properties ?? {};
+      if (Object.keys(properties).length === 0)
+        throw new BadRequestError("this workflow takes no input fields to fill");
+      // the same checks a run's input gets (services/runs.ts), so a sample the page shows will run
+      let validateInput: ReturnType<typeof sampleAjv.compile>;
+      try {
+        validateInput = sampleAjv.compile(definition.inputs as object);
+      } catch {
+        throw new BadRequestError("the workflow's input schema does not compile");
+      }
+      const provider = await registryOf(ctx).generation(
+        model.ref,
+        resolveContext(ctx, p.workspaceId),
+      );
+      const controller = new AbortController();
+      req.raw.once("close", () => {
+        if (!req.raw.complete) controller.abort();
+      });
+      const out = await sampleInputs({
+        definition,
+        scenario: req.body.scenario,
+        ...(req.body.instructions ? { instructions: req.body.instructions } : {}),
+        ...(req.body.current ? { current: req.body.current } : {}),
+        ...(req.body.keep ? { keep: req.body.keep } : {}),
+        count: req.body.count,
+        generate: (request) => provider.generate(request, callCtx(controller.signal)),
+        jsonSchema: model.jsonSchema,
+        validate: (input) =>
+          validateInput(input)
+            ? []
+            : (validateInput.errors ?? []).map(
+                (e) => `${e.instancePath || "/"} ${e.message ?? e.keyword}`,
+              ),
+      });
+      req.audit = {
+        resourceId: req.params.id,
+        details: {
+          model: `${model.ref.provider}/${model.ref.model}`,
+          scenario: req.body.scenario,
+          samples: out.samples.length,
+          rejected: out.rejected,
+          iterations: out.iterations,
+          costUsd: out.costUsd,
+          promptHash: out.promptHash,
+        },
+      };
+      return {
+        samples: out.samples,
+        rejected: out.rejected,
+        model: model.ref,
+        usage: out.usage,
+        costUsd: out.costUsd,
       };
     },
   );

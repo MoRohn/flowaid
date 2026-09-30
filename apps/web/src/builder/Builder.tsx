@@ -766,6 +766,16 @@ function BuilderView({
               status={live?.status ?? null}
               error={runError}
               secretsHref={`/${s.ws}/workflows/${workflow.id}/settings?tab=secrets`}
+              {...(s.can("runs:create")
+                ? {
+                    aiFill: {
+                      workflowId: workflow.id,
+                      getDefinition: () => store.getState().definition,
+                      // on when the workspace has a text model (the same check as the AI builder)
+                      available: s.features.ai_builder === true,
+                    },
+                  }
+                : {})}
               problems={errors.length ? blocking : []}
               onShowProblems={() => setBottomTab("problems")}
               disabledReason={

@@ -6,7 +6,7 @@
  */
 import Link from "next/link";
 import { useRef, useState } from "react";
-import { AlertTriangle, Play } from "lucide-react";
+import { AlertTriangle, Play, Sparkles, Undo2 } from "lucide-react";
 import type { JsonSchema } from "@flowaid/workflow-core";
 import { CodeEditor, SchemaForm, withDefaults, type SchemaFormHandle } from "@flowaid/ui/forms";
 import {
@@ -23,6 +23,8 @@ import {
 import type { RunStatus } from "@flowaid/workflow-core";
 import type { Environment } from "~/api/types";
 import type { RunStartError } from "./errors";
+import { AiFillPanel } from "./AiFillPanel";
+import type { Sample } from "./aiFill";
 
 /** A compile error in the way of running, with how to reach it. */
 export interface BlockingProblem {
@@ -50,6 +52,14 @@ export interface RunTabProps {
   error?: RunStartError | null;
   /** The workflow's Secrets settings, linked when an unbound key stopped the run. */
   secretsHref?: string;
+  /** Fill with AI: realistic inputs written from the workflow; omitted where runs are not allowed */
+  aiFill?: {
+    workflowId: string;
+    /** the definition as edited, unsaved changes included */
+    getDefinition: () => unknown;
+    /** whether a text model is set up */
+    available: boolean;
+  };
 }
 
 /** Top-level required properties that are missing or empty, by name. */
@@ -84,6 +94,32 @@ export function RunTab(p: RunTabProps) {
   const [missing, setMissing] = useState<string[]>([]);
   const form = useRef<SchemaFormHandle>(null);
   const fields = useRef<HTMLDivElement>(null);
+  const [aiOpen, setAiOpen] = useState(false);
+  // the example now in the form, and what the form held before it (for Undo)
+  const [filled, setFilled] = useState<{ title: string; previous: Record<string, unknown> } | null>(
+    null,
+  );
+
+  /** Puts a whole input in the form and the JSON editor alike. */
+  const replaceInput = (next: Record<string, unknown>) => {
+    p.onValueChange(next);
+    setSeed((cur) => ({ n: cur.n + 1, values: next }));
+    setText(JSON.stringify(next, null, 2));
+    setJsonError(null);
+    setMissing((m) => (m.length ? missingRequired(p.inputs, next) : m));
+  };
+  const currentInput = (): Record<string, unknown> => {
+    if (mode !== "json") return value;
+    try {
+      return JSON.parse(text) as Record<string, unknown>;
+    } catch {
+      return value;
+    }
+  };
+  const applySample = (sample: Sample) => {
+    setFilled((f) => ({ title: sample.title, previous: f?.previous ?? currentInput() }));
+    replaceInput(sample.input);
+  };
 
   const check = (input: Record<string, unknown>): boolean => {
     const gaps = missingRequired(p.inputs, input);
@@ -143,6 +179,16 @@ export function RunTab(p: RunTabProps) {
           <ToggleGroupItem value="form">Form</ToggleGroupItem>
           <ToggleGroupItem value="json">JSON</ToggleGroupItem>
         </ToggleGroup>
+        {p.aiFill && hasFields(p.inputs) ? (
+          <Button
+            variant={aiOpen ? "secondary" : "ghost"}
+            leadingIcon={<Sparkles strokeWidth={1.75} />}
+            aria-expanded={aiOpen}
+            onClick={() => setAiOpen((o) => !o)}
+          >
+            Fill with AI
+          </Button>
+        ) : null}
         {p.environments.length > 0 ? (
           <FieldRow className="w-44">
             <Label>Environment</Label>
@@ -241,6 +287,43 @@ export function RunTab(p: RunTabProps) {
         </div>
       ) : null}
 
+      {aiOpen && p.aiFill ? (
+        <AiFillPanel
+          workflowId={p.aiFill.workflowId}
+          getDefinition={p.aiFill.getDefinition}
+          schema={p.inputs}
+          current={currentInput()}
+          available={p.aiFill.available}
+          applied={filled?.title ?? null}
+          onApply={applySample}
+          onClose={() => setAiOpen(false)}
+        />
+      ) : null}
+
+      {filled ? (
+        <div
+          role="status"
+          className="flex flex-wrap items-center gap-2 rounded-sm border border-border bg-surface-2 px-2.5 py-1.5 text-xs text-ink-2"
+        >
+          <Sparkles className="size-3.5 text-accent-text" strokeWidth={1.75} aria-hidden="true" />
+          <span className="min-w-0 flex-1">
+            Filled with the example <span className="font-medium text-ink">{filled.title}</span>.
+            Check the values before running: they are made up.
+          </span>
+          <Button
+            size="sm"
+            variant="ghost"
+            leadingIcon={<Undo2 strokeWidth={1.75} />}
+            onClick={() => {
+              replaceInput(filled.previous);
+              setFilled(null);
+            }}
+          >
+            Undo
+          </Button>
+        </div>
+      ) : null}
+
       {missing.length ? (
         <p className="text-xs text-danger" role="alert">
           Fill in {missing.map((k) => label(p.inputs, k)).join(", ")} to run.
@@ -256,6 +339,8 @@ export function RunTab(p: RunTabProps) {
               schema={p.inputs as never}
               defaultValues={seed.values}
               onChange={(v) => {
+                // a real edit: Undo would now throw it away, so the fill is no longer undone
+                setFilled(null);
                 p.onValueChange(v);
                 if (missing.length) setMissing(missingRequired(p.inputs, v));
               }}
@@ -276,6 +361,7 @@ export function RunTab(p: RunTabProps) {
             onChange={(v) => {
               setText(v);
               setJsonError(null);
+              setFilled(null);
             }}
             minRows={6}
             maxRows={20}

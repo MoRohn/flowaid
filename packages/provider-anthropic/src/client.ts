@@ -156,6 +156,18 @@ export function messagesBody(model: string, req: GenerationRequest, stream: bool
   return body;
 }
 
+/** Sampling settings some models refuse (Anthropic answers 400: "`temperature` is deprecated"). */
+const SAMPLING = ["temperature", "top_p"] as const;
+/** Models that refused a sampling setting in this process: later requests leave them out. */
+const NO_SAMPLING = new Set<string>();
+
+function samplingRefused(errorText: string, key: string): boolean {
+  return new RegExp(
+    `\`?${key}\`?[^.]{0,40}(deprecated|not supported|unsupported|not allowed)`,
+    "i",
+  ).test(errorText);
+}
+
 const HEALTHY = (): ProviderHealth => ({
   status: "healthy",
   errorRate1m: 0,
@@ -203,7 +215,25 @@ export class AnthropicClient implements GenerationProvider {
   }
 
   private async post(body: JsonObject, signal: AbortSignal): Promise<Response> {
-    const response = await this.options.http(
+    const model = typeof body.model === "string" ? body.model : this.model;
+    // newer models refuse sampling settings; once one says so it is sent without them
+    if (NO_SAMPLING.has(model)) for (const k of SAMPLING) delete body[k];
+    const response = await this.send(body, signal);
+    if (response.ok) return response;
+    const text = await response.text();
+    const refused = SAMPLING.filter((k) => k in body && samplingRefused(text, k));
+    if (response.status === 400 && refused.length > 0) {
+      NO_SAMPLING.add(model);
+      for (const k of SAMPLING) delete body[k];
+      const retry = await this.send(body, signal);
+      if (retry.ok) return retry;
+      throw errorFromResponse("anthropic", retry.status, retry.headers, await retry.text());
+    }
+    throw errorFromResponse("anthropic", response.status, response.headers, text);
+  }
+
+  private async send(body: JsonObject, signal: AbortSignal): Promise<Response> {
+    return this.options.http(
       `${(this.options.baseUrl ?? ANTHROPIC_BASE_URL).replace(/\/+$/, "")}/v1/messages`,
       {
         method: "POST",
@@ -216,14 +246,6 @@ export class AnthropicClient implements GenerationProvider {
         signal,
       },
     );
-    if (!response.ok)
-      throw errorFromResponse(
-        "anthropic",
-        response.status,
-        response.headers,
-        await response.text(),
-      );
-    return response;
   }
 
   private finish(
