@@ -12,7 +12,7 @@ import { isAllowed, parsePluginSpec } from "./spec.js";
 import { readTarball, verifyIntegrity, type TarEntry } from "./tarball.js";
 
 /** The node SDK version this platform runs (`@flowaid/node-sdk`); a package's `flowaid.sdk` range must accept it. */
-export const PLATFORM_SDK_VERSION = "0.7.0";
+export const PLATFORM_SDK_VERSION = "0.8.0";
 
 export type PluginProblemCode =
   | "E_PLUGIN_NOT_ALLOWED"

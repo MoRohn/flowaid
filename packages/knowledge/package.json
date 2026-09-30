@@ -1,6 +1,6 @@
 {
   "name": "@flowaid/knowledge",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "private": true,
   "description": "Knowledge/RAG for flowaid (ARCHITECTURE.md §10.8): loaders, normalisation, the token chunker, reciprocal rank fusion, the knowledge service behind ctx.knowledge, and VectorIndexAdapter implementations (memory, Qdrant, Pinecone, Weaviate, Milvus, Chroma, Elasticsearch, OpenSearch; pgvector lives in @flowaid/database).",
   "license": "Apache-2.0",
