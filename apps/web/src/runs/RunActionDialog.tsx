@@ -59,7 +59,8 @@ function ActionForm({
   onOpenChange,
   onSubmit,
 }: RunActionDialogProps & { action: RunAction }) {
-  const [mode, setMode] = useState("reexecute");
+  // the free choice first: re-executing calls (and charges) every model and tool again
+  const [mode, setMode] = useState("recorded");
   // "draft", or the id of a published version
   const [target, setTarget] = useState(
     action.kind === "fork" && action.versionId ? action.versionId : "draft",
@@ -109,25 +110,26 @@ function ActionForm({
   const copy = {
     replay: {
       title: "Replay this run",
-      description: "Starts a new run of the same version with the same input.",
-      confirm: "Replay",
+      description:
+        "Starts a new run of the same version with the same input. This run is left as it is.",
+      confirm: mode === "reexecute" ? "Replay and call again" : "Replay",
     },
     fork: {
       title: "Fork this run",
       description:
-        "Starts a new run with results reused from this one, on the version you choose and with the input you edit.",
+        "Starts a new run on the version you choose, with the input you edit. Steps whose inputs are unchanged reuse this run's results; the rest call their models and tools again, at their usual cost.",
       confirm: "Fork",
     },
     restart: {
       title: `Restart from ${action.kind === "restart" ? action.nodeName : ""}`,
       description:
-        "Starts a new run that reuses this run's results up to the node, then executes the node and everything after it.",
+        "Starts a new run that reuses this run's results up to the node, then executes the node and everything after it. Model and tool calls from there on are made, and charged, again.",
       confirm: "Restart",
     },
     retry: {
       title: `Retry ${action.kind === "retry" ? action.nodeName : ""}`,
       description:
-        "Reopens this failed run and executes the node again, then continues from its result. No new run is created.",
+        "Reopens this failed run and executes the node again, then continues from its result. No new run is created. Use it for passing errors such as a timeout; a wrong setting fails the same way, so fix the draft and fork this run onto it instead.",
       confirm: "Retry node",
     },
   }[action.kind];
@@ -148,14 +150,14 @@ function ActionForm({
       {action.kind === "replay" ? (
         <RadioGroup value={mode} onValueChange={setMode} aria-label="Replay mode">
           <RadioItem
-            value="reexecute"
-            label="Execute every node again"
-            description="Models and tools are called again; results may differ."
-          />
-          <RadioItem
             value="recorded"
             label="Reuse recorded results"
-            description="Node results are taken from this run where the inputs match."
+            description="Step results are taken from this run where the inputs match, so those calls are not made or charged again."
+          />
+          <RadioItem
+            value="reexecute"
+            label="Run every step again"
+            description="Models and tools are called again, at their usual cost; results may differ."
           />
         </RadioGroup>
       ) : null}

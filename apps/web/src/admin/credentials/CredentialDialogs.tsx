@@ -1,9 +1,12 @@
 "use client";
 /**
  * Create, rotate and inspect credentials. Secret values are write-only: the API seals them and
- * only ever returns masked hints, so these forms never pre-fill a secret.
+ * only ever returns masked hints, so these forms never pre-fill a secret. A new credential is
+ * built step by step (service, secret, where it may be used, review); its draft is kept in this
+ * browser tab without the secret values.
  */
 import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
 import { useMemo, useState, type FormEvent } from "react";
 import { CheckCircle2, ExternalLink, Plug, XCircle } from "lucide-react";
 import {
@@ -33,14 +36,29 @@ import {
 } from "@flowaid/ui/primitives";
 import { KeyValueList } from "@flowaid/ui/inspector";
 import { RelativeTime } from "@flowaid/ui/data";
-import { get, patch, post, qs } from "~/api/client";
+import { get, getAll, patch, post, qs } from "~/api/client";
 import type { Environment } from "~/api/types";
+import { suggestSecretName } from "~/builder/keySources";
+import { DraftStatus, GuidedFlow, type FlowStep } from "~/guide/GuidedFlow";
+import { CheckList, type Check } from "~/guide/Readiness";
+import { useKeptDraft } from "~/guide/useKeptDraft";
 import { useSession } from "~/session";
-import type { Credential, CredentialField, CredentialType, SecretUse } from "../types";
+import { providerName } from "../providerNames";
+import type { Credential, CredentialField, CredentialType, Provider, SecretUse } from "../types";
 import { Notice, useMutate } from "../ui";
 import { credentialGuide } from "./guide";
-
-const ALL_ENVIRONMENTS = "__all";
+import {
+  ALL_ENVIRONMENTS,
+  SERVICE_GROUP_LABEL,
+  credentialBody,
+  credentialChecks,
+  emptyCredentialDraft,
+  externalRefProblem,
+  keptDraft,
+  serverKeyProvider,
+  serviceGroup,
+  type CredentialDraft,
+} from "./logic";
 
 const ACRONYMS: Record<string, string> = {
   api: "API",
@@ -141,36 +159,62 @@ export function CreateCredentialDialog({
   defaultType?: string;
 }) {
   const s = useSession();
-  const [typeId, setTypeId] = useState(defaultType ?? types[0]?.id ?? "");
-  const [name, setName] = useState("");
-  const [storage, setStorage] = useState<"db" | "external">("db");
-  const [externalRef, setExternalRef] = useState("");
-  const [env, setEnv] = useState(ALL_ENVIRONMENTS);
-  const [values, setValues] = useState<Record<string, string>>({});
-  const [testAfter, setTestAfter] = useState(true);
+  // kept in this browser tab until created, without the secret values (they stay in memory only)
+  const kept = useKeptDraft<CredentialDraft>(
+    `flowaid:draft:${s.ws}:credential`,
+    () => emptyCredentialDraft(defaultType ?? ""),
+    (d) => keptDraft(d, types),
+  );
+  const { draft, setDraft } = kept;
   // after saving: the credential, and the connection test when one ran
   const [saved, setSaved] = useState<{
     credential: Credential;
     test: { ok: boolean; message?: string } | null;
   } | null>(null);
-  const type = types.find((t) => t.id === typeId);
-  const guide = credentialGuide(typeId);
-  const canTest = Boolean(type?.testSupported) && storage === "db";
-  const reset = () => {
-    setName("");
-    setValues({});
-    setExternalRef("");
-    setSaved(null);
-  };
+  const providers = useQuery({
+    queryKey: ["providers", s.ws],
+    queryFn: () => get<Provider[]>("/v1/providers"),
+    staleTime: 60_000,
+    enabled: open,
+  });
+  const existing = useQuery({
+    queryKey: ["credentials", s.ws],
+    queryFn: () => getAll<Credential>("/v1/credentials"),
+    enabled: open,
+  });
+  const workflows = useQuery({
+    queryKey: ["workflow-names", s.ws],
+    queryFn: () => get<{ items: { id: string; name: string }[] }>("/v1/workflows?limit=200"),
+    enabled: open,
+  });
+  const type = types.find((t) => t.id === draft.typeId);
+  const guide = credentialGuide(draft.typeId);
+  const serverHasKey = (p: string) =>
+    (providers.data ?? []).some((x) => x.id === p && x.configuredOnServer);
+  const canUseExternal = s.can("admin");
+  const canTest = Boolean(type?.testSupported) && draft.storage === "db";
+  const set = <K extends keyof CredentialDraft>(k: K, v: CredentialDraft[K]) =>
+    setDraft((d) => ({ ...d, [k]: v }));
+  const envName = (id: string) => environments.find((e) => e.id === id)?.name ?? id;
+  const checks = credentialChecks(draft, {
+    type,
+    serverHasKey,
+    existingNames: (existing.data ?? []).map((c) => c.name),
+    envName,
+    canUseExternal,
+  });
+  const blocking = checks.filter((c) => c.state === "blocker");
+  const nameProblem = blocking.find((c) => c.id === "name");
+  const blockedAt = (step: string) => blocking.some((c) => c.step === step);
   const close = (o: boolean) => {
     onOpenChange(o);
-    if (!o) reset();
+    if (!o) setSaved(null);
   };
   const create = useMutate(
     async (body: Record<string, unknown>) => {
       const credential = await post<Credential>("/v1/credentials", body);
       const test =
-        canTest && testAfter
+        canTest && draft.testAfter
           ? await post<{ ok: boolean; message?: string }>(
               `/v1/credentials/${credential.id}/test`,
             ).catch((e: unknown) => ({
@@ -181,27 +225,20 @@ export function CreateCredentialDialog({
       return { credential, test };
     },
     {
-      // the dialog's result step says it; no toast on top
+      // the dialog's result step says it; no toast on top. A failed create keeps everything typed.
       invalidate: [["credentials", s.ws]],
-      onSuccess: (r) => setSaved(r),
+      onSuccess: (r) => {
+        kept.discard();
+        setSaved(r);
+      },
+      errorTitle: "Could not create the credential",
     },
   );
-  const missing =
-    storage === "db" && type
-      ? type.fields.filter((f) => f.required && !values[f.name]?.trim()).map((f) => f.name)
-      : [];
 
   function submit(e: FormEvent) {
     e.preventDefault();
-    if (!type) return;
-    const clean = Object.fromEntries(Object.entries(values).filter(([, v]) => v.trim() !== ""));
-    create.mutate({
-      name: name.trim(),
-      type: type.id,
-      storage,
-      ...(storage === "db" ? { values: clean } : { externalRef: externalRef.trim() }),
-      environmentId: env === ALL_ENVIRONMENTS ? null : env,
-    });
+    if (!type || blocking.length) return;
+    create.mutate(credentialBody(draft));
   }
 
   if (saved)
@@ -209,7 +246,10 @@ export function CreateCredentialDialog({
       <Dialog open={open} onOpenChange={close}>
         <DialogContent size="md">
           <DialogHeader>
-            <DialogTitle>{saved.credential.name} is saved</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle2 strokeWidth={1.75} className="size-4 text-ok-text" aria-hidden />
+              {saved.credential.name} is saved
+            </DialogTitle>
             <DialogDescription>
               The secret is encrypted; FlowAId shows only a masked hint from now on.
             </DialogDescription>
@@ -234,18 +274,35 @@ export function CreateCredentialDialog({
               </p>
             ) : null}
             <div className="flex flex-col gap-1.5 text-sm text-ink-2">
-              <p className="font-medium text-ink">Next: use it in a workflow</p>
-              <p>
-                Nodes read credentials through named secrets (for example{" "}
-                <code className="font-mono text-xs">TYPESAFE_API_KEY</code>). Open a workflow&apos;s{" "}
-                <span className="font-medium text-ink">Settings → Secrets</span> and bind the secret
-                to this credential for each environment.
-              </p>
+              <p className="m-0 font-medium text-ink">Next: use it in a workflow</p>
+              <ol className="m-0 flex list-decimal flex-col gap-1.5 pl-5">
+                <li>
+                  Open a workflow and select a step that needs this service. Its Config tab lists
+                  the step&apos;s credential slots: bind the slot to a secret (for example{" "}
+                  <code className="font-mono text-xs">
+                    {suggestSecretName(saved.credential.type, [])}
+                  </code>
+                  ), or add the secret there.
+                </li>
+                <li>
+                  In the workflow&apos;s{" "}
+                  <span className="font-medium text-ink">Settings → Secrets</span>, bind that secret
+                  to {saved.credential.name} for each environment it should work in
+                  {saved.credential.environmentId
+                    ? ` (only ${envName(saved.credential.environmentId)} can use it)`
+                    : ""}
+                  .
+                </li>
+                <li>Press Run draft in the builder to try it; draft runs use dev.</li>
+              </ol>
             </div>
           </DialogBody>
           <DialogFooter>
-            <Button type="button" variant="ghost" onClick={reset}>
+            <Button type="button" variant="ghost" onClick={() => setSaved(null)}>
               Add another
+            </Button>
+            <Button asChild variant="secondary">
+              <Link href={`/${s.ws}/workflows`}>Open a workflow</Link>
             </Button>
             <Button type="button" variant="primary" onClick={() => close(false)}>
               Done
@@ -255,9 +312,273 @@ export function CreateCredentialDialog({
       </Dialog>
     );
 
+  const groups = (["models", "tools", "http"] as const)
+    .map((g) => ({ g, items: types.filter((t) => serviceGroup(t.id) === g) }))
+    .filter((x) => x.items.length > 0);
+  const savedCount = (id: string) => (existing.data ?? []).filter((c) => c.type === id).length;
+  const provider = type ? serverKeyProvider(type.id) : undefined;
+
+  const steps: FlowStep[] = [
+    {
+      id: "service",
+      title: "Choose the service",
+      why: "Pick what the key is for. The type decides which fields you fill in and whether FlowAId can test it; a step asks for a credential of one type.",
+      done: type !== undefined,
+      requirement: "choose the service",
+      example:
+        "For decision steps choose TypeSafe API key; for Generate and Agent steps, the key of the model provider you use. For an API with no type of its own, choose Bearer token or API key under “Any HTTP API”.",
+      children: (
+        <>
+          <RadioGroup
+            value={draft.typeId}
+            onValueChange={(v) => setDraft((d) => ({ ...d, typeId: v, values: {} }))}
+            aria-label="Service"
+            className="max-h-72 gap-3 overflow-auto rounded-sm border border-border p-3"
+          >
+            {groups.map(({ g, items }) => (
+              <div key={g} className="flex flex-col gap-2">
+                <p className="text-eyebrow m-0">{SERVICE_GROUP_LABEL[g]}</p>
+                {items.map((t) => {
+                  const p = serverKeyProvider(t.id);
+                  const n = savedCount(t.id);
+                  return (
+                    <RadioItem
+                      key={t.id}
+                      value={t.id}
+                      label={t.name}
+                      description={t.description}
+                      meta={
+                        n > 0 ? `${n} saved` : p && serverHasKey(p) ? "server key set" : undefined
+                      }
+                    />
+                  );
+                })}
+              </div>
+            ))}
+          </RadioGroup>
+          {guide.use || guide.where ? (
+            <p className="m-0 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-3">
+              {guide.use ? <span>{guide.use}</span> : null}
+              {guide.where ? (
+                <a
+                  className="inline-flex items-center gap-1 text-accent-text hover:underline"
+                  href={guide.where.url}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Get a key: {guide.where.label}
+                  <ExternalLink strokeWidth={1.75} className="size-3" aria-hidden="true" />
+                </a>
+              ) : null}
+            </p>
+          ) : null}
+          {provider && serverHasKey(provider) ? (
+            <Notice tone="info">
+              The server already has its own {providerName(provider)} key (set in its environment,
+              such as .env.local). Steps whose secret is optional use it without a credential. Add
+              one here to use a different key, a key per environment, or for a secret a workflow
+              marks as required.
+            </Notice>
+          ) : null}
+        </>
+      ),
+    },
+    {
+      id: "secret",
+      title: "Enter the secret",
+      why: "Name it after what it is for and where it is used, then paste the values from the service. Secret fields are encrypted as soon as you create the credential and are never shown again; they are not kept if you close this dialog.",
+      done: type !== undefined && !blockedAt("secret"),
+      requirement: "fill in the fields marked as required",
+      example: (
+        <>
+          Names like <strong className="font-medium text-ink">OpenAI (prod)</strong> or{" "}
+          <strong className="font-medium text-ink">GitHub read-only</strong> say what it is and
+          where it belongs, which matters once you have several.
+        </>
+      ),
+      children: type ? (
+        <>
+          <FieldRow
+            label="Name"
+            htmlFor="cred-name"
+            required
+            hint="How workflows and people refer to it"
+            error={draft.name.trim() ? nameProblem?.message : undefined}
+          >
+            <Input
+              id="cred-name"
+              value={draft.name}
+              maxLength={100}
+              placeholder={`${type.name} (production)`}
+              onChange={(e) => set("name", e.target.value)}
+            />
+          </FieldRow>
+          <FieldRow
+            label="Storage"
+            hint={
+              canUseExternal
+                ? "Encrypted in FlowAId suits most keys. Choose an external secret manager when your team keeps keys in Vault, AWS, Azure or Google Cloud; FlowAId then reads the value when a run needs it."
+                : "Only admins can point at an external secret manager."
+            }
+          >
+            <RadioGroup
+              value={draft.storage}
+              onValueChange={(v) => set("storage", v as "db" | "external")}
+              orientation="horizontal"
+              aria-label="Storage"
+            >
+              <RadioItem value="db" label="Encrypted in FlowAId" />
+              <RadioItem
+                value="external"
+                label="External secret manager"
+                disabled={!canUseExternal}
+              />
+            </RadioGroup>
+          </FieldRow>
+          {draft.storage === "external" ? (
+            <FieldRow
+              label="External reference"
+              htmlFor="cred-ref"
+              required
+              hint="For example vault:secret/data/openai#apiKey, env:FLOWAID_SECRET_OPENAI or aws-sm:arn:aws:secretsmanager:<region>:<account>:secret:<name>"
+              error={draft.externalRef.trim() ? externalRefProblem(draft.externalRef) : undefined}
+            >
+              <Input
+                id="cred-ref"
+                className="font-mono"
+                value={draft.externalRef}
+                onChange={(e) => set("externalRef", e.target.value)}
+              />
+            </FieldRow>
+          ) : (
+            <FieldInputs type={type} values={draft.values} onChange={(v) => set("values", v)} />
+          )}
+        </>
+      ) : (
+        <p className="m-0 text-sm text-ink-3">Choose the service first.</p>
+      ),
+    },
+    {
+      id: "scope",
+      title: "Choose where it may be used",
+      why: "By default every environment and every workflow may bind it. Narrow it for keys that must not leak into tests, such as a production key: a binding outside these limits never resolves, and the run fails with “secret not bound”.",
+      done: !blockedAt("scope"),
+      requirement: "choose at least one workflow",
+      example:
+        "One key for everything is simplest. Separate keys for dev and prod let you try changes against a test account and rotate one without touching the other.",
+      children: (
+        <>
+          <FieldRow
+            label="Environment"
+            htmlFor="cred-env"
+            hint="Limit the credential to one environment, or allow every environment"
+          >
+            <Select id="cred-env" value={draft.env} onValueChange={(v) => set("env", v)}>
+              <SelectItem value={ALL_ENVIRONMENTS}>All environments</SelectItem>
+              {environments.map((e) => (
+                <SelectItem key={e.id} value={e.id}>
+                  {e.name}
+                </SelectItem>
+              ))}
+            </Select>
+          </FieldRow>
+          <fieldset className="flex flex-col gap-2">
+            <legend className="mb-1 text-xs font-medium text-ink">Workflows</legend>
+            <RadioGroup
+              value={draft.allowedWorkflowIds === null ? "all" : "some"}
+              onValueChange={(v) => set("allowedWorkflowIds", v === "all" ? null : [])}
+              orientation="horizontal"
+              aria-label="Workflows that may use it"
+            >
+              <RadioItem value="all" label="Every workflow" />
+              <RadioItem value="some" label="Only the workflows I choose" />
+            </RadioGroup>
+            {draft.allowedWorkflowIds !== null ? (
+              <div className="flex max-h-40 flex-col gap-1 overflow-auto rounded-sm border border-border p-2">
+                {workflows.isPending ? (
+                  <p className="m-0 text-xs text-ink-3">Loading workflows…</p>
+                ) : (workflows.data?.items ?? []).length === 0 ? (
+                  <p className="m-0 text-xs text-ink-3">
+                    No workflows yet. Allow every workflow, or create the workflow first and limit
+                    the credential from its details later.
+                  </p>
+                ) : (
+                  (workflows.data?.items ?? []).map((w) => (
+                    <Checkbox
+                      key={w.id}
+                      size="sm"
+                      label={w.name}
+                      checked={draft.allowedWorkflowIds?.includes(w.id) ?? false}
+                      onCheckedChange={(c) =>
+                        set(
+                          "allowedWorkflowIds",
+                          c === true
+                            ? [...(draft.allowedWorkflowIds ?? []), w.id]
+                            : (draft.allowedWorkflowIds ?? []).filter((x) => x !== w.id),
+                        )
+                      }
+                    />
+                  ))
+                )}
+              </div>
+            ) : null}
+          </fieldset>
+        </>
+      ),
+    },
+    {
+      id: "review",
+      doneLabel: "Ready to create",
+      title: "Review and create",
+      why: "Check the details. Creating it encrypts the secret and saves the credential; no workflow uses it until one binds it.",
+      done: blocking.length === 0,
+      requirement: "fix the items marked as needed",
+      children: (
+        <>
+          <dl className="m-0 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 rounded-sm border border-border px-3 py-2 text-sm">
+            <dt className="text-ink-3">Service</dt>
+            <dd className="m-0 text-ink">{type?.name ?? "—"}</dd>
+            <dt className="text-ink-3">Name</dt>
+            <dd className="m-0 text-ink">{draft.name.trim() || "—"}</dd>
+            <dt className="text-ink-3">Stored</dt>
+            <dd className="m-0 text-ink">
+              {draft.storage === "external" ? (
+                <span className="font-mono text-xs break-all">{draft.externalRef || "—"}</span>
+              ) : (
+                "Encrypted in FlowAId"
+              )}
+            </dd>
+            <dt className="text-ink-3">Environments</dt>
+            <dd className="m-0 text-ink">
+              {draft.env === ALL_ENVIRONMENTS ? "All" : envName(draft.env)}
+            </dd>
+            <dt className="text-ink-3">Workflows</dt>
+            <dd className="m-0 text-ink">
+              {draft.allowedWorkflowIds === null
+                ? "All"
+                : `${draft.allowedWorkflowIds.length} chosen`}
+            </dd>
+          </dl>
+          <CheckList
+            checks={checks.map((c): Check => ({ id: c.id, label: c.message, state: c.state }))}
+            aria-label="Before you create"
+          />
+          {canTest ? (
+            <Checkbox
+              checked={draft.testAfter}
+              onCheckedChange={(v) => set("testAfter", v === true)}
+              label="Test the connection after creating it"
+              description="Sends one request to the service with this key; nothing else runs."
+            />
+          ) : null}
+        </>
+      ),
+    },
+  ];
+
   return (
     <Dialog open={open} onOpenChange={close}>
-      <DialogContent size="md">
+      <DialogContent size="lg">
         <form onSubmit={submit}>
           <DialogHeader>
             <DialogTitle>New credential</DialogTitle>
@@ -265,116 +586,29 @@ export function CreateCredentialDialog({
               Values are encrypted with a per-credential key and never shown again.
             </DialogDescription>
           </DialogHeader>
-          <DialogBody className="flex flex-col gap-4">
-            <FieldRow label="Type" htmlFor="cred-type" required>
-              <Select
-                id="cred-type"
-                value={typeId}
-                onValueChange={(v) => {
-                  setTypeId(v);
-                  setValues({});
-                }}
-              >
-                {types.map((t) => (
-                  <SelectItem key={t.id} value={t.id} description={t.description}>
-                    {t.name}
-                  </SelectItem>
-                ))}
-              </Select>
-            </FieldRow>
-            {guide.use || guide.where ? (
-              <p className="-mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-3">
-                {guide.use ? <span>{guide.use}</span> : null}
-                {guide.where ? (
-                  <a
-                    className="inline-flex items-center gap-1 text-accent-text hover:underline"
-                    href={guide.where.url}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Get a key: {guide.where.label}
-                    <ExternalLink strokeWidth={1.75} className="size-3" aria-hidden="true" />
-                  </a>
-                ) : null}
-              </p>
-            ) : null}
-            <FieldRow
-              label="Name"
-              htmlFor="cred-name"
-              required
-              hint="How workflows and people refer to it"
-            >
-              <Input
-                id="cred-name"
-                value={name}
-                maxLength={100}
-                placeholder={type ? `${type.name} (production)` : ""}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </FieldRow>
-            <FieldRow label="Storage">
-              <RadioGroup
-                value={storage}
-                onValueChange={(v) => setStorage(v as "db" | "external")}
-                orientation="horizontal"
-                aria-label="Storage"
-              >
-                <RadioItem value="db" label="Encrypted in FlowAId" />
-                <RadioItem value="external" label="External secret manager" />
-              </RadioGroup>
-            </FieldRow>
-            {storage === "external" ? (
-              <FieldRow
-                label="External reference"
-                htmlFor="cred-ref"
-                required
-                hint="For example vault://secret/data/openai#apiKey or aws-sm://prod/openai"
-              >
-                <Input
-                  id="cred-ref"
-                  className="font-mono"
-                  value={externalRef}
-                  onChange={(e) => setExternalRef(e.target.value)}
+          <DialogBody>
+            <GuidedFlow
+              steps={steps}
+              initialStep={defaultType ? 1 : 0}
+              status={
+                <DraftStatus
+                  dirty={kept.dirty}
+                  restored={kept.restored}
+                  onDiscard={kept.discard}
+                  what="the credential"
                 />
-              </FieldRow>
-            ) : type ? (
-              <FieldInputs type={type} values={values} onChange={setValues} />
-            ) : null}
-            <FieldRow
-              label="Environment"
-              htmlFor="cred-env"
-              hint="Limit the credential to one environment, or allow every environment"
-            >
-              <Select id="cred-env" value={env} onValueChange={setEnv}>
-                <SelectItem value={ALL_ENVIRONMENTS}>All environments</SelectItem>
-                {environments.map((e) => (
-                  <SelectItem key={e.id} value={e.id}>
-                    {e.name}
-                  </SelectItem>
-                ))}
-              </Select>
-            </FieldRow>
-            {canTest ? (
-              <label className="flex items-center gap-2 text-sm text-ink">
-                <Checkbox checked={testAfter} onCheckedChange={(v) => setTestAfter(v === true)} />
-                Test the connection after saving
-              </label>
-            ) : null}
+              }
+            />
           </DialogBody>
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => close(false)}>
-              Cancel
+              Close
             </Button>
             <Button
               type="submit"
               variant="primary"
               loading={create.isPending}
-              disabled={
-                !type ||
-                !name.trim() ||
-                missing.length > 0 ||
-                (storage === "external" && !externalRef.trim())
-              }
+              disabled={blocking.length > 0}
             >
               Create credential
             </Button>
@@ -524,6 +758,13 @@ export function CredentialSheet({
             ),
         },
         { label: "Environment", value: envName(credential.environmentId) },
+        {
+          label: "Workflows",
+          value:
+            credential.allowedWorkflowIds === null
+              ? "Any workflow may bind it"
+              : `Only ${credential.allowedWorkflowIds.length} chosen workflow${credential.allowedWorkflowIds.length === 1 ? "" : "s"}`,
+        },
         ...Object.entries(credential.publicFields).map(([k, v]) => ({
           id: `public:${k}`,
           label: k,

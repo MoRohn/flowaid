@@ -2,12 +2,18 @@
 /**
  * Publish (UI.md §3): what changes against the latest version (the compiler's `diff`), the
  * diagnostics that block or warn, release notes, deploy targets and an optional evaluation gate.
+ * A review at the top says whether it can be published and what pressing Publish will do; it
+ * deploys only to the environments ticked here, none by default.
  */
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { diff } from "@flowaid/workflow-compiler";
 import type { Diagnostic, WorkflowDefinition } from "@flowaid/workflow-core";
-import { DiagnosticList, WorkflowDiffSummary } from "@flowaid/ui/inspector";
+import {
+  DiagnosticList,
+  WorkflowDiffSummary,
+  type DiagnosticPresentation,
+} from "@flowaid/ui/inspector";
 import {
   Button,
   Checkbox,
@@ -27,8 +33,12 @@ import {
   Textarea,
   toast,
 } from "@flowaid/ui/primitives";
-import { ApiError, get, post } from "~/api/client";
-import type { Environment, Page, VersionDetail, VersionSummary } from "~/api/types";
+import { ApiError, get, getAll, post } from "~/api/client";
+import type { Environment, VersionDetail, VersionSummary } from "~/api/types";
+import { missingRequiredSecrets } from "~/admin/logic";
+import { CheckList, QualityNote, blockers } from "~/guide/Readiness";
+import { useSession } from "~/session";
+import { publishChecks, publishOutcome } from "./publishReview";
 
 export interface PublishDialogProps {
   open: boolean;
@@ -37,6 +47,8 @@ export interface PublishDialogProps {
   latestVersionId: string | null;
   draft: WorkflowDefinition;
   diagnostics: readonly Diagnostic[];
+  /** the builder's plain-language location, hint and "Show node" for each diagnostic */
+  describe?: (d: Diagnostic) => DiagnosticPresentation | undefined;
   environments: readonly Environment[];
   /** saves the draft first; resolves when the server has it */
   flush: () => Promise<void>;
@@ -44,6 +56,7 @@ export interface PublishDialogProps {
 }
 
 export function PublishDialog(p: PublishDialogProps) {
+  const s = useSession();
   const qc = useQueryClient();
   const [notes, setNotes] = useState("");
   const [label, setLabel] = useState("");
@@ -57,13 +70,10 @@ export function PublishDialog(p: PublishDialogProps) {
   });
   const sets = useQuery({
     queryKey: ["evaluation-sets"],
-    queryFn: () =>
-      get<Page<{ id: string; name: string }> | { id: string; name: string }[]>(
-        "/v1/evaluations/sets",
-      ),
+    queryFn: () => getAll<{ id: string; name: string }>("/v1/evaluations/sets"),
     enabled: p.open,
   });
-  const setList = Array.isArray(sets.data) ? sets.data : (sets.data?.items ?? []);
+  const setList = sets.data ?? [];
   const changes = useMemo(() => {
     if (!latest.data) return null;
     try {
@@ -74,6 +84,37 @@ export function PublishDialog(p: PublishDialogProps) {
   }, [latest.data, p.draft]);
   const errors = p.diagnostics.filter((d) => d.severity === "error");
   const warnings = p.diagnostics.filter((d) => d.severity === "warning");
+  // required secrets per ticked environment (the Deployments page refuses a deploy without them)
+  const canSeeSecrets = s.can("secrets:bind");
+  const bindings = useQueries({
+    queries: deployTo.map((envId) => ({
+      queryKey: ["secret-bindings", s.ws, p.workflowId, envId],
+      queryFn: () => get<Record<string, string>>(`/v1/workflows/${p.workflowId}/secrets/${envId}`),
+      enabled: p.open && canSeeSecrets && (p.draft.secrets ?? []).length > 0,
+    })),
+  });
+  const needsSecrets = (p.draft.secrets ?? []).some((x) => x.required !== false);
+  const targets = deployTo.map((envId, i) => {
+    const bound = bindings[i]?.data;
+    return {
+      name: p.environments.find((e) => e.id === envId)?.name ?? "that environment",
+      missingSecrets:
+        bound && needsSecrets ? missingRequiredSecrets(p.draft.secrets ?? [], bound) : undefined,
+    };
+  });
+  const latestVersion = p.latestVersionId === null ? null : (latest.data?.version ?? undefined);
+  const gate = gateSet
+    ? { setName: setList.find((x) => x.id === gateSet)?.name ?? "the set", minPassRate: minPass }
+    : null;
+  const checks = publishChecks({
+    diagnostics: p.diagnostics,
+    latestVersion,
+    changes,
+    comparing: p.latestVersionId !== null && latest.isPending,
+    deployTo: targets,
+    gate,
+  });
+  const blocked = blockers(checks).length > 0;
 
   const publish = useMutation({
     mutationFn: async () => {
@@ -92,12 +133,20 @@ export function PublishDialog(p: PublishDialogProps) {
       void qc.invalidateQueries({ queryKey: ["workflow", p.workflowId] });
       void qc.invalidateQueries({ queryKey: ["versions", p.workflowId] });
       p.onPublished(v);
+      setDeployTo([]);
       p.onOpenChange(false);
     },
   });
 
   return (
-    <Dialog open={p.open} onOpenChange={p.onOpenChange}>
+    <Dialog
+      open={p.open}
+      onOpenChange={(open) => {
+        // environments are ticked afresh each time: a closed dialog never deploys on reopening
+        if (!open) setDeployTo([]);
+        p.onOpenChange(open);
+      }}
+    >
       <DialogContent size="lg">
         <DialogHeader>
           <DialogTitle>Publish a new version</DialogTitle>
@@ -107,12 +156,31 @@ export function PublishDialog(p: PublishDialogProps) {
           </DialogDescription>
         </DialogHeader>
         <DialogBody className="flex flex-col gap-5">
+          <section aria-labelledby="pub-review" className="flex flex-col gap-2">
+            <h3 id="pub-review" className="text-eyebrow">
+              Ready to publish?
+            </h3>
+            <CheckList checks={checks} aria-label="Publish checks" />
+            {!canSeeSecrets && needsSecrets && deployTo.length > 0 ? (
+              <p className="m-0 text-xs text-ink-3">
+                Your role cannot see secret bindings, so they are checked when the deploy happens.
+              </p>
+            ) : null}
+            <QualityNote>
+              These checks confirm the draft is complete and valid. They cannot tell you whether its
+              answers are good: run the draft on a few real examples in the builder, or evaluate it,
+              before publishing.
+            </QualityNote>
+          </section>
           {errors.length > 0 ? (
             <section className="flex flex-col gap-2">
               <h3 className="text-sm font-semibold text-danger">
                 Fix {errors.length} error{errors.length > 1 ? "s" : ""} before publishing
               </h3>
-              <DiagnosticList diagnostics={errors} />
+              <DiagnosticList
+                diagnostics={errors}
+                {...(p.describe ? { describe: p.describe } : {})}
+              />
             </section>
           ) : null}
           <section className="flex flex-col gap-2">
@@ -137,7 +205,10 @@ export function PublishDialog(p: PublishDialogProps) {
               <h3 className="text-eyebrow">
                 {warnings.length} warning{warnings.length > 1 ? "s" : ""}
               </h3>
-              <DiagnosticList diagnostics={warnings} />
+              <DiagnosticList
+                diagnostics={warnings}
+                {...(p.describe ? { describe: p.describe } : {})}
+              />
             </section>
           ) : null}
           <div className="grid gap-4 sm:grid-cols-[1fr_200px]">
@@ -165,6 +236,10 @@ export function PublishDialog(p: PublishDialogProps) {
           {p.environments.length > 0 ? (
             <fieldset className="flex flex-col gap-2">
               <legend className="text-eyebrow mb-1">Deploy to</legend>
+              <p className="m-0 text-xs text-ink-3">
+                Optional. Leave all unticked to publish only and deploy later from Deployments.
+                Ticking one makes the new version live there as soon as it is published.
+              </p>
               <div className="flex flex-wrap gap-4">
                 {p.environments.map((e) => (
                   <label key={e.id} className="flex items-center gap-2 text-sm">
@@ -179,6 +254,18 @@ export function PublishDialog(p: PublishDialogProps) {
                   </label>
                 ))}
               </div>
+              {p.environments.some((e) => e.protected && deployTo.includes(e.id)) ? (
+                <p className="m-0 text-xs text-warn-text" role="status">
+                  {p.environments
+                    .filter((e) => e.protected && deployTo.includes(e.id))
+                    .map((e) => e.name)
+                    .join(", ")}{" "}
+                  is protected, which usually means real traffic uses it; only an admin may deploy
+                  there. Publishing now makes this version live there straight away; to try it
+                  first, tick only a test environment now and deploy the same version here later
+                  from Deployments.
+                </p>
+              ) : null}
             </fieldset>
           ) : null}
           {setList.length > 0 ? (
@@ -212,6 +299,19 @@ export function PublishDialog(p: PublishDialogProps) {
               </FieldRow>
             </div>
           ) : null}
+          <section aria-labelledby="pub-outcome" className="flex flex-col gap-1.5">
+            <h3 id="pub-outcome" className="text-eyebrow">
+              When you press Publish
+            </h3>
+            <ol className="m-0 flex list-decimal flex-col gap-0.5 pl-5 text-sm text-ink-2">
+              {publishOutcome(
+                latestVersion,
+                targets.map((t) => t.name),
+              ).map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ol>
+          </section>
           {publish.error ? (
             <p className="text-sm text-danger" role="alert">
               {publish.error instanceof ApiError ? publish.error.message : "Publishing failed."}
@@ -219,15 +319,21 @@ export function PublishDialog(p: PublishDialogProps) {
           ) : null}
         </DialogBody>
         <DialogFooter>
-          <Button variant="ghost" onClick={() => p.onOpenChange(false)}>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setDeployTo([]);
+              p.onOpenChange(false);
+            }}
+          >
             Cancel
           </Button>
           <Button
             onClick={() => publish.mutate()}
             loading={publish.isPending}
-            disabled={errors.length > 0}
+            disabled={blocked || (p.latestVersionId !== null && latest.isPending)}
           >
-            Publish
+            {deployTo.length ? "Publish and deploy" : "Publish"}
           </Button>
         </DialogFooter>
       </DialogContent>

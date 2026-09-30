@@ -29,6 +29,7 @@ import { Badge, Button, CategoryDot, Kbd, Panel, Skeleton, Textarea } from "@/pr
 import type { ConfidenceThresholds, DecisionKind } from "@/types";
 import { MiniGraph } from "./MiniGraph";
 import { ThresholdMeter } from "./ThresholdMeter";
+import { useLatestRef } from "@/lib/useLatestRef";
 
 export interface BuilderPlanDecision {
   id: string;
@@ -126,6 +127,10 @@ export interface AIBuilderPanelProps extends Omit<HTMLAttributes<HTMLDivElement>
   title?: string;
   /** Render without the panel chrome (inside a sheet or another panel). */
   flush?: boolean;
+  /** Text the composer starts with (an unsent prompt kept from earlier). */
+  initialDraft?: string;
+  /** Every change to the composer's unsent text, so the page can keep it. */
+  onDraftChange?: (draft: string) => void;
 }
 
 const DEFAULT_EXAMPLES = [
@@ -199,6 +204,8 @@ export const AIBuilderPanel = forwardRef<HTMLDivElement, AIBuilderPanelProps>(
       provenance,
       title = "Build with AI",
       flush = false,
+      initialDraft = "",
+      onDraftChange,
       className,
       ...rest
     },
@@ -206,7 +213,15 @@ export const AIBuilderPanel = forwardRef<HTMLDivElement, AIBuilderPanelProps>(
   ) {
     const reduced = useReducedMotion();
     const animate = !reduced && status === "streaming";
-    const [draft, setDraft] = useState("");
+    const [draft, setDraftState] = useState(initialDraft);
+    const onDraftChangeRef = useLatestRef(onDraftChange);
+    const setDraft = useCallback(
+      (next: string) => {
+        setDraftState(next);
+        onDraftChangeRef.current?.(next);
+      },
+      [onDraftChangeRef],
+    );
     const [refining, setRefining] = useState(false);
     const refineRef = useRef<HTMLTextAreaElement | null>(null);
     // the composer is locked while a plan is on its way or being saved
@@ -225,7 +240,7 @@ export const AIBuilderPanel = forwardRef<HTMLDivElement, AIBuilderPanelProps>(
       else onSubmit(text);
       setDraft("");
       setRefining(false);
-    }, [draft, streaming, saving, refining, onRefine, onSubmit]);
+    }, [draft, streaming, saving, refining, onRefine, onSubmit, setDraft]);
 
     const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
       if (e.key === "Enter" && isMod(e)) {

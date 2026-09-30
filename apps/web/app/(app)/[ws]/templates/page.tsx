@@ -4,199 +4,25 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useMemo, useState } from "react";
 import { LayoutTemplate } from "lucide-react";
 import type { NodeCategory } from "@flowaid/ui";
-import {
-  Badge,
-  Button,
-  Dialog,
-  DialogBody,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  EmptyState,
-  FieldRow,
-  Input,
-  Select,
-  SelectItem,
-} from "@flowaid/ui/primitives";
+import { EmptyState } from "@flowaid/ui/primitives";
 import { TemplateGallery, type WorkflowTemplateView } from "@flowaid/ui/builder";
 import { PageHeader } from "@flowaid/ui/shell";
 import type { NodeManifest } from "@flowaid/workflow-core";
-import { get, post } from "~/api/client";
-import type { WorkflowDetail } from "~/api/types";
-import { templateResourceSlots, templateToView } from "~/admin/logic";
+import { get, getAll } from "~/api/client";
+import { templateToView } from "~/admin/logic";
 import type { McpServer, TemplateRow } from "~/admin/types";
-import { Notice, QueryView, useMutate } from "~/admin/ui";
+import { QueryView } from "~/admin/ui";
+import { TEMPLATES } from "~/guide/capabilities/templates";
+import { PageIntro } from "~/guide/PageIntro";
+import type { Check } from "~/guide/Readiness";
+import { generationCheck, typesafeCheck, useConnections } from "~/guide/useConnections";
 import { useSession } from "~/session";
 import { businessArea, splitBusinessFlows } from "~/templates/business";
-import { templateNeeds, type TemplateNeed, type WorkspaceResources } from "~/templates/readiness";
+import { templateNeeds, type WorkspaceResources } from "~/templates/readiness";
+import { UseTemplateDialog } from "~/templates/UseTemplateDialog";
 import { AppFrame, PageBody } from "~/shell/AppFrame";
 import { HELP } from "~/shell/help";
 import { LearnMore } from "~/shell/LearnMore";
-
-function UseTemplateDialog({
-  template,
-  needs,
-  onClose,
-}: {
-  template: TemplateRow | null;
-  needs: TemplateNeed[];
-  onClose: () => void;
-}) {
-  const s = useSession();
-  const router = useRouter();
-  const [name, setName] = useState("");
-  const [picked, setPicked] = useState<Record<string, string>>({});
-  const slots = template ? templateResourceSlots(template) : [];
-  const needsMcp = slots.some((x) => x.kind === "mcpServers");
-  const servers = useQuery({
-    queryKey: ["mcp-servers", s.ws],
-    queryFn: () => get<McpServer[]>("/v1/mcp/servers"),
-    enabled: template !== null && needsMcp && s.can("mcp:read"),
-  });
-  const create = useMutate(
-    () =>
-      post<WorkflowDetail>("/v1/workflows", {
-        name: (name || template?.name || "").trim(),
-        templateId: template?.id,
-        ...(Object.keys(picked).length ? { resources: picked } : {}),
-      }),
-    {
-      success: (w) => `Created ${w.name}`,
-      invalidate: [["workflows", s.ws]],
-      onSuccess: (w) => router.push(`/${s.ws}/workflows/${w.id}`),
-    },
-  );
-  return (
-    <Dialog
-      open={template !== null}
-      onOpenChange={(o) => {
-        if (!o) {
-          setName("");
-          setPicked({});
-          onClose();
-        }
-      }}
-    >
-      <DialogContent size="md">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            create.mutate(undefined);
-          }}
-        >
-          <DialogHeader>
-            <DialogTitle>Use “{template?.name}”</DialogTitle>
-            <DialogDescription>{template?.description}</DialogDescription>
-          </DialogHeader>
-          <DialogBody className="flex flex-col gap-4">
-            <FieldRow label="Workflow name" htmlFor="tpl-name" required>
-              <Input
-                id="tpl-name"
-                value={name}
-                placeholder={template?.name}
-                maxLength={200}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </FieldRow>
-            {slots.map((slot) =>
-              slot.kind === "mcpServers" ? (
-                <FieldRow
-                  key={slot.key}
-                  label={`MCP server: ${slot.key}`}
-                  htmlFor={`tpl-res-${slot.key}`}
-                  hint={
-                    <>
-                      {slot.description}
-                      {slot.requiredTools.length ? (
-                        <span className="mt-1 flex flex-wrap gap-1">
-                          {slot.requiredTools.map((t) => (
-                            <Badge key={t} tone="outline" mono size="sm">
-                              {t}
-                            </Badge>
-                          ))}
-                        </span>
-                      ) : null}
-                    </>
-                  }
-                >
-                  <Select
-                    id={`tpl-res-${slot.key}`}
-                    value={picked[slot.key] ?? ""}
-                    placeholder={
-                      (servers.data ?? []).length ? "Choose a server" : "No MCP servers connected"
-                    }
-                    onValueChange={(v) => setPicked((p) => ({ ...p, [slot.key]: v }))}
-                  >
-                    {(servers.data ?? []).map((m) => (
-                      <SelectItem key={m.id} value={m.id} meta={`${m.toolCount} tools`}>
-                        {m.name}
-                      </SelectItem>
-                    ))}
-                  </Select>
-                </FieldRow>
-              ) : (
-                <Notice key={slot.key} tone="info">
-                  Knowledge source “{slot.key}” is chosen in the builder once knowledge sources are
-                  enabled.
-                </Notice>
-              ),
-            )}
-            {needsMcp && servers.data && servers.data.length === 0 ? (
-              <Notice>
-                Connect an MCP server under Integrations first, or create the workflow now and pick
-                the server in the builder.
-              </Notice>
-            ) : null}
-            {needs.length > 0 ? (
-              <div>
-                <p className="mb-1.5 text-xs font-medium text-ink">
-                  {needs.every((n) => n.ready)
-                    ? "Everything it needs is set up"
-                    : "What it needs before its runs can succeed"}
-                </p>
-                <ul className="m-0 flex list-none flex-col gap-1 p-0 text-xs" role="list">
-                  {needs.map((n) => (
-                    <li key={n.label} className="flex gap-1.5">
-                      <span
-                        aria-hidden="true"
-                        className={n.ready ? "text-ok-text" : "text-warn-text"}
-                      >
-                        {n.ready ? "✓" : "○"}
-                      </span>
-                      <span>
-                        <span className="text-ink">{n.label}</span>
-                        <span className="text-ink-3">
-                          {" "}
-                          · {n.ready ? "ready" : "to set up"}: {n.detail}
-                        </span>
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-                {needs.every((n) => n.ready) ? null : (
-                  <p className="mt-1.5 text-2xs text-ink-3">
-                    You can create the workflow now either way; the builder shows what is still
-                    missing.
-                  </p>
-                )}
-              </div>
-            ) : null}
-          </DialogBody>
-          <DialogFooter>
-            <Button type="button" variant="ghost" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button type="submit" variant="primary" loading={create.isPending}>
-              Create workflow
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 export default function TemplatesPage() {
   return (
@@ -224,6 +50,12 @@ function Templates() {
     useId && canWrite
       ? (templates.data?.find((x) => x.id === useId || x.slug === useId) ?? null)
       : null;
+  // someone who has built workflows knows what templates are: the intro starts folded
+  const workflows = useQuery({
+    queryKey: ["workflow-names", s.ws],
+    queryFn: () => get<{ items: unknown[] }>("/v1/workflows?limit=200"),
+  });
+  const hasWorkflows = (workflows.data?.items.length ?? 0) > 0;
   const closeDialog = () => {
     setUsing(null);
     if (useId) router.replace(pathname, { scroll: false });
@@ -246,17 +78,17 @@ function Templates() {
   });
   const credentials = useQuery({
     queryKey: ["credentials", s.ws],
-    queryFn: () => get<{ type: string }[]>("/v1/credentials"),
+    queryFn: () => getAll<{ type: string }>("/v1/credentials"),
     enabled: s.can("credentials:read"),
   });
   const mcp = useQuery({
     queryKey: ["mcp-servers", s.ws],
-    queryFn: () => get<McpServer[]>("/v1/mcp/servers"),
+    queryFn: () => getAll<McpServer>("/v1/mcp/servers"),
     enabled: s.can("mcp:read"),
   });
   const knowledge = useQuery({
     queryKey: ["knowledge-sources", s.ws],
-    queryFn: () => get<unknown[]>("/v1/knowledge/sources"),
+    queryFn: () => getAll<unknown>("/v1/knowledge/sources"),
     enabled: s.features.knowledge === true,
   });
   // readiness only once the key state is known: "to set up" must not flash while loading
@@ -271,6 +103,39 @@ function Templates() {
       }
     : null;
   const needsOf = (t: TemplateRow) => (have ? templateNeeds(t, have) : []);
+  const connections = useConnections();
+  const checks: Check[] = [
+    typesafeCheck(connections, s.ws, "Decision steps in most templates"),
+    generationCheck(connections, s.ws, { need: "Templates that write text or use agents" }),
+    mcp.isPending && s.can("mcp:read")
+      ? { id: "mcp", label: "MCP servers", state: "checking" }
+      : (mcp.data?.length ?? 0) > 0
+        ? {
+            id: "mcp",
+            label: `${mcp.data?.length} MCP server${mcp.data?.length === 1 ? "" : "s"} connected`,
+            state: "ok",
+          }
+        : {
+            id: "mcp",
+            label: "MCP servers",
+            state: "optional",
+            detail: "Only templates that call tools on a server need one.",
+            fix: (
+              <a className="text-accent-text hover:underline" href={`/${s.ws}/integrations`}>
+                Connect one under Integrations
+              </a>
+            ),
+          },
+    ...(canWrite
+      ? []
+      : [
+          {
+            id: "role",
+            label: "Your role can browse templates but not create workflows from them",
+            state: "info",
+          } satisfies Check,
+        ]),
+  ];
   const views = useMemo(
     () =>
       (templates.data ?? [])
@@ -302,6 +167,11 @@ function Templates() {
             </>
           }
         />
+        <PageIntro
+          guide={TEMPLATES}
+          checks={checks}
+          defaultCollapsed={(templates.data?.length ?? 0) > 0 && hasWorkflows}
+        />
         <div className="mt-4">
           <QueryView query={templates}>
             {(rows) =>
@@ -324,11 +194,14 @@ function Templates() {
           </QueryView>
         </div>
       </PageBody>
-      <UseTemplateDialog
-        template={using ?? linked}
-        needs={(using ?? linked) ? needsOf((using ?? linked) as TemplateRow) : []}
-        onClose={closeDialog}
-      />
+      {(using ?? linked) ? (
+        <UseTemplateDialog
+          key={(using ?? linked)?.id}
+          template={(using ?? linked) as TemplateRow}
+          needs={needsOf((using ?? linked) as TemplateRow)}
+          onClose={closeDialog}
+        />
+      ) : null}
     </AppFrame>
   );
 }

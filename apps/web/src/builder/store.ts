@@ -48,11 +48,15 @@ export interface BuilderState {
   /** bumps when the definition changes from outside the forms (undo, redo, reload, JSON edits): forms remount */
   epoch: number;
 
-  /** Adds a node; with `after`, also a control edge from that node's port to it (one undo step). */
+  /**
+   * Adds a node; with `after`, also a control edge from that node's port to it, and with `secrets`
+   * the workflow secrets its credential slots were bound to (one undo step).
+   */
   addNode(
     node: WorkflowNode,
     position: { x: number; y: number },
     after?: { node: string; port: string },
+    secrets?: readonly { name: string; credentialType: string; required: boolean }[],
   ): string;
   removeNodes(ids: string[]): void;
   updateNode(id: string, recipe: (n: Draft<WorkflowNode>) => void, label?: string): void;
@@ -146,7 +150,7 @@ export function createBuilderStore(init: {
       notice: null,
       epoch: 0,
 
-      addNode(node, position, after) {
+      addNode(node, position, after, secrets) {
         const from = after ? findNode(get().definition, after.node) : undefined;
         const connect =
           from && after && node.kind !== "input" && node.kind !== "note" ? after : undefined;
@@ -154,6 +158,8 @@ export function createBuilderStore(init: {
           connect && from ? `Add ${node.name} after ${from.name}` : `Add ${node.name}`,
           (d) => {
             d.nodes.push(node);
+            for (const x of secrets ?? [])
+              if (!d.secrets.some((y) => y.name === x.name)) d.secrets.push({ ...x });
             d.layout ??= { nodes: {} };
             d.layout.nodes[node.id] = { x: Math.round(position.x), y: Math.round(position.y) };
             if (connect)

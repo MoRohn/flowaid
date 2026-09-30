@@ -1,6 +1,6 @@
 /** The authenticated caller of a request (API.md §1). */
 import type { WorkspaceRole } from "@flowaid/database";
-import { ForbiddenError } from "@flowaid/workflow-core";
+import { ForbiddenError, UnauthorizedError } from "@flowaid/workflow-core";
 import type { Scope } from "./scopes.js";
 
 export type PrincipalType =
@@ -33,6 +33,19 @@ export interface SessionOnly {
 }
 
 export type AuthMode = "public" | "session" | "api_key" | "session_or_api_key";
+
+/**
+ * The signed-in user of a session route, with or without a workspace. Throws 401 rather than
+ * letting a missing session reach a query as an empty user id.
+ */
+export function sessionUserId(req: {
+  principal?: Principal | null;
+  sessionOnly?: SessionOnly | null;
+}): string {
+  const userId = req.principal?.userId ?? req.sessionOnly?.userId;
+  if (!userId) throw new UnauthorizedError("no session");
+  return userId;
+}
 
 export function hasScope(p: Principal, scope: Scope): boolean {
   return p.scopes.has(scope) || p.scopes.has("admin");

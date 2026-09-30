@@ -1,5 +1,6 @@
 /** API-only value schemas (API.md §7). */
 import { z } from "zod";
+import { and, eq, gt, lt, or, type AnyColumn, type SQL } from "drizzle-orm";
 import { FEATURE_KEYS } from "@flowaid/env";
 
 export const SlugSchema = z
@@ -54,6 +55,48 @@ export function decodeCursor(cursor: string | undefined): [string | number, stri
     /* fall through */
   }
   return null;
+}
+
+/**
+ * Keyset pagination for a collection in one fixed `(sort, id)` order (a name, or a creation time),
+ * which is why it takes no `order`.
+ */
+export const PageQuery = z.object({
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+  cursor: z.string().max(500).optional(),
+});
+
+/**
+ * The rows after `cursor` in `(sort, id)` order, or undefined on the first page (or for a cursor
+ * that does not decode). `parse` turns the cursor's sort value back into the column's type.
+ */
+export function afterCursor(
+  sort: AnyColumn,
+  id: AnyColumn,
+  cursor: string | undefined,
+  dir: "asc" | "desc" = "asc",
+  parse: (v: string | number) => unknown = (v) => v,
+): SQL | undefined {
+  const c = decodeCursor(cursor);
+  if (!c) return undefined;
+  const value = parse(c[0]);
+  const past = dir === "asc" ? gt : lt;
+  return or(past(sort, value), and(eq(sort, value), past(id, c[1])));
+}
+
+/** `{ items, next_cursor }` from rows fetched with `.limit(limit + 1)`. */
+export function toPage<R, T>(
+  rows: readonly R[],
+  limit: number,
+  key: (row: R) => [string | number, string],
+  map: (row: R) => T,
+): { items: T[]; next_cursor: string | null } {
+  const items = rows.slice(0, limit);
+  const last = items.at(-1);
+  return {
+    items: items.map(map),
+    next_cursor: rows.length > limit && last ? encodeCursor(...key(last)) : null,
+  };
 }
 
 export const NoContent = z.null().describe("No content");

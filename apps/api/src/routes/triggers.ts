@@ -8,7 +8,21 @@ import { Readable } from "node:stream";
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
-import { and, desc, eq, gte, lt, lte, or } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gt,
+  gte,
+  inArray,
+  isNull,
+  lt,
+  lte,
+  or,
+  sql,
+  type AnyColumn,
+} from "drizzle-orm";
 import {
   artifacts,
   auditEvents,
@@ -28,10 +42,22 @@ import {
 } from "@flowaid/workflow-core";
 import { canSeeWorkflow, hasScope, type Principal } from "../auth/principal.js";
 import type { ApiContext } from "../context.js";
-import { IdParams, ListQuery, decodeCursor, encodeCursor } from "../dto/common.js";
+import {
+  IdParams,
+  ListQuery,
+  PageQuery,
+  afterCursor,
+  decodeCursor,
+  encodeCursor,
+  toPage,
+} from "../dto/common.js";
 import { startRun } from "../services/runs.js";
 
 type WebhookRow = typeof webhooks.$inferSelect;
+
+/** Only the workflows `p` may see, in SQL so a page is not thinned after the fact. */
+const visibleWorkflows = (p: Principal, col: AnyColumn) =>
+  p.workflowIds ? (p.workflowIds.size ? inArray(col, [...p.workflowIds]) : sql`false`) : undefined;
 type ScheduleRow = typeof schedules.$inferSelect;
 
 const webhookDto = (w: WebhookRow, ctx: ApiContext, slug: string) => ({
@@ -105,10 +131,14 @@ export function triggerRoutes(app: FastifyInstance, ctx: ApiContext): void {
         scope: "webhooks:write",
         cli: { noun: "webhook", verb: "list" },
       },
-      schema: { tags: ["triggers"], querystring: z.object({ workflowId: z.uuid().optional() }) },
+      schema: {
+        tags: ["triggers"],
+        querystring: PageQuery.extend({ workflowId: z.uuid().optional() }),
+      },
     },
     async (req) => {
       const p = need(req.principal);
+      const { limit, cursor } = req.query;
       const rows = await ctx.db.tenant(p.workspaceId, (tx) =>
         tx
           .select()
@@ -117,13 +147,19 @@ export function triggerRoutes(app: FastifyInstance, ctx: ApiContext): void {
             and(
               eq(webhooks.workspaceId, p.workspaceId),
               req.query.workflowId ? eq(webhooks.workflowId, req.query.workflowId) : undefined,
+              visibleWorkflows(p, webhooks.workflowId),
+              afterCursor(webhooks.path, webhooks.id, cursor),
             ),
           )
-          .orderBy(webhooks.path),
+          .orderBy(asc(webhooks.path), asc(webhooks.id))
+          .limit(limit + 1),
       );
-      return rows
-        .filter((w) => canSeeWorkflow(p, w.workflowId))
-        .map((w) => webhookDto(w, ctx, p.workspaceSlug));
+      return toPage(
+        rows,
+        limit,
+        (w) => [w.path, w.id],
+        (w) => webhookDto(w, ctx, p.workspaceSlug),
+      );
     },
   );
 
@@ -291,10 +327,25 @@ export function triggerRoutes(app: FastifyInstance, ctx: ApiContext): void {
         scope: "schedules:write",
         cli: { noun: "schedule", verb: "list" },
       },
-      schema: { tags: ["triggers"], querystring: z.object({ workflowId: z.uuid().optional() }) },
+      schema: {
+        tags: ["triggers"],
+        querystring: PageQuery.extend({ workflowId: z.uuid().optional() }),
+      },
     },
     async (req) => {
       const p = need(req.principal);
+      const { limit } = req.query;
+      // Soonest next run first, schedules with none (disabled) last; the cursor's "" is such a one.
+      const c = decodeCursor(req.query.cursor);
+      const after = !c
+        ? undefined
+        : c[0] === ""
+          ? and(isNull(schedules.nextRunAt), gt(schedules.id, c[1]))
+          : or(
+              isNull(schedules.nextRunAt),
+              gt(schedules.nextRunAt, new Date(String(c[0]))),
+              and(eq(schedules.nextRunAt, new Date(String(c[0]))), gt(schedules.id, c[1])),
+            );
       const rows = await ctx.db.tenant(p.workspaceId, (tx) =>
         tx
           .select()
@@ -303,11 +354,14 @@ export function triggerRoutes(app: FastifyInstance, ctx: ApiContext): void {
             and(
               eq(schedules.workspaceId, p.workspaceId),
               req.query.workflowId ? eq(schedules.workflowId, req.query.workflowId) : undefined,
+              visibleWorkflows(p, schedules.workflowId),
+              after,
             ),
           )
-          .orderBy(schedules.nextRunAt),
+          .orderBy(sql`${schedules.nextRunAt} asc nulls last`, asc(schedules.id))
+          .limit(limit + 1),
       );
-      return rows.filter((s) => canSeeWorkflow(p, s.workflowId)).map(scheduleDto);
+      return toPage(rows, limit, (s) => [s.nextRunAt?.toISOString() ?? "", s.id], scheduleDto);
     },
   );
 

@@ -42,6 +42,10 @@ import type { Projection } from "./model";
 import { useModelViews } from "./models";
 import { CredentialSlots } from "./CredentialSlots";
 import { PolicyEditor } from "./PolicyEditor";
+import { createLoadOptions } from "./optionProviders";
+
+// agent presets, MCP servers/tools/prompts and OpenAPI toolsets/operations for picker fields
+const loadOptions = createLoadOptions();
 
 export interface NodeInspectorProps {
   node: WorkflowNode;
@@ -168,6 +172,7 @@ export function NodeInspector({
             defaultValues={node.config}
             scope={scope}
             nodeType={manifest.id}
+            loadOptions={loadOptions}
             models={models}
             templateRefs={refs}
             variables={variables}

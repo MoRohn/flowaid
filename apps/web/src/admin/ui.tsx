@@ -29,7 +29,7 @@ import {
   toast,
 } from "@flowaid/ui/primitives";
 import { CodeEditor } from "@flowaid/ui/forms";
-import { api, get } from "~/api/client";
+import { api, getAll } from "~/api/client";
 import { useSession } from "~/session";
 import { ErrorPanel, errorMessage } from "~/shell/states";
 import type { MemberRow } from "./types";
@@ -123,7 +123,7 @@ export function useMembers(): Map<string, string> {
   const wsId = s.me.workspaces.find((w) => w.slug === s.ws)?.id ?? "";
   const q = useQuery({
     queryKey: ["members", s.ws],
-    queryFn: () => get<MemberRow[]>(`/v1/workspaces/${wsId}/members`),
+    queryFn: () => getAll<MemberRow>(`/v1/workspaces/${wsId}/members`),
     staleTime: 60_000,
   });
   return useMemo(() => new Map((q.data ?? []).map((m) => [m.userId, m.name || m.email])), [q.data]);

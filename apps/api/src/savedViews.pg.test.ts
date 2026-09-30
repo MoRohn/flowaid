@@ -23,18 +23,44 @@ describeDb("saved views (Postgres)", () => {
     expect(again.json().id).toBe(failed.json().id);
 
     const list = (await call(t.app, jar, "GET", "/v1/saved-views?scope=runs")).json() as {
-      name: string;
-      filters: Record<string, unknown>;
-    }[];
-    expect(list.map((v) => v.name)).toEqual(["Approvals", "Failed today"]);
-    expect(list[1]?.filters).toEqual({ status: "failed", range: "7d" });
+      items: { name: string; filters: Record<string, unknown> }[];
+      next_cursor: string | null;
+    };
+    expect(list.items.map((v) => v.name)).toEqual(["Approvals", "Failed today"]);
+    expect(list.next_cursor).toBeNull();
+    expect(list.items[1]?.filters).toEqual({ status: "failed", range: "7d" });
 
     expect((await save("", {})).statusCode).toBe(400);
     const id = failed.json().id as string;
     expect((await call(t.app, jar, "DELETE", `/v1/saved-views/${id}`)).statusCode).toBe(204);
     expect((await call(t.app, jar, "DELETE", `/v1/saved-views/${id}`)).statusCode).toBe(404);
     expect(
-      ((await call(t.app, jar, "GET", "/v1/saved-views?scope=runs")).json() as unknown[]).length,
+      ((await call(t.app, jar, "GET", "/v1/saved-views?scope=runs")).json() as { items: unknown[] })
+        .items.length,
     ).toBe(1);
+  });
+
+  it("pages the list by name with a cursor", async () => {
+    for (const name of ["Pager C", "Pager A", "Pager B"])
+      await call(t.app, jar, "POST", "/v1/saved-views", { scope: "runs", name, filters: {} });
+    type Page = { items: { name: string }[]; next_cursor: string | null };
+    const first = (
+      await call(t.app, jar, "GET", "/v1/saved-views?scope=runs&limit=2")
+    ).json() as Page;
+    expect(first.items.map((v) => v.name)).toEqual(["Approvals", "Pager A"]);
+    expect(first.next_cursor).toEqual(expect.any(String));
+    const rest = (
+      await call(
+        t.app,
+        jar,
+        "GET",
+        `/v1/saved-views?scope=runs&limit=2&cursor=${first.next_cursor ?? ""}`,
+      )
+    ).json() as Page;
+    expect(rest.items.map((v) => v.name)).toEqual(["Pager B", "Pager C"]);
+    expect(rest.next_cursor).toBeNull();
+    expect((await call(t.app, jar, "GET", "/v1/saved-views?scope=runs&limit=500")).statusCode).toBe(
+      400,
+    );
   });
 });

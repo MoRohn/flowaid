@@ -333,8 +333,11 @@ export const agentNode = defineNode({
         .uuid()
         .optional()
         .meta({
+          title: "Agent preset",
           "x-ui": {
-            help: "An agent preset (Agents page); the node's own settings override it.",
+            widget: "select",
+            optionsProvider: "agentPresets",
+            help: "Pick an agent preset by name (made under Agents); the step's own settings override it.",
           },
         }),
       documents: documentScopeSchema.optional().meta({
@@ -379,6 +382,8 @@ export const agentNode = defineNode({
   idempotency: "none",
   generation: true,
   streams: true,
+  // the builder lists presets from /v1/agents; this node-side provider is the offline fallback
+  optionProviders: { agentPresets: () => Promise.resolve([]) },
   // a spend bound the compiler can see (E_AGENT_UNBOUNDED); the loop enforces it too
   defaultPolicy: { timeoutMs: 600_000, maxCostUsd: AGENT_DEFAULTS.maxCostUsd },
   execute: async (ctx, input) => {

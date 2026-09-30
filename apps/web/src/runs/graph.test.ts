@@ -93,4 +93,59 @@ describe("read-only graph projection", () => {
     expect(g.nodes.find((n) => n.id === "start")?.position).toEqual({ x: 10, y: 20 });
     expect(g.edges).toHaveLength(3);
   });
+
+  it("gives a branch an outlet for every case an edge leaves from, even without a plan", () => {
+    const def = {
+      ...definition,
+      nodes: [
+        ...definition.nodes,
+        {
+          id: "route",
+          name: "Route",
+          kind: "branch",
+          cases: [
+            { port: "refund", label: "Refund", when: "true" },
+            { port: "decline", label: "Decline", when: "false" },
+          ],
+        },
+      ],
+      edges: [
+        ...definition.edges,
+        { id: "e3", from: { node: "route", port: "refund" }, to: { node: "done" } },
+        { id: "e4", from: { node: "route", port: "decline" }, to: { node: "done" } },
+      ],
+    } as unknown as WorkflowDefinition;
+    const route = toNodeViews(def, undefined, catalog).find((v) => v.id === "route");
+    expect(route?.routes).toEqual([
+      { id: "refund", label: "Refund" },
+      { id: "decline", label: "Decline" },
+    ]);
+  });
+
+  it("draws data edges from the bindings when there is no plan", () => {
+    const def = {
+      ...definition,
+      nodes: definition.nodes.map((n) =>
+        n.id === "draft"
+          ? {
+              ...n,
+              inputs: {
+                amount: { kind: "ref", ref: { kind: "port", node: "start", port: "amount" } },
+              },
+            }
+          : n,
+      ),
+    } as unknown as WorkflowDefinition;
+    const data = toEdgeViews(def, undefined).filter((e) => e.kind === "data");
+    expect(data).toEqual([
+      expect.objectContaining({
+        source: "start",
+        sourceHandle: "out:amount",
+        target: "draft",
+        targetHandle: "in:amount",
+      }),
+    ]);
+    const draft = toNodeViews(def, undefined, catalog).find((v) => v.id === "draft");
+    expect(draft?.inputs.map((p) => p.id)).toContain("amount");
+  });
 });

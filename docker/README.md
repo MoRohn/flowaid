@@ -86,7 +86,7 @@ commands and the restore order; [UPGRADES.md](../docs/operations/UPGRADES.md) an
 
 | Service       | Reads `.env` (`env_file`) | Explicit variables                                                                                                                              |
 | ------------- | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `api`         | yes                       | the shared map above, `HOST`, `PORT`, `CORS_ORIGINS`, `DATABASE_ADMIN_URL`                                                                      |
+| `api`         | yes                       | the shared map above, `HOST`, `PORT`, `CORS_ORIGINS`, `DATABASE_ADMIN_URL`, `MCP_STDIO_ENABLED`                                                 |
 | `worker`      | yes                       | the shared map above, `WORKER_POOLS`, `WORKER_CONCURRENCY`, `MCP_STDIO_ENABLED`                                                                 |
 | `worker-code` | **no**                    | `NODE_ENV`, `LOG_LEVEL`, `DATABASE_URL` (role `flowaid_code`), `DB_RLS`, `REDIS_URL`, `WORKER_POOLS=code`, `WORKER_CONCURRENCY`, `SANDBOX_MODE` |
 | `web`         | **no**                    | `NODE_ENV`, `HOSTNAME`, `PORT`, `FLOWAID_API_INTERNAL_URL`, `NEXT_PUBLIC_FLOWAID_BASE_URL`                                                      |

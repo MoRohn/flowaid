@@ -15,6 +15,7 @@ import { ErrorPanel, errorMessage } from "~/shell/states";
 import { useCatalog, useMembers, useWorkflowNames } from "~/runs/api";
 import { humanizeId, respondedRecord } from "~/runs/humanTasks";
 import { ReviewLinks } from "~/runs/ReviewLinks";
+import { TaskGuidancePanel } from "~/runs/TaskGuidancePanel";
 import type { HumanTask, Page } from "~/api/types";
 import type { HumanTaskDetail, RunDetail, VersionDetail } from "~/runs/types";
 import { nodeIndex, nodeRunViews, taskToApproval } from "~/runs/views";
@@ -96,7 +97,13 @@ export default function HumanTaskPage({ params }: { params: Promise<{ taskId: st
 
   let body;
   if (detail.isError)
-    body = <ErrorPanel error={detail.error} onRetry={() => void detail.refetch()} />;
+    body = (
+      <ErrorPanel
+        error={detail.error}
+        onRetry={() => void detail.refetch()}
+        back={{ href: `/${s.ws}/human-tasks`, label: "All human tasks" }}
+      />
+    );
   else if (!task)
     body = (
       <div className="mx-auto flex max-w-[640px] flex-col gap-4 py-10" aria-busy="true">
@@ -105,8 +112,8 @@ export default function HumanTaskPage({ params }: { params: Promise<{ taskId: st
       </div>
     );
   else {
-    const nodeName =
-      nodeIndex(version.data?.definition).get(task.nodeId)?.name ?? humanizeId(task.nodeId);
+    const node = nodeIndex(version.data?.definition).get(task.nodeId);
+    const nodeName = node?.name ?? humanizeId(task.nodeId);
     const responded = respondedRecord(task, members.data ?? []);
     const targets: EscalationTarget[] = [
       ...(members.data ?? [])
@@ -156,6 +163,7 @@ export default function HumanTaskPage({ params }: { params: Promise<{ taskId: st
             ) : null}
           </div>
         ) : null}
+        <TaskGuidancePanel task={task} node={node} className="mx-auto mt-6 w-full max-w-[640px]" />
         <ReviewPage
           card={{
             request: taskToApproval(task, nodeName, nodeRuns),

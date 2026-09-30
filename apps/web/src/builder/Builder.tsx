@@ -85,6 +85,8 @@ import { WorkflowPanel } from "./WorkflowPanel";
 import { useGuideContext } from "~/guide/GuideProvider";
 import { explainRun } from "~/guide/explain";
 import { NodeInspector } from "./NodeInspector";
+import { useKeySources } from "./CredentialSlots";
+import { autoBindSlots } from "./keySources";
 import { PublishDialog } from "./PublishDialog";
 import { RunTab, missingRequired } from "./RunTab";
 import { CostTab, ReviewTab, advisorAvailability, costDiagnostics, useAdvisor } from "./advisor";
@@ -459,6 +461,7 @@ function BuilderView({
   // Quick add: a new step follows the selected one (placed beside it and connected from its
   // first free port); otherwise it goes where asked, moved clear of other steps.
   const [recentKinds, setRecentKinds] = useState<string[]>(readRecentKinds);
+  const keySources = useKeySources();
   const addNode = useCallback(
     (def: NodeDefinitionView, position: { x: number; y: number }) => {
       const st = store.getState();
@@ -476,14 +479,22 @@ function BuilderView({
       const port = after
         ? freeControlPort(d, after, defaultControlOuts(after, catalog))
         : undefined;
+      // a key the workflow or the server already has is bound now, not left as an error
+      const bound =
+        node.kind === "task"
+          ? autoBindSlots(catalog.get(node.type)?.credentials ?? [], d.secrets, keySources)
+          : undefined;
+      if (bound && node.kind === "task")
+        node.credentials = { ...bound.credentials, ...node.credentials };
       st.addNode(
         node,
         placeNewStep(d, position, after),
         after && port ? { node: after.id, port } : undefined,
+        bound?.declare,
       );
       setRecentKinds((prev) => rememberRecentKind(prev, def.kind));
     },
-    [store, catalog],
+    [store, catalog, keySources],
   );
 
   // --- save (autosave, ⌘S, before run/publish) ---
@@ -687,7 +698,7 @@ function BuilderView({
       />
     );
 
-  const describeProblem = (d: Diagnostic) => {
+  const describeProblem = (d: Diagnostic, beforeShow?: () => void) => {
     const shown = presentDiagnostic(d, definition);
     const nodeId = diagnosticNodeId(d, definition);
     return {
@@ -705,7 +716,14 @@ function BuilderView({
             </Button>
           ) : null}
           {nodeId ? (
-            <Button size="sm" variant="secondary" onClick={() => showNode(nodeId)}>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                beforeShow?.();
+                showNode(nodeId);
+              }}
+            >
               Show node
             </Button>
           ) : null}
@@ -1002,7 +1020,8 @@ function BuilderView({
         workflowId={workflow.id}
         latestVersionId={workflow.latestVersionId}
         draft={definition}
-        diagnostics={compiled.diagnostics}
+        diagnostics={readable(compiled.diagnostics)}
+        describe={(d) => describeProblem(d, () => setPublishOpen(false))}
         environments={s.environments}
         flush={saveNow}
         onPublished={() => void qc.invalidateQueries({ queryKey: ["workflows", s.ws] })}

@@ -8,6 +8,10 @@ import { WorkflowsBrowser } from "@flowaid/ui/data";
 import { PageHeader } from "@flowaid/ui/shell";
 import { get, qs } from "~/api/client";
 import type { Page, WorkflowWithActivity } from "~/api/types";
+import { WORKFLOWS } from "~/guide/capabilities/workflows";
+import { PageIntro } from "~/guide/PageIntro";
+import type { Check } from "~/guide/Readiness";
+import { generationCheck, typesafeCheck, useConnections } from "~/guide/useConnections";
 import { useSession } from "~/session";
 import { AppFrame, PageBody } from "~/shell/AppFrame";
 import { ErrorPanel } from "~/shell/states";
@@ -28,6 +32,20 @@ export default function WorkflowsPage() {
   });
   const envs = toEnvironmentViews(s.environments);
   const canWrite = s.can("workflows:write");
+  const connections = useConnections();
+  const checks: Check[] = [
+    typesafeCheck(connections, s.ws),
+    generationCheck(connections, s.ws),
+    ...(canWrite
+      ? []
+      : [
+          {
+            id: "role",
+            label: "Your role can open and run workflows but not create or change them",
+            state: "info",
+          } satisfies Check,
+        ]),
+  ];
   const newButton = canWrite ? (
     <Button
       leadingIcon={<Plus strokeWidth={1.75} />}
@@ -44,6 +62,11 @@ export default function WorkflowsPage() {
           title="Workflows"
           description="Typed decision workflows in this workspace."
           actions={newButton}
+        />
+        <PageIntro
+          guide={WORKFLOWS}
+          checks={checks}
+          defaultCollapsed={(list.data?.items.length ?? 0) > 0 || Boolean(query)}
         />
         <div className="mt-4">
           {list.isPending ? (

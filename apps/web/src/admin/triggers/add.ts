@@ -3,6 +3,7 @@
  * the workflow's trigger settings write it into the draft; publishing and deploying make it live.
  * Pure, so it is unit tested.
  */
+import { checkCron } from "@flowaid/ui/forms";
 
 export type NewTrigger =
   | {
@@ -37,12 +38,21 @@ export const CRON_PRESETS: readonly { cron: string; label: string }[] = [
   { cron: "0 9 * * 1", label: "Mondays at 09:00" },
 ];
 
-/** Five space-separated cron fields (the API checks the values; this catches the shape). */
-export function cronProblem(cron: string): string | null {
-  const parts = cron.trim().split(/\s+/);
-  return parts.length === 5 && cron.trim().length >= 9
-    ? null
-    : "Use five fields: minute, hour, day of month, month, day of week";
+/**
+ * Why a five-field cron cannot be used, or null: the shape, each field's range (minute 0-59,
+ * hour 0-23, …) and whether it ever fires (31 February never does), parsed the way the scheduler
+ * parses it, so the dialog catches what deploying would reject.
+ */
+export function cronProblem(cron: string, timezone = "UTC"): string | null {
+  const check = checkCron(cron, timezone, 1);
+  if (!check.ok) return check.message;
+  return check.next.length === 0 ? "This timetable never matches a real date." : null;
+}
+
+/** The next few times a valid cron fires, for the dialog to show; empty when it is not valid. */
+export function nextCronRuns(cron: string, timezone = "UTC", count = 3): Date[] {
+  const check = checkCron(cron, timezone, count);
+  return check.ok ? check.next : [];
 }
 
 type Definition = Record<string, unknown> & { triggers?: readonly Record<string, unknown>[] };
@@ -63,7 +73,7 @@ export function withTrigger(
       return { error: `This workflow already has a webhook at /${trigger.path}` };
     triggers.push({ ...trigger, inputPointer: "/body", allowedHeaders: [] });
   } else {
-    const problem = cronProblem(trigger.cron);
+    const problem = cronProblem(trigger.cron, trigger.timezone);
     if (problem) return { error: problem };
     const cron = trigger.cron.trim().replace(/\s+/g, " ");
     if (triggers.some((t) => t.type === "schedule" && t.cron === cron))

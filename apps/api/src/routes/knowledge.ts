@@ -19,7 +19,17 @@ import {
 } from "@flowaid/workflow-core";
 import type { Principal } from "../auth/principal.js";
 import type { ApiContext } from "../context.js";
-import { IdParams, ListQuery, NoContent, decodeCursor, encodeCursor, page } from "../dto/common.js";
+import {
+  IdParams,
+  ListQuery,
+  NoContent,
+  PageQuery,
+  afterCursor,
+  decodeCursor,
+  encodeCursor,
+  page,
+  toPage,
+} from "../dto/common.js";
 import { indexFor, knowledgeServiceFor } from "../services/knowledge.js";
 import {
   checkPageIndexConfig,
@@ -231,26 +241,38 @@ export function knowledgeRoutes(app: FastifyInstance, ctx: ApiContext): void {
       schema: {
         tags: ["knowledge"],
         summary: "Knowledge sources with document and chunk counts",
-        response: { 200: z.array(KnowledgeSourceSchema) },
+        querystring: PageQuery,
+        response: { 200: page(KnowledgeSourceSchema) },
       },
     },
     async (req) => {
       const p = need(req.principal);
+      const { limit, cursor } = req.query;
       const rows = await ctx.db.tenant(p.workspaceId, (tx) =>
         tx
           .select()
           .from(knowledgeSources)
-          .where(eq(knowledgeSources.workspaceId, p.workspaceId))
-          .orderBy(asc(knowledgeSources.name)),
+          .where(
+            and(
+              eq(knowledgeSources.workspaceId, p.workspaceId),
+              afterCursor(knowledgeSources.name, knowledgeSources.id, cursor),
+            ),
+          )
+          .orderBy(asc(knowledgeSources.name), asc(knowledgeSources.id))
+          .limit(limit + 1),
       );
       const summary = new Map(
         (await knowledgeServiceFor(ctx, p.workspaceId).sources()).map((s) => [s.id, s]),
       );
-      return rows.map((s) =>
-        sourceDto(s, {
-          documents: summary.get(s.id)?.documents ?? 0,
-          chunks: summary.get(s.id)?.chunks ?? 0,
-        }),
+      return toPage(
+        rows,
+        limit,
+        (s) => [s.name, s.id],
+        (s) =>
+          sourceDto(s, {
+            documents: summary.get(s.id)?.documents ?? 0,
+            chunks: summary.get(s.id)?.chunks ?? 0,
+          }),
       );
     },
   );

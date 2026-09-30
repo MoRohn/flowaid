@@ -393,12 +393,15 @@ export function workflowRoutes(app: FastifyInstance, ctx: ApiContext): void {
         });
         assertSaveable(compiled.diagnostics);
         const slug = await uniqueSlug(tx, p.workspaceId, req.body.slug ?? slugify(req.body.name));
+        const draft = WorkflowDefinitionSchema.parse(definition);
+        // a template's own description becomes the workflow's unless one is given
+        const description = req.body.description ?? draft.description;
         const created = await createWorkflow(tx, {
           workspaceId: p.workspaceId,
           name: req.body.name,
           slug,
-          draft: WorkflowDefinitionSchema.parse(definition),
-          ...(req.body.description !== undefined ? { description: req.body.description } : {}),
+          draft,
+          ...(description !== undefined ? { description } : {}),
           ...(req.body.tags ? { tags: req.body.tags } : {}),
           createdBy: p.userId,
         });

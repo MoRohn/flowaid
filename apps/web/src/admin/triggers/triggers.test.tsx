@@ -94,7 +94,7 @@ const schedule: Schedule = {
 
 describe("webhook list", () => {
   it("shows loading, then the empty state", async () => {
-    stubApi({ "GET /v1/webhooks": () => [] });
+    stubApi({ "GET /v1/webhooks": () => ({ items: [], next_cursor: null }) });
     render(withClient(<WebhookList />));
     expect(screen.getByLabelText("Loading")).toBeTruthy();
     expect(await screen.findByText(/No webhook is live/)).toBeTruthy();
@@ -112,7 +112,7 @@ describe("webhook list", () => {
 
   it("lists deliveries with duplicate and rejected states", async () => {
     stubApi({
-      "GET /v1/webhooks": () => [hook],
+      "GET /v1/webhooks": () => ({ items: [hook], next_cursor: null }),
       "GET /v1/webhooks/wh-1/deliveries": () => ({
         items: [
           {
@@ -172,7 +172,7 @@ describe("webhook list", () => {
 describe("schedule list", () => {
   it("shows the definition's cron read-only, the last error and the policy fields", async () => {
     const fetchMock = stubApi({
-      "GET /v1/schedules": () => [schedule],
+      "GET /v1/schedules": () => ({ items: [schedule], next_cursor: null }),
       "PATCH /v1/schedules/sc-1": () => ({ ...schedule, jitterMs: 60_000 }),
     });
     render(withClient(<ScheduleList />));
@@ -212,7 +212,7 @@ describe("notification channels", () => {
 
   it("shows the empty state and validates a new channel before sending it", async () => {
     const fetchMock = stubApi({
-      "GET /v1/notifications": () => [],
+      "GET /v1/notifications": () => ({ items: [], next_cursor: null }),
       "POST /v1/notifications": () => ({ channel, signingSecret: "nfsec_once" }),
     });
     render(withClient(<NotificationsTab />));
@@ -253,7 +253,7 @@ describe("notification channels", () => {
 
   it("reports a failed test send with the server's reason", async () => {
     stubApi({
-      "GET /v1/notifications": () => [channel],
+      "GET /v1/notifications": () => ({ items: [channel], next_cursor: null }),
       "POST /v1/notifications/nc-1/test": () =>
         Response.json({ ok: false, error: "the endpoint answered HTTP 500" }),
     });

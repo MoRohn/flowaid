@@ -21,9 +21,10 @@ import {
 import { uuidv7 } from "@flowaid/shared";
 import { ConflictError, ForbiddenError, NotFoundError } from "@flowaid/workflow-core";
 import { and, asc, eq } from "drizzle-orm";
+import { sessionUserId } from "../auth/principal.js";
 import { roleAtLeast } from "../auth/scopes.js";
 import type { ApiContext } from "../context.js";
-import { IdParams, NoContent } from "../dto/common.js";
+import { IdParams, NoContent, PageQuery, afterCursor, page, toPage } from "../dto/common.js";
 import {
   CreateWorkspaceRequestSchema,
   EnvironmentPatchSchema,
@@ -69,7 +70,7 @@ export function workspaceRoutes(app: FastifyInstance, ctx: ApiContext): void {
       },
     },
     async (req) => {
-      const userId = req.principal?.userId ?? req.sessionOnly?.userId ?? "";
+      const userId = sessionUserId(req);
       const rows = await ctx.db.system((tx) => listUserWorkspaces(tx, userId));
       return rows.map((w) => ({
         id: w.workspace.id,
@@ -97,7 +98,7 @@ export function workspaceRoutes(app: FastifyInstance, ctx: ApiContext): void {
       },
     },
     async (req, reply) => {
-      const userId = req.principal?.userId ?? req.sessionOnly?.userId ?? "";
+      const userId = sessionUserId(req);
       const created = await ctx.db.system(async (tx) => {
         if (await getWorkspaceBySlug(tx, req.body.slug))
           throw new ConflictError(`the slug '${req.body.slug}' is taken`);
@@ -200,26 +201,43 @@ export function workspaceRoutes(app: FastifyInstance, ctx: ApiContext): void {
         scope: "workflows:read",
         cli: { noun: "member", verb: "list", positional: ["id"] },
       },
-      schema: { tags: ["workspaces"], params: IdParams, response: { 200: z.array(MemberSchema) } },
+      schema: {
+        tags: ["workspaces"],
+        params: IdParams,
+        querystring: PageQuery,
+        response: { 200: page(MemberSchema) },
+      },
     },
     async (req) => {
       sameWorkspace(req.principal?.workspaceId ?? "", req.params.id);
+      const { limit, cursor } = req.query;
       const rows = await ctx.db.system((tx) =>
         tx
           .select({ m: memberships, u: users })
           .from(memberships)
           .innerJoin(users, eq(users.id, memberships.userId))
-          .where(eq(memberships.workspaceId, req.params.id))
-          .orderBy(asc(users.email)),
+          .where(
+            and(
+              eq(memberships.workspaceId, req.params.id),
+              afterCursor(users.email, users.id, cursor),
+            ),
+          )
+          .orderBy(asc(users.email), asc(users.id))
+          .limit(limit + 1),
       );
-      return rows.map(({ m, u }) => ({
-        userId: u.id,
-        email: u.email,
-        name: u.name,
-        role: m.role,
-        status: u.status,
-        joinedAt: m.createdAt.toISOString(),
-      }));
+      return toPage(
+        rows,
+        limit,
+        ({ u }) => [u.email, u.id],
+        ({ m, u }) => ({
+          userId: u.id,
+          email: u.email,
+          name: u.name,
+          role: m.role,
+          status: u.status,
+          joinedAt: m.createdAt.toISOString(),
+        }),
+      );
     },
   );
 

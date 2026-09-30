@@ -221,7 +221,7 @@ export const RunHeader = forwardRef<HTMLDivElement, RunHeaderProps>(function Run
         >
           {tokens !== undefined ? formatTokens(tokens) : "—"}
         </Stat>
-        <Stat label="Nodes">
+        <Stat label="Steps">
           {run.nodeRuns.filter((n) => n.status === "completed").length}/{run.nodeRuns.length}
         </Stat>
         <Stat label="Ended">

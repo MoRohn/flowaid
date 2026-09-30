@@ -161,8 +161,28 @@ describeDb("evaluations (Postgres)", () => {
     ).toBe(201);
   });
 
+  it("pages the sets by name with a cursor", async () => {
+    for (const name of ["Pager C", "Pager A", "Pager B"])
+      await call(t.app, jar, "POST", "/v1/evaluations/sets", { name });
+    const names: string[] = [];
+    let cursor: string | null = null;
+    do {
+      const pg = (
+        await call(t.app, jar, "GET", `/v1/evaluations/sets?limit=2&cursor=${cursor ?? ""}`)
+      ).json() as { items: { name: string }[]; next_cursor: string | null };
+      expect(pg.items.length).toBeLessThanOrEqual(2);
+      names.push(...pg.items.map((x) => x.name));
+      cursor = pg.next_cursor;
+    } while (cursor);
+    expect(names).toEqual([...names].sort());
+    expect(new Set(names).size).toBe(names.length);
+    expect(names.filter((n) => n.startsWith("Pager"))).toEqual(["Pager A", "Pager B", "Pager C"]);
+    expect((await call(t.app, jar, "GET", "/v1/evaluations/sets?limit=500")).statusCode).toBe(400);
+  });
+
   it("turns a run into a case with decisions and outcome prefilled", async () => {
-    const v = (await call(t.app, jar, "GET", `/v1/workflows/${workflowId}/versions`)).json()[0];
+    const v = (await call(t.app, jar, "GET", `/v1/workflows/${workflowId}/versions`)).json()
+      .items[0];
     const envs = (await call(t.app, jar, "GET", "/v1/environments")).json() as {
       id: string;
       name: string;

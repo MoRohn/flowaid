@@ -1,0 +1,238 @@
+/**
+ * Guidance for evaluations (`/v1/evaluations/*`, packages/evaluation): the new-set draft and its
+ * review, how well a set's cases cover the workflow, and how to read a finished report. Pure, so
+ * each rule is tested against what the scorer actually checks.
+ */
+import type { CaseResultRow, EvaluationCase, EvaluationSummary } from "~/admin/types";
+
+export interface Note {
+  id: string;
+  state: "ok" | "blocker" | "warning" | "info" | "optional";
+  message: string;
+}
+
+/** "Any workflow" in the set's workflow choice. */
+export const ANY_WORKFLOW = "__any";
+
+export interface SetDraft {
+  name: string;
+  description: string;
+  /** a workflow id, or ANY_WORKFLOW */
+  workflowId: string;
+}
+
+export const emptySetDraft = (): SetDraft => ({
+  name: "",
+  description: "",
+  workflowId: ANY_WORKFLOW,
+});
+
+/** The `POST /v1/evaluations/sets` body. */
+export function setBody(d: SetDraft): Record<string, unknown> {
+  return {
+    name: d.name.trim(),
+    description: d.description,
+    ...(d.workflowId !== ANY_WORKFLOW ? { workflowId: d.workflowId } : {}),
+  };
+}
+
+/** What the review of a new set says; set names are unique in a workspace (the API answers 409). */
+export function setReviewNotes(
+  d: SetDraft,
+  ctx: { existingNames: readonly string[]; workflowName: string | null },
+): Note[] {
+  const notes: Note[] = [];
+  const name = d.name.trim();
+  if (!name) notes.push({ id: "name", state: "blocker", message: "Give the set a name" });
+  else if (ctx.existingNames.includes(name))
+    notes.push({
+      id: "name-taken",
+      state: "blocker",
+      message: `A set named ${name} already exists: choose another name.`,
+    });
+  if (d.workflowId === ANY_WORKFLOW)
+    notes.push({
+      id: "any-workflow",
+      state: "info",
+      message:
+        "Not tied to a workflow: Add to evaluation on a run offers only sets tied to that run's workflow, cases are written as JSON rather than the workflow's input form, and every run of the set asks which workflow to test.",
+    });
+  else
+    notes.push({
+      id: "workflow",
+      state: "ok",
+      message: `Tests ${ctx.workflowName ?? "the chosen workflow"}: its runs can be added as cases, and new cases use its input form.`,
+    });
+  if (!d.description.trim())
+    notes.push({
+      id: "no-description",
+      state: "optional",
+      message:
+        "No description: a line on what the set protects helps when it fails months from now.",
+    });
+  return notes;
+}
+
+// ── cases ─────────────────────────────────────────────────────────────────────────────────────
+
+const has = (v: unknown): boolean =>
+  Array.isArray(v)
+    ? v.length > 0
+    : v !== null && typeof v === "object" && Object.keys(v).length > 0;
+
+/**
+ * The case checks nothing beyond the run finishing: no output, decision, branch, node, tool,
+ * outcome, human, latency or cost expectation. The scorer then only checks `status`, so the
+ * case passes whenever the run completes, whatever it answered.
+ */
+export function checksOnlyCompletion(expected: Record<string, unknown>): boolean {
+  return !(
+    has(expected.output) ||
+    has(expected.decisions) ||
+    has(expected.branches) ||
+    has(expected.requiredNodes) ||
+    has(expected.forbiddenNodes) ||
+    has(expected.requiredTools) ||
+    has(expected.forbiddenTools) ||
+    typeof expected.outcome === "string" ||
+    typeof expected.humanExpected === "boolean" ||
+    typeof expected.maxLatencyMs === "number" ||
+    typeof expected.maxCostUsd === "number"
+  );
+}
+
+/** The case asks a judge model to grade an output. */
+export function usesJudge(expected: Record<string, unknown>): boolean {
+  return (
+    Array.isArray(expected.output) &&
+    expected.output.some(
+      (o) =>
+        o !== null &&
+        typeof o === "object" &&
+        (o as { matcher?: { type?: unknown } }).matcher?.type === "judge",
+    )
+  );
+}
+
+const ESCALATION_TAG = /escalat|human|review|handoff|hand-off/i;
+
+/** The judge message the scorer writes when the worker has no judge model. */
+export const NO_JUDGE = "no judge provider is configured";
+
+/** How well a set's cases cover the workflow, for the set's page. */
+export function caseCoverage(cases: readonly EvaluationCase[]): Note[] {
+  const n = cases.length;
+  if (n === 0) return [];
+  const notes: Note[] = [];
+  const weak = cases.filter((c) => checksOnlyCompletion(c.expected)).length;
+  notes.push(
+    weak
+      ? {
+          id: "weak",
+          state: "warning",
+          message: `${weak} of ${n} case${n === 1 ? "" : "s"} only check${weak === 1 ? "s" : ""} that the run finishes, so ${weak === 1 ? "it passes" : "they pass"} even when the answer is wrong. Add an output, decision or branch expectation.`,
+        }
+      : {
+          id: "weak",
+          state: "ok",
+          message: "Every case checks the answer, not only that the run finishes.",
+        },
+  );
+  const fromRuns = cases.filter((c) => c.sourceRunId).length;
+  notes.push(
+    fromRuns
+      ? {
+          id: "from-runs",
+          state: "ok",
+          message: `${fromRuns} of ${n} taken from real runs.`,
+        }
+      : {
+          id: "from-runs",
+          state: "optional",
+          message:
+            "None taken from real runs yet: open a finished run of the workflow and choose Add to evaluation to capture a real input with its decisions and branches.",
+        },
+  );
+  const tags = [...new Set(cases.flatMap((c) => c.tags))].sort();
+  notes.push(
+    tags.length
+      ? { id: "tags", state: "ok", message: `Tagged: ${tags.join(", ")}.` }
+      : {
+          id: "tags",
+          state: "optional",
+          message:
+            "No tags: tagging cases typical, edge or escalate shows at a glance which kind of request is failing.",
+        },
+  );
+  const escalates = cases.some(
+    (c) => c.expected.humanExpected === true || c.tags.some((t) => ESCALATION_TAG.test(t)),
+  );
+  if (!escalates)
+    notes.push({
+      id: "escalation",
+      state: "optional",
+      message:
+        "No case expects the workflow to ask a person. If some requests must be escalated, add one with “humanExpected”: true.",
+    });
+  const judged = cases.filter((c) => usesJudge(c.expected)).length;
+  if (judged)
+    notes.push({
+      id: "judge",
+      state: "warning",
+      message: `${judged} case${judged === 1 ? " uses" : "s use"} a judge check. The evaluation worker in this release has no judge model configured, so judge checks fail with “${NO_JUDGE}”.`,
+    });
+  return notes;
+}
+
+// ── reports ───────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * How to read a finished report: runs that finished against cases that passed, and what else
+ * limits what the pass rate says. `weakCases` are the ids of cases that only check completion.
+ */
+export function reportReading(
+  summary: EvaluationSummary,
+  results: readonly CaseResultRow[],
+  weakCases: ReadonlySet<string>,
+): Note[] {
+  const n = summary.cases;
+  if (n === 0) return [];
+  const notes: Note[] = [];
+  const finished = Math.round(summary.completionRate * n);
+  notes.push(
+    finished === n
+      ? { id: "finished", state: "ok", message: `All ${n} runs finished.` }
+      : {
+          id: "finished",
+          state: "warning",
+          message: `${finished} of ${n} runs finished; the others failed, timed out, were cancelled or could not start, and fail their status check. Open one to see its error before reading anything else.`,
+        },
+  );
+  notes.push({
+    id: "passed",
+    state: summary.passed === n ? "ok" : "info",
+    message: `${summary.passed} of ${n} cases met every expectation. A finished run with a wrong answer counts as a failure.`,
+  });
+  const weakPasses = results.filter((r) => r.passed && weakCases.has(r.caseId)).length;
+  if (weakPasses)
+    notes.push({
+      id: "weak",
+      state: "warning",
+      message: `${weakPasses} of the passing cases only check that the run finishes: their pass says nothing about the answer.`,
+    });
+  const judgeless = results.filter((r) => r.checks.some((c) => c.message === NO_JUDGE)).length;
+  if (judgeless)
+    notes.push({
+      id: "judge",
+      state: "warning",
+      message: `${judgeless} case${judgeless === 1 ? " has" : "s have"} judge checks that could not run (no judge model is configured for evaluations), so ${judgeless === 1 ? "it fails" : "they fail"} whatever the answer.`,
+    });
+  const escalated = results.filter((r) => r.metrics?.humanRequested).length;
+  if (escalated)
+    notes.push({
+      id: "human",
+      state: "info",
+      message: `${escalated} run${escalated === 1 ? "" : "s"} asked a person; the evaluation answered from the case (approve unless the case says otherwise), so no one was actually asked.`,
+    });
+  return notes;
+}

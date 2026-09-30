@@ -77,3 +77,45 @@ export function keySource(type: string, sources: KeySources, required = false): 
   if (sources.saved.includes(type)) return { kind: "saved" };
   return { kind: "missing" };
 }
+
+export interface SecretDeclaration {
+  name: string;
+  credentialType: string;
+  required: boolean;
+}
+
+/**
+ * Keys a newly added step can use without asking: each required slot binds to a secret the
+ * workflow already declares for it, or, when the server has the key (or none is needed), to a new
+ * optional secret, the same way the "Add a key" dialog declares one. Slots nothing answers stay
+ * unbound, so the step still says what it needs.
+ */
+export function autoBindSlots(
+  slots: readonly { name: string; types: readonly string[]; required?: boolean }[],
+  secrets: readonly SecretDeclaration[],
+  sources: KeySources,
+): { credentials: Record<string, string>; declare: SecretDeclaration[] } {
+  const credentials: Record<string, string> = {};
+  const declare: SecretDeclaration[] = [];
+  const all = () => [...secrets, ...declare];
+  for (const slot of slots) {
+    if (!slot.required) continue;
+    const existing = all().find((x) => slot.types.includes(x.credentialType));
+    if (existing) {
+      credentials[slot.name] = existing.name;
+      continue;
+    }
+    const type = slot.types.find((t) => {
+      const kind = keySource(t, sources).kind;
+      return kind === "server" || kind === "none";
+    });
+    if (!type) continue;
+    const name = suggestSecretName(
+      type,
+      all().map((x) => x.name),
+    );
+    declare.push({ name, credentialType: type, required: false });
+    credentials[slot.name] = name;
+  }
+  return { credentials, declare };
+}

@@ -9,6 +9,9 @@ import { Button, EmptyState, toast } from "@flowaid/ui/primitives";
 import { ApprovalsTable } from "@flowaid/ui/data";
 import { PageHeader } from "@flowaid/ui/shell";
 import { get, post, qs } from "~/api/client";
+import { HUMAN_TASKS } from "~/guide/capabilities/humanTasks";
+import { PageIntro } from "~/guide/PageIntro";
+import type { Check } from "~/guide/Readiness";
 import { useSession } from "~/session";
 import { AppFrame, PageBody } from "~/shell/AppFrame";
 import { ErrorPanel, errorMessage } from "~/shell/states";
@@ -66,6 +69,18 @@ function Inbox() {
     onError: (e) => toast.error(errorMessage(e)),
   });
 
+  const canAnswer = s.can("runs:approve");
+  const checks: Check[] = [
+    canAnswer
+      ? { id: "role", label: "Your role can answer tasks", state: "ok" }
+      : {
+          id: "role",
+          label: "Your role can see tasks but not answer them",
+          state: "info",
+          detail: "Answering needs the approve permission (runs:approve).",
+        },
+  ];
+
   const setTab = (id: string) =>
     router.replace(id === "open" ? pathname : `${pathname}?tab=${id}`, { scroll: false });
   const open = (id: string) => router.push(`/${s.ws}/human-tasks/${id}`);
@@ -98,6 +113,7 @@ function Inbox() {
         tab={tab}
         onTabChange={setTab}
       />
+      <PageIntro guide={HUMAN_TASKS} checks={checks} defaultCollapsed={items.length > 0} />
       <div className="mt-4 flex flex-col gap-3">
         {tasks.isError ? (
           <ErrorPanel error={tasks.error} onRetry={() => void tasks.refetch()} />

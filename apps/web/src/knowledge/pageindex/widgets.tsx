@@ -11,7 +11,7 @@ import { useId } from "react";
 import { X } from "lucide-react";
 import { Checkbox, IconButton, Input, Select, SelectItem } from "@flowaid/ui/primitives";
 import { TextWidget, primaryType, registerWidget, type SchemaWidgetProps } from "@flowaid/ui/forms";
-import { currentWorkspace, get } from "~/api/client";
+import { currentWorkspace, get, getAll } from "~/api/client";
 import type { KnowledgeSource } from "../model";
 import type { DocumentSummary } from "./model";
 
@@ -27,7 +27,7 @@ interface Option {
 function usePageIndexSources() {
   return useQuery({
     queryKey: ["knowledge-sources", currentWorkspace()],
-    queryFn: () => get<KnowledgeSource[]>("/v1/knowledge/sources"),
+    queryFn: () => getAll<KnowledgeSource>("/v1/knowledge/sources"),
     select: (rows) => rows.filter((s) => s.kind === "pageindex"),
     staleTime: 30_000,
   });

@@ -6,7 +6,7 @@
  */
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Play } from "lucide-react";
 import { Button, EmptyState, toast } from "@flowaid/ui/primitives";
 import {
@@ -25,6 +25,7 @@ import { useSession } from "~/session";
 import { ErrorPanel, errorMessage } from "~/shell/states";
 import { toEnvironmentViews } from "~/views";
 import { useVersionNumbers, useWorkflowNames } from "./api";
+import { RunActionDialog, type RunActionRequest } from "./RunActionDialog";
 import { SavedViewsMenu } from "./SavedViewsMenu";
 import { isActiveRun, toRunRow } from "./views";
 
@@ -93,11 +94,17 @@ export function RunsList({ workflowId }: { workflowId?: string }) {
     },
     onError: (e) => toast.error(errorMessage(e)),
   });
-  const replay = useMutation({
-    mutationFn: (id: string) => post<{ run_id: string }>(`/v1/runs/${id}/replay`, {}),
-    onSuccess: (r) => router.push(`/${s.ws}/runs/${r.run_id}`),
-    onError: (e) => toast.error(errorMessage(e)),
-  });
+  // replay re-executes (and may pay for) every step, so a row's Replay asks first
+  const [replaying, setReplaying] = useState<string | null>(null);
+  const replay = async ({ path, body }: RunActionRequest) => {
+    try {
+      const r = await post<{ run_id: string }>(path, body ?? {});
+      router.push(`/${s.ws}/runs/${r.run_id}`);
+    } catch (e) {
+      toast.error(errorMessage(e));
+      throw e;
+    }
+  };
 
   const facets: RunFilterFacet[] = workflowId
     ? ["status", "environment", "origin", "range"]
@@ -118,7 +125,7 @@ export function RunsList({ workflowId }: { workflowId?: string }) {
         rowHref={(r) => `/${s.ws}/runs/${r.id}`}
         {...(workflowId ? { defaultColumnVisibility: { workflowName: false } } : {})}
         {...(s.can("runs:cancel") ? { onCancel: (r) => cancel.mutate(r.id) } : {})}
-        {...(s.can("runs:replay") ? { onReplay: (r) => replay.mutate(r.id) } : {})}
+        {...(s.can("runs:replay") ? { onReplay: (r) => setReplaying(r.id) } : {})}
         toolbar={
           <FilterBar
             value={filters}
@@ -159,6 +166,16 @@ export function RunsList({ workflowId }: { workflowId?: string }) {
         }
         aria-label="Runs"
       />
+      {replaying ? (
+        <RunActionDialog
+          runId={replaying}
+          action={{ kind: "replay" }}
+          onOpenChange={(open) => {
+            if (!open) setReplaying(null);
+          }}
+          onSubmit={replay}
+        />
+      ) : null}
       {runs.hasNextPage ? (
         <div className="flex justify-center">
           <Button

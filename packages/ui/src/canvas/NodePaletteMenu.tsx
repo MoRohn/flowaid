@@ -58,6 +58,8 @@ export interface NodePaletteMenuProps {
   side?: "bottom" | "right" | "top" | "left";
   align?: "start" | "center" | "end";
   className?: string;
+  /** Where focus goes when the menu closes; it has no trigger to return to (Radix `onCloseAutoFocus`). */
+  onCloseAutoFocus?: (event: Event) => void;
 }
 
 /**
@@ -81,6 +83,7 @@ export function NodePaletteMenu({
   side = "bottom",
   align = "start",
   className,
+  onCloseAutoFocus,
 }: NodePaletteMenuProps) {
   const [query, setQuery] = useState("");
 
@@ -141,6 +144,7 @@ export function NodePaletteMenu({
         sideOffset={anchor ? 6 : 0}
         className={cn("overflow-hidden", className)}
         aria-label="Add node"
+        {...(onCloseAutoFocus ? { onCloseAutoFocus } : {})}
       >
         <Cmdk
           label="Add node"

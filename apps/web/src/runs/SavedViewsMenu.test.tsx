@@ -4,7 +4,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { installDomStubs } from "@/primitives/testStubs";
 import { SavedViewsMenu, type SavedView } from "./SavedViewsMenu";
 
-const api = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), del: vi.fn() }));
+const api = vi.hoisted(() => ({ getAll: vi.fn(), post: vi.fn(), del: vi.fn() }));
 vi.mock("~/api/client", async (actual) => ({
   ...(await actual<Record<string, unknown>>()),
   ...api,
@@ -13,7 +13,7 @@ vi.mock("~/api/client", async (actual) => ({
 beforeAll(() => installDomStubs());
 afterEach(() => {
   cleanup();
-  api.get.mockReset();
+  api.getAll.mockReset();
   api.post.mockReset();
   api.del.mockReset();
 });
@@ -42,7 +42,7 @@ const renderMenu = (query: string, onApply = vi.fn()) => {
 
 describe("SavedViewsMenu", () => {
   it("names the view the filters match and applies another", async () => {
-    api.get.mockResolvedValue(VIEWS);
+    api.getAll.mockResolvedValue(VIEWS);
     const onApply = renderMenu("status=failed");
     const trigger = await screen.findByRole("button", { name: "Saved views" });
     await waitFor(() => expect(trigger.textContent).toContain("Failed"));
@@ -52,7 +52,7 @@ describe("SavedViewsMenu", () => {
   });
 
   it("saves the current filters under a name", async () => {
-    api.get.mockResolvedValue([]);
+    api.getAll.mockResolvedValue([]);
     api.post.mockResolvedValue({ ...VIEWS[0], name: "Mine" });
     renderMenu("origin=webhook");
     open(await screen.findByRole("button", { name: "Saved views" }));

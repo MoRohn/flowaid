@@ -4,7 +4,13 @@ import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { and, asc, eq } from "drizzle-orm";
-import { connectSession, discoverTools, evaluatePolicy, type McpServerConfig } from "@flowaid/mcp";
+import {
+  connectSession,
+  discoverTools,
+  evaluatePolicy,
+  planStdioSpawn,
+  type McpServerConfig,
+} from "@flowaid/mcp";
 import {
   OpenApiImportError,
   executeOperation,
@@ -35,9 +41,9 @@ import {
   type ToolDefinition,
 } from "@flowaid/workflow-core";
 import { generateApiKey } from "../auth/apiKey.js";
-import type { Principal } from "../auth/principal.js";
+import { hasScope, type Principal } from "../auth/principal.js";
 import type { ApiContext } from "../context.js";
-import { IdParams, NoContent } from "../dto/common.js";
+import { IdParams, NoContent, PageQuery, afterCursor, toPage } from "../dto/common.js";
 import { ApiKeyCreatedSchema } from "../dto/identity.js";
 
 type ToolRow = typeof tools.$inferSelect;
@@ -114,19 +120,22 @@ export function toolRoutes(app: FastifyInstance, ctx: ApiContext): void {
         scope: "tools:read",
         cli: { noun: "tool", verb: "list" },
       },
-      schema: { tags: ["tools"] },
+      schema: { tags: ["tools"], querystring: PageQuery },
     },
     async (req) => {
       const p = need(req.principal);
-      return (
-        await ctx.db.tenant(p.workspaceId, (tx) =>
-          tx
-            .select()
-            .from(tools)
-            .where(eq(tools.workspaceId, p.workspaceId))
-            .orderBy(asc(tools.name)),
-        )
-      ).map(toolDto);
+      const { limit, cursor } = req.query;
+      const rows = await ctx.db.tenant(p.workspaceId, (tx) =>
+        tx
+          .select()
+          .from(tools)
+          .where(
+            and(eq(tools.workspaceId, p.workspaceId), afterCursor(tools.name, tools.id, cursor)),
+          )
+          .orderBy(asc(tools.name), asc(tools.id))
+          .limit(limit + 1),
+      );
+      return toPage(rows, limit, (t) => [t.name, t.id], toolDto);
     },
   );
 
@@ -418,6 +427,26 @@ export function toolRoutes(app: FastifyInstance, ctx: ApiContext): void {
     if (!s) throw new NotFoundError("MCP server not found");
     return s;
   };
+  /**
+   * A stdio server is an arbitrary process on the worker, so registering or changing one needs the
+   * `admin` scope, and its command, arguments and environment must pass the worker's spawn policy
+   * now instead of being stored and refused at run time (ARCHITECTURE.md §10.2).
+   */
+  const checkStdio = (
+    p: Principal,
+    s: { command?: string | null; args?: string[] | null; env?: Record<string, string> | null },
+  ) => {
+    if (!hasScope(p, "admin"))
+      throw new ForbiddenError("registering a stdio MCP server needs the admin scope");
+    if (!s.command) throw new BadRequestError("command is required for stdio servers");
+    const policy = ctx.config.mcpStdio;
+    const unlisted = Object.keys(s.env ?? {}).filter((n) => !policy.envAllowlist.includes(n));
+    if (unlisted.length)
+      throw new BadRequestError(
+        `environment variables not in FLOWAID_MCP_STDIO_ENV_ALLOWLIST: ${unlisted.join(", ")}`,
+      );
+    planStdioSpawn(policy, { command: s.command, args: s.args ?? [], env: s.env ?? {} });
+  };
   const configOf = (s: McpRow): McpServerConfig => ({
     id: s.id,
     name: s.name,
@@ -448,19 +477,25 @@ export function toolRoutes(app: FastifyInstance, ctx: ApiContext): void {
         scope: "mcp:read",
         cli: { noun: "mcp-server", verb: "list" },
       },
-      schema: { tags: ["mcp"] },
+      schema: { tags: ["mcp"], querystring: PageQuery },
     },
     async (req) => {
       const p = need(req.principal);
-      return (
-        await ctx.db.tenant(p.workspaceId, (tx) =>
-          tx
-            .select()
-            .from(mcpServers)
-            .where(eq(mcpServers.workspaceId, p.workspaceId))
-            .orderBy(asc(mcpServers.name)),
-        )
-      ).map(mcpDto);
+      const { limit, cursor } = req.query;
+      const rows = await ctx.db.tenant(p.workspaceId, (tx) =>
+        tx
+          .select()
+          .from(mcpServers)
+          .where(
+            and(
+              eq(mcpServers.workspaceId, p.workspaceId),
+              afterCursor(mcpServers.name, mcpServers.id, cursor),
+            ),
+          )
+          .orderBy(asc(mcpServers.name), asc(mcpServers.id))
+          .limit(limit + 1),
+      );
+      return toPage(rows, limit, (s) => [s.name, s.id], mcpDto);
     },
   );
 
@@ -480,8 +515,7 @@ export function toolRoutes(app: FastifyInstance, ctx: ApiContext): void {
       const b = req.body;
       if (b.transport !== "stdio" && !b.url)
         throw new BadRequestError("url is required for HTTP transports");
-      if (b.transport === "stdio" && !b.command)
-        throw new BadRequestError("command is required for stdio servers");
+      if (b.transport === "stdio") checkStdio(p, b);
       const row = await ctx.db.tenant(p.workspaceId, async (tx) => {
         await credentialOf(tx, p, b.credentialId);
         const [dup] = await tx
@@ -548,7 +582,18 @@ export function toolRoutes(app: FastifyInstance, ctx: ApiContext): void {
       const p = need(req.principal);
       const b = req.body;
       const row = await ctx.db.tenant(p.workspaceId, async (tx) => {
-        await loadServer(tx, p, req.params.id);
+        const cur = await loadServer(tx, p, req.params.id);
+        const touchesStdio =
+          b.transport !== undefined ||
+          b.command !== undefined ||
+          b.args !== undefined ||
+          b.env !== undefined;
+        if (touchesStdio && (b.transport ?? cur.transport) === "stdio")
+          checkStdio(p, {
+            command: b.command !== undefined ? b.command : cur.command,
+            args: b.args !== undefined ? b.args : cur.args,
+            env: b.env !== undefined ? b.env : cur.env,
+          });
         await credentialOf(tx, p, b.credentialId);
         const [u] = await tx
           .update(mcpServers)
@@ -802,27 +847,39 @@ export function toolRoutes(app: FastifyInstance, ctx: ApiContext): void {
         scope: "mcp:read",
         cli: { noun: "mcp-exposure", verb: "list" },
       },
-      schema: { tags: ["mcp"] },
+      schema: { tags: ["mcp"], querystring: PageQuery },
     },
     async (req) => {
       const p = need(req.principal);
+      const { limit, cursor } = req.query;
       const rows = await ctx.db.tenant(p.workspaceId, (tx) =>
         tx
           .select()
           .from(mcpExposures)
-          .where(eq(mcpExposures.workspaceId, p.workspaceId))
-          .orderBy(asc(mcpExposures.toolName)),
+          .where(
+            and(
+              eq(mcpExposures.workspaceId, p.workspaceId),
+              afterCursor(mcpExposures.toolName, mcpExposures.id, cursor),
+            ),
+          )
+          .orderBy(asc(mcpExposures.toolName), asc(mcpExposures.id))
+          .limit(limit + 1),
       );
       const url = `${ctx.config.baseUrl.replace(/\/$/, "")}/mcp/${p.workspaceSlug}`;
-      return rows.map((e) => ({
-        id: e.id,
-        workflowId: e.workflowId,
-        environmentId: e.environmentId,
-        toolName: e.toolName,
-        description: e.description,
-        enabled: e.enabled,
-        url,
-      }));
+      return toPage(
+        rows,
+        limit,
+        (e) => [e.toolName, e.id],
+        (e) => ({
+          id: e.id,
+          workflowId: e.workflowId,
+          environmentId: e.environmentId,
+          toolName: e.toolName,
+          description: e.description,
+          enabled: e.enabled,
+          url,
+        }),
+      );
     },
   );
 

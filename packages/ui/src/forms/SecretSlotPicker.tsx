@@ -30,7 +30,14 @@ export function secretsForSlot(slot: CredentialSlot, secrets: readonly SecretDec
 }
 
 /** A credential slot's display name: `llm` → "LLM", `api_token` → "Api token". */
+const SLOT_NAMES: Record<string, string> = {
+  typesafe: "TypeSafe",
+  openai: "OpenAI",
+  github: "GitHub",
+};
+
 export function humanizeSlot(name: string): string {
+  if (SLOT_NAMES[name]) return SLOT_NAMES[name];
   // short acronyms (llm, mcp, api) read as such
   if (/^[a-z]{2,3}$/.test(name)) return name.toUpperCase();
   const spaced = name.replace(/_+/g, " ").trim();

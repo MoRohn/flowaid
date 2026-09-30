@@ -6,7 +6,7 @@ import { useMemo, useState } from "react";
 import { Badge, Card, SearchInput, ToggleGroup, ToggleGroupItem } from "@flowaid/ui/primitives";
 import { DataTable, createDataTableColumns, type DataTableColumns } from "@flowaid/ui/data";
 import { formatCompactNumber } from "@flowaid/ui/lib";
-import { get } from "~/api/client";
+import { get, getAll } from "~/api/client";
 import { useSession } from "~/session";
 import type { Credential, ModelInfo, Provider } from "../types";
 import { QueryView, Section } from "../ui";
@@ -38,7 +38,7 @@ export function ProvidersTab() {
   });
   const creds = useQuery({
     queryKey: ["credentials", s.ws],
-    queryFn: () => get<Credential[]>("/v1/credentials"),
+    queryFn: () => getAll<Credential>("/v1/credentials"),
     enabled: s.can("credentials:read"),
   });
   const credCount = (provider: string) =>
@@ -114,7 +114,7 @@ export function ProvidersTab() {
     <div className="flex flex-col gap-5">
       <Section
         title="Providers"
-        description="Server-wide keys come from the environment; workspace keys are credentials bound per workflow."
+        description="A provider is ready when it has a key: set on the server in FlowAId's environment, or stored as a credential under Credentials. Steps and agents can only use models of a ready provider."
       >
         <QueryView query={providers} rows={2}>
           {(rows) => (
@@ -142,7 +142,8 @@ export function ProvidersTab() {
                         className="text-xs text-accent-text hover:underline"
                         href={`/${s.ws}/credentials`}
                       >
-                        Add a {PROVIDER_NAME[p.id] ?? p.id} credential
+                        Add {/^[aeiou]/i.test(PROVIDER_NAME[p.id] ?? p.id) ? "an" : "a"}{" "}
+                        {PROVIDER_NAME[p.id] ?? p.id} credential
                       </Link>
                     ) : null}
                   </Card>
@@ -154,7 +155,7 @@ export function ProvidersTab() {
       </Section>
       <Section
         title="Models"
-        description="Every model the provider registry knows, with list prices per million tokens."
+        description="Every model the provider registry knows, with the providers' list prices per million tokens. What a run actually costs shows in its trace."
       >
         <QueryView query={models}>
           {() => (

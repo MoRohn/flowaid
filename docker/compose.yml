@@ -122,6 +122,8 @@ services:
       # `pnpm start` on your own computer, and the api container never sees loopback callers
       FLOWAID_AUTH_MODE: ${FLOWAID_AUTH_MODE:-password}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://flowaid.localhost:3000}
+      # the api refuses to register a stdio MCP server the worker would not spawn
+      MCP_STDIO_ENABLED: ${MCP_STDIO_ENABLED:-false}
       # Owner connection used only for migrations (DATABASE.md).
       DATABASE_ADMIN_URL: postgres://${POSTGRES_USER:-flowaid}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env (openssl rand -hex 16)}@postgres:5432/${POSTGRES_DB:-flowaid}
     ports:

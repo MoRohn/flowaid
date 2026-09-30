@@ -9,7 +9,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useSyncExternalStore, type ReactNode } from "react";
 import { Check, ExternalLink, X } from "lucide-react";
 import { Badge, Button, IconButton, ProgressBar } from "@flowaid/ui/primitives";
-import { get } from "~/api/client";
+import { get, getAll } from "~/api/client";
 import type { Page, WorkflowSummary } from "~/api/types";
 import { useSession } from "~/session";
 import { HELP, PROVIDER_KEY_URL } from "~/shell/help";
@@ -167,7 +167,7 @@ export function GettingStarted() {
   });
   const credentials = useQuery({
     queryKey: ["credentials", s.ws],
-    queryFn: () => get<{ type: string }[]>("/v1/credentials"),
+    queryFn: () => getAll<{ type: string }>("/v1/credentials"),
     enabled: s.can("credentials:read"),
   });
   const workflows = useQuery({
@@ -186,7 +186,7 @@ export function GettingStarted() {
   });
   const keys = useQuery({
     queryKey: ["api-keys", s.ws],
-    queryFn: () => get<{ id: string }[]>("/v1/api-keys"),
+    queryFn: () => getAll<{ id: string }>("/v1/api-keys"),
     enabled: s.can("api_keys:manage"),
   });
 

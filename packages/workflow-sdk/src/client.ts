@@ -25,6 +25,7 @@ import {
   type RunAccepted,
   type RunCompleted,
   type RunRequest,
+  type VersionSummary,
 } from "./types.js";
 
 export interface RunCallOptions extends Omit<RunRequest, "input"> {
@@ -128,7 +129,13 @@ export class Flowaid {
       ),
     publish: (id: string, body: { notes?: string; label?: string; deployTo?: string[] } = {}) =>
       this.api.post("/v1/workflows/{id}/publish", { path: { id }, body }),
-    versions: (id: string) => this.api.get("/v1/workflows/{id}/versions", { path: { id } }),
+    /** One page of the published versions, newest first (`limit`, `cursor`). */
+    versions: (id: string, query: { limit?: number; cursor?: string } = {}) =>
+      this.transport.request<Page<VersionSummary>>(
+        "GET",
+        `/v1/workflows/${encodeURIComponent(id)}/versions`,
+        { query },
+      ),
     deploy: (id: string, environmentId: string, versionId: string) =>
       this.api.put("/v1/workflows/{id}/deployments/{environmentId}", {
         path: { id, environmentId },
@@ -178,13 +185,9 @@ export class Flowaid {
       let path: string;
       if (o.version === "draft") path = `/v1/workflows/${id}/draft/export/package`;
       else {
-        const versions = await this.transport.request<{ id: string; version: number }[]>(
-          "GET",
-          `/v1/workflows/${id}/versions`,
-        );
-        const match = versions.find((v) => v.version === o.version);
-        if (!match) throw new Error(`workflow ${id} has no version ${o.version}`);
-        path = `/v1/workflow-versions/${match.id}/export/package`;
+        const versionId = await this.versionId(id, o.version);
+        if (!versionId) throw new Error(`workflow ${id} has no version ${o.version}`);
+        path = `/v1/workflow-versions/${versionId}/export/package`;
       }
       const { job_id } = await this.transport.request<{ job_id: string }>("POST", path, {
         body,
@@ -320,6 +323,19 @@ export class Flowaid {
         this.pollEvaluation(id, o),
     },
   };
+
+  /** The id of published version `n`, walking the (newest-first) pages until it is passed. */
+  private async versionId(workflowId: string, n: number): Promise<string | undefined> {
+    let cursor: string | undefined;
+    do {
+      const page = await this.workflows.versions(workflowId, { limit: 200, cursor });
+      const match = page.items.find((v) => v.version === n);
+      if (match) return match.id;
+      if (page.items.some((v) => v.version !== null && v.version < n)) return undefined;
+      cursor = page.next_cursor ?? undefined;
+    } while (cursor);
+    return undefined;
+  }
 
   private async *pollWorkflowRuns(workflowId: string, o: PollOptions): AsyncGenerator<Run> {
     const last = new Map<string, string>();

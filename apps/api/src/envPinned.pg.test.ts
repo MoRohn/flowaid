@@ -89,9 +89,9 @@ describeDb("API keys pinned to an environment stay in it (Postgres)", () => {
       });
     const devCred = (await create("dev-only", envs.dev)).json().id as string;
     const shared = (await create("shared")).json().id as string;
-    const names = ((await asKey("GET", "/v1/credentials")).json() as { name: string }[]).map(
-      (c) => c.name,
-    );
+    const names = (
+      (await asKey("GET", "/v1/credentials")).json() as { items: { name: string }[] }
+    ).items.map((c) => c.name);
     expect(names).toContain("shared");
     expect(names).not.toContain("dev-only");
     expect(

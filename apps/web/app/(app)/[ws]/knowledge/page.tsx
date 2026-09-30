@@ -5,8 +5,14 @@ import { BookOpen, Plus } from "lucide-react";
 import { Badge, Button, Card, EmptyState } from "@flowaid/ui/primitives";
 import { RelativeTime } from "@flowaid/ui/data";
 import { PageHeader } from "@flowaid/ui/shell";
-import { get } from "~/api/client";
+import { get, getAll } from "~/api/client";
+import type { ModelInfo } from "~/admin/types";
+import { providerName } from "~/admin/providerNames";
 import { QueryView, useOpenFromQuery } from "~/admin/ui";
+import { KNOWLEDGE } from "~/guide/capabilities/knowledge";
+import { PageIntro } from "~/guide/PageIntro";
+import type { Check } from "~/guide/Readiness";
+import { useConnections } from "~/guide/useConnections";
 import {
   KIND_LABEL,
   countsLine,
@@ -26,7 +32,7 @@ export default function KnowledgePage() {
   const canWrite = s.can("knowledge:write");
   const sources = useQuery({
     queryKey: ["knowledge-sources", s.ws],
-    queryFn: () => get<KnowledgeSource[]>("/v1/knowledge/sources"),
+    queryFn: () => getAll<KnowledgeSource>("/v1/knowledge/sources"),
     refetchInterval: (q) =>
       q.state.data?.some(
         (x) => !isPageIndexKind(x.kind) && (x.status === "syncing" || x.status === "new"),
@@ -34,6 +40,58 @@ export default function KnowledgePage() {
         ? 3000
         : false,
   });
+  const connections = useConnections();
+  const models = useQuery({
+    queryKey: ["models", s.ws],
+    queryFn: () => get<ModelInfo[]>("/v1/models"),
+  });
+  const embedders = [
+    ...new Set(
+      (models.data ?? [])
+        .filter((m) => m.kind === "embedding" && !m.deprecated)
+        .map((m) => m.provider),
+    ),
+  ];
+  const readyEmbedders = embedders.filter(connections.ready);
+  const checks: Check[] = [
+    connections.loading || models.isPending
+      ? { id: "embedding", label: "An embedding key", state: "checking" }
+      : readyEmbedders.length
+        ? {
+            id: "embedding",
+            label: `Meaning search ready: ${readyEmbedders.map(providerName).join(", ")}`,
+            state: "ok",
+          }
+        : {
+            id: "embedding",
+            label: "An embedding key, to search by meaning",
+            state: "optional",
+            detail: `Without one, new sources search by keywords only.${connections.partial ? " Keys stored as credentials are not visible to your role." : ""}`,
+            fix: (
+              <a className="text-accent-text hover:underline" href={`/${s.ws}/credentials`}>
+                Add an OpenAI or Gemini key under Credentials
+              </a>
+            ),
+          },
+    s.features.pageindex === true
+      ? { id: "pageindex", label: "PageIndex service available for PDFs", state: "ok" }
+      : {
+          id: "pageindex",
+          label: "PageIndex service, for PDFs indexed by section",
+          state: "optional",
+          detail: "Not configured on this server. Other kinds of source work without it.",
+          fix: <LearnMore href={HELP.pageindexSetup} label="Setup guide" />,
+        },
+    ...(canWrite
+      ? []
+      : [
+          {
+            id: "role",
+            label: "Your role can search sources but not create or change them",
+            state: "info",
+          } satisfies Check,
+        ]),
+  ];
   const newButton = canWrite ? (
     <Button
       variant="primary"
@@ -57,6 +115,11 @@ export default function KnowledgePage() {
           }
           actions={newButton}
         />
+        <PageIntro
+          guide={KNOWLEDGE}
+          checks={checks}
+          defaultCollapsed={(sources.data?.length ?? 0) > 0}
+        />
         <div className="mt-4">
           <QueryView query={sources}>
             {(rows) =>
@@ -64,7 +127,7 @@ export default function KnowledgePage() {
                 <EmptyState
                   icon={<BookOpen strokeWidth={1.5} />}
                   title="No knowledge sources"
-                  description="Create a source, add documents or point it at a site, then search it with the Knowledge base or Hybrid search nodes."
+                  description="Create a source, add documents or point it at a site, then search it with the Knowledge base or Hybrid search steps. New source walks through each setting."
                   primaryAction={newButton}
                 />
               ) : (
@@ -102,7 +165,7 @@ export default function KnowledgePage() {
           </QueryView>
         </div>
       </PageBody>
-      <NewSourceDialog open={creating} onOpenChange={setCreating} />
+      {creating ? <NewSourceDialog open onOpenChange={setCreating} /> : null}
     </AppFrame>
   );
 }

@@ -147,6 +147,29 @@ export const upload = <T>(
   });
 export const del = <T>(path: string, o?: RequestOptions) => api<T>("DELETE", path, o);
 
+/**
+ * Every item of a keyset-paged collection (`{ items, next_cursor }`), following the cursor 200 at a
+ * time; for pickers and lookups that need the whole set.
+ */
+export async function getAll<T>(
+  path: string,
+  params: Record<string, string | number | boolean | undefined | null> = {},
+  o?: RequestOptions,
+): Promise<T[]> {
+  const out: T[] = [];
+  let cursor: string | null = null;
+  for (let page = 0; page < 100; page++) {
+    const res: { items: T[]; next_cursor: string | null } = await get(
+      `${path}${qs({ ...params, limit: 200, cursor })}`,
+      o,
+    );
+    out.push(...res.items);
+    cursor = res.next_cursor;
+    if (!cursor) break;
+  }
+  return out;
+}
+
 /** `?a=1&b=2` from defined values only. */
 export function qs(params: Record<string, string | number | boolean | undefined | null>): string {
   const u = new URLSearchParams();

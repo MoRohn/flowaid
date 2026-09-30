@@ -149,7 +149,7 @@ export function ApprovalsTable({
     () =>
       helper.columns([
         helper.accessor("nodeName", {
-          header: "Node",
+          header: "Step",
           size: 200,
           minSize: 150,
           cell: ({ row }) => (

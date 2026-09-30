@@ -4,6 +4,7 @@
  * `plan.dataEdges`, positions from `definition.layout` (auto-laid out where missing).
  */
 import type {
+  DataDependency,
   ExecutionPlan,
   JsonSchema,
   NodeCategory,
@@ -12,6 +13,7 @@ import type {
   WorkflowNode,
 } from "@flowaid/workflow-core";
 import type { PortView, WorkflowEdgeView, WorkflowNodeView } from "@flowaid/ui";
+import { bindingDataEdges } from "~/builder/model";
 import { autoLayout, toCanvasEdge, type CanvasEdge } from "@flowaid/ui/canvas";
 import {
   CONTROL_IN,
@@ -65,6 +67,7 @@ export function toNodeViews(
   plan: ExecutionPlan | undefined,
   catalog: Catalog,
 ): WorkflowNodeView[] {
+  const deps = dataDependencies(definition, plan);
   return definition.nodes.map((n) => {
     const planNode = plan?.nodes[n.id];
     const manifest = n.kind === "task" ? catalog.get(n.type) : undefined;
@@ -79,6 +82,7 @@ export function toNodeViews(
     if (n.kind === "task") for (const name of Object.keys(n.inputs)) addIn(port(name));
     if (n.kind === "output") addIn(port("value", definition.outputs, true));
     for (const d of planNode?.dataIn ?? []) addIn(port(d.to.port));
+    for (const d of deps) if (d.to.node === n.id) addIn(port(d.to.port));
 
     let outputs: PortView[];
     if (planNode)
@@ -88,6 +92,10 @@ export function toNodeViews(
         (definition.inputs as { properties?: Record<string, JsonSchema> }).properties ?? {};
       outputs = Object.entries(props).map(([name, schema]) => port(name, schema));
     } else outputs = (manifest?.outputs ?? []).map((p) => port(p.name, p.schema));
+    // a port only the bindings name (a task's declared output) still needs a handle for its edge
+    for (const d of deps)
+      if (d.from.node === n.id && !outputs.some((o) => o.id === d.from.port))
+        outputs.push(port(d.from.port));
 
     const view: WorkflowNodeView = {
       id: n.id,
@@ -102,13 +110,35 @@ export function toNodeViews(
     else if (n.description) view.description = n.description;
     if (n.parent) view.parent = n.parent;
     if (n.disabled) view.disabled = true;
-    if (planNode && planNode.controlOut.length > 0)
-      view.routes = planNode.controlOut.map((p) => ({ id: p, label: p.replace(/_/g, " ") }));
+    // the plan's control-outs plus every port an edge leaves from: without a plan (or with a
+    // stale one) a branch would otherwise draw only true/false and drop its case edges
+    const ctl = new Set(planNode?.controlOut ?? []);
+    for (const e of definition.edges) if (e.from.node === n.id) ctl.add(e.from.port);
+    if (ctl.size > 0)
+      view.routes = [...ctl].map((p) => ({
+        id: p,
+        label:
+          (n.kind === "branch" ? n.cases.find((c) => c.port === p)?.label : undefined) ??
+          p.replace(/_/g, " "),
+      }));
     return view;
   });
 }
 
-/** Control edges (definition) + data edges (plan), as canvas edge views. */
+/**
+ * The plan's data edges, or without a plan (the versions endpoint does not send one) the ones the
+ * bindings imply, as the builder draws them; one per port pair.
+ */
+function dataDependencies(definition: WorkflowDefinition, plan: ExecutionPlan | undefined) {
+  const byPair = new Map<string, DataDependency>();
+  for (const d of plan?.dataEdges ?? bindingDataEdges(definition)) {
+    const k = `${d.from.node}.${d.from.port}→${d.to.node}.${d.to.port}`;
+    if (!byPair.has(k)) byPair.set(k, d);
+  }
+  return [...byPair.values()];
+}
+
+/** Control edges (definition) + data edges (plan, else bindings), as canvas edge views. */
 export function toEdgeViews(
   definition: WorkflowDefinition,
   plan: ExecutionPlan | undefined,
@@ -122,7 +152,7 @@ export function toEdgeViews(
     targetHandle: CONTROL_IN,
     route: e.from.port,
   }));
-  const data: WorkflowEdgeView[] = (plan?.dataEdges ?? []).map((d) => ({
+  const data: WorkflowEdgeView[] = dataDependencies(definition, plan).map((d) => ({
     id: `d:${d.from.node}.${d.from.port}→${d.to.node}.${d.to.port}`,
     kind: "data",
     source: d.from.node,

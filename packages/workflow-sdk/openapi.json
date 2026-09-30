@@ -868,6 +868,18 @@
         "tags": ["workspaces"],
         "parameters": [
           {
+            "schema": { "default": 50, "type": "integer", "minimum": 1, "maximum": 200 },
+            "in": "query",
+            "name": "limit",
+            "required": false
+          },
+          {
+            "schema": { "type": "string", "maxLength": 500 },
+            "in": "query",
+            "name": "cursor",
+            "required": false
+          },
+          {
             "schema": {
               "type": "string",
               "format": "uuid",
@@ -887,27 +899,35 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "userId": {
-                        "type": "string",
-                        "format": "uuid",
-                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                      },
-                      "email": { "type": "string" },
-                      "name": { "type": "string" },
-                      "role": {
-                        "type": "string",
-                        "enum": ["owner", "admin", "editor", "operator", "viewer"]
-                      },
-                      "status": { "type": "string" },
-                      "joinedAt": { "type": "string" }
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "userId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "email": { "type": "string" },
+                          "name": { "type": "string" },
+                          "role": {
+                            "type": "string",
+                            "enum": ["owner", "admin", "editor", "operator", "viewer"]
+                          },
+                          "status": { "type": "string" },
+                          "joinedAt": { "type": "string" }
+                        },
+                        "required": ["userId", "email", "name", "role", "status", "joinedAt"],
+                        "additionalProperties": false
+                      }
                     },
-                    "required": ["userId", "email", "name", "role", "status", "joinedAt"],
-                    "additionalProperties": false
-                  }
+                    "next_cursor": { "type": ["string", "null"] }
+                  },
+                  "required": ["items", "next_cursor"],
+                  "additionalProperties": false
                 }
               }
             }
@@ -1247,6 +1267,20 @@
     "/v1/api-keys": {
       "get": {
         "tags": ["api-keys"],
+        "parameters": [
+          {
+            "schema": { "default": 50, "type": "integer", "minimum": 1, "maximum": 200 },
+            "in": "query",
+            "name": "limit",
+            "required": false
+          },
+          {
+            "schema": { "type": "string", "maxLength": 500 },
+            "in": "query",
+            "name": "cursor",
+            "required": false
+          }
+        ],
         "x-cli": { "noun": "api-key", "verb": "list" },
         "x-auth": "session_or_api_key",
         "x-scopes": ["api_keys:manage"],
@@ -1256,48 +1290,56 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "string",
-                        "format": "uuid",
-                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                      },
-                      "name": { "type": "string" },
-                      "prefix": { "type": "string" },
-                      "scopes": { "type": "array", "items": { "type": "string" } },
-                      "environmentId": { "type": ["string", "null"] },
-                      "workflowIds": {
-                        "anyOf": [
-                          { "type": "array", "items": { "type": "string" } },
-                          { "type": "null" }
-                        ]
-                      },
-                      "serviceAccount": { "type": "boolean" },
-                      "rateLimitPerMin": { "type": ["number", "null"] },
-                      "expiresAt": { "type": "string" },
-                      "lastUsedAt": { "type": ["string", "null"] },
-                      "revokedAt": { "type": ["string", "null"] },
-                      "createdAt": { "type": "string" }
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "name": { "type": "string" },
+                          "prefix": { "type": "string" },
+                          "scopes": { "type": "array", "items": { "type": "string" } },
+                          "environmentId": { "type": ["string", "null"] },
+                          "workflowIds": {
+                            "anyOf": [
+                              { "type": "array", "items": { "type": "string" } },
+                              { "type": "null" }
+                            ]
+                          },
+                          "serviceAccount": { "type": "boolean" },
+                          "rateLimitPerMin": { "type": ["number", "null"] },
+                          "expiresAt": { "type": "string" },
+                          "lastUsedAt": { "type": ["string", "null"] },
+                          "revokedAt": { "type": ["string", "null"] },
+                          "createdAt": { "type": "string" }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "prefix",
+                          "scopes",
+                          "environmentId",
+                          "workflowIds",
+                          "serviceAccount",
+                          "rateLimitPerMin",
+                          "expiresAt",
+                          "lastUsedAt",
+                          "revokedAt",
+                          "createdAt"
+                        ],
+                        "additionalProperties": false
+                      }
                     },
-                    "required": [
-                      "id",
-                      "name",
-                      "prefix",
-                      "scopes",
-                      "environmentId",
-                      "workflowIds",
-                      "serviceAccount",
-                      "rateLimitPerMin",
-                      "expiresAt",
-                      "lastUsedAt",
-                      "revokedAt",
-                      "createdAt"
-                    ],
-                    "additionalProperties": false
-                  }
+                    "next_cursor": { "type": ["string", "null"] }
+                  },
+                  "required": ["items", "next_cursor"],
+                  "additionalProperties": false
                 }
               }
             }
@@ -1470,7 +1512,54 @@
         "x-cli": { "noun": "node", "verb": "list" },
         "x-auth": "session_or_api_key",
         "x-scopes": ["workflows:read"],
-        "responses": { "200": { "description": "Default Response" } }
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "type": "string" },
+                      "version": { "type": "string" },
+                      "metadata": {
+                        "type": "object",
+                        "properties": {
+                          "name": { "type": "string" },
+                          "description": { "type": "string" },
+                          "category": { "type": "string" }
+                        },
+                        "required": ["name", "description", "category"],
+                        "additionalProperties": {}
+                      },
+                      "configSchema": {},
+                      "inputs": { "type": "array", "items": {} },
+                      "outputs": { "type": "array", "items": {} },
+                      "controlPorts": { "type": "array", "items": {} },
+                      "credentials": { "type": "array", "items": {} },
+                      "capabilities": { "type": "array", "items": { "type": "string" } }
+                    },
+                    "required": [
+                      "id",
+                      "version",
+                      "metadata",
+                      "configSchema",
+                      "inputs",
+                      "outputs",
+                      "controlPorts",
+                      "credentials",
+                      "capabilities"
+                    ],
+                    "additionalProperties": {}
+                  }
+                }
+              }
+            }
+          },
+          "304": { "description": "No content" }
+        }
       }
     },
     "/v1/nodes/{typeId}": {
@@ -1488,7 +1577,50 @@
         "x-cli": { "noun": "node", "verb": "get", "positional": ["typeId"] },
         "x-auth": "session_or_api_key",
         "x-scopes": ["workflows:read"],
-        "responses": { "200": { "description": "Default Response" } }
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string" },
+                    "version": { "type": "string" },
+                    "metadata": {
+                      "type": "object",
+                      "properties": {
+                        "name": { "type": "string" },
+                        "description": { "type": "string" },
+                        "category": { "type": "string" }
+                      },
+                      "required": ["name", "description", "category"],
+                      "additionalProperties": {}
+                    },
+                    "configSchema": {},
+                    "inputs": { "type": "array", "items": {} },
+                    "outputs": { "type": "array", "items": {} },
+                    "controlPorts": { "type": "array", "items": {} },
+                    "credentials": { "type": "array", "items": {} },
+                    "capabilities": { "type": "array", "items": { "type": "string" } }
+                  },
+                  "required": [
+                    "id",
+                    "version",
+                    "metadata",
+                    "configSchema",
+                    "inputs",
+                    "outputs",
+                    "controlPorts",
+                    "credentials",
+                    "capabilities"
+                  ],
+                  "additionalProperties": {}
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/v1/tools/catalog": {
@@ -1498,7 +1630,47 @@
         "x-cli": { "noun": "tool", "verb": "catalog" },
         "x-auth": "session_or_api_key",
         "x-scopes": ["workflows:read"],
-        "responses": { "200": { "description": "Default Response" } }
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": { "type": "string" },
+                      "description": { "type": "string" },
+                      "inputSchema": {},
+                      "outputSchema": {},
+                      "approvalRequired": { "type": "boolean" },
+                      "source": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": ["mcp", "openapi", "workflow", "builtin", "http"]
+                          }
+                        },
+                        "required": ["kind"],
+                        "additionalProperties": {}
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "description",
+                      "inputSchema",
+                      "approvalRequired",
+                      "source"
+                    ],
+                    "additionalProperties": {}
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/v1/workflows/{id}/signature": {
@@ -1539,7 +1711,37 @@
         "x-cli": { "noun": "workflow", "verb": "signature", "positional": ["id"] },
         "x-auth": "session_or_api_key",
         "x-scopes": ["workflows:read"],
-        "responses": { "200": { "description": "Default Response" } }
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "versionId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "inputs": {},
+                    "outputs": {},
+                    "references": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      }
+                    }
+                  },
+                  "required": ["versionId", "inputs", "outputs", "references"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/v1/models": {
@@ -1557,7 +1759,43 @@
         "x-cli": { "noun": "model", "verb": "list" },
         "x-auth": "session_or_api_key",
         "x-scopes": ["workflows:read"],
-        "responses": { "200": { "description": "Default Response" } }
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "provider": { "type": "string" },
+                      "model": { "type": "string" },
+                      "aliases": { "type": "array", "items": { "type": "string" } },
+                      "kind": {
+                        "type": "string",
+                        "enum": ["decision", "chat", "embedding", "rerank"]
+                      },
+                      "contextTokens": { "type": "number" },
+                      "maxOutputTokens": { "type": "number" },
+                      "pricing": {},
+                      "deprecated": { "type": "string" },
+                      "capabilities": {
+                        "type": "object",
+                        "propertyNames": { "type": "string" },
+                        "additionalProperties": { "type": "boolean" }
+                      },
+                      "longContext": {},
+                      "limits": {}
+                    },
+                    "required": ["provider", "model", "kind", "capabilities"],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/v1/providers": {
@@ -1567,7 +1805,28 @@
         "x-cli": { "noun": "provider", "verb": "list" },
         "x-auth": "session_or_api_key",
         "x-scopes": ["workflows:read"],
-        "responses": { "200": { "description": "Default Response" } }
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "type": "string" },
+                      "models": { "type": "number" },
+                      "configuredOnServer": { "type": "boolean" }
+                    },
+                    "required": ["id", "models", "configuredOnServer"],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/v1/workflows": {
@@ -3082,6 +3341,18 @@
         "tags": ["versions"],
         "parameters": [
           {
+            "schema": { "default": 50, "type": "integer", "minimum": 1, "maximum": 200 },
+            "in": "query",
+            "name": "limit",
+            "required": false
+          },
+          {
+            "schema": { "type": "string", "maxLength": 500 },
+            "in": "query",
+            "name": "cursor",
+            "required": false
+          },
+          {
             "schema": {
               "type": "string",
               "format": "uuid",
@@ -3101,45 +3372,53 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "string",
-                        "format": "uuid",
-                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                      },
-                      "workflowId": {
-                        "type": "string",
-                        "format": "uuid",
-                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                      },
-                      "kind": { "type": "string", "enum": ["published", "draft"] },
-                      "version": { "type": ["number", "null"] },
-                      "label": { "type": ["string", "null"] },
-                      "definitionHash": { "type": "string" },
-                      "planHash": { "type": "string" },
-                      "compilerVersion": { "type": "string" },
-                      "notes": { "type": ["string", "null"] },
-                      "publishedBy": { "type": ["string", "null"] },
-                      "createdAt": { "type": "string" }
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "workflowId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "kind": { "type": "string", "enum": ["published", "draft"] },
+                          "version": { "type": ["number", "null"] },
+                          "label": { "type": ["string", "null"] },
+                          "definitionHash": { "type": "string" },
+                          "planHash": { "type": "string" },
+                          "compilerVersion": { "type": "string" },
+                          "notes": { "type": ["string", "null"] },
+                          "publishedBy": { "type": ["string", "null"] },
+                          "createdAt": { "type": "string" }
+                        },
+                        "required": [
+                          "id",
+                          "workflowId",
+                          "kind",
+                          "version",
+                          "label",
+                          "definitionHash",
+                          "planHash",
+                          "compilerVersion",
+                          "notes",
+                          "publishedBy",
+                          "createdAt"
+                        ],
+                        "additionalProperties": false
+                      }
                     },
-                    "required": [
-                      "id",
-                      "workflowId",
-                      "kind",
-                      "version",
-                      "label",
-                      "definitionHash",
-                      "planHash",
-                      "compilerVersion",
-                      "notes",
-                      "publishedBy",
-                      "createdAt"
-                    ],
-                    "additionalProperties": false
-                  }
+                    "next_cursor": { "type": ["string", "null"] }
+                  },
+                  "required": ["items", "next_cursor"],
+                  "additionalProperties": false
                 }
               }
             }
@@ -5236,6 +5515,18 @@
       "get": {
         "tags": ["credentials"],
         "parameters": [
+          {
+            "schema": { "default": 50, "type": "integer", "minimum": 1, "maximum": 200 },
+            "in": "query",
+            "name": "limit",
+            "required": false
+          },
+          {
+            "schema": { "type": "string", "maxLength": 500 },
+            "in": "query",
+            "name": "cursor",
+            "required": false
+          },
           { "schema": { "type": "string" }, "in": "query", "name": "type", "required": false },
           {
             "schema": {
@@ -5257,62 +5548,70 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "string",
-                        "format": "uuid",
-                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                      },
-                      "name": { "type": "string" },
-                      "type": { "type": "string" },
-                      "storage": { "type": "string", "enum": ["db", "external"] },
-                      "externalRef": { "type": ["string", "null"] },
-                      "publicFields": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
                         "type": "object",
-                        "propertyNames": { "type": "string" },
-                        "additionalProperties": { "type": "string" }
-                      },
-                      "hints": {
-                        "type": "object",
-                        "propertyNames": { "type": "string" },
-                        "additionalProperties": { "type": "string" }
-                      },
-                      "scopes": { "type": "array", "items": { "type": "string" } },
-                      "environmentId": { "type": ["string", "null"] },
-                      "allowedWorkflowIds": {
-                        "anyOf": [
-                          { "type": "array", "items": { "type": "string" } },
-                          { "type": "null" }
-                        ]
-                      },
-                      "lastTestedAt": { "type": ["string", "null"] },
-                      "lastTestOk": { "type": ["boolean", "null"] },
-                      "lastUsedAt": { "type": ["string", "null"] },
-                      "rotatedAt": { "type": ["string", "null"] },
-                      "createdAt": { "type": "string" }
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "name": { "type": "string" },
+                          "type": { "type": "string" },
+                          "storage": { "type": "string", "enum": ["db", "external"] },
+                          "externalRef": { "type": ["string", "null"] },
+                          "publicFields": {
+                            "type": "object",
+                            "propertyNames": { "type": "string" },
+                            "additionalProperties": { "type": "string" }
+                          },
+                          "hints": {
+                            "type": "object",
+                            "propertyNames": { "type": "string" },
+                            "additionalProperties": { "type": "string" }
+                          },
+                          "scopes": { "type": "array", "items": { "type": "string" } },
+                          "environmentId": { "type": ["string", "null"] },
+                          "allowedWorkflowIds": {
+                            "anyOf": [
+                              { "type": "array", "items": { "type": "string" } },
+                              { "type": "null" }
+                            ]
+                          },
+                          "lastTestedAt": { "type": ["string", "null"] },
+                          "lastTestOk": { "type": ["boolean", "null"] },
+                          "lastUsedAt": { "type": ["string", "null"] },
+                          "rotatedAt": { "type": ["string", "null"] },
+                          "createdAt": { "type": "string" }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "type",
+                          "storage",
+                          "externalRef",
+                          "publicFields",
+                          "hints",
+                          "scopes",
+                          "environmentId",
+                          "allowedWorkflowIds",
+                          "lastTestedAt",
+                          "lastTestOk",
+                          "lastUsedAt",
+                          "rotatedAt",
+                          "createdAt"
+                        ],
+                        "additionalProperties": false
+                      }
                     },
-                    "required": [
-                      "id",
-                      "name",
-                      "type",
-                      "storage",
-                      "externalRef",
-                      "publicFields",
-                      "hints",
-                      "scopes",
-                      "environmentId",
-                      "allowedWorkflowIds",
-                      "lastTestedAt",
-                      "lastTestOk",
-                      "lastUsedAt",
-                      "rotatedAt",
-                      "createdAt"
-                    ],
-                    "additionalProperties": false
-                  }
+                    "next_cursor": { "type": ["string", "null"] }
+                  },
+                  "required": ["items", "next_cursor"],
+                  "additionalProperties": false
                 }
               }
             }
@@ -5820,6 +6119,20 @@
     "/v1/tools": {
       "get": {
         "tags": ["tools"],
+        "parameters": [
+          {
+            "schema": { "default": 50, "type": "integer", "minimum": 1, "maximum": 200 },
+            "in": "query",
+            "name": "limit",
+            "required": false
+          },
+          {
+            "schema": { "type": "string", "maxLength": 500 },
+            "in": "query",
+            "name": "cursor",
+            "required": false
+          }
+        ],
         "x-cli": { "noun": "tool", "verb": "list" },
         "x-auth": "session_or_api_key",
         "x-scopes": ["tools:read"],
@@ -6024,6 +6337,20 @@
     "/v1/mcp/servers": {
       "get": {
         "tags": ["mcp"],
+        "parameters": [
+          {
+            "schema": { "default": 50, "type": "integer", "minimum": 1, "maximum": 200 },
+            "in": "query",
+            "name": "limit",
+            "required": false
+          },
+          {
+            "schema": { "type": "string", "maxLength": 500 },
+            "in": "query",
+            "name": "cursor",
+            "required": false
+          }
+        ],
         "x-cli": { "noun": "mcp-server", "verb": "list" },
         "x-auth": "session_or_api_key",
         "x-scopes": ["mcp:read"],
@@ -6392,6 +6719,20 @@
     "/v1/mcp/exposures": {
       "get": {
         "tags": ["mcp"],
+        "parameters": [
+          {
+            "schema": { "default": 50, "type": "integer", "minimum": 1, "maximum": 200 },
+            "in": "query",
+            "name": "limit",
+            "required": false
+          },
+          {
+            "schema": { "type": "string", "maxLength": 500 },
+            "in": "query",
+            "name": "cursor",
+            "required": false
+          }
+        ],
         "x-cli": { "noun": "mcp-exposure", "verb": "list" },
         "x-auth": "session_or_api_key",
         "x-scopes": ["mcp:read"],
@@ -6522,6 +6863,18 @@
       "get": {
         "tags": ["triggers"],
         "parameters": [
+          {
+            "schema": { "default": 50, "type": "integer", "minimum": 1, "maximum": 200 },
+            "in": "query",
+            "name": "limit",
+            "required": false
+          },
+          {
+            "schema": { "type": "string", "maxLength": 500 },
+            "in": "query",
+            "name": "cursor",
+            "required": false
+          },
           {
             "schema": {
               "type": "string",
@@ -6683,6 +7036,18 @@
       "get": {
         "tags": ["triggers"],
         "parameters": [
+          {
+            "schema": { "default": 50, "type": "integer", "minimum": 1, "maximum": 200 },
+            "in": "query",
+            "name": "limit",
+            "required": false
+          },
+          {
+            "schema": { "type": "string", "maxLength": 500 },
+            "in": "query",
+            "name": "cursor",
+            "required": false
+          },
           {
             "schema": {
               "type": "string",
@@ -6970,6 +7335,20 @@
     "/v1/notifications": {
       "get": {
         "tags": ["notifications"],
+        "parameters": [
+          {
+            "schema": { "default": 50, "type": "integer", "minimum": 1, "maximum": 200 },
+            "in": "query",
+            "name": "limit",
+            "required": false
+          },
+          {
+            "schema": { "type": "string", "maxLength": 500 },
+            "in": "query",
+            "name": "cursor",
+            "required": false
+          }
+        ],
         "x-cli": { "noun": "notification", "verb": "list" },
         "x-auth": "session_or_api_key",
         "x-scopes": ["admin"],
@@ -6979,39 +7358,50 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "string",
-                        "format": "uuid",
-                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                      },
-                      "kind": { "type": "string", "enum": ["email", "slack_webhook", "webhook"] },
-                      "name": { "type": "string" },
-                      "config": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
                         "type": "object",
-                        "propertyNames": { "type": "string" },
-                        "additionalProperties": {}
-                      },
-                      "events": { "type": "array", "items": { "type": "string" } },
-                      "enabled": { "type": "boolean" },
-                      "secretSet": { "type": "boolean" },
-                      "createdAt": { "type": "string" }
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": ["email", "slack_webhook", "webhook"]
+                          },
+                          "name": { "type": "string" },
+                          "config": {
+                            "type": "object",
+                            "propertyNames": { "type": "string" },
+                            "additionalProperties": {}
+                          },
+                          "events": { "type": "array", "items": { "type": "string" } },
+                          "enabled": { "type": "boolean" },
+                          "secretSet": { "type": "boolean" },
+                          "createdAt": { "type": "string" }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "name",
+                          "config",
+                          "events",
+                          "enabled",
+                          "secretSet",
+                          "createdAt"
+                        ],
+                        "additionalProperties": false
+                      }
                     },
-                    "required": [
-                      "id",
-                      "kind",
-                      "name",
-                      "config",
-                      "events",
-                      "enabled",
-                      "secretSet",
-                      "createdAt"
-                    ],
-                    "additionalProperties": false
-                  }
+                    "next_cursor": { "type": ["string", "null"] }
+                  },
+                  "required": ["items", "next_cursor"],
+                  "additionalProperties": false
                 }
               }
             }
@@ -7304,6 +7694,18 @@
       "get": {
         "tags": ["datasets"],
         "parameters": [
+          {
+            "schema": { "default": 50, "type": "integer", "minimum": 1, "maximum": 200 },
+            "in": "query",
+            "name": "limit",
+            "required": false
+          },
+          {
+            "schema": { "type": "string", "maxLength": 500 },
+            "in": "query",
+            "name": "cursor",
+            "required": false
+          },
           {
             "schema": {
               "type": "string",
@@ -7846,6 +8248,20 @@
     "/v1/agents": {
       "get": {
         "tags": ["agents"],
+        "parameters": [
+          {
+            "schema": { "default": 50, "type": "integer", "minimum": 1, "maximum": 200 },
+            "in": "query",
+            "name": "limit",
+            "required": false
+          },
+          {
+            "schema": { "type": "string", "maxLength": 500 },
+            "in": "query",
+            "name": "cursor",
+            "required": false
+          }
+        ],
         "x-cli": { "noun": "agent", "verb": "list" },
         "x-auth": "session_or_api_key",
         "x-scopes": ["tools:read"],
@@ -7855,28 +8271,43 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "string",
-                        "format": "uuid",
-                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                      },
-                      "name": { "type": "string" },
-                      "description": { "type": "string" },
-                      "config": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
                         "type": "object",
-                        "propertyNames": { "type": "string" },
-                        "additionalProperties": {}
-                      },
-                      "createdAt": { "type": "string" },
-                      "updatedAt": { "type": "string" }
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "name": { "type": "string" },
+                          "description": { "type": "string" },
+                          "config": {
+                            "type": "object",
+                            "propertyNames": { "type": "string" },
+                            "additionalProperties": {}
+                          },
+                          "createdAt": { "type": "string" },
+                          "updatedAt": { "type": "string" }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "description",
+                          "config",
+                          "createdAt",
+                          "updatedAt"
+                        ],
+                        "additionalProperties": false
+                      }
                     },
-                    "required": ["id", "name", "description", "config", "createdAt", "updatedAt"],
-                    "additionalProperties": false
-                  }
+                    "next_cursor": { "type": ["string", "null"] }
+                  },
+                  "required": ["items", "next_cursor"],
+                  "additionalProperties": false
                 }
               }
             }
@@ -8258,7 +8689,80 @@
         "x-cli": { "noun": "tool", "verb": "add-workflow" },
         "x-auth": "session_or_api_key",
         "x-scopes": ["tools:write"],
-        "responses": { "200": { "description": "Default Response" } }
+        "responses": {
+          "201": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "name": { "type": "string" },
+                    "kind": { "type": "string", "enum": ["openapi", "workflow", "code", "http"] },
+                    "definitions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": { "type": "string" },
+                          "description": { "type": "string" },
+                          "inputSchema": {},
+                          "outputSchema": {},
+                          "approvalRequired": { "type": "boolean" },
+                          "source": {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": ["mcp", "openapi", "workflow", "builtin", "http"]
+                              }
+                            },
+                            "required": ["kind"],
+                            "additionalProperties": {}
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "description",
+                          "inputSchema",
+                          "approvalRequired",
+                          "source"
+                        ],
+                        "additionalProperties": {}
+                      }
+                    },
+                    "source": {
+                      "type": "object",
+                      "propertyNames": { "type": "string" },
+                      "additionalProperties": {}
+                    },
+                    "credentialId": { "type": ["string", "null"] },
+                    "version": { "type": "number" },
+                    "createdAt": { "type": "string" },
+                    "updatedAt": { "type": "string" }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "kind",
+                    "definitions",
+                    "source",
+                    "credentialId",
+                    "version",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/v1/metrics/overview": {
@@ -9129,6 +9633,20 @@
       "get": {
         "summary": "Knowledge sources with document and chunk counts",
         "tags": ["knowledge"],
+        "parameters": [
+          {
+            "schema": { "default": 50, "type": "integer", "minimum": 1, "maximum": 200 },
+            "in": "query",
+            "name": "limit",
+            "required": false
+          },
+          {
+            "schema": { "type": "string", "maxLength": 500 },
+            "in": "query",
+            "name": "cursor",
+            "required": false
+          }
+        ],
         "x-cli": { "noun": "knowledge", "verb": "list" },
         "x-auth": "session_or_api_key",
         "x-scopes": ["knowledge:read"],
@@ -9138,79 +9656,87 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "string",
-                        "format": "uuid",
-                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                      },
-                      "name": { "type": "string" },
-                      "kind": { "type": "string" },
-                      "config": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
                         "type": "object",
-                        "propertyNames": { "type": "string" },
-                        "additionalProperties": {}
-                      },
-                      "pipeline": {
-                        "type": "object",
-                        "propertyNames": { "type": "string" },
-                        "additionalProperties": {}
-                      },
-                      "credentialId": {
-                        "anyOf": [
-                          {
+                        "properties": {
+                          "id": {
                             "type": "string",
                             "format": "uuid",
                             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                           },
-                          { "type": "null" }
-                        ]
-                      },
-                      "status": {
-                        "type": "string",
-                        "enum": ["new", "syncing", "ready", "stale", "error"]
-                      },
-                      "stats": {
-                        "type": "object",
-                        "propertyNames": { "type": "string" },
-                        "additionalProperties": {}
-                      },
-                      "documents": {
-                        "type": "integer",
-                        "minimum": -9007199254740991,
-                        "maximum": 9007199254740991
-                      },
-                      "chunks": {
-                        "type": "integer",
-                        "minimum": -9007199254740991,
-                        "maximum": 9007199254740991
-                      },
-                      "lastSyncAt": { "type": ["string", "null"] },
-                      "lastError": { "type": ["string", "null"] },
-                      "createdAt": { "type": "string" },
-                      "updatedAt": { "type": "string" }
+                          "name": { "type": "string" },
+                          "kind": { "type": "string" },
+                          "config": {
+                            "type": "object",
+                            "propertyNames": { "type": "string" },
+                            "additionalProperties": {}
+                          },
+                          "pipeline": {
+                            "type": "object",
+                            "propertyNames": { "type": "string" },
+                            "additionalProperties": {}
+                          },
+                          "credentialId": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                              },
+                              { "type": "null" }
+                            ]
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": ["new", "syncing", "ready", "stale", "error"]
+                          },
+                          "stats": {
+                            "type": "object",
+                            "propertyNames": { "type": "string" },
+                            "additionalProperties": {}
+                          },
+                          "documents": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "chunks": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "lastSyncAt": { "type": ["string", "null"] },
+                          "lastError": { "type": ["string", "null"] },
+                          "createdAt": { "type": "string" },
+                          "updatedAt": { "type": "string" }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "kind",
+                          "config",
+                          "pipeline",
+                          "credentialId",
+                          "status",
+                          "stats",
+                          "documents",
+                          "chunks",
+                          "lastSyncAt",
+                          "lastError",
+                          "createdAt",
+                          "updatedAt"
+                        ],
+                        "additionalProperties": false
+                      }
                     },
-                    "required": [
-                      "id",
-                      "name",
-                      "kind",
-                      "config",
-                      "pipeline",
-                      "credentialId",
-                      "status",
-                      "stats",
-                      "documents",
-                      "chunks",
-                      "lastSyncAt",
-                      "lastError",
-                      "createdAt",
-                      "updatedAt"
-                    ],
-                    "additionalProperties": false
-                  }
+                    "next_cursor": { "type": ["string", "null"] }
+                  },
+                  "required": ["items", "next_cursor"],
+                  "additionalProperties": false
                 }
               }
             }
@@ -14101,6 +14627,18 @@
         "tags": ["runs"],
         "parameters": [
           {
+            "schema": { "default": 50, "type": "integer", "minimum": 1, "maximum": 200 },
+            "in": "query",
+            "name": "limit",
+            "required": false
+          },
+          {
+            "schema": { "type": "string", "maxLength": 500 },
+            "in": "query",
+            "name": "cursor",
+            "required": false
+          },
+          {
             "schema": { "type": "string", "enum": ["runs"] },
             "in": "query",
             "name": "scope",
@@ -14116,28 +14654,36 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "string",
-                        "format": "uuid",
-                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                      },
-                      "scope": { "type": "string", "enum": ["runs"] },
-                      "name": { "type": "string" },
-                      "filters": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
                         "type": "object",
-                        "propertyNames": { "type": "string" },
-                        "additionalProperties": {}
-                      },
-                      "createdAt": { "type": "string" },
-                      "updatedAt": { "type": "string" }
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "scope": { "type": "string", "enum": ["runs"] },
+                          "name": { "type": "string" },
+                          "filters": {
+                            "type": "object",
+                            "propertyNames": { "type": "string" },
+                            "additionalProperties": {}
+                          },
+                          "createdAt": { "type": "string" },
+                          "updatedAt": { "type": "string" }
+                        },
+                        "required": ["id", "scope", "name", "filters", "createdAt", "updatedAt"],
+                        "additionalProperties": false
+                      }
                     },
-                    "required": ["id", "scope", "name", "filters", "createdAt", "updatedAt"],
-                    "additionalProperties": false
-                  }
+                    "next_cursor": { "type": ["string", "null"] }
+                  },
+                  "required": ["items", "next_cursor"],
+                  "additionalProperties": false
                 }
               }
             }

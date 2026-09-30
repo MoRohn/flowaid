@@ -12,6 +12,7 @@ import type { AuthService } from "./auth/service.js";
 import type { AlertDispatcher, SmtpSettings } from "@flowaid/observability";
 import type { JwtKeys } from "./auth/jwt.js";
 import type { S3Options } from "@flowaid/storage";
+import type { StdioPolicy } from "@flowaid/mcp";
 
 export interface ApiConfig {
   production: boolean;
@@ -50,6 +51,12 @@ export interface ApiConfig {
   launcher: { url: string; token: string } | null;
   /** Plugins (ARCHITECTURE.md §3.5): the allow-list, the npm registry, and whether local installs are accepted. */
   plugins: { allowList: readonly string[]; registry: string; allowLocal: boolean };
+  /**
+   * The worker's stdio MCP policy (MCP_STDIO_ENABLED, FLOWAID_MCP_STDIO_ALLOWED_COMMANDS and
+   * FLOWAID_MCP_STDIO_ENV_ALLOWLIST), checked when a stdio server is registered so the API never
+   * stores a command the worker would refuse to spawn.
+   */
+  mcpStdio: Omit<StdioPolicy, "parentEnv">;
 }
 
 export interface Clock {
@@ -132,6 +139,11 @@ export function configFromEnv(env: Env): ApiConfig {
       registry: String(env.FLOWAID_PLUGIN_REGISTRY),
       allowLocal: env.FLOWAID_PLUGIN_ALLOW_LOCAL,
     },
+    mcpStdio: {
+      enabled: env.flags.mcpStdioEnabled,
+      allowedCommands: env.FLOWAID_MCP_STDIO_ALLOWED_COMMANDS,
+      envAllowlist: env.FLOWAID_MCP_STDIO_ENV_ALLOWLIST,
+    },
   };
 }
 
@@ -172,6 +184,7 @@ export function defaultConfig(over: Partial<ApiConfig> = {}): ApiConfig {
     pageIndex: null,
     launcher: null,
     plugins: { allowList: ["@flowaid"], registry: "https://registry.npmjs.org", allowLocal: false },
+    mcpStdio: { enabled: false, allowedCommands: [], envAllowlist: [] },
     ...over,
   };
 }

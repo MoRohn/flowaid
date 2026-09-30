@@ -176,6 +176,7 @@ describeDb("identity and access (Postgres)", () => {
     const me = (await t.app.inject({ method: "GET", url: "/v1/me", headers: bearer })).json();
     expect(me.principal).toMatchObject({ type: "api_key", id });
     const list = (await call(t.app, jar, "GET", "/v1/api-keys")).json();
+    expect(list.items.map((k: { id: string }) => k.id)).toContain(id);
     expect(JSON.stringify(list)).not.toContain(key);
 
     // A viewer's key loses what the viewer cannot do.
@@ -236,6 +237,52 @@ describeDb("identity and access (Postgres)", () => {
     ).toBe(401);
     expect(await audit("api_key.create")).toBeGreaterThan(0);
     expect(await audit("api_key.rotate")).toBe(1);
+  });
+
+  it("pages API keys newest first and members by email with a cursor", async () => {
+    const jar = await login(t.app);
+    const ws = (await call(t.app, jar, "GET", "/v1/me")).json().principal.workspaceId as string;
+    type Page = { items: Record<string, string>[]; next_cursor: string | null };
+    const walk = async (url: string, field: string) => {
+      const out: string[] = [];
+      let cursor: string | null = null;
+      do {
+        const sep = url.includes("?") ? "&" : "?";
+        const pg = (
+          await call(t.app, jar, "GET", `${url}${sep}limit=2${cursor ? `&cursor=${cursor}` : ""}`)
+        ).json() as Page;
+        expect(pg.items.length).toBeLessThanOrEqual(2);
+        out.push(...pg.items.map((x) => x[field] as string));
+        cursor = pg.next_cursor;
+      } while (cursor);
+      return out;
+    };
+    const made: string[] = [];
+    for (const name of ["page-1", "page-2", "page-3"])
+      made.push(
+        (await call(t.app, jar, "POST", "/v1/api-keys", { name, scopes: ["runs:read"] })).json()
+          .id as string,
+      );
+    const keys = await walk("/v1/api-keys", "id");
+    expect(keys.slice(0, 3)).toEqual(made.reverse());
+    expect(keys).toEqual(
+      ((await call(t.app, jar, "GET", "/v1/api-keys?limit=200")).json() as Page).items.map(
+        (k) => k.id,
+      ),
+    );
+
+    for (const email of ["pager-c@example.com", "pager-a@example.com", "pager-b@example.com"])
+      await call(t.app, jar, "POST", `/v1/workspaces/${ws}/members`, { email, role: "viewer" });
+    const emails = await walk(`/v1/workspaces/${ws}/members`, "email");
+    expect(emails).toEqual([...emails].sort());
+    expect(emails.filter((e) => e.startsWith("pager-"))).toEqual([
+      "pager-a@example.com",
+      "pager-b@example.com",
+      "pager-c@example.com",
+    ]);
+    expect(
+      (await call(t.app, jar, "GET", `/v1/workspaces/${ws}/members?limit=500`)).statusCode,
+    ).toBe(400);
   });
 
   it("a demoted creator's key loses scopes on the next request", async () => {

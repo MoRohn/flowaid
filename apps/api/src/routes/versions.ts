@@ -2,7 +2,7 @@
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { stringify as toYaml } from "yaml";
 import {
   activeDeployment,
@@ -13,9 +13,9 @@ import {
   environments,
   getVersion,
   listSecretBindings,
-  listVersions,
   saveDraft,
   unbindSecret,
+  workflowVersions,
   workflows,
   type WorkflowVersionRow,
 } from "@flowaid/database";
@@ -36,7 +36,7 @@ import {
   type Principal,
 } from "../auth/principal.js";
 import type { ApiContext } from "../context.js";
-import { IdParams } from "../dto/common.js";
+import { IdParams, PageQuery, afterCursor, page, toPage } from "../dto/common.js";
 import {
   DeployRequestSchema,
   DeployResponseSchema,
@@ -108,22 +108,42 @@ export function versionRoutes(app: FastifyInstance, ctx: ApiContext): void {
       schema: {
         tags: ["versions"],
         params: IdParams,
-        response: { 200: z.array(WorkflowVersionSummarySchema) },
+        querystring: PageQuery,
+        response: { 200: page(WorkflowVersionSummarySchema) },
       },
     },
     async (req) => {
       const p = need(req.principal);
+      const { limit, cursor } = req.query;
       return ctx.db.tenant(p.workspaceId, async (tx) => {
         await visibleWorkflow(tx, p, req.params.id);
-        return (await listVersions(tx, req.params.id)).map((v) => {
-          const {
-            definition: _d,
-            diagnostics: _g,
-            catalogSnapshot: _c,
-            ...summary
-          } = versionDto(v);
-          return summary;
-        });
+        // Published versions, newest first.
+        const rows = await tx
+          .select()
+          .from(workflowVersions)
+          .where(
+            and(
+              eq(workflowVersions.workflowId, req.params.id),
+              eq(workflowVersions.kind, "published"),
+              afterCursor(workflowVersions.version, workflowVersions.id, cursor, "desc", Number),
+            ),
+          )
+          .orderBy(desc(workflowVersions.version), desc(workflowVersions.id))
+          .limit(limit + 1);
+        return toPage(
+          rows,
+          limit,
+          (v) => [v.version ?? 0, v.id],
+          (v) => {
+            const {
+              definition: _d,
+              diagnostics: _g,
+              catalogSnapshot: _c,
+              ...summary
+            } = versionDto(v);
+            return summary;
+          },
+        );
       });
     },
   );

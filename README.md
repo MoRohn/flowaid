@@ -47,9 +47,10 @@ that one runtime.
 </picture>
 
 > [!NOTE]
-> FlowAId is in public beta. Everything described here runs today, and every change is gated by
-> the unit and PostgreSQL suites, an accessibility gallery and a browser acceptance journey against
-> the production builds. Interfaces may still change before 1.0.
+> FlowAId is in public beta; the current release is **0.6.0** (see the [Changelog](CHANGELOG.md)).
+> Everything described here runs today, and every change is gated by the unit and PostgreSQL
+> suites, an accessibility gallery and a browser acceptance journey against the production builds.
+> Interfaces may still change before 1.0.
 
 ## Quick start
 
@@ -79,10 +80,13 @@ generation; everything else runs without any key. Then:
    trace shows every decision's probabilities and cost.
 3. **Make it yours**: click the empty canvas to rename it and change its settings, or select a
    step to edit it.
-4. **Publish** a version, then call it from your code, a webhook, a schedule or an MCP client.
+4. **Publish and deploy** a version, then call it from your code, a webhook, a schedule or an MCP
+   client.
 
-The Overview's _Get started_ checklist walks you through each step. Options, the desktop app and
-troubleshooting are in [Running FlowAId on your computer](docs/guides/running-locally.md).
+The Overview's _Get started_ checklist walks you through each step, every page opens with a short
+_Start here_ that checks what it needs, and _Guide_ in the top bar explains the page you are on.
+Options, the desktop app and troubleshooting are in
+[Running FlowAId on your computer](docs/guides/running-locally.md).
 
 ## Business flows
 
@@ -132,10 +136,10 @@ other requests are declined by policy or go to _Agent review_.
   <img alt="The Refund request handling flow after a run: Refund request, Assess the request (eligible: yes), Apply the limits, Decide automatically? taking the refund branch to Refund automatically, with Decline (outside policy), Agent review and its outcomes not taken" src="docs/assets/screenshots/flow-refund-requests-light.webp">
 </picture>
 
-More templates cover support triage with safety checks, GitHub issue triage over MCP, a
-LangChain retrieval assistant, a bounded research agent, and PageIndex document Q&A, comparison
-and agents. The [business flows guide](docs/guides/business-flows.md) lists every input,
-decision and outcome.
+More templates cover a message triage starter that needs only the TypeSafe key, support triage
+with safety checks, GitHub issue triage over MCP (with or without a knowledge base), a LangChain
+knowledge assistant, a bounded research agent, and PageIndex document Q&A, comparison and agents.
+The [business flows guide](docs/guides/business-flows.md) lists every input, decision and outcome.
 
 ## Why FlowAId
 
@@ -220,22 +224,25 @@ its URL, its signature scheme and a request you can paste into a terminal.
 
 ## Capabilities
 
-| Area                     | What you get                                                                                                                                                                                                                  |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Build**                | Visual builder with an in-browser compiler, undo/redo and autosave; 60 core nodes plus bundled LangChain nodes; loops, subflows and branches; FlowExpr expressions; an AI workflow builder, an AI critic and a cost optimiser |
-| **Start fast**           | Business flows for finance, sales, IT and customer service, plus triage, research, retrieval and document templates, each listing what it needs                                                                               |
-| **Decide**               | TypeSafe Jev decisions (yes/no, choice, score) with calibrated distributions, versioned decision contracts, consequence-based thresholds and human failover                                                                   |
-| **Generate**             | OpenAI, Anthropic, Google Gemini, Ollama and any OpenAI-compatible endpoint, with routing strategies and failover; Cohere and Jina rerank                                                                                     |
-| **Run and observe**      | Event-sourced runs with live traces, replay, restart from a node, fork onto any version and retry a failed node; metrics, Prometheus and OpenTelemetry export, trace reviews and alerts                                       |
-| **People**               | Durable approvals, reviews, forms and choices, an inbox with SLAs, single-use external review links                                                                                                                           |
-| **Quality**              | Evaluation sets from hand or real runs, scoring of outputs, decisions and branches, calibration, regressions against a baseline, and a publish gate                                                                           |
-| **Agents and knowledge** | A bounded agent node with tools and workflows as tools; knowledge sources with pgvector hybrid search; PageIndex document intelligence with page-checked citations                                                            |
-| **Integrate**            | REST API and TypeScript SDK, the `flowaid` CLI, workflows served as MCP tools, MCP servers and OpenAPI documents as tools, signed webhooks, schedules, event triggers, installable node plugins                               |
-| **Own it**               | Runs on your computer or your server on PostgreSQL; envelope-encrypted credentials (local key, Vault, Azure Key Vault or GCP KMS); sandboxed code nodes; flows download as runnable TypeScript packages                       |
+| Area                     | What you get                                                                                                                                                                                                                                                                |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Build**                | Visual builder with an in-browser compiler, undo/redo and autosave; 63 core nodes plus 9 bundled LangChain nodes; loops, subflows and branches; FlowExpr expressions; an AI workflow builder, an AI critic and a cost optimiser                                             |
+| **Guidance**             | _Start here_ on every page with checks against your workspace; step-by-step creation that ticks off from what you enter, with an _All fields_ view; the Guide, plain-language help with no AI model; Ask FlowAId answers questions about your workspace (with a text model) |
+| **Start fast**           | Business flows for finance, sales, IT and customer service, plus triage, research, retrieval and document templates, each listing what it needs                                                                                                                             |
+| **Decide**               | TypeSafe Jev decisions (yes/no, choice, score) with calibrated distributions, versioned decision contracts, consequence-based thresholds and human failover                                                                                                                 |
+| **Generate**             | OpenAI, Anthropic, Google Gemini, Ollama and any OpenAI-compatible endpoint, with routing strategies and failover; Cohere and Jina rerank                                                                                                                                   |
+| **Run and observe**      | Event-sourced runs with live traces, replay, restart from a node, fork onto any version and retry a failed node; metrics, Prometheus and OpenTelemetry export, trace reviews and alerts                                                                                     |
+| **People**               | Durable approvals, reviews, forms and choices, an inbox with SLAs, single-use external review links                                                                                                                                                                         |
+| **Quality**              | Evaluation sets from hand or real runs, scoring of outputs, decisions and branches, calibration, regressions against a baseline, and a publish gate                                                                                                                         |
+| **Agents and knowledge** | A bounded agent node with tools and workflows as tools; knowledge sources with pgvector hybrid search; PageIndex document intelligence with page-checked citations                                                                                                          |
+| **Integrate**            | REST API and TypeScript SDK, the `flowaid` CLI, workflows served as MCP tools, MCP servers and OpenAPI documents as tools, signed webhooks, schedules, event triggers, installable node plugins                                                                             |
+| **Own it**               | Runs on your computer or your server on PostgreSQL; envelope-encrypted credentials (local key, Vault, Azure Key Vault or GCP KMS); sandboxed code nodes; flows download as runnable TypeScript packages                                                                     |
 
 ## Call your workflows
 
-Every published workflow is an HTTP endpoint. Create an API key under _Settings → API keys_:
+Every workflow deployed to an environment is an HTTP endpoint. Create an API key under
+_Settings → API keys_ and limit it to that environment (a key that is not limited must send
+`environmentId` with each run):
 
 ```sh
 curl -X POST http://flowaid.localhost:3001/v1/workflows/<workflow-id>/run \
@@ -322,8 +329,10 @@ packages/
   providers/  provider-*/   Provider registry, pricing, failover · TypeSafe, OpenAI, Anthropic, Ollama
   database/             PostgreSQL schema, migrations, RLS, run store, queue
   ui/                   React component library and playground
-  …                     advisor, codegen, credentials, evaluation, importer, insights, jev, knowledge,
-                        langchain, mcp, observability, openapi-tools, pageindex, plugins, sandbox, storage
+  nodes-langchain/      The bundled LangChain nodes (LangChain stays in this and packages/langchain)
+  …                     advisor, codegen, config, create-flowaid-node, credentials, env, evaluation,
+                        importer, insights, jev, knowledge, langchain, mcp, observability,
+                        openapi-tools, pageindex, plugins, sandbox, shared, storage
 brand/                  Identity: logo, design tokens, fonts, style guide
 docker/                 Compose stack and the Dockerfile (api, worker, web targets)
 docs/                   Guides, design, operations, project history (index: docs/README.md)

@@ -313,8 +313,8 @@ export function RunsTable({
       helper.accessor((r) => r.costUsd, {
         id: "cost",
         header: "Cost",
-        size: 88,
-        minSize: 72,
+        size: 104,
+        minSize: 100,
         sortFn: "basic",
         sortUndefined: "last",
         meta: { numeric: true },

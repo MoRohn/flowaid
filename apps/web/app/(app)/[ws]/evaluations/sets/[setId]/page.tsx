@@ -36,7 +36,7 @@ import {
 } from "@flowaid/ui/data";
 import { formatPercent } from "@flowaid/ui/lib";
 import { PageHeader } from "@flowaid/ui/shell";
-import { del, get, patch, post, qs } from "~/api/client";
+import { del, get, getAll, patch, post, qs } from "~/api/client";
 import type { Page, VersionSummary, WorkflowDetail, WorkflowSummary } from "~/api/types";
 import {
   expectationSummary,
@@ -48,13 +48,25 @@ import {
   runTone,
 } from "~/admin/logic";
 import type { EvaluationCase, EvaluationRun, EvaluationSet } from "~/admin/types";
-import { JsonField, QueryView, Section, useConfirm, useMutate } from "~/admin/ui";
+import { JsonField, Notice, QueryView, Section, useConfirm, useMutate } from "~/admin/ui";
+import { caseCoverage } from "~/evaluations/logic";
+import { CaseGuide, EXAMPLE_EXPECTATION, ExpectationHelp } from "~/evaluations/SetGuide";
 import { useSession } from "~/session";
 import { AppFrame, PageBody } from "~/shell/AppFrame";
 import { errorMessage } from "~/shell/states";
 
 const DRAFT = "__draft";
 const NONE = "__none";
+
+/** Required top-level input fields the value leaves out (or leaves as empty text). */
+function missingRequired(schema: unknown, value: unknown): string[] {
+  const s = schema as { required?: unknown; properties?: Record<string, { title?: string }> };
+  if (!Array.isArray(s?.required)) return [];
+  const obj = (value && typeof value === "object" ? value : {}) as Record<string, unknown>;
+  return (s.required as string[])
+    .filter((k) => obj[k] === undefined || obj[k] === "")
+    .map((k) => s.properties?.[k]?.title ?? k);
+}
 
 function CaseDialog({
   setId,
@@ -89,6 +101,8 @@ function CaseDialog({
   const [tags, setTags] = useState(existing?.tags.join(", ") ?? "");
   const inputOk = parseJsonText(inputText);
   const expectedOk = parseJsonObject(expected);
+  // a case without the workflow's required inputs only tests the input check
+  const missing = inputOk.ok ? missingRequired(schema, inputOk.value) : [];
   const save = useMutate(
     () => {
       const body = {
@@ -110,12 +124,8 @@ function CaseDialog({
   return (
     <Dialog open={editing !== null} onOpenChange={(o) => (o ? undefined : onClose())}>
       <DialogContent size="lg">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            save.mutate(undefined);
-          }}
-        >
+        {/* not a <form>: the input form (SchemaForm) renders its own, and forms cannot nest */}
+        <div>
           <DialogHeader>
             <DialogTitle>{existing ? `Edit case ${existing.ordinal + 1}` : "New case"}</DialogTitle>
             <DialogDescription>
@@ -144,7 +154,15 @@ function CaseDialog({
                 </ToggleGroup>
               ) : null}
               {mode === "form" && hasForm ? (
-                <FieldRow label="Input" hint="What the run starts with, from the workflow's inputs">
+                <FieldRow
+                  label="Input"
+                  hint="What the run starts with, from the workflow's inputs"
+                  {...(missing.length
+                    ? {
+                        error: `Fill in the required ${missing.length === 1 ? "field" : "fields"}: ${missing.join(", ")}`,
+                      }
+                    : {})}
+                >
                   <SchemaForm
                     key={seed}
                     schema={schema as never}
@@ -159,19 +177,42 @@ function CaseDialog({
                   label="Input"
                   value={inputText}
                   onChange={setInput}
-                  error={inputOk.ok ? null : inputOk.error}
+                  error={
+                    inputOk.ok
+                      ? missing.length
+                        ? `Leaves out required ${missing.length === 1 ? "field" : "fields"} ${missing.join(", ")}. Runs refuse such input; keep it only to test that refusal.`
+                        : null
+                      : inputOk.error
+                  }
                   minRows={10}
                 />
               )}
             </div>
-            <JsonField
-              id="case-expected"
-              label="Expected"
-              value={expected}
-              onChange={setExpected}
-              error={expectedOk.ok ? null : expectedOk.error}
-              minRows={10}
-            />
+            <div className="flex flex-col gap-2">
+              <JsonField
+                id="case-expected"
+                label="Expected"
+                value={expected}
+                onChange={setExpected}
+                error={expectedOk.ok ? null : expectedOk.error}
+                minRows={10}
+              />
+              <p className="m-0 flex flex-wrap items-center gap-x-2 text-xs text-ink-3">
+                <span>
+                  Check the answer, not only that the run finishes. The example's step ids are
+                  placeholders: use your workflow's.
+                </span>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="link"
+                  onClick={() => setExpected(pretty(EXAMPLE_EXPECTATION))}
+                >
+                  Use the example
+                </Button>
+              </p>
+              <ExpectationHelp />
+            </div>
             <FieldRow
               label="Tags"
               htmlFor="case-tags"
@@ -186,15 +227,18 @@ function CaseDialog({
               Cancel
             </Button>
             <Button
-              type="submit"
+              type="button"
               variant="primary"
               loading={save.isPending}
-              disabled={!inputOk.ok || !expectedOk.ok}
+              // the form view blocks a case missing required fields; JSON (for testing the
+              // refusal on purpose) only warns
+              disabled={!inputOk.ok || !expectedOk.ok || (mode === "form" && missing.length > 0)}
+              onClick={() => save.mutate(undefined)}
             >
               {existing ? "Save case" : "Add case"}
             </Button>
           </DialogFooter>
-        </form>
+        </div>
       </DialogContent>
     </Dialog>
   );
@@ -205,11 +249,13 @@ function RunDialog({
   open,
   onOpenChange,
   previous,
+  caseCount,
 }: {
   set: EvaluationSet;
   open: boolean;
   onOpenChange: (o: boolean) => void;
   previous: EvaluationRun[];
+  caseCount: number;
 }) {
   const s = useSession();
   const router = useRouter();
@@ -229,7 +275,7 @@ function RunDialog({
   });
   const versions = useQuery({
     queryKey: ["versions", s.ws, workflowId],
-    queryFn: () => get<VersionSummary[]>(`/v1/workflows/${workflowId}/versions`),
+    queryFn: () => getAll<VersionSummary>(`/v1/workflows/${workflowId}/versions`),
     enabled: open && Boolean(workflowId),
     select: (v) =>
       v.filter((x) => x.kind === "published").sort((a, b) => (b.version ?? 0) - (a.version ?? 0)),
@@ -256,12 +302,8 @@ function RunDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="md">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            start.mutate(undefined);
-          }}
-        >
+        {/* runs start only from the labelled button, never from Enter in a field */}
+        <form onSubmit={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>Run “{set.name}”</DialogTitle>
             <DialogDescription>
@@ -270,6 +312,12 @@ function RunDialog({
             </DialogDescription>
           </DialogHeader>
           <DialogBody className="flex flex-col gap-4">
+            <Notice tone="info">
+              Starting runs the workflow {caseCount} time{caseCount === 1 ? "" : "s"}, once per
+              case. Its steps call their models and tools for real with the chosen environment's
+              keys, so this may cost money with your providers and any tool that changes data will
+              change it. Nothing is published or deployed.
+            </Notice>
             {!set.workflowId ? (
               <FieldRow label="Workflow" htmlFor="run-wf" required>
                 <Select
@@ -291,7 +339,12 @@ function RunDialog({
               </FieldRow>
             ) : null}
             <div className="grid gap-4 sm:grid-cols-2">
-              <FieldRow label="Version" htmlFor="run-version" required>
+              <FieldRow
+                label="Version"
+                htmlFor="run-version"
+                required
+                hint="The draft tests unpublished changes; a version tests what callers run."
+              >
                 <Select id="run-version" value={version} onValueChange={setVersion} mono>
                   <SelectItem value={DRAFT}>Current draft</SelectItem>
                   {(versions.data ?? []).map((v, i) => (
@@ -319,7 +372,11 @@ function RunDialog({
                   ))}
                 </Select>
               </FieldRow>
-              <FieldRow label="Compare with" htmlFor="run-baseline">
+              <FieldRow
+                label="Compare with"
+                htmlFor="run-baseline"
+                hint="An earlier run of this set: the report shows what changed per case."
+              >
                 <Select id="run-baseline" value={baseline} onValueChange={setBaseline}>
                   <SelectItem value={NONE}>No baseline</SelectItem>
                   {baselines.map((r) => (
@@ -364,6 +421,11 @@ function RunDialog({
                   className="w-28"
                 />
               ) : null}
+              <p className="m-0 w-full text-xs text-ink-3">
+                {gated
+                  ? `The report is marked Gate failed below ${Math.round((minPass ?? 0) * 100)}% of cases passing. It blocks nothing by itself: publishing checks its own gate when you publish.`
+                  : "Optional: marks the report pass or fail against a minimum share of passing cases."}
+              </p>
             </div>
           </DialogBody>
           <DialogFooter>
@@ -371,13 +433,14 @@ function RunDialog({
               Cancel
             </Button>
             <Button
-              type="submit"
+              type="button"
               variant="primary"
               leadingIcon={<Play strokeWidth={1.75} />}
+              onClick={() => start.mutate(undefined)}
               loading={start.isPending}
               disabled={!workflowId || !env}
             >
-              Start evaluation
+              Start evaluation ({caseCount} run{caseCount === 1 ? "" : "s"})
             </Button>
           </DialogFooter>
         </form>
@@ -413,10 +476,16 @@ export default function SetPage({ params }: { params: Promise<{ setId: string }>
   });
   const versionNo = useQuery({
     queryKey: ["versions", s.ws, set.data?.workflowId],
-    queryFn: () => get<VersionSummary[]>(`/v1/workflows/${set.data?.workflowId ?? ""}/versions`),
+    queryFn: () => getAll<VersionSummary>(`/v1/workflows/${set.data?.workflowId ?? ""}/versions`),
     enabled: Boolean(set.data?.workflowId),
     select: (vs) => new Map(vs.map((v) => [v.id, v.version])),
   });
+  const versionLabel = (id: string | null) => {
+    if (!id) return "draft";
+    const n = versionNo.data?.get(id);
+    // the draft is compiled into a version without a number
+    return n ? `v${n}` : versionNo.data?.has(id) ? "draft" : "";
+  };
   const removeCase = useMutate((c: EvaluationCase) => del(`/v1/evaluations/cases/${c.id}`), {
     success: "Case deleted",
     invalidate: [["evaluation-cases", s.ws, setId]],
@@ -503,6 +572,13 @@ export default function SetPage({ params }: { params: Promise<{ setId: string }>
     [canWrite],
   );
   const caseCount = cases.data?.items.length ?? 0;
+  const testedWorkflowId = set.data?.workflowId ?? null;
+  const tested = useQuery({
+    queryKey: ["workflow", s.ws, testedWorkflowId],
+    queryFn: () => get<WorkflowDetail>(`/v1/workflows/${testedWorkflowId as string}`),
+    enabled: Boolean(testedWorkflowId),
+  });
+  const coverage = useMemo(() => caseCoverage(cases.data?.items ?? []), [cases.data]);
 
   return (
     <AppFrame
@@ -518,7 +594,19 @@ export default function SetPage({ params }: { params: Promise<{ setId: string }>
             <>
               <PageHeader
                 title={x.name}
-                description={x.description || undefined}
+                description={
+                  [
+                    x.workflowId
+                      ? `Tests ${tested.data?.name ?? "its workflow"}.`
+                      : "Not tied to a workflow: choose one when you run it.",
+                    x.description,
+                    canWrite && cases.data && caseCount === 0
+                      ? "Add a case before running an evaluation."
+                      : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ") || undefined
+                }
                 actions={
                   canWrite ? (
                     <>
@@ -544,7 +632,11 @@ export default function SetPage({ params }: { params: Promise<{ setId: string }>
                 }
               />
               <div className="mt-5 flex flex-col gap-5">
-                <Section title={`Cases (${caseCount})`}>
+                {cases.data ? <CaseGuide coverage={coverage} count={caseCount} /> : null}
+                <Section
+                  title={`Cases (${caseCount})`}
+                  description="Each case is an input and what a right run looks like. Cases marked “from run” were captured from real runs."
+                >
                   <DataTable
                     columns={columns}
                     data={cases.data?.items ?? []}
@@ -563,14 +655,17 @@ export default function SetPage({ params }: { params: Promise<{ setId: string }>
                         size="sm"
                         icon={<FlaskConical strokeWidth={1.5} />}
                         title="No cases yet"
-                        description="Add cases by hand, or open a finished run and choose “Add to evaluation” to capture its input and output."
+                        description="Add cases by hand, or open a finished run and choose “Add to evaluation” to capture its input, decisions and branches."
                       />
                     }
                     itemLabel={["case", "cases"]}
                     aria-label="Cases"
                   />
                 </Section>
-                <Section title="Runs">
+                <Section
+                  title="Runs"
+                  description="Each evaluation run scores every case against one version. Open one for its report."
+                >
                   <QueryView query={runs} rows={2}>
                     {(p) =>
                       p.items.length === 0 ? (
@@ -593,11 +688,7 @@ export default function SetPage({ params }: { params: Promise<{ setId: string }>
                                   <RelativeTime date={r.createdAt} />
                                 </span>
                                 <span className="font-mono text-2xs text-ink-3">
-                                  {r.workflowVersionId
-                                    ? versionNo.data?.get(r.workflowVersionId)
-                                      ? `v${versionNo.data.get(r.workflowVersionId)}`
-                                      : "published"
-                                    : "draft"}
+                                  {versionLabel(r.workflowVersionId)}
                                 </span>
                                 {r.status === "running" || r.status === "queued" ? (
                                   <ProgressBar
@@ -612,7 +703,7 @@ export default function SetPage({ params }: { params: Promise<{ setId: string }>
                                       {formatPercent(r.summary.passRate)} pass
                                     </span>
                                   ) : null}
-                                  {r.report ? (
+                                  {r.report?.gate ? (
                                     <Badge tone={r.report.verdict === "pass" ? "ok" : "danger"}>
                                       {r.report.verdict === "pass" ? "Gate passed" : "Gate failed"}
                                     </Badge>
@@ -636,6 +727,7 @@ export default function SetPage({ params }: { params: Promise<{ setId: string }>
                   open={running}
                   onOpenChange={setRunning}
                   previous={runs.data?.items ?? []}
+                  caseCount={caseCount}
                 />
               ) : null}
             </>

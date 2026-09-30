@@ -132,10 +132,12 @@ describe("Flowaid client", () => {
     const server = fakeFetch([
       (req) =>
         req.url.pathname === `/v1/workflows/${WF}/versions`
-          ? json(200, [
-              { id: "v-2", version: 2 },
-              { id: "v-1", version: 1 },
-            ])
+          ? json(
+              200,
+              req.url.searchParams.get("cursor") === "c2"
+                ? { items: [{ id: "v-1", version: 1 }], next_cursor: null }
+                : { items: [{ id: "v-2", version: 2 }], next_cursor: "c2" },
+            )
           : undefined,
       (req) =>
         req.url.pathname === "/v1/workflow-versions/v-1/export/package"
@@ -162,7 +164,8 @@ describe("Flowaid client", () => {
     });
     const zip = await fa.workflows.exportPackage(WF, { version: 1, mode: "vendored" });
     expect([...zip]).toEqual([0x50, 0x4b, 3, 4]);
-    expect(server.requests[1]?.body).toEqual({ mode: "vendored" });
+    expect(server.requests[1]?.url.searchParams.get("cursor")).toBe("c2");
+    expect(server.requests[2]?.body).toEqual({ mode: "vendored" });
     expect(polls).toBe(3);
 
     const draft = fakeFetch([() => apiError(422, "COMPILE_ERROR")]);

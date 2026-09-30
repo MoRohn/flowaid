@@ -151,7 +151,21 @@ describeDb("workflows, versions and deployments (Postgres)", () => {
     const v2 = (await call(t.app, jar, "POST", `/v1/workflows/${w.id}/publish`, {})).json();
     expect(v2.version).toBe(2);
     const versions = (await call(t.app, jar, "GET", `/v1/workflows/${w.id}/versions`)).json();
-    expect(versions.map((v: { version: number }) => v.version)).toEqual([2, 1]);
+    expect(versions.items.map((v: { version: number }) => v.version)).toEqual([2, 1]);
+    expect(versions.next_cursor).toBeNull();
+    const newest = (
+      await call(t.app, jar, "GET", `/v1/workflows/${w.id}/versions?limit=1`)
+    ).json() as { items: { version: number }[]; next_cursor: string | null };
+    expect(newest.items.map((v) => v.version)).toEqual([2]);
+    const older = (
+      await call(
+        t.app,
+        jar,
+        "GET",
+        `/v1/workflows/${w.id}/versions?limit=1&cursor=${newest.next_cursor ?? ""}`,
+      )
+    ).json();
+    expect(older).toEqual({ items: [expect.objectContaining({ version: 1 })], next_cursor: null });
     const d = (
       await call(
         t.app,
@@ -202,6 +216,10 @@ describeDb("workflows, versions and deployments (Postgres)", () => {
     });
     expect(created.statusCode).toBe(201);
     const id = created.json().id as string;
+    // the copy's record carries the template's description, as its definition does
+    const copy = (await call(t.app, jar, "GET", `/v1/workflows/${id}`)).json();
+    expect(copy.description).toMatch(/^Batch-judge a support ticket/);
+    expect(copy.description).toBe(copy.draft.description);
     const pub = await call(t.app, jar, "POST", `/v1/workflows/${id}/publish`, {});
     expect(pub.statusCode).toBe(422);
     expect(pub.json().error).toMatchObject({

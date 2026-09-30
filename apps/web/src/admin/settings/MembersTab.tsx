@@ -22,7 +22,7 @@ import {
   SelectItem,
 } from "@flowaid/ui/primitives";
 import { RelativeTime } from "@flowaid/ui/data";
-import { del, get, patch, post } from "~/api/client";
+import { del, getAll, patch, post } from "~/api/client";
 import type { Role } from "~/api/types";
 import { useSession } from "~/session";
 import { ROLES, ROLE_DESCRIPTION } from "../logic";
@@ -42,7 +42,7 @@ export function MembersTab() {
   const key = ["members", s.ws];
   const members = useQuery({
     queryKey: key,
-    queryFn: () => get<MemberRow[]>(`/v1/workspaces/${id}/members`),
+    queryFn: () => getAll<MemberRow>(`/v1/workspaces/${id}/members`),
   });
   const invite = useMutate(
     (b: { email: string; role: Role }) => post<MemberRow>(`/v1/workspaces/${id}/members`, b),

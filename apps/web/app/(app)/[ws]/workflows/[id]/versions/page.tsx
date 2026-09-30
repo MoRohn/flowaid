@@ -17,10 +17,13 @@ import {
   toast,
 } from "@flowaid/ui/primitives";
 import { RelativeTime } from "@flowaid/ui/data";
-import { get, post } from "~/api/client";
+import { get, getAll, post } from "~/api/client";
 import type { Deployment, VersionSummary } from "~/api/types";
 import { WorkflowFrame } from "~/admin/WorkflowFrame";
 import { QueryView, downloadFrom, useConfirm, useMutate } from "~/admin/ui";
+import { WORKFLOW_VERSIONS } from "~/guide/capabilities/workflow";
+import { PageIntro } from "~/guide/PageIntro";
+import { publishedCheck } from "~/workflows/readiness";
 import { useSession } from "~/session";
 import { errorMessage } from "~/shell/states";
 
@@ -32,7 +35,7 @@ export default function VersionsPage({ params }: { params: Promise<{ id: string 
   const restore = useConfirm<VersionSummary>();
   const versions = useQuery({
     queryKey: ["versions", s.ws, id],
-    queryFn: () => get<VersionSummary[]>(`/v1/workflows/${id}/versions`),
+    queryFn: () => getAll<VersionSummary>(`/v1/workflows/${id}/versions`),
   });
   const deployments = useQuery({
     queryKey: ["deployments", s.ws, id],
@@ -64,6 +67,7 @@ export default function VersionsPage({ params }: { params: Promise<{ id: string 
       on ? [...p.filter((x) => x !== vid).slice(-1), vid] : p.filter((x) => x !== vid),
     );
   const canWrite = s.can("workflows:write");
+  const publishedCount = versions.data?.filter((v) => v.kind === "published").length;
 
   const compareButton = (
     <Button
@@ -87,6 +91,12 @@ export default function VersionsPage({ params }: { params: Promise<{ id: string 
     <WorkflowFrame id={id} tab="versions" actions={compareButton}>
       {() => (
         <>
+          <PageIntro
+            guide={WORKFLOW_VERSIONS}
+            checks={[publishedCheck(publishedCount, s.ws, id)]}
+            defaultCollapsed={(publishedCount ?? 1) > 0}
+            className="mb-4"
+          />
           <QueryView query={versions}>
             {(rows) => {
               const published = rows

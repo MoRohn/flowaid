@@ -5,13 +5,13 @@ exports[`generated CLI > matches the command tree snapshot 1`] = `
 agent create {--name --description --config --body --out}
 agent delete <id> {--out}
 agent get <id> {--out}
-agent list {--out}
+agent list {--limit --cursor --out}
 agent update <id> {--name --description --config --body --out}
 alerts
 alerts deliveries {--limit --before --out}
 api-key
 api-key create {--name --scopes --mode --environment-id --workflow-ids --expires-at --rate-limit-per-min --service-account --body --out}
-api-key list {--out}
+api-key list {--limit --cursor --out}
 api-key revoke <id> {--out}
 api-key rotate <id> {--grace-minutes --body --out}
 artifact
@@ -30,7 +30,7 @@ credential
 credential create {--name --type --storage --values --external-ref --scopes --environment-id --allowed-workflow-ids --body --out}
 credential delete <id> {--force --out}
 credential get <id> {--out}
-credential list {--type --environment-id --out}
+credential list {--limit --cursor --type --environment-id --out}
 credential rotate <id> {--values --body --out}
 credential test <id> {--out}
 credential update <id> {--name --values --scopes --environment-id --allowed-workflow-ids --body --out}
@@ -43,7 +43,7 @@ dataset create {--name --description --workflow-id --input-schema --body --out}
 dataset delete <id> {--out}
 dataset delete-case <id> {--out}
 dataset get <id> {--out}
-dataset list {--workflow-id --out}
+dataset list {--limit --cursor --workflow-id --out}
 dataset update-case <id> {--input --expected --metadata --tags --body --out}
 deployment
 deployment deploy <id> <environmentId> {--version-id --variable-overrides --body --out}
@@ -81,7 +81,7 @@ knowledge delete <id> {--out}
 knowledge delete-document <id> {--out}
 knowledge documents <id> {--limit --cursor --order --out}
 knowledge get <id> {--out}
-knowledge list {--out}
+knowledge list {--limit --cursor --out}
 knowledge query <id> {--text --top-k --mode --hybrid --filter --body --out}
 knowledge sync <id> {--out}
 knowledge update <id> {--name --config --pipeline --credential-id --body --out}
@@ -91,14 +91,14 @@ logout
 mcp-exposure
 mcp-exposure create {--workflow-id --environment-id --tool-name --description --body --out}
 mcp-exposure delete <id> {--out}
-mcp-exposure list {--out}
+mcp-exposure list {--limit --cursor --out}
 mcp-server
 mcp-server call <id> <name> {--args --body --out}
 mcp-server create {--name --transport --url --command --args --env --auth-kind --credential-id --body --out}
 mcp-server delete <id> {--out}
 mcp-server discover <id> {--out}
 mcp-server get <id> {--out}
-mcp-server list {--out}
+mcp-server list {--limit --cursor --out}
 mcp-server policy <id> {--allow --deny --approval-required --body --out}
 mcp-server prompts <id> {--out}
 mcp-server resources <id> {--out}
@@ -114,7 +114,7 @@ me revoke-session <id> {--out}
 me sessions {--out}
 member
 member add <id> {--email --role --body --out}
-member list <id> {--out}
+member list <id> {--limit --cursor --out}
 member remove <id> <userId> {--out}
 member update <id> <userId> {--role --body --out}
 metrics
@@ -129,7 +129,7 @@ notification
 notification create {--kind --name --config --events --enabled --slack-webhook-url --body --out}
 notification delete <id> {--out}
 notification events {--out}
-notification list {--out}
+notification list {--limit --cursor --out}
 notification rotate-secret <id> {--out}
 notification test <id> {--out}
 notification update <id> {--name --config --events --enabled --slack-webhook-url --body --out}
@@ -178,7 +178,7 @@ run start <id> {--input --mode --environment-id --version-id --draft --session-i
 run start-version <id> {--input --mode --environment-id --session-id --variables --labels --wait-timeout-ms --body --out}
 run stream <id> {--after --no-deltas --until}
 schedule
-schedule list {--workflow-id --out}
+schedule list {--limit --cursor --workflow-id --out}
 schedule trigger <id> {--out}
 schedule update <id> {--enabled --overlap --catch-up --max-catch-up --jitter-ms --cron --body --out}
 secret
@@ -204,7 +204,7 @@ tool catalog {--out}
 tool delete <id> {--out}
 tool get <id> {--out}
 tool invoke <id> {--tool --args --body --out}
-tool list {--out}
+tool list {--limit --cursor --out}
 tool openapi-import {--url --document --format --name --server-url --include --credential-id --body --out}
 tool openapi-preview {--url --document --format --body --out}
 tool update <id> {--name --credential-id --body --out}
@@ -213,16 +213,16 @@ version
 version diff <id> <otherId> {--out}
 version export <id> {--format --out}
 version get <id> {--include --out}
-version list <id> {--out}
+version list <id> {--limit --cursor --out}
 version package <id> {--mode --include-sample-from-run-id --include-recorded-run-id --body --out}
 version restore <id> {--out}
 view
 view delete <id> {--out}
-view list {--scope --out}
+view list {--limit --cursor --scope --out}
 view save {--scope --name --filters --body --out}
 webhook
 webhook deliveries <id> {--limit --cursor --order --out}
-webhook list {--workflow-id --out}
+webhook list {--limit --cursor --workflow-id --out}
 webhook rotate-secret <id> {--out}
 webhook update <id> {--secret-credential-id --callback-url --allowed-headers --enabled --require-timestamp --idempotency-header --path --body --out}
 workflow

@@ -22,7 +22,7 @@ import {
   Switch,
 } from "@flowaid/ui/primitives";
 import { RelativeTime } from "@flowaid/ui/data";
-import { get, patch, post, qs } from "~/api/client";
+import { get, getAll, patch, post } from "~/api/client";
 import type { Page } from "~/api/types";
 import { useSession } from "~/session";
 import type { Webhook as WebhookRow, WebhookDelivery } from "../types";
@@ -30,6 +30,17 @@ import { Notice, OneTimeSecretDialog, QueryView, useMutate } from "../ui";
 import { DELIVERY_LABEL, deliveryTone } from "./logic";
 import { exampleWebhookRequest } from "./add";
 import { NoTriggers } from "./AddTriggerDialog";
+import { ListHelp, WEBHOOK_TERMS } from "./ListHelp";
+
+/** The live webhooks (one workflow's, or all); shared with the Triggers page's checks. */
+export function useWebhooks(workflowId?: string) {
+  const s = useSession();
+  return useQuery({
+    queryKey: ["triggers", s.ws, workflowId ?? "*", "webhooks"],
+    queryFn: () => getAll<WebhookRow>("/v1/webhooks", { workflowId }),
+    enabled: s.can("webhooks:write"),
+  });
+}
 
 export function WebhookList({
   workflowId,
@@ -42,22 +53,22 @@ export function WebhookList({
   highlight?: string | null;
 }) {
   const s = useSession();
-  const [secret, setSecret] = useState<string | null>(null);
+  const [secret, setSecret] = useState<{ value: string; env: string } | null>(null);
   const [log, setLog] = useState<WebhookRow | null>(null);
   const key = ["triggers", s.ws, workflowId ?? "*", "webhooks"];
-  const hooks = useQuery({
-    queryKey: key,
-    queryFn: () => get<WebhookRow[]>(`/v1/webhooks${qs({ workflowId })}`),
-    enabled: s.can("webhooks:write"),
-  });
+  const hooks = useWebhooks(workflowId);
   const envName = (id: string) => s.environments.find((e) => e.id === id)?.name ?? id.slice(0, 8);
   const patchHook = useMutate(
     (v: { id: string; body: Record<string, unknown> }) => patch(`/v1/webhooks/${v.id}`, v.body),
     { success: "Webhook updated", invalidate: [key] },
   );
   const rotate = useMutate(
-    (id: string) => post<{ secret: string }>(`/v1/webhooks/${id}/rotate-secret`),
-    { invalidate: [key], onSuccess: (r) => setSecret(r.secret) },
+    (h: WebhookRow) => post<{ secret: string }>(`/v1/webhooks/${h.id}/rotate-secret`),
+    {
+      invalidate: [key],
+      onSuccess: (r, h) => setSecret({ value: r.secret, env: envName(h.environmentId) }),
+      errorTitle: "Could not create the signing secret",
+    },
   );
 
   if (!s.can("webhooks:write"))
@@ -69,160 +80,163 @@ export function WebhookList({
           rows.length === 0 ? (
             <NoTriggers kind="webhook" {...(workflowId ? { workflowId } : {})} />
           ) : (
-            <ul
-              className="flex flex-col divide-y divide-border rounded-md border border-border"
-              role="list"
-            >
-              {rows.map((h) => (
-                <li
-                  key={h.id}
-                  className={
-                    "flex flex-col gap-2 px-3 py-2.5 " +
-                    (highlight === h.id ? "bg-accent-soft" : "")
-                  }
-                >
-                  <div className="flex items-center gap-2">
-                    <Webhook
-                      strokeWidth={1.75}
-                      className="size-3.5 shrink-0 text-ink-3"
-                      aria-hidden="true"
-                    />
-                    {workflowName ? (
-                      <a
-                        className="shrink-0 text-xs font-medium text-ink hover:underline"
-                        href={`/${s.ws}/workflows/${h.workflowId}/settings?tab=triggers`}
-                      >
-                        {workflowName(h.workflowId)}
-                      </a>
-                    ) : null}
-                    <Badge mono>{envName(h.environmentId)}</Badge>
-                    <code className="min-w-0 flex-1 truncate font-mono text-2xs text-ink">
-                      {h.url}
-                    </code>
-                    <CopyButton value={h.url} label="Copy URL" size="sm" />
-                  </div>
-                  <div className="flex flex-wrap items-center gap-4 text-xs text-ink-2">
-                    <label className="flex items-center gap-2">
-                      <Switch
-                        size="sm"
-                        checked={h.enabled}
-                        onCheckedChange={(c) =>
-                          patchHook.mutate({ id: h.id, body: { enabled: c } })
-                        }
+            <>
+              <ListHelp terms={WEBHOOK_TERMS} />
+              <ul
+                className="flex flex-col divide-y divide-border rounded-md border border-border"
+                role="list"
+              >
+                {rows.map((h) => (
+                  <li
+                    key={h.id}
+                    className={
+                      "flex flex-col gap-2 px-3 py-2.5 " +
+                      (highlight === h.id ? "bg-accent-soft" : "")
+                    }
+                  >
+                    <div className="flex items-center gap-2">
+                      <Webhook
+                        strokeWidth={1.75}
+                        className="size-3.5 shrink-0 text-ink-3"
+                        aria-hidden="true"
                       />
-                      Enabled
-                    </label>
-                    <label className="flex items-center gap-2">
-                      <Switch
-                        size="sm"
-                        checked={h.requireTimestamp}
-                        disabled={h.signature !== "hmac_sha256"}
-                        onCheckedChange={(c) =>
-                          patchHook.mutate({ id: h.id, body: { requireTimestamp: c } })
-                        }
-                      />
-                      Require signed timestamp
-                    </label>
-                    <label className="flex items-center gap-2">
-                      Idempotency header
-                      <Input
-                        size="sm"
-                        mono
-                        className="w-44"
-                        placeholder="body hash"
-                        aria-label="Idempotency header"
-                        defaultValue={h.idempotencyHeader ?? ""}
-                        key={`${h.id}:${h.idempotencyHeader ?? ""}`}
-                        onBlur={(e) => {
-                          const v = e.target.value.trim();
-                          if (v === (h.idempotencyHeader ?? "")) return;
-                          patchHook.mutate({ id: h.id, body: { idempotencyHeader: v || null } });
-                        }}
-                      />
-                    </label>
-                    {h.signature === "none" ? (
-                      <Badge tone="warn" dot>
-                        Unsigned
-                      </Badge>
-                    ) : (
-                      <span className="flex items-center gap-1.5">
-                        {h.secretBound ? (
-                          <Badge tone="ok" dot>
-                            Signed ({h.signature})
-                          </Badge>
-                        ) : (
-                          <Badge tone="warn" dot>
-                            No signing secret
-                          </Badge>
-                        )}
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          leadingIcon={<KeyRound strokeWidth={1.75} />}
-                          loading={rotate.isPending && rotate.variables === h.id}
-                          onClick={() => rotate.mutate(h.id)}
+                      {workflowName ? (
+                        <a
+                          className="shrink-0 text-xs font-medium text-ink hover:underline"
+                          href={`/${s.ws}/workflows/${h.workflowId}/settings?tab=triggers`}
                         >
-                          {h.secretBound ? "Rotate secret" : "Generate secret"}
-                        </Button>
-                      </span>
-                    )}
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      leadingIcon={<History strokeWidth={1.75} />}
-                      onClick={() => setLog(h)}
-                    >
-                      Deliveries
-                    </Button>
-                    <span className="ml-auto text-2xs text-ink-3">
-                      {h.lastReceivedAt ? (
-                        <>
-                          last call <RelativeTime date={h.lastReceivedAt} />
-                        </>
-                      ) : (
-                        "never called"
-                      )}
-                    </span>
-                  </div>
-                  <details className="group text-xs">
-                    <summary className="cursor-pointer select-none text-ink-3 hover:text-ink">
-                      Example request
-                    </summary>
-                    <div className="mt-2 flex items-start gap-2">
-                      <pre className="min-w-0 flex-1 overflow-x-auto rounded-md border border-border bg-surface-2 p-2 font-mono text-2xs text-ink">
-                        {exampleWebhookRequest(
-                          h.url,
-                          h.signature as "hmac_sha256" | "token" | "none",
-                        )}
-                      </pre>
-                      <CopyButton
-                        value={exampleWebhookRequest(
-                          h.url,
-                          h.signature as "hmac_sha256" | "token" | "none",
-                        )}
-                        label="Copy example request"
-                        size="sm"
-                      />
+                          {workflowName(h.workflowId)}
+                        </a>
+                      ) : null}
+                      <Badge mono>{envName(h.environmentId)}</Badge>
+                      <code className="min-w-0 flex-1 truncate font-mono text-2xs text-ink">
+                        {h.url}
+                      </code>
+                      <CopyButton value={h.url} label="Copy URL" size="sm" />
                     </div>
-                    <p className="mt-1.5 text-ink-3">
-                      {h.signature === "hmac_sha256"
-                        ? "Replace <signing secret> with the secret you generated; the signature covers the timestamp and the raw body, and each one is accepted once."
-                        : h.signature === "token"
-                          ? "Replace <signing secret> with the secret you generated."
-                          : "Unsigned: anyone who knows this URL can start runs."}{" "}
-                      The JSON body becomes the run&apos;s input.
-                    </p>
-                  </details>
-                </li>
-              ))}
-            </ul>
+                    <div className="flex flex-wrap items-center gap-4 text-xs text-ink-2">
+                      <label className="flex items-center gap-2">
+                        <Switch
+                          size="sm"
+                          checked={h.enabled}
+                          onCheckedChange={(c) =>
+                            patchHook.mutate({ id: h.id, body: { enabled: c } })
+                          }
+                        />
+                        Enabled
+                      </label>
+                      <label className="flex items-center gap-2">
+                        <Switch
+                          size="sm"
+                          checked={h.requireTimestamp}
+                          disabled={h.signature !== "hmac_sha256"}
+                          onCheckedChange={(c) =>
+                            patchHook.mutate({ id: h.id, body: { requireTimestamp: c } })
+                          }
+                        />
+                        Require signed timestamp
+                      </label>
+                      <label className="flex items-center gap-2">
+                        Idempotency header
+                        <Input
+                          size="sm"
+                          mono
+                          className="w-44"
+                          placeholder="body hash"
+                          aria-label="Idempotency header"
+                          defaultValue={h.idempotencyHeader ?? ""}
+                          key={`${h.id}:${h.idempotencyHeader ?? ""}`}
+                          onBlur={(e) => {
+                            const v = e.target.value.trim();
+                            if (v === (h.idempotencyHeader ?? "")) return;
+                            patchHook.mutate({ id: h.id, body: { idempotencyHeader: v || null } });
+                          }}
+                        />
+                      </label>
+                      {h.signature === "none" ? (
+                        <Badge tone="warn" dot>
+                          Unsigned
+                        </Badge>
+                      ) : (
+                        <span className="flex items-center gap-1.5">
+                          {h.secretBound ? (
+                            <Badge tone="ok" dot>
+                              Signed ({h.signature})
+                            </Badge>
+                          ) : (
+                            <Badge tone="warn" dot>
+                              No signing secret: calls are refused
+                            </Badge>
+                          )}
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            leadingIcon={<KeyRound strokeWidth={1.75} />}
+                            loading={rotate.isPending && rotate.variables?.id === h.id}
+                            onClick={() => rotate.mutate(h)}
+                          >
+                            {h.secretBound ? "Rotate secret" : "Generate secret"}
+                          </Button>
+                        </span>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        leadingIcon={<History strokeWidth={1.75} />}
+                        onClick={() => setLog(h)}
+                      >
+                        Deliveries
+                      </Button>
+                      <span className="ml-auto text-2xs text-ink-3">
+                        {h.lastReceivedAt ? (
+                          <>
+                            last call <RelativeTime date={h.lastReceivedAt} />
+                          </>
+                        ) : (
+                          "never called"
+                        )}
+                      </span>
+                    </div>
+                    <details className="group text-xs">
+                      <summary className="cursor-pointer select-none text-ink-3 hover:text-ink">
+                        Example request
+                      </summary>
+                      <div className="mt-2 flex items-start gap-2">
+                        <pre className="min-w-0 flex-1 overflow-x-auto rounded-md border border-border bg-surface-2 p-2 font-mono text-2xs text-ink">
+                          {exampleWebhookRequest(
+                            h.url,
+                            h.signature as "hmac_sha256" | "token" | "none",
+                          )}
+                        </pre>
+                        <CopyButton
+                          value={exampleWebhookRequest(
+                            h.url,
+                            h.signature as "hmac_sha256" | "token" | "none",
+                          )}
+                          label="Copy example request"
+                          size="sm"
+                        />
+                      </div>
+                      <p className="mt-1.5 text-ink-3">
+                        {h.signature === "hmac_sha256"
+                          ? "Replace <signing secret> with the secret you generated; the signature covers the timestamp and the raw body, and each one is accepted once."
+                          : h.signature === "token"
+                            ? "Replace <signing secret> with the secret you generated."
+                            : "Unsigned: anyone who knows this URL can start runs."}{" "}
+                        The JSON body becomes the run&apos;s input.
+                      </p>
+                    </details>
+                  </li>
+                ))}
+              </ul>
+            </>
           )
         }
       </QueryView>
       <OneTimeSecretDialog
-        secret={secret}
-        title="Webhook signing secret"
-        description="Configure the sender with it now; it is stored as a credential and cannot be shown again."
+        secret={secret?.value ?? null}
+        title={`Webhook signing secret for ${secret?.env ?? "this environment"}`}
+        description="Give it to the sender now: it is stored encrypted and cannot be shown again. It works only in this environment, and any earlier secret here stops working."
         onClose={() => setSecret(null)}
       />
       <DeliveriesSheet hook={log} onClose={() => setLog(null)} />

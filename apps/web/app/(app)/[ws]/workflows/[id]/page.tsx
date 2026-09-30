@@ -10,7 +10,7 @@ import { AppFrame, PageBody } from "~/shell/AppFrame";
 import { ErrorPanel } from "~/shell/states";
 
 export default function BuilderPage({ params }: { params: Promise<{ ws: string; id: string }> }) {
-  const { id } = use(params);
+  const { ws, id } = use(params);
   const workflow = useQuery({
     queryKey: ["workflow", id],
     queryFn: () => get<WorkflowDetail>(`/v1/workflows/${id}`),
@@ -36,6 +36,7 @@ export default function BuilderPage({ params }: { params: Promise<{ ws: string; 
           <ErrorPanel
             error={failed}
             onRetry={() => void Promise.all([workflow.refetch(), nodes.refetch(), tools.refetch()])}
+            back={{ href: `/${ws}/workflows`, label: "All workflows" }}
           />
         </PageBody>
       </AppFrame>

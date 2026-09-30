@@ -24,7 +24,7 @@ import {
   RadioGroup,
   RadioItem,
 } from "@flowaid/ui/primitives";
-import { get } from "~/api/client";
+import { get, getAll } from "~/api/client";
 import { useSession } from "~/session";
 import { providerName } from "~/admin/providerNames";
 import type { BuilderStore } from "./store";
@@ -38,7 +38,7 @@ import {
   type KeySources,
 } from "./keySources";
 
-function useKeySources(): KeySources {
+export function useKeySources(): KeySources {
   const s = useSession();
   const providers = useQuery({
     queryKey: ["providers", s.ws],
@@ -47,7 +47,7 @@ function useKeySources(): KeySources {
   });
   const credentials = useQuery({
     queryKey: ["credentials", s.ws],
-    queryFn: () => get<{ type: string }[]>("/v1/credentials"),
+    queryFn: () => getAll<{ type: string }>("/v1/credentials"),
     enabled: s.can("credentials:read"),
   });
   return {

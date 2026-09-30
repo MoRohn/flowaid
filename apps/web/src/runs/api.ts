@@ -5,7 +5,7 @@
  */
 import { useQueries, useQuery } from "@tanstack/react-query";
 import type { NodeManifest } from "@flowaid/workflow-core";
-import { get, qs } from "~/api/client";
+import { get, getAll, qs } from "~/api/client";
 import type { Member, Page, VersionSummary, WorkflowSummary } from "~/api/types";
 import type { Catalog, EventPage } from "./types";
 
@@ -39,7 +39,7 @@ export function useVersionNumbers(ws: string, workflowIds: readonly string[]) {
   const results = useQueries({
     queries: unique.map((id) => ({
       queryKey: ["versions", ws, id],
-      queryFn: () => get<VersionSummary[]>(`/v1/workflows/${id}/versions`),
+      queryFn: () => getAll<VersionSummary>(`/v1/workflows/${id}/versions`),
       staleTime: 60_000,
     })),
   });
@@ -71,7 +71,7 @@ export async function fetchAllEvents(runId: string, signal?: AbortSignal): Promi
 export function useMembers(ws: string, workspaceId: string | null) {
   return useQuery({
     queryKey: ["members", ws],
-    queryFn: () => get<Member[]>(`/v1/workspaces/${workspaceId as string}/members`),
+    queryFn: () => getAll<Member>(`/v1/workspaces/${workspaceId as string}/members`),
     enabled: Boolean(workspaceId),
     staleTime: 5 * 60_000,
     retry: false,

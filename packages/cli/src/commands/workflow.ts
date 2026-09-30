@@ -49,13 +49,16 @@ export async function versionIdFor(
   const n = Number(version);
   if (!Number.isInteger(n) || n < 1)
     throw new Error(`--version must be a version number or 'draft' (got ${version})`);
-  const versions = await fa.transport.request<{ id: string; version: number }[]>(
-    "GET",
-    `/v1/workflows/${encodeURIComponent(workflowId)}/versions`,
-  );
-  const match = versions.find((v) => v.version === n);
-  if (!match) throw new Error(`workflow ${workflowId} has no published version ${n}`);
-  return match.id;
+  // Pages come newest first: stop once they pass version n.
+  let cursor: string | undefined;
+  do {
+    const page = await fa.workflows.versions(workflowId, { limit: 200, cursor });
+    const match = page.items.find((v) => v.version === n);
+    if (match) return match.id;
+    if (page.items.some((v) => v.version !== null && v.version < n)) break;
+    cursor = page.next_cursor ?? undefined;
+  } while (cursor);
+  throw new Error(`workflow ${workflowId} has no published version ${n}`);
 }
 
 async function runRemote(io: CliIO, g: GlobalOptions, id: string, o: RunFlags): Promise<void> {

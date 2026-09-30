@@ -191,7 +191,7 @@ export function PluginsTab() {
       {admin ? (
         <Section
           title="Install a package"
-          description="Only packages on the server's allow-list (FLOWAID_PLUGIN_ALLOWED_SCOPES) can be installed."
+          description="Only packages on the server's allow-list (FLOWAID_PLUGIN_ALLOWED_SCOPES) can be installed. The server checks the package against its published integrity; restart the workers afterwards so its steps appear in the palette."
         >
           <form
             className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end"

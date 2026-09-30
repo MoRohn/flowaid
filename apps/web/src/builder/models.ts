@@ -7,7 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import type { ModelView } from "@flowaid/ui";
 import type { ModelInfo } from "@flowaid/workflow-core";
-import { get } from "~/api/client";
+import { get, getAll } from "~/api/client";
 import { useSession } from "~/session";
 
 const LOCAL_PROVIDERS = new Set(["ollama", "vllm"]);
@@ -66,7 +66,7 @@ export function useModelViews(): ModelView[] {
   });
   const credentials = useQuery({
     queryKey: ["credentials", s.ws],
-    queryFn: () => get<{ type: string }[]>("/v1/credentials"),
+    queryFn: () => getAll<{ type: string }>("/v1/credentials"),
     enabled: s.can("credentials:read"),
   });
   const keys = useMemo(

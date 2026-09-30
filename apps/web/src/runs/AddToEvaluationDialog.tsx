@@ -19,7 +19,7 @@ import {
   SelectItem,
   toast,
 } from "@flowaid/ui/primitives";
-import { get, post, qs } from "~/api/client";
+import { getAll, post } from "~/api/client";
 import { errorMessage } from "~/shell/states";
 import type { EvaluationSetSummary } from "./types";
 
@@ -45,7 +45,7 @@ export function AddToEvaluationDialog({
   const [expectOutput, setExpectOutput] = useState(output !== undefined && output !== null);
   const sets = useQuery({
     queryKey: ["evaluation-sets", ws, workflowId],
-    queryFn: () => get<EvaluationSetSummary[]>(`/v1/evaluations/sets${qs({ workflowId })}`),
+    queryFn: () => getAll<EvaluationSetSummary>("/v1/evaluations/sets", { workflowId }),
     enabled: open,
   });
   // the only set that fits this workflow is the one meant

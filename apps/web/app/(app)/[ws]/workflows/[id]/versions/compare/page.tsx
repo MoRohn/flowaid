@@ -7,12 +7,15 @@ import { Button, EmptyState, Select, SelectItem } from "@flowaid/ui/primitives";
 import { VersionCompare } from "@flowaid/ui/builder";
 import { DiffView } from "@flowaid/ui/data";
 import type { WorkflowDiff } from "@flowaid/ui";
-import { get, qs } from "~/api/client";
+import { get, getAll, qs } from "~/api/client";
 import type { Deployment, Page, VersionDetail, VersionSummary } from "~/api/types";
 import { WorkflowFrame } from "~/admin/WorkflowFrame";
 import { summaryMetrics, versionView } from "~/admin/logic";
 import type { EvaluationRun } from "~/admin/types";
 import { Notice, QueryView, Section, useMembers } from "~/admin/ui";
+import { VERSION_COMPARE } from "~/guide/capabilities/workflow";
+import { PageIntro } from "~/guide/PageIntro";
+import { publishedCheck } from "~/workflows/readiness";
 import { useSession } from "~/session";
 
 /** The latest completed evaluation of a version, if any. */
@@ -31,7 +34,7 @@ function Compare({ id }: { id: string }) {
   const params = useSearchParams();
   const versions = useQuery({
     queryKey: ["versions", s.ws, id],
-    queryFn: () => get<VersionSummary[]>(`/v1/workflows/${id}/versions`),
+    queryFn: () => getAll<VersionSummary>(`/v1/workflows/${id}/versions`),
   });
   const published = (versions.data ?? [])
     .filter((v) => v.kind === "published")
@@ -113,6 +116,12 @@ function Compare({ id }: { id: string }) {
 
   return (
     <div className="flex flex-col gap-5">
+      <PageIntro
+        guide={VERSION_COMPARE}
+        checks={[publishedCheck(versions.data ? published.length : undefined, s.ws, id, 2)]}
+        defaultCollapsed={!versions.isSuccess || published.length >= 2}
+        className=""
+      />
       {published.length >= 2 ? (
         <div className="flex flex-wrap items-center gap-4">
           {picker("a", a, "Base")}

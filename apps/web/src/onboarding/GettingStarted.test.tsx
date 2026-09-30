@@ -16,6 +16,8 @@ vi.mock("~/session", () => ({
 const responses: Record<string, unknown> = {};
 vi.mock("~/api/client", () => ({
   get: (path: string) => Promise.resolve(responses[path.split("?")[0] as string]),
+  getAll: (path: string) =>
+    Promise.resolve((responses[path.split("?")[0] as string] as { items: unknown[] }).items),
 }));
 
 import { GettingStarted } from "./GettingStarted";
@@ -41,11 +43,11 @@ beforeEach(() => {
   push.mockReset();
   Object.assign(responses, {
     "/v1/providers": [{ id: "typesafe", configuredOnServer: true }],
-    "/v1/credentials": [],
+    "/v1/credentials": { items: [], next_cursor: null },
     "/v1/workflows": { items: [{ id: "w1", latestVersion: null }], next_cursor: null },
     "/v1/runs": { items: [], next_cursor: null },
     "/v1/human-tasks": { items: [], next_cursor: null },
-    "/v1/api-keys": [],
+    "/v1/api-keys": { items: [], next_cursor: null },
   });
 });
 

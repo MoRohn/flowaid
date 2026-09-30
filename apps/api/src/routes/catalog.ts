@@ -16,6 +16,14 @@ import {
 import { ForbiddenError, NotFoundError, type ToolDefinition } from "@flowaid/workflow-core";
 import { assertEnvironmentAllowed } from "../auth/principal.js";
 import type { ApiContext } from "../context.js";
+import { NoContent } from "../dto/common.js";
+import {
+  ModelDtoSchema,
+  NodeManifestDtoSchema,
+  ProviderDtoSchema,
+  ToolDefinitionDtoSchema,
+  WorkflowSignatureSchema,
+} from "../dto/catalog.js";
 import { visibleWorkflow } from "../services/workflows.js";
 import { loadEnabledPlugins } from "../services/plugins.js";
 
@@ -44,12 +52,16 @@ export function catalogRoutes(app: FastifyInstance, ctx: ApiContext): void {
         scope: "workflows:read",
         cli: { noun: "node", verb: "list" },
       },
-      schema: { tags: ["catalog"], summary: "Node manifests (core, bundled and enabled plugins)" },
+      schema: {
+        tags: ["catalog"],
+        summary: "Node manifests (core, bundled and enabled plugins)",
+        response: { 200: z.array(NodeManifestDtoSchema), 304: NoContent },
+      },
     },
     async (req, reply) => {
       const { manifests, etag } = await catalogFor(ctx, req.principal?.workspaceId ?? null);
       void reply.header("etag", etag).header("cache-control", "private, max-age=60");
-      if (req.headers["if-none-match"] === etag) return reply.code(304).send();
+      if (req.headers["if-none-match"] === etag) return reply.code(304).send(null);
       return manifests;
     },
   );
@@ -66,6 +78,7 @@ export function catalogRoutes(app: FastifyInstance, ctx: ApiContext): void {
         tags: ["catalog"],
         params: z.object({ typeId: z.string().min(1).max(200) }),
         querystring: z.object({ version: z.string().optional() }),
+        response: { 200: NodeManifestDtoSchema },
       },
     },
     async (req) => {
@@ -90,6 +103,7 @@ export function catalogRoutes(app: FastifyInstance, ctx: ApiContext): void {
       schema: {
         tags: ["catalog"],
         summary: "Tool signatures the compiler resolves (MCP, OpenAPI, workflows)",
+        response: { 200: z.array(ToolDefinitionDtoSchema) },
       },
     },
     async (req) => {
@@ -124,6 +138,7 @@ export function catalogRoutes(app: FastifyInstance, ctx: ApiContext): void {
           environmentId: z.uuid().optional(),
           versionId: z.uuid().optional(),
         }),
+        response: { 200: WorkflowSignatureSchema },
       },
     },
     async (req) => {
@@ -192,6 +207,7 @@ export function catalogRoutes(app: FastifyInstance, ctx: ApiContext): void {
           provider: z.string().optional(),
           kind: z.enum(["decision", "chat", "embedding", "rerank"]).optional(),
         }),
+        response: { 200: z.array(ModelDtoSchema) },
       },
     },
     (req) =>
@@ -212,6 +228,7 @@ export function catalogRoutes(app: FastifyInstance, ctx: ApiContext): void {
       schema: {
         tags: ["catalog"],
         summary: "Providers with their credential types and whether the server has them configured",
+        response: { 200: z.array(ProviderDtoSchema) },
       },
     },
     () => {

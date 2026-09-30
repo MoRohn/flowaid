@@ -54,6 +54,7 @@ import {
   GLOSSARY,
   PAGE_GUIDES,
   RUN_GUIDE,
+  WORKFLOW_PAGE_GUIDES,
   sectionOf,
   type PageGuide,
 } from "./pages";
@@ -65,6 +66,10 @@ export const GUIDE_WIDTH = 380;
 function guideFor(pathname: string, context: GuideContext | null): PageGuide | undefined {
   if (context?.kind === "builder") return BUILDER_GUIDE;
   if (context?.kind === "run") return RUN_GUIDE;
+  // /ws/workflows/<id>/<page>: the workflow's own page, not the list
+  const [, , section, id, page] = pathname.split("/");
+  if (section === "workflows" && id && id !== "new" && page && WORKFLOW_PAGE_GUIDES[page])
+    return WORKFLOW_PAGE_GUIDES[page];
   return PAGE_GUIDES[sectionOf(pathname)];
 }
 

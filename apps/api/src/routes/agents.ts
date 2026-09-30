@@ -23,7 +23,8 @@ import {
 } from "@flowaid/workflow-core";
 import type { Principal } from "../auth/principal.js";
 import type { ApiContext } from "../context.js";
-import { IdParams, NoContent } from "../dto/common.js";
+import { IdParams, NoContent, PageQuery, afterCursor, page, toPage } from "../dto/common.js";
+import { ToolDtoSchema } from "../dto/catalog.js";
 
 const need = (p: Principal | null | undefined): Principal => {
   if (!p) throw new ForbiddenError("no principal");
@@ -104,19 +105,23 @@ export function agentRoutes(app: FastifyInstance, ctx: ApiContext): void {
         scope: "tools:read",
         cli: { noun: "agent", verb: "list" },
       },
-      schema: { tags: ["agents"], response: { 200: z.array(AgentDto) } },
+      schema: { tags: ["agents"], querystring: PageQuery, response: { 200: page(AgentDto) } },
     },
     async (req) => {
       enabled();
       const p = need(req.principal);
+      const { limit, cursor } = req.query;
       const rows = await ctx.db.tenant(p.workspaceId, (tx) =>
         tx
           .select()
           .from(agents)
-          .where(eq(agents.workspaceId, p.workspaceId))
-          .orderBy(asc(agents.name)),
+          .where(
+            and(eq(agents.workspaceId, p.workspaceId), afterCursor(agents.name, agents.id, cursor)),
+          )
+          .orderBy(asc(agents.name), asc(agents.id))
+          .limit(limit + 1),
       );
-      return rows.map(agentDto);
+      return toPage(rows, limit, (a) => [a.name, a.id], agentDto);
     },
   );
 
@@ -263,6 +268,7 @@ export function agentRoutes(app: FastifyInstance, ctx: ApiContext): void {
           description: z.string().min(1).max(4000),
           approvalRequired: z.boolean().default(false),
         }),
+        response: { 201: ToolDtoSchema },
       },
     },
     async (req, reply) => {

@@ -116,7 +116,7 @@ export const PAGE_GUIDES: Readonly<Record<string, PageGuide>> = {
     purpose: "Ready-made workflows to start from. Business flows run as soon as you create them.",
     steps: [
       "Read what a flow does and what it needs; “Ready to run” means everything is set up.",
-      "Choose Use template, name it, and create it. You get your own copy.",
+      "Use template checks what it needs against your workspace, then names your copy. Missing keys are warnings, not blockers.",
       "In the builder, press Run draft to try it with an example.",
     ],
     actions: [{ label: "Or start from a blank workflow", to: "workflows/new" }],
@@ -127,7 +127,8 @@ export const PAGE_GUIDES: Readonly<Record<string, PageGuide>> = {
     purpose: "Every workflow in this workspace. Open one to see its steps, try it, and change it.",
     steps: [
       "Open a workflow to see its steps on the canvas.",
-      "New workflow starts from a template, a blank canvas, or a file.",
+      "New workflow walks you through naming it and choosing how to start: describe it, blank, a template, or an import.",
+      "Each workflow's Versions, Deployments and Settings pages explain what publishing and deploying change.",
     ],
     actions: [
       { label: "New workflow", to: "workflows/new" },
@@ -158,10 +159,12 @@ export const PAGE_GUIDES: Readonly<Record<string, PageGuide>> = {
   },
   credentials: {
     title: "Credentials",
-    purpose: "The keys FlowAId uses to reach other services, stored encrypted.",
+    purpose:
+      "The keys FlowAId uses to reach other services, stored encrypted and never shown again.",
     steps: [
-      "Add a key for a service, such as TypeSafe or OpenAI. It is tested when you save it.",
-      "Workflows use keys through their Settings → Secrets, per environment.",
+      "New credential walks through the service, the secret, where it may be used, and a review.",
+      "Choose the environments and workflows it may be used in; narrower is safer.",
+      "Workflows use it through a step's key slot and Settings → Secrets, per environment.",
     ],
     actions: [],
     terms: ["key", "environment"],
@@ -169,8 +172,12 @@ export const PAGE_GUIDES: Readonly<Record<string, PageGuide>> = {
   triggers: {
     title: "Triggers",
     purpose:
-      "Ways to start workflows automatically: web addresses other systems call, and schedules.",
-    steps: ["Add a webhook or a schedule to a workflow; it goes live when a version is deployed."],
+      "Ways to start workflows automatically: web addresses other systems call, schedules, and tools for MCP clients.",
+    steps: [
+      "Add a webhook or schedule step by step; it is written into the workflow's draft.",
+      "It goes live in an environment only when a version with it is published and deployed there.",
+      "Each tab's lists explain signing secrets, replay protection, missed runs and Run now.",
+    ],
     actions: [],
     terms: ["publish", "environment"],
   },
@@ -178,7 +185,11 @@ export const PAGE_GUIDES: Readonly<Record<string, PageGuide>> = {
     title: "Settings",
     purpose:
       "Workspace settings: API keys for your code, environments, notifications and the audit log.",
-    steps: ["Create an API key to call your workflows from your own systems."],
+    steps: [
+      "Each tab starts with what it is for and what is already set up.",
+      "New API key walks through what it may do, where and for how long; the key is shown once.",
+      "Notifications are only sent for real events, or when you press Send a test.",
+    ],
     actions: [],
     terms: ["environment", "key"],
   },
@@ -186,28 +197,44 @@ export const PAGE_GUIDES: Readonly<Record<string, PageGuide>> = {
     title: "Evaluations",
     purpose:
       "Test sets that check a workflow still answers correctly before you publish a new version.",
-    steps: ["Build a set from real runs, then run it against a version to compare results."],
+    steps: [
+      "New set names what it checks and which workflow it belongs to.",
+      "Add cases by hand or from real runs with Add to evaluation; cover typical, edge and must-escalate requests.",
+      "Starting an evaluation runs the workflow once per case and costs what those runs cost; the report separates finished runs from passed cases.",
+    ],
     actions: [],
     terms: ["publish", "confidence"],
   },
   knowledge: {
     title: "Knowledge",
     purpose: "Documents and pages your workflows can search and cite.",
-    steps: ["Add a source, let it index, then use it from a workflow's retrieval step."],
+    steps: [
+      "New source walks through where documents come from and how they are searched.",
+      "Add documents, check each shows Indexed, then try a search on the source's page.",
+      "Use it from a Knowledge base or Hybrid search step in a workflow.",
+    ],
     actions: [],
     terms: ["workflow"],
   },
   integrations: {
     title: "Integrations",
-    purpose: "Connect AI providers, tool servers and APIs your workflows can use.",
-    steps: ["Connect a provider or server once; every workflow can then use it."],
+    purpose: "Connect tool servers, APIs and model providers your workflows and agents can use.",
+    steps: [
+      "Each tab says when to use it: MCP servers, OpenAPI tools, providers or plugins.",
+      "Connecting a server or importing an API is step by step; nothing is contacted until you press Test connection or Discover tools.",
+      "Connected tools appear in the Agents tool list and in MCP and OpenAPI steps.",
+    ],
     actions: [],
     terms: ["key"],
   },
   agents: {
     title: "Agents",
     purpose: "Reusable AI helpers that can use tools within limits you set.",
-    steps: ["Create an agent, give it tools, and use it as a step in a workflow."],
+    steps: [
+      "New agent walks through its job, model, instructions, tools and limits, then a review.",
+      "Add an Agent step to a workflow and choose the agent under Agent preset.",
+      "Run the draft; the trace shows each model turn and tool call.",
+    ],
     actions: [],
     terms: ["step"],
   },
@@ -237,6 +264,55 @@ export const RUN_GUIDE: PageGuide = {
   ],
   actions: [],
   terms: ["run", "trace", "confidence", "decision"],
+};
+
+/** A workflow's own pages ("/ws/workflows/<id>/<page>"), which the Workflows guide does not cover. */
+export const WORKFLOW_PAGE_GUIDES: Readonly<Record<string, PageGuide>> = {
+  runs: {
+    title: "This workflow's runs",
+    purpose: "Every request this workflow handled, newest first, in every environment.",
+    steps: [
+      "Filter by environment or status to find a run.",
+      "Open a run to read what happened, step by step, and what it cost.",
+      "A failed run can be retried or forked onto a fixed draft from its page.",
+    ],
+    actions: [],
+    terms: ["run", "trace", "environment"],
+  },
+  versions: {
+    title: "Versions",
+    purpose:
+      "Each published, frozen copy of this workflow. Deployments run a version, never the draft.",
+    steps: [
+      "Publish from the builder to add a version.",
+      "Compare two versions to see what changed between them.",
+      "Restoring a version copies it into the draft; nothing is deployed until you deploy.",
+    ],
+    actions: [],
+    terms: ["publish", "draft", "environment"],
+  },
+  deployments: {
+    title: "Deployments",
+    purpose: "Which version each environment runs. API calls, webhooks and schedules use it.",
+    steps: [
+      "Deploy a published version to an environment; its secrets must be bound there first.",
+      "A protected environment (usually prod) accepts deploys only from an admin; on your own computer that is you.",
+      "Roll back by deploying an earlier version.",
+    ],
+    actions: [],
+    terms: ["environment", "publish", "key"],
+  },
+  settings: {
+    title: "Workflow settings",
+    purpose: "Its name and description, secrets per environment, triggers and evaluation gate.",
+    steps: [
+      "Secrets: bind a saved credential to each secret the workflow declares, per environment.",
+      "Triggers: webhooks and schedules are part of the draft and go live when deployed.",
+      "Changes in one tab are kept while you look at another; leaving the page asks first.",
+    ],
+    actions: [],
+    terms: ["key", "environment", "draft"],
+  },
 };
 
 /** The section a path is in: "/ws/templates/…" → "templates", "/ws" → "". */

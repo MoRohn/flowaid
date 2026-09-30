@@ -108,6 +108,27 @@ export function parseUrls(text: string): string[] {
     .filter(Boolean);
 }
 
+/** Lines that are not http(s) web addresses (FlowAId only fetches those). */
+export function badUrls(text: string): string[] {
+  return parseUrls(text).filter((u) => {
+    try {
+      const url = new URL(u);
+      return url.protocol !== "http:" && url.protocol !== "https:";
+    } catch {
+      return true;
+    }
+  });
+}
+
+const notWeb = (bad: string[]) =>
+  `Not a web address (http:// or https://): ${bad.slice(0, 3).join(", ")}${bad.length > 3 ? ` and ${bad.length - 3} more` : ""}`;
+
+/** The field error for a list of page URLs, or a sitemap URL. */
+export function urlFieldError(text: string): string | undefined {
+  const bad = badUrls(text);
+  return bad.length ? notWeb(bad) : undefined;
+}
+
 export interface SourceForm {
   name: string;
   kind: SourceKind;
@@ -160,6 +181,8 @@ export function sourceFormError(f: SourceForm): string | null {
   if (!f.name.trim()) return "Give the source a name";
   if (f.kind === "url" && parseUrls(f.urls).length === 0) return "Add at least one URL";
   if (f.kind === "sitemap" && !f.urls.trim()) return "Add the sitemap URL";
+  if ((f.kind === "url" || f.kind === "sitemap") && badUrls(f.urls).length)
+    return notWeb(badUrls(f.urls));
   if (f.kind === "github" && !/^[\w.-]+\/[\w.-]+$/.test(f.repo.trim()))
     return "Name the repository as owner/name";
   if (f.kind === "pageindex") return f.indexModel.trim() ? null : "Name the indexing model";

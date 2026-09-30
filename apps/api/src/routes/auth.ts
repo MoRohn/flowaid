@@ -30,6 +30,7 @@ import { and, asc, desc, eq, isNull, ne } from "drizzle-orm";
 import { hashSecret, randomToken } from "../auth/apiKey.js";
 import { ACCESS_TTL_S } from "../auth/jwt.js";
 import { hashPassword, passwordProblem, verifyPassword } from "../auth/passwords.js";
+import { sessionUserId } from "../auth/principal.js";
 import type { ApiContext } from "../context.js";
 import { NoContent } from "../dto/common.js";
 import { LoginRequestSchema, MeResponseSchema, SessionResponseSchema } from "../dto/identity.js";
@@ -393,8 +394,7 @@ export function authRoutes(app: FastifyInstance, ctx: ApiContext): void {
       },
     },
     async (req, reply) => {
-      const userId = req.principal?.userId ?? req.sessionOnly?.userId;
-      if (!userId) throw new UnauthorizedError("no session");
+      const userId = sessionUserId(req);
       await ctx.db.system((tx) => revokeAllSessions(tx, userId));
       ctx.auth.invalidateUser(userId);
       clearCookies(ctx, reply);
@@ -423,8 +423,7 @@ export function authRoutes(app: FastifyInstance, ctx: ApiContext): void {
       },
     },
     async (req, reply) => {
-      const userId = req.principal?.userId ?? req.sessionOnly?.userId;
-      if (!userId) throw new UnauthorizedError("no session");
+      const userId = sessionUserId(req);
       const user = await ctx.db.system((tx) => getUser(tx, userId));
       if (!user || !(await verifyPassword(user.passwordHash, req.body.currentPassword)))
         throw new UnauthorizedError("the current password is wrong");
@@ -479,7 +478,7 @@ export function authRoutes(app: FastifyInstance, ctx: ApiContext): void {
       },
     },
     async (req) => {
-      const userId = req.principal?.userId ?? req.sessionOnly?.userId ?? "";
+      const userId = sessionUserId(req);
       const sid = req.principal?.sid ?? req.sessionOnly?.sid;
       const rows = await ctx.db.system((tx) =>
         tx
@@ -515,7 +514,7 @@ export function authRoutes(app: FastifyInstance, ctx: ApiContext): void {
       },
     },
     async (req, reply) => {
-      const userId = req.principal?.userId ?? req.sessionOnly?.userId ?? "";
+      const userId = sessionUserId(req);
       await ctx.db.system(async (tx) => {
         const [t] = await tx
           .select()

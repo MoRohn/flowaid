@@ -1,5 +1,8 @@
 "use client";
-/** API keys: create (scopes, environment and workflow pins, expiry, rate limit), rotate with grace, revoke. */
+/**
+ * API keys: create (scopes, environment and workflow pins, expiry, rate limit) step by step,
+ * rotate with grace, revoke. The key is shown once, with a request that calls a workflow with it.
+ */
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { KeyRound, Plus, RotateCw, Trash2 } from "lucide-react";
@@ -27,16 +30,34 @@ import {
   ToggleGroupItem,
 } from "@flowaid/ui/primitives";
 import { RelativeTime, ScopeChips } from "@flowaid/ui/data";
-import { del, get, post } from "~/api/client";
+import { del, get, getAll, post } from "~/api/client";
 import type { ApiKeySummary, Page, WorkflowSummary } from "~/api/types";
+import { DraftStatus, GuidedFlow, type FlowStep } from "~/guide/GuidedFlow";
+import { CheckList, type Check } from "~/guide/Readiness";
+import { useKeptDraft } from "~/guide/useKeptDraft";
 import { useSession } from "~/session";
+import { HELP } from "~/shell/help";
+import { LearnMore } from "~/shell/LearnMore";
 import { SCOPE_GROUPS, SCOPE_PRESETS, daysUntil } from "../logic";
 import type { CreatedKey } from "../types";
 import { OneTimeSecretDialog, QueryView, Section, useConfirm, useMutate } from "../ui";
 import { useOpenFromQuery } from "~/admin/ui";
+import {
+  ANY_ENVIRONMENT,
+  EXPIRY_DAYS,
+  apiKeyBody,
+  apiKeyChecks,
+  emptyApiKeyDraft,
+  type ApiKeyDraft,
+  type GuidanceCheck,
+} from "./guidance";
 
-const ANY = "__any";
-const EXPIRY_DAYS = [30, 90, 180, 365] as const;
+/** What each ready-made scope set is for, beside its button. */
+const PRESET_USE: Record<string, string> = {
+  "Run workflows": "Start runs and read their results: a website, a script or another service.",
+  "Read only": "Look at workflows, runs and evaluation results: dashboards and reports.",
+  "CI / deploy": "Change, publish and deploy workflows and run evaluations: a CI job.",
+};
 
 function CreateKeyDialog({
   open,
@@ -45,209 +66,319 @@ function CreateKeyDialog({
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
-  onCreated: (k: CreatedKey) => void;
+  onCreated: (k: CreatedKey, draft: ApiKeyDraft) => void;
 }) {
   const s = useSession();
-  const [name, setName] = useState("");
-  const [mode, setMode] = useState<"live" | "test">("live");
-  const [scopes, setScopes] = useState<string[]>([...(SCOPE_PRESETS["Run workflows"] ?? [])]);
-  const [env, setEnv] = useState(ANY);
-  const [pinned, setPinned] = useState<string[]>([]);
-  const [days, setDays] = useState<string>("90");
-  const [rate, setRate] = useState<number | null>(null);
-  const [serviceAccount, setServiceAccount] = useState(false);
+  // kept in this browser tab until the key is created; a key's draft holds no secret
+  const kept = useKeptDraft<ApiKeyDraft>(`flowaid:draft:${s.ws}:api-key`, () =>
+    emptyApiKeyDraft(SCOPE_PRESETS["Run workflows"] ?? []),
+  );
+  const { draft, setDraft } = kept;
+  const set = <K extends keyof ApiKeyDraft>(k: K, v: ApiKeyDraft[K]) =>
+    setDraft((d) => ({ ...d, [k]: v }));
   const workflows = useQuery({
     queryKey: ["workflow-names", s.ws],
     queryFn: () => get<Page<WorkflowSummary>>("/v1/workflows?limit=200"),
     select: (p) => p.items,
     enabled: open,
   });
-  const create = useMutate(
-    () =>
-      post<CreatedKey>("/v1/api-keys", {
-        name: name.trim(),
-        scopes,
-        mode,
-        ...(env !== ANY ? { environmentId: env } : {}),
-        ...(pinned.length ? { workflowIds: pinned } : {}),
-        expiresAt: new Date(Date.now() + Number(days) * 86_400_000).toISOString(),
-        ...(rate ? { rateLimitPerMin: rate } : {}),
-        ...(serviceAccount ? { serviceAccount: { name: name.trim() } } : {}),
-      }),
-    {
-      invalidate: [["api-keys", s.ws]],
-      onSuccess: (k) => {
-        onOpenChange(false);
-        setName("");
-        setPinned([]);
-        onCreated(k);
-      },
+  const checks = apiKeyChecks(draft, { environments: s.environments, isAdmin: s.can("admin") });
+  const blocking = checks.filter((c) => c.state === "blocker");
+  const blockedAt = (step: GuidanceCheck["step"]) => blocking.some((c) => c.step === step);
+  // what a step still needs, in the checks' own words (nothing on the form is marked)
+  const needed = (step?: GuidanceCheck["step"]) =>
+    blocking
+      .filter((c) => step === undefined || c.step === step)
+      .map((c) => c.message.charAt(0).toLowerCase() + c.message.slice(1))
+      .join("; ");
+  const create = useMutate(() => post<CreatedKey>("/v1/api-keys", apiKeyBody(draft)), {
+    invalidate: [["api-keys", s.ws]],
+    // a refused create keeps the draft as it is
+    errorTitle: "Could not create the key",
+    onSuccess: (k) => {
+      onOpenChange(false);
+      onCreated(k, draft);
+      kept.discard();
     },
-  );
+  });
   const toggle = (scope: string, on: boolean) =>
-    setScopes((xs) => (on ? [...xs, scope] : xs.filter((x) => x !== scope)));
+    set("scopes", on ? [...draft.scopes, scope] : draft.scopes.filter((x) => x !== scope));
+  const preset = Object.entries(SCOPE_PRESETS).find(
+    ([, set]) => set.length === draft.scopes.length && set.every((x) => draft.scopes.includes(x)),
+  )?.[0];
+  const envName = (id: string) => s.environments.find((e) => e.id === id)?.name ?? id;
+
+  const steps: FlowStep[] = [
+    {
+      id: "name",
+      title: "Name it",
+      why: "Name the key after what will use it. When you look at the list, or at the audit log, the name is how you tell which system made a call and which key to rotate.",
+      done: !blockedAt("name"),
+      requirement: "give the key a name",
+      example: (
+        <>
+          <strong className="font-medium text-ink">website-support-form</strong>,{" "}
+          <strong className="font-medium text-ink">ci-publish</strong> or{" "}
+          <strong className="font-medium text-ink">nightly-report</strong>: one key per caller.
+        </>
+      ),
+      children: (
+        <FieldRow label="Name" htmlFor="key-name" required>
+          <Input
+            id="key-name"
+            value={draft.name}
+            maxLength={100}
+            onChange={(e) => set("name", e.target.value)}
+            placeholder="ci-deploy"
+          />
+        </FieldRow>
+      ),
+    },
+    {
+      id: "scopes",
+      title: "Choose what it may do",
+      why: "Scopes are the actions the key allows. Give it only what its caller needs: a leaked key can do exactly what its scopes allow. Scopes your own role lacks are greyed out.",
+      done: !blockedAt("scopes"),
+      requirement: "choose at least one scope",
+      example:
+        "Most callers only start runs: Run workflows is enough. Add a scope later by creating a new key, when a call fails with a missing-scope error.",
+      children: (
+        <fieldset>
+          <legend className="sr-only">Scopes</legend>
+          <div className="mb-3 flex flex-col gap-1.5">
+            {Object.entries(SCOPE_PRESETS).map(([label, scopes]) => (
+              <div key={label} className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={preset === label ? "primary" : "secondary"}
+                  aria-pressed={preset === label}
+                  onClick={() => set("scopes", [...scopes])}
+                >
+                  {label}
+                </Button>
+                <span className="text-xs text-ink-3">{PRESET_USE[label]}</span>
+              </div>
+            ))}
+          </div>
+          <p className="m-0 mb-2 text-xs font-medium text-ink">Scopes ({draft.scopes.length})</p>
+          <div className="grid gap-3 rounded-md border border-border p-3 sm:grid-cols-2">
+            {SCOPE_GROUPS.map((g) => (
+              <div key={g.label} className="flex flex-col gap-1">
+                <p className="text-2xs font-semibold uppercase tracking-wide text-ink-3">
+                  {g.label}
+                </p>
+                {g.scopes.map((sc) => (
+                  <Checkbox
+                    key={sc}
+                    size="sm"
+                    label={<span className="font-mono text-xs">{sc}</span>}
+                    checked={draft.scopes.includes(sc)}
+                    disabled={!s.can(sc)}
+                    onCheckedChange={(c) => toggle(sc, c === true)}
+                  />
+                ))}
+              </div>
+            ))}
+          </div>
+        </fieldset>
+      ),
+    },
+    {
+      id: "reach",
+      title: "Choose where it works",
+      why: "Limit the key to one environment and to the workflows it calls. A key limited to an environment always runs there; one that is not must name the environment in every request.",
+      done: !blockedAt("reach"),
+      requirement: needed("reach") || "fix what the review lists",
+      example:
+        "A production caller: limit it to prod and to its workflows. A test script: a Test key limited to dev.",
+      children: (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <FieldRow
+              label="Environment"
+              htmlFor="key-env"
+              hint="Runs started with this key use this environment"
+            >
+              <Select id="key-env" value={draft.env} onValueChange={(v) => set("env", v)}>
+                <SelectItem value={ANY_ENVIRONMENT}>Any (the request chooses)</SelectItem>
+                {s.environments.map((e) => (
+                  <SelectItem key={e.id} value={e.id}>
+                    {e.name}
+                  </SelectItem>
+                ))}
+              </Select>
+            </FieldRow>
+            <FieldRow
+              label="Mode"
+              htmlFor="key-mode"
+              hint="Test keys start fa_test_ so they are easy to tell apart, and cannot be limited to a protected environment"
+            >
+              <ToggleGroup
+                id="key-mode"
+                type="single"
+                value={draft.mode}
+                onValueChange={(v) => v && set("mode", v as "live" | "test")}
+                aria-label="Mode"
+              >
+                <ToggleGroupItem value="live">Live</ToggleGroupItem>
+                <ToggleGroupItem value="test">Test</ToggleGroupItem>
+              </ToggleGroup>
+            </FieldRow>
+          </div>
+          <fieldset>
+            <legend className="mb-2 text-xs font-medium text-ink">
+              Workflows ({draft.pinned.length ? `${draft.pinned.length} pinned` : "all"})
+            </legend>
+            <div className="flex max-h-40 flex-col gap-1 overflow-auto rounded-md border border-border p-2">
+              {(workflows.data ?? []).length === 0 ? (
+                <p className="text-xs text-ink-3">
+                  No workflows yet; the key will reach every workflow.
+                </p>
+              ) : (
+                (workflows.data ?? []).map((w) => (
+                  <Checkbox
+                    key={w.id}
+                    size="sm"
+                    label={w.name}
+                    checked={draft.pinned.includes(w.id)}
+                    onCheckedChange={(c) =>
+                      set(
+                        "pinned",
+                        c === true
+                          ? [...draft.pinned, w.id]
+                          : draft.pinned.filter((x) => x !== w.id),
+                      )
+                    }
+                  />
+                ))
+              )}
+            </div>
+          </fieldset>
+          <FieldRow
+            label="Service account"
+            htmlFor="key-sa"
+            hint="Owned by a bot identity instead of you, with exactly the scopes chosen here. Admins only."
+          >
+            <Checkbox
+              id="key-sa"
+              checked={draft.serviceAccount}
+              onCheckedChange={(c) => set("serviceAccount", c === true)}
+              label="Create as a service account"
+            />
+          </FieldRow>
+        </>
+      ),
+    },
+    {
+      id: "expiry",
+      title: "Set how long it lasts",
+      why: "Every key expires. A shorter life limits the damage of a key that leaked unnoticed; rotating issues a new key with the same settings and lets the old one overlap for a grace period.",
+      done: !blockedAt("expiry"),
+      requirement: "choose when it expires",
+      example: "90 days suits most callers. Use 30 for a one-off script.",
+      children: (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <FieldRow label="Expires" htmlFor="key-exp">
+            <Select id="key-exp" value={draft.days} onValueChange={(v) => set("days", v)}>
+              {EXPIRY_DAYS.map((d) => (
+                <SelectItem key={d} value={String(d)}>
+                  In {d} days
+                </SelectItem>
+              ))}
+            </Select>
+          </FieldRow>
+          <FieldRow
+            label="Rate limit"
+            htmlFor="key-rate"
+            hint="Requests per minute; empty uses the server default"
+          >
+            <NumberInput
+              id="key-rate"
+              value={draft.rate}
+              min={1}
+              max={100_000}
+              unit="/min"
+              onValueChange={(v) => set("rate", v)}
+            />
+          </FieldRow>
+        </div>
+      ),
+    },
+    {
+      id: "review",
+      doneLabel: "Ready to create",
+      title: "Review and create",
+      why: "Check what the key can reach. The key is shown once, right after you create it: have your secret store ready.",
+      done: blocking.length === 0,
+      requirement: needed() || "fix what is listed above",
+      children: (
+        <>
+          <dl className="m-0 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 rounded-sm border border-border px-3 py-2 text-sm">
+            <dt className="text-ink-3">Name</dt>
+            <dd className="m-0 text-ink">{draft.name.trim() || "—"}</dd>
+            <dt className="text-ink-3">Scopes</dt>
+            <dd className="m-0 font-mono text-xs text-ink">
+              {draft.scopes.length ? draft.scopes.join(", ") : "—"}
+            </dd>
+            <dt className="text-ink-3">Environment</dt>
+            <dd className="m-0 text-ink">
+              {draft.env === ANY_ENVIRONMENT ? "Any" : envName(draft.env)}
+            </dd>
+            <dt className="text-ink-3">Workflows</dt>
+            <dd className="m-0 text-ink">
+              {draft.pinned.length ? `${draft.pinned.length} pinned` : "All"}
+            </dd>
+            <dt className="text-ink-3">Expires</dt>
+            <dd className="m-0 text-ink">In {draft.days} days</dd>
+          </dl>
+          <CheckList
+            checks={checks.map((c): Check => ({ id: c.id, label: c.message, state: c.state }))}
+            aria-label="Before you create"
+          />
+        </>
+      ),
+    },
+  ];
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="lg">
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            create.mutate(undefined);
+            if (blocking.length === 0) create.mutate(undefined);
           }}
         >
           <DialogHeader>
             <DialogTitle>New API key</DialogTitle>
             <DialogDescription>
-              Keys never exceed your own role's scopes. Pin keys to an environment and workflows
-              whenever you can.
+              Keys never exceed your own role&apos;s scopes. Pin keys to an environment and
+              workflows whenever you can.
             </DialogDescription>
           </DialogHeader>
           <DialogBody className="flex max-h-[70vh] flex-col gap-4 overflow-auto">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <FieldRow label="Name" htmlFor="key-name" required>
-                <Input
-                  id="key-name"
-                  value={name}
-                  maxLength={100}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="ci-deploy"
+            <GuidedFlow
+              steps={steps}
+              status={
+                <DraftStatus
+                  dirty={kept.dirty}
+                  restored={kept.restored}
+                  onDiscard={kept.discard}
+                  what="the key"
                 />
-              </FieldRow>
-              <FieldRow label="Mode" htmlFor="key-mode">
-                <ToggleGroup
-                  id="key-mode"
-                  type="single"
-                  value={mode}
-                  onValueChange={(v) => v && setMode(v as "live" | "test")}
-                  aria-label="Mode"
-                >
-                  <ToggleGroupItem value="live">Live</ToggleGroupItem>
-                  <ToggleGroupItem value="test">Test</ToggleGroupItem>
-                </ToggleGroup>
-              </FieldRow>
-            </div>
-            <fieldset>
-              <legend className="mb-2 flex w-full flex-wrap items-center justify-between gap-2 text-xs font-medium text-ink">
-                <span>Scopes ({scopes.length})</span>
-                <span className="flex gap-1">
-                  {Object.entries(SCOPE_PRESETS).map(([label, set]) => (
-                    <Button
-                      key={label}
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setScopes([...set])}
-                    >
-                      {label}
-                    </Button>
-                  ))}
-                </span>
-              </legend>
-              <div className="grid gap-3 rounded-md border border-border p-3 sm:grid-cols-2">
-                {SCOPE_GROUPS.map((g) => (
-                  <div key={g.label} className="flex flex-col gap-1">
-                    <p className="text-2xs font-semibold uppercase tracking-wide text-ink-3">
-                      {g.label}
-                    </p>
-                    {g.scopes.map((sc) => (
-                      <Checkbox
-                        key={sc}
-                        size="sm"
-                        label={<span className="font-mono text-xs">{sc}</span>}
-                        checked={scopes.includes(sc)}
-                        disabled={!s.can(sc)}
-                        onCheckedChange={(c) => toggle(sc, c === true)}
-                      />
-                    ))}
-                  </div>
-                ))}
-              </div>
-            </fieldset>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <FieldRow
-                label="Environment"
-                htmlFor="key-env"
-                hint="Runs started with this key use this environment"
-              >
-                <Select id="key-env" value={env} onValueChange={setEnv}>
-                  <SelectItem value={ANY}>Any (the request chooses)</SelectItem>
-                  {s.environments.map((e) => (
-                    <SelectItem key={e.id} value={e.id}>
-                      {e.name}
-                    </SelectItem>
-                  ))}
-                </Select>
-              </FieldRow>
-              <FieldRow label="Expires" htmlFor="key-exp">
-                <Select id="key-exp" value={days} onValueChange={setDays}>
-                  {EXPIRY_DAYS.map((d) => (
-                    <SelectItem key={d} value={String(d)}>
-                      In {d} days
-                    </SelectItem>
-                  ))}
-                </Select>
-              </FieldRow>
-              <FieldRow
-                label="Rate limit"
-                htmlFor="key-rate"
-                hint="Requests per minute; empty uses the server default"
-              >
-                <NumberInput
-                  id="key-rate"
-                  value={rate}
-                  min={1}
-                  max={100_000}
-                  unit="/min"
-                  onValueChange={setRate}
-                />
-              </FieldRow>
-              <FieldRow
-                label="Service account"
-                htmlFor="key-sa"
-                hint="Owned by a bot identity instead of you; survives you leaving"
-              >
-                <Checkbox
-                  id="key-sa"
-                  checked={serviceAccount}
-                  onCheckedChange={(c) => setServiceAccount(c === true)}
-                  label="Create as a service account"
-                />
-              </FieldRow>
-            </div>
-            <fieldset>
-              <legend className="mb-2 text-xs font-medium text-ink">
-                Workflows ({pinned.length ? `${pinned.length} pinned` : "all"})
-              </legend>
-              <div className="flex max-h-40 flex-col gap-1 overflow-auto rounded-md border border-border p-2">
-                {(workflows.data ?? []).length === 0 ? (
-                  <p className="text-xs text-ink-3">
-                    No workflows yet; the key will reach every workflow.
-                  </p>
-                ) : (
-                  (workflows.data ?? []).map((w) => (
-                    <Checkbox
-                      key={w.id}
-                      size="sm"
-                      label={w.name}
-                      checked={pinned.includes(w.id)}
-                      onCheckedChange={(c) =>
-                        setPinned((p) => (c === true ? [...p, w.id] : p.filter((x) => x !== w.id)))
-                      }
-                    />
-                  ))
-                )}
-              </div>
-            </fieldset>
+              }
+            />
           </DialogBody>
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-              Cancel
+              Close
             </Button>
             <Button
               type="submit"
               variant="primary"
               loading={create.isPending}
-              disabled={!name.trim() || scopes.length === 0}
+              disabled={blocking.length > 0}
             >
               Create key
             </Button>
@@ -261,13 +392,17 @@ function CreateKeyDialog({
 export function ApiKeysTab() {
   const s = useSession();
   const [creating, setCreating] = useOpenFromQuery();
-  const [secret, setSecret] = useState<{ title: string; key: string } | null>(null);
+  const [secret, setSecret] = useState<{
+    title: string;
+    key: string;
+    environmentId: string | null;
+  } | null>(null);
   const [rotating, setRotating] = useState<ApiKeySummary | null>(null);
   const [grace, setGrace] = useState("60");
   const revoke = useConfirm<ApiKeySummary>();
   const keys = useQuery({
     queryKey: ["api-keys", s.ws],
-    queryFn: () => get<ApiKeySummary[]>("/v1/api-keys"),
+    queryFn: () => getAll<ApiKeySummary>("/v1/api-keys"),
   });
   const rotate = useMutate(
     (k: ApiKeySummary) =>
@@ -276,7 +411,7 @@ export function ApiKeysTab() {
       invalidate: [["api-keys", s.ws]],
       onSuccess: (c, k) => {
         setRotating(null);
-        setSecret({ title: `New key for ${k.name}`, key: c.key });
+        setSecret({ title: `New key for ${k.name}`, key: c.key, environmentId: k.environmentId });
       },
     },
   );
@@ -379,13 +514,21 @@ export function ApiKeysTab() {
       <CreateKeyDialog
         open={creating}
         onOpenChange={setCreating}
-        onCreated={(k) => setSecret({ title: "API key created", key: k.key })}
+        onCreated={(k, d) =>
+          setSecret({
+            title: `${d.name.trim()} created`,
+            key: k.key,
+            environmentId: d.env === ANY_ENVIRONMENT ? null : d.env,
+          })
+        }
       />
       <OneTimeSecretDialog
         secret={secret?.key ?? null}
         title={secret?.title ?? ""}
         onClose={() => setSecret(null)}
-        extra={secret ? <KeyExample apiKey={secret.key} /> : null}
+        extra={
+          secret ? <KeyExample apiKey={secret.key} environmentId={secret.environmentId} /> : null
+        }
       />
       <ConfirmDialog
         open={rotating !== null}
@@ -423,20 +566,31 @@ export function ApiKeysTab() {
   );
 }
 
-/** How to use a fresh key: start a deployed workflow's run from a script. */
-function KeyExample({ apiKey }: { apiKey: string }) {
+/**
+ * How to use a fresh key: start a deployed workflow's run from a script. A key that is not
+ * limited to an environment must name one in the request (the API refuses it otherwise).
+ */
+function KeyExample({ apiKey, environmentId }: { apiKey: string; environmentId: string | null }) {
+  const s = useSession();
   const origin = typeof window === "undefined" ? "" : window.location.origin;
+  const fallback = s.environments.find((e) => e.name === "dev") ?? s.environments[0];
+  const body = environmentId
+    ? `{"input": {"message": "Hello"}, "mode": "sync"}`
+    : `{"input": {"message": "Hello"}, "mode": "sync", "environmentId": "${fallback?.id ?? "<environment id>"}"}`;
   const example = [
     `curl -X POST ${origin}/v1/workflows/<workflow id>/run \\`,
     `  -H "Authorization: Bearer ${apiKey}" \\`,
     "  -H 'content-type: application/json' \\",
-    `  -d '{"input": {"message": "Hello"}, "mode": "sync"}'`,
+    `  -d '${body}'`,
   ].join("\n");
   return (
     <div className="flex flex-col gap-1.5">
       <p className="text-xs text-ink-2">
-        Start a run of the version deployed to the key&apos;s environment (the workflow id is in the
-        workflow&apos;s address):
+        Start a run of the version deployed to{" "}
+        {environmentId
+          ? "the key's environment"
+          : `${fallback?.name ?? "an environment"} (change environmentId to call another)`}
+        . The workflow id is in the workflow&apos;s address:
       </p>
       <div className="flex items-start gap-2">
         <pre className="min-w-0 flex-1 overflow-x-auto rounded-md border border-border bg-surface-2 p-2 font-mono text-2xs text-ink">
@@ -446,7 +600,9 @@ function KeyExample({ apiKey }: { apiKey: string }) {
       </div>
       <p className="text-xs text-ink-3">
         The same key works with the SDK and the <code className="font-mono">flowaid</code> CLI (
-        <code className="font-mono">FLOWAID_API_KEY</code>).
+        <code className="font-mono">FLOWAID_API_KEY</code>). Nothing has run yet: the request above
+        starts a run only when you send it, and fails until a version is deployed to that
+        environment. <LearnMore href={HELP.callIt} label="Calling a workflow" />
       </p>
     </div>
   );

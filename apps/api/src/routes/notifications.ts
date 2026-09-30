@@ -25,7 +25,7 @@ import {
 } from "@flowaid/workflow-core";
 import type { Principal } from "../auth/principal.js";
 import type { ApiContext } from "../context.js";
-import { IdParams, NoContent } from "../dto/common.js";
+import { IdParams, NoContent, PageQuery, afterCursor, page, toPage } from "../dto/common.js";
 import { channelSecret } from "../services/notify.js";
 
 type Row = typeof notifications.$inferSelect;
@@ -156,19 +156,27 @@ export function notificationRoutes(app: FastifyInstance, ctx: ApiContext): void 
       },
       schema: {
         tags: ["notifications"],
-        response: { 200: z.array(NotificationChannelSchema) },
+        querystring: PageQuery,
+        response: { 200: page(NotificationChannelSchema) },
       },
     },
     async (req) => {
       const p = need(req.principal);
+      const { limit, cursor } = req.query;
       const rows = await ctx.db.tenant(p.workspaceId, (tx) =>
         tx
           .select()
           .from(notifications)
-          .where(eq(notifications.workspaceId, p.workspaceId))
-          .orderBy(asc(notifications.name)),
+          .where(
+            and(
+              eq(notifications.workspaceId, p.workspaceId),
+              afterCursor(notifications.name, notifications.id, cursor),
+            ),
+          )
+          .orderBy(asc(notifications.name), asc(notifications.id))
+          .limit(limit + 1),
       );
-      return rows.map(dto);
+      return toPage(rows, limit, (n) => [n.name, n.id], dto);
     },
   );
 

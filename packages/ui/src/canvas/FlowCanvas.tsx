@@ -676,6 +676,17 @@ function FlowCanvasInner({
 
   const onSurface = useCallback((event: KeyboardEvent) => isCanvasSurfaceTarget(event.target), []);
   const inCanvas = useCallback((event: KeyboardEvent) => isCanvasShortcutTarget(event.target), []);
+  const inCanvasOrIdle = useCallback(
+    (event: KeyboardEvent) =>
+      isCanvasShortcutTarget(event.target) ||
+      event.target === document.body ||
+      event.target === document.documentElement,
+    [],
+  );
+  const pageScope = useMemo(
+    () => ({ current: typeof document === "undefined" ? null : document.documentElement }),
+    [],
+  );
   const onNode = useCallback(
     (event: KeyboardEvent) => focusedNodeElement(event.target) !== null,
     [],
@@ -754,9 +765,12 @@ function FlowCanvasInner({
     scope: wrapperRef,
     preventDefault: false,
   });
+  // ⌘K adds a node from the canvas and also when focus rests nowhere in particular (after a
+  // dialog or the palette closes), so it wins over the app's command menu there; from any other
+  // control the command menu still answers
   useShortcut([...CANVAS_SHORTCUTS.palette.keys], () => openPaletteAt(null), {
-    ...shortcut("palette", inCanvas, catalog !== undefined && !locked),
-    scope: wrapperRef,
+    ...shortcut("palette", inCanvasOrIdle, catalog !== undefined && !locked),
+    scope: pageScope,
   });
   useShortcut(
     [...CANVAS_SHORTCUTS.duplicate.keys],
@@ -1038,6 +1052,11 @@ function FlowCanvasInner({
             open={palette !== null}
             onOpenChange={(open) => {
               if (!open) setPalette(null);
+            }}
+            // it has no trigger to return focus to: hand focus back to the canvas so its keys work
+            onCloseAutoFocus={(event) => {
+              event.preventDefault();
+              wrapperRef.current?.focus({ preventScroll: true });
             }}
             anchor={palette?.screen ?? null}
             catalog={catalog}

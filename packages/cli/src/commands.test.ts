@@ -135,7 +135,7 @@ describe("hand-written commands", () => {
     const t = fakeIo([
       (c) =>
         c.url.pathname === `/v1/workflows/${WF}/versions`
-          ? json(200, [{ id: "v-2", version: 2 }])
+          ? json(200, { items: [{ id: "v-2", version: 2 }], next_cursor: null })
           : undefined,
       (c) =>
         c.url.pathname.endsWith("/export")

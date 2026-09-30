@@ -118,7 +118,7 @@ describeDb("knowledge routes (Postgres + pgvector)", () => {
         { keepContent: true },
       );
 
-    const list = (await call(t.app, jar, "GET", "/v1/knowledge/sources")).json() as {
+    const list = (await call(t.app, jar, "GET", "/v1/knowledge/sources")).json().items as {
       id: string;
       documents: number;
       chunks: number;
@@ -191,5 +191,36 @@ describeDb("knowledge routes (Postgres + pgvector)", () => {
       tx.execute<{ n: number }>(sql`select count(*)::int as n from chunks where source_id = ${id}`),
     );
     expect(left[0]?.n).toBe(0);
+  });
+
+  it("pages the sources by name with a cursor", async () => {
+    for (const name of ["Pager C", "Pager A", "Pager B"])
+      expect(
+        (
+          await call(t.app, jar, "POST", "/v1/knowledge/sources", {
+            name,
+            kind: "files",
+            pipeline: { embedding: { provider: "fake", model: "hashed-bow" } },
+          })
+        ).statusCode,
+      ).toBe(201);
+    type Page = { items: { name: string; documents: number }[]; next_cursor: string | null };
+    const first = (await call(t.app, jar, "GET", "/v1/knowledge/sources?limit=2")).json() as Page;
+    expect(first.next_cursor).toEqual(expect.any(String));
+    const all = [...first.items];
+    for (let cursor = first.next_cursor; cursor;) {
+      const next = (
+        await call(t.app, jar, "GET", `/v1/knowledge/sources?limit=2&cursor=${cursor}`)
+      ).json() as Page;
+      all.push(...next.items);
+      cursor = next.next_cursor;
+    }
+    expect(all.map((s) => s.name).filter((n) => n.startsWith("Pager"))).toEqual([
+      "Pager A",
+      "Pager B",
+      "Pager C",
+    ]);
+    expect(all.find((s) => s.name === "Pager A")).toMatchObject({ documents: 0 });
+    expect((await call(t.app, jar, "GET", "/v1/knowledge/sources?limit=500")).statusCode).toBe(400);
   });
 });

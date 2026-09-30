@@ -45,10 +45,10 @@ const source = (id: string, name: string, kind = "pageindex") => ({ id, name, ki
 
 function api() {
   return stubApi({
-    "GET /v1/knowledge/sources": () => [
-      source("src-1", "Policies"),
-      source("src-2", "Web help", "url"),
-    ],
+    "GET /v1/knowledge/sources": () => ({
+      items: [source("src-1", "Policies"), source("src-2", "Web help", "url")],
+      next_cursor: null,
+    }),
     "GET /v1/pageindex/sources/src-1/documents": () => ({
       items: [doc({ state: "ready" }), doc({ state: "running" }, "Contract.pdf", "doc-2")],
     }),

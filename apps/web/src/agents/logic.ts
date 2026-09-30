@@ -156,3 +156,76 @@ export function modelLabel(model: unknown): string {
   }
   return m.model ?? "No model";
 }
+
+/** The providers a model setting calls: one, or every candidate of a failover policy. */
+export function modelProviders(model: unknown): string[] {
+  const m = model as { provider?: unknown; candidates?: { provider?: unknown }[] } | undefined;
+  if (!m) return [];
+  const list = Array.isArray(m.candidates) ? m.candidates.map((c) => c.provider) : [m.provider];
+  return [...new Set(list.filter((p): p is string => typeof p === "string"))];
+}
+
+/** Whether the agent node asks before `irreversible` calls to this tool (agent.ts `needsApproval`). */
+export function changesData(tool: { approvalRequired?: boolean; idempotency?: unknown }): boolean {
+  return tool.approvalRequired === true || tool.idempotency === "none";
+}
+
+export interface AgentReviewNote {
+  id: string;
+  state: "blocker" | "warning" | "info";
+  message: string;
+}
+
+/**
+ * What to know before saving, beyond the form's own errors: providers without a key (the agent
+ * fails when it runs), tools that change data but never ask, and an agent with no tools or no
+ * instructions (valid, but probably not what was meant).
+ */
+export function reviewNotes(
+  d: AgentDraft,
+  ctx: {
+    providerReady: (provider: string) => boolean;
+    /** tool name → whether it changes data */
+    changes: ReadonlyMap<string, boolean>;
+  },
+): AgentReviewNote[] {
+  const notes: AgentReviewNote[] = [];
+  const missing = modelProviders(d.model).filter((p) => !ctx.providerReady(p));
+  if (missing.length)
+    notes.push({
+      id: "provider-key",
+      state: "warning",
+      message: `No key for ${missing.join(", ")} in this workspace: the agent can be saved, but its runs fail until a key is added under Credentials.`,
+    });
+  const unguarded = d.tools.filter((t) => t.approval === "never" && ctx.changes.get(t.name));
+  if (unguarded.length)
+    notes.push({
+      id: "unguarded",
+      state: "warning",
+      message: `${unguarded.map((t) => t.name).join(", ")} can change data and will run without asking anyone.`,
+    });
+  if (!d.tools.length)
+    notes.push({
+      id: "no-tools",
+      state: "info",
+      message: "No tools: the agent can only write answers from what it is given.",
+    });
+  if (!d.system.trim())
+    notes.push({
+      id: "no-instructions",
+      state: "info",
+      message:
+        "No instructions: the agent sees only the step's input. A goal and an answer format usually give steadier results.",
+    });
+  return notes;
+}
+
+/** A starting point for the instructions, meant to be edited. */
+export const EXAMPLE_INSTRUCTIONS = `You help customers with questions about their orders.
+
+Goal: answer the customer's question using the tools, not guesses.
+- Look up the order before saying anything about its status.
+- If a tool fails or the order cannot be found, say so and ask for the order number.
+- Never promise a refund; say that a person will review refund requests.
+
+Answer in two or three short sentences, in the customer's language.`;

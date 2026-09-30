@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { checkDraft, draftOf, emptyDraft, modelLabel } from "./logic";
+import {
+  changesData,
+  checkDraft,
+  draftOf,
+  emptyDraft,
+  modelLabel,
+  modelProviders,
+  reviewNotes,
+} from "./logic";
 
 const model = { provider: "openai", model: "gpt-test" };
 
@@ -45,5 +53,38 @@ describe("agent preset drafts", () => {
       modelLabel({ candidates: [model, { provider: "x", model: "y" }], strategy: "cheapest" }),
     ).toBe("cheapest · gpt-test +1");
     expect(modelLabel(undefined)).toBe("No model");
+  });
+});
+
+describe("agent review notes", () => {
+  const ready = (p: string) => p === "openai";
+  const base = { ...emptyDraft(), name: "Helper", model, system: "Answer briefly." };
+
+  it("names providers without a key, from a single model or a failover policy", () => {
+    expect(modelProviders(model)).toEqual(["openai"]);
+    expect(
+      modelProviders({ candidates: [{ provider: "anthropic" }, { provider: "openai" }] }),
+    ).toEqual(["anthropic", "openai"]);
+    const notes = reviewNotes(
+      { ...base, model: { candidates: [{ provider: "anthropic", model: "x" }] } },
+      { providerReady: ready, changes: new Map() },
+    );
+    expect(notes.find((n) => n.id === "provider-key")?.message).toContain("anthropic");
+  });
+
+  it("warns about tools that change data but never ask, and notes a toolless agent", () => {
+    const unguarded = reviewNotes(
+      { ...base, tools: [{ name: "refund", approval: "never" }] },
+      { providerReady: ready, changes: new Map([["refund", true]]) },
+    );
+    expect(unguarded.map((n) => n.id)).toEqual(["unguarded"]);
+    const bare = reviewNotes({ ...base, system: "" }, { providerReady: ready, changes: new Map() });
+    expect(bare.map((n) => n.id)).toEqual(["no-tools", "no-instructions"]);
+  });
+
+  it("treats non-idempotent or approval-marked tools as changing data", () => {
+    expect(changesData({ approvalRequired: false, idempotency: "none" })).toBe(true);
+    expect(changesData({ approvalRequired: true, idempotency: "idempotent" })).toBe(true);
+    expect(changesData({ approvalRequired: false, idempotency: "idempotent" })).toBe(false);
   });
 });

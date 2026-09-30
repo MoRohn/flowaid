@@ -7,6 +7,7 @@ import { EnvironmentsTab } from "~/admin/settings/EnvironmentsTab";
 import { MembersTab } from "~/admin/settings/MembersTab";
 import { NotificationsTab } from "~/admin/settings/NotificationsTab";
 import { ProfileTab } from "~/admin/settings/ProfileTab";
+import { SettingsIntro } from "~/admin/settings/SettingsIntro";
 import { WorkspaceTab } from "~/admin/settings/WorkspaceTab";
 import { DraftProvider, isTabDirty, useDirtyKeys } from "~/admin/drafts";
 import { useQueryTab } from "~/admin/ui";
@@ -62,6 +63,8 @@ function Settings() {
         tab={tab}
         onTabChange={(t) => setTab(t as TabId)}
       />
+      {/* "Start here" follows the open tab */}
+      <SettingsIntro tab={tab} />
       <div className="mt-5">
         {tab === "workspace" ? (
           <WorkspaceTab />

@@ -315,16 +315,23 @@ describeDb("credentials, tools and MCP (Postgres)", () => {
     expect(catalog.filter((x) => x.source.kind === "mcp").map((x) => x.name)).toContain(
       "search_docs",
     );
-    const stdio = (
-      await call(t.app, jar, "POST", "/v1/mcp/servers", {
-        name: "local",
-        transport: "stdio",
-        command: "/usr/bin/true",
-      })
-    ).json().id as string;
-    expect((await call(t.app, jar, "POST", `/v1/mcp/servers/${stdio}/discover`)).statusCode).toBe(
-      400,
-    );
+    // stdio is off by default, so the API refuses to store one at all
+    const stdio = await call(t.app, jar, "POST", "/v1/mcp/servers", {
+      name: "local",
+      transport: "stdio",
+      command: "/usr/bin/true",
+    });
+    expect(stdio.statusCode).toBe(403);
+    expect(stdio.body).toContain("MCP_STDIO_ENABLED=false");
+    // nor turn an HTTP server into one
+    expect(
+      (
+        await call(t.app, jar, "PATCH", `/v1/mcp/servers/${id}`, {
+          transport: "stdio",
+          command: "/bin/sh",
+        })
+      ).statusCode,
+    ).toBe(403);
   });
 
   it("mints MCP tokens (service accounts pinned to workflows) and manages exposures", async () => {
@@ -371,6 +378,175 @@ describeDb("credentials, tools and MCP (Postgres)", () => {
         })
       ).statusCode,
     ).toBe(409);
-    expect((await call(t.app, jar, "GET", "/v1/mcp/exposures")).json()).toHaveLength(1);
+    const exposures = (await call(t.app, jar, "GET", "/v1/mcp/exposures?limit=1")).json();
+    expect(exposures).toEqual({
+      items: [expect.objectContaining({ toolName: "exposed_tool" })],
+      next_cursor: null,
+    });
+  });
+
+  /** Every page of a list, `limit` at a time, and the first page on its own. */
+  const pages = async (path: string, limit: number) => {
+    type Page = { items: { id: string; name: string }[]; next_cursor: string | null };
+    const first = (await call(t.app, jar, "GET", `${path}?limit=${limit}`)).json() as Page;
+    const all = [...first.items];
+    for (let cursor = first.next_cursor; cursor;) {
+      const next = (
+        await call(t.app, jar, "GET", `${path}?limit=${limit}&cursor=${cursor}`)
+      ).json() as Page;
+      all.push(...next.items);
+      cursor = next.next_cursor;
+    }
+    return { first, all };
+  };
+
+  it("pages credentials by name with a cursor", async () => {
+    for (const name of ["Pager C", "Pager A", "Pager B"])
+      await call(t.app, jar, "POST", "/v1/credentials", {
+        name,
+        type: "http.bearer",
+        values: { token: "sk-live-1234567890abcdef" },
+      });
+    const { first, all } = await pages("/v1/credentials", 2);
+    expect(first.items).toHaveLength(2);
+    expect(first.next_cursor).toEqual(expect.any(String));
+    const everything = (await call(t.app, jar, "GET", "/v1/credentials?limit=200")).json();
+    expect(everything.next_cursor).toBeNull();
+    expect(all.map((c) => c.id)).toEqual(everything.items.map((c: { id: string }) => c.id));
+    expect(all.map((c) => c.name).filter((n) => n.startsWith("Pager"))).toEqual([
+      "Pager A",
+      "Pager B",
+      "Pager C",
+    ]);
+    expect((await call(t.app, jar, "GET", "/v1/credentials?limit=500")).statusCode).toBe(400);
+  });
+
+  it("pages tools and MCP servers by name with a cursor", async () => {
+    for (const name of ["Pager C", "Pager A", "Pager B"])
+      await call(t.app, jar, "POST", "/v1/mcp/servers", {
+        name,
+        transport: "streamable_http",
+        url: `${upstream.url}/mcp`,
+      });
+    const { first, all } = await pages("/v1/mcp/servers", 2);
+    expect(first.items).toHaveLength(2);
+    expect(first.next_cursor).toEqual(expect.any(String));
+    const everything = (await call(t.app, jar, "GET", "/v1/mcp/servers?limit=200")).json();
+    expect(all.map((x) => x.id)).toEqual(everything.items.map((x: { id: string }) => x.id));
+    expect(all.map((x) => x.name).filter((n) => n.startsWith("Pager"))).toEqual([
+      "Pager A",
+      "Pager B",
+      "Pager C",
+    ]);
+    for (const name of ["pager-b", "pager-a"])
+      expect(
+        (
+          await call(t.app, jar, "POST", "/v1/tools/openapi/import", {
+            name,
+            document: PETSTORE,
+            serverUrl: upstream.url,
+          })
+        ).statusCode,
+      ).toBe(201);
+    const tools = await pages("/v1/tools", 1);
+    expect(tools.first.items).toHaveLength(1);
+    expect(tools.first.next_cursor).toEqual(expect.any(String));
+    const listed = (await call(t.app, jar, "GET", "/v1/tools")).json();
+    expect(listed.next_cursor).toBeNull();
+    expect(tools.all.map((x) => x.id)).toEqual(listed.items.map((x: { id: string }) => x.id));
+    expect(tools.all.map((x) => x.name).filter((n) => n.startsWith("pager"))).toEqual([
+      "pager-a",
+      "pager-b",
+    ]);
+  });
+});
+
+describeDb("stdio MCP registration (Postgres)", () => {
+  let t: TestApp;
+  let jar: Jar;
+  beforeAll(async () => {
+    t = await createTestApp({
+      mcpStdio: {
+        enabled: true,
+        allowedCommands: [
+          { command: "/usr/bin/true" },
+          { command: "/usr/bin/env", argsPattern: "--version" },
+        ],
+        envAllowlist: ["LOG_LEVEL"],
+      },
+    });
+    jar = await login(t.app);
+  });
+  afterAll(async () => {
+    await t.close();
+  });
+  const register = (body: Record<string, unknown>, headers?: Record<string, string>) =>
+    call(
+      t.app,
+      headers ? null : jar,
+      "POST",
+      "/v1/mcp/servers",
+      { transport: "stdio", ...body },
+      headers,
+    );
+
+  it("checks the command, arguments and environment against the worker's policy", async () => {
+    const ok = await register({
+      name: "ok",
+      command: "/usr/bin/true",
+      env: { LOG_LEVEL: "debug" },
+    });
+    expect(ok.statusCode).toBe(201);
+    expect((await register({ name: "sh", command: "/bin/sh" })).statusCode).toBe(403);
+    expect((await register({ name: "rel", command: "true" })).statusCode).toBe(403);
+    expect(
+      (await register({ name: "args", command: "/usr/bin/env", args: ["node", "x.js"] }))
+        .statusCode,
+    ).toBe(403);
+    const env = await register({
+      name: "env",
+      command: "/usr/bin/true",
+      env: { NODE_OPTIONS: "-r x" },
+    });
+    expect(env.statusCode).toBe(400);
+    expect(env.body).toContain("NODE_OPTIONS");
+    const id = ok.json().id as string;
+    expect(
+      (await call(t.app, jar, "PATCH", `/v1/mcp/servers/${id}`, { command: "/bin/bash" }))
+        .statusCode,
+    ).toBe(403);
+    expect(
+      (await call(t.app, jar, "PATCH", `/v1/mcp/servers/${id}`, { name: "renamed" })).statusCode,
+    ).toBe(200);
+  });
+
+  it("needs the admin scope, not just mcp:write", async () => {
+    const key = (
+      await call(t.app, jar, "POST", "/v1/api-keys", {
+        name: "mcp-bot",
+        scopes: ["mcp:read", "mcp:write"],
+      })
+    ).json().key as string;
+    const auth = { authorization: `Bearer ${key}` };
+    const res = await register({ name: "bot", command: "/usr/bin/true" }, auth);
+    expect(res.statusCode).toBe(403);
+    expect(res.body).toContain("admin scope");
+    // HTTP servers still only need mcp:write
+    expect(
+      (
+        await call(
+          t.app,
+          null,
+          "POST",
+          "/v1/mcp/servers",
+          {
+            name: "remote",
+            transport: "streamable_http",
+            url: "https://mcp.example.com/mcp",
+          },
+          auth,
+        )
+      ).statusCode,
+    ).toBe(201);
   });
 });

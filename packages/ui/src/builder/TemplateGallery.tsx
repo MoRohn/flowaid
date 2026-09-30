@@ -27,7 +27,7 @@ export interface WorkflowTemplateView {
   /** Number of TypeSafe decisions in the template. */
   decisionCount?: number;
   /** What it needs before it can run, and whether the workspace has it; omit when unknown. */
-  needs?: { label: string; ready: boolean }[];
+  needs?: TemplateNeedView[];
   /** The business area it serves ("Finance"), shown above the name. */
   useCase?: string;
 }
@@ -213,7 +213,14 @@ export const TemplateGallery = forwardRef<HTMLDivElement, TemplateGalleryProps>(
 );
 
 /** "Ready to run", or each thing still to set up; the words carry the state, not the colour. */
-function TemplateNeeds({ needs }: { needs: { label: string; ready: boolean }[] }) {
+export interface TemplateNeedView {
+  label: string;
+  ready: boolean;
+  /** a few words in place of "(to set up)", e.g. "needs a saved credential" */
+  state?: string;
+}
+
+function TemplateNeeds({ needs }: { needs: TemplateNeedView[] }) {
   const missing = needs.filter((n) => !n.ready);
   if (missing.length === 0)
     return (
@@ -226,11 +233,11 @@ function TemplateNeeds({ needs }: { needs: { label: string; ready: boolean }[] }
     <div className="flex flex-col gap-0.5 text-2xs">
       <p className="text-ink-2">Needs before it runs:</p>
       <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
-        {needs.map((n) => (
-          <li key={n.label} className={n.ready ? "text-ink-3" : "text-warn-text"}>
+        {needs.map((n, i) => (
+          <li key={`${i}:${n.label}`} className={n.ready ? "text-ink-3" : "text-warn-text"}>
             <span aria-hidden="true">{n.ready ? "✓ " : "○ "}</span>
             {n.label}
-            {n.ready ? " (ready)" : " (to set up)"}
+            {` (${n.state ?? (n.ready ? "ready" : "to set up")})`}
           </li>
         ))}
       </ul>

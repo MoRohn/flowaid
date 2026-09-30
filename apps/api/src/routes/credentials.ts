@@ -19,7 +19,7 @@ import {
   type Principal,
 } from "../auth/principal.js";
 import type { ApiContext } from "../context.js";
-import { IdParams, NoContent } from "../dto/common.js";
+import { IdParams, NoContent, PageQuery, afterCursor, page, toPage } from "../dto/common.js";
 
 type CredentialRow = typeof credentials.$inferSelect;
 
@@ -169,8 +169,11 @@ export function credentialRoutes(app: FastifyInstance, ctx: ApiContext): void {
       },
       schema: {
         tags: ["credentials"],
-        querystring: z.object({ type: z.string().optional(), environmentId: z.uuid().optional() }),
-        response: { 200: z.array(CredentialSummarySchema) },
+        querystring: PageQuery.extend({
+          type: z.string().optional(),
+          environmentId: z.uuid().optional(),
+        }),
+        response: { 200: page(CredentialSummarySchema) },
       },
     },
     async (req) => {
@@ -193,11 +196,18 @@ export function credentialRoutes(app: FastifyInstance, ctx: ApiContext): void {
                     eq(credentials.environmentId, p.environmentId),
                   )
                 : undefined,
+              afterCursor(credentials.name, credentials.id, req.query.cursor),
             ),
           )
-          .orderBy(asc(credentials.name)),
+          .orderBy(asc(credentials.name), asc(credentials.id))
+          .limit(req.query.limit + 1),
       );
-      return rows.map((row) => dto(row));
+      return toPage(
+        rows,
+        req.query.limit,
+        (c) => [c.name, c.id],
+        (row) => dto(row),
+      );
     },
   );
 

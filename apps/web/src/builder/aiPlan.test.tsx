@@ -34,7 +34,11 @@ vi.mock("~/api/client", async (actual) => ({
 
 const { default: NewWorkflowPage } = await import("../../app/(app)/[ws]/workflows/new/page");
 
-beforeAll(() => installDomStubs());
+beforeAll(() => {
+  installDomStubs();
+  // every way to start on one page ("All fields"); the step-by-step view has its own test
+  window.localStorage.setItem("flowaid:guided-mode", "all");
+});
 afterEach(() => {
   cleanup();
   get.mockReset();

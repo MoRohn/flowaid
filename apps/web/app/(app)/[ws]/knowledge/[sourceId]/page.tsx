@@ -49,8 +49,10 @@ import {
   type QueryResult,
   type SearchMode,
 } from "~/knowledge/model";
+import { scoreReading, sourceStatusHelp } from "~/knowledge/guidance";
 import { readConfig, OPTIMIZE_LABEL } from "~/knowledge/pageindex/model";
 import { PageIndexSource } from "~/knowledge/pageindex/PageIndexSource";
+import { SourceGuide } from "~/knowledge/SourceGuide";
 import { useSession } from "~/session";
 import { AppFrame, PageBody } from "~/shell/AppFrame";
 import { errorMessage } from "~/shell/states";
@@ -144,7 +146,11 @@ function UploadDialog({
               </p>
             ) : (
               <>
-                <FieldRow label="Or paste a document" htmlFor="kd-title">
+                <FieldRow
+                  label="Or paste a document"
+                  htmlFor="kd-title"
+                  hint="The title is what search hits and citations show, so name it as people would recognise it."
+                >
                   <Input
                     id="kd-title"
                     value={title}
@@ -246,7 +252,7 @@ function Playground({ source }: { source: KnowledgeSource }) {
   return (
     <Section
       title="Try a search"
-      description="What a retrieval node would get for this query: the best chunks and their scores."
+      description="What a retrieval step would get for this query: the best chunks and their scores. Nothing is saved, and a search by meaning embeds the query with the source's model."
     >
       <form
         className="flex flex-wrap items-end gap-3"
@@ -266,23 +272,34 @@ function Playground({ source }: { source: KnowledgeSource }) {
         </FieldRow>
         <FieldRow label="Mode" htmlFor="kq-mode" className="w-36 shrink-0">
           <Select id="kq-mode" value={mode} onValueChange={(v) => setMode(v as SearchMode)}>
-            <SelectItem value="hybrid" disabled={!source.pipeline.embedding}>
+            <SelectItem
+              value="hybrid"
+              disabled={!source.pipeline.embedding}
+              {...(!source.pipeline.embedding
+                ? { description: "Needs an embedding model; this source is keywords only" }
+                : {})}
+            >
               Hybrid
             </SelectItem>
-            <SelectItem value="vector" disabled={!source.pipeline.embedding}>
+            <SelectItem
+              value="vector"
+              disabled={!source.pipeline.embedding}
+              {...(!source.pipeline.embedding
+                ? { description: "Needs an embedding model; this source is keywords only" }
+                : {})}
+            >
               Semantic
             </SelectItem>
             <SelectItem value="keyword">Keyword</SelectItem>
           </Select>
         </FieldRow>
-        <FieldRow label="Results" htmlFor="kq-k" className="shrink-0">
+        <FieldRow label="Results" htmlFor="kq-k" className="w-24 shrink-0">
           <NumberInput
             id="kq-k"
             value={topK}
             min={1}
             max={50}
             onValueChange={(v) => setTopK(v ?? 5)}
-            className="w-20"
           />
         </FieldRow>
         <Button
@@ -296,12 +313,19 @@ function Playground({ source }: { source: KnowledgeSource }) {
         </Button>
       </form>
       {source.chunks === 0 ? (
-        <p className="mt-3 text-xs text-ink-3">Nothing is indexed yet.</p>
+        <p className="mt-3 text-xs text-ink-3">
+          Nothing is indexed yet: search works once a document shows Indexed.
+        </p>
       ) : null}
       {query.data ? (
         <ol className="mt-4 flex flex-col gap-2" aria-label="Search results">
           {query.data.hits.length === 0 ? (
-            <li className="text-xs text-ink-3">No matching chunks.</li>
+            <li className="text-xs text-ink-3">
+              No matching chunks.{" "}
+              {query.data.mode === "keyword"
+                ? "Keyword search needs the query's words in the text: try other words, or Hybrid if the source has an embedding model."
+                : "Try the words the documents themselves use, or check that the document you expect shows Indexed."}
+            </li>
           ) : (
             query.data.hits.map((h, i) => (
               <li key={h.chunkId} className="rounded-md border border-border p-3">
@@ -318,6 +342,12 @@ function Playground({ source }: { source: KnowledgeSource }) {
             ))
           )}
         </ol>
+      ) : null}
+      {query.data?.hits.length ? (
+        <p className="mt-3 text-xs text-ink-3">
+          {scoreReading(query.data.mode)}
+          {query.data.costUsd > 0 ? ` This search cost $${query.data.costUsd.toFixed(6)}.` : ""}
+        </p>
       ) : null}
     </Section>
   );
@@ -486,7 +516,8 @@ export default function KnowledgeSourcePage({ params }: { params: Promise<{ sour
                     ) : null
                   }
                 />
-                <div className="mt-5">
+                <div className="mt-5 flex flex-col gap-5">
+                  <SourceGuide source={src} />
                   <PageIndexSource sourceId={src.id} canWrite={canWrite} />
                 </div>
               </>
@@ -509,14 +540,17 @@ export default function KnowledgeSourcePage({ params }: { params: Promise<{ sour
                         >
                           Delete
                         </Button>
-                        <Button
-                          leadingIcon={<RefreshCw strokeWidth={1.75} />}
-                          loading={sync.isPending}
-                          disabled={src.status === "syncing"}
-                          onClick={() => sync.mutate(undefined)}
-                        >
-                          Sync now
-                        </Button>
+                        {/* uploads and pasted text have nothing to fetch again */}
+                        {!isUploadKind(src.kind) ? (
+                          <Button
+                            leadingIcon={<RefreshCw strokeWidth={1.75} />}
+                            loading={sync.isPending}
+                            disabled={src.status === "syncing"}
+                            onClick={() => sync.mutate(undefined)}
+                          >
+                            Sync now
+                          </Button>
+                        ) : null}
                         {isUploadKind(src.kind) ? (
                           <Button
                             variant="primary"
@@ -549,6 +583,7 @@ export default function KnowledgeSourcePage({ params }: { params: Promise<{ sour
                     </span>
                   ) : null}
                 </div>
+                <p className="mt-1.5 text-xs text-ink-3">{sourceStatusHelp(src)}</p>
                 {src.lastError ? (
                   <div className="mt-3">
                     <Notice tone={src.status === "error" ? "danger" : "warn"}>
@@ -574,7 +609,15 @@ export default function KnowledgeSourcePage({ params }: { params: Promise<{ sour
                   </div>
                 ) : null}
                 <div className="mt-5 flex flex-col gap-5">
-                  <Section title={`Documents (${src.documents})`}>
+                  <SourceGuide source={src} />
+                  <Section
+                    title={`Documents (${src.documents})`}
+                    description={
+                      isUploadKind(src.kind)
+                        ? "Added by hand. Each is chunked and indexed in the background."
+                        : "Fetched by the source on each sync; only what changed is indexed again."
+                    }
+                  >
                     <DataTable
                       columns={columns}
                       data={documents.data?.items ?? []}

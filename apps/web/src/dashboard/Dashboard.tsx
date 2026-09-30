@@ -29,6 +29,8 @@ import {
 import { PageHeader } from "@flowaid/ui/shell";
 import { get, qs } from "~/api/client";
 import type { Environment, Page, WorkflowSummary } from "~/api/types";
+import { OVERVIEW } from "~/guide/capabilities/overview";
+import { PageIntro } from "~/guide/PageIntro";
 import { ErrorPanel } from "~/shell/states";
 import { Attention } from "./Attention";
 import { insightWindowFor } from "./insights";
@@ -85,6 +87,8 @@ export function Dashboard({ ws, environments, now = Date.now, intro }: Dashboard
     <div className="flex flex-col gap-5">
       <PageHeader title="Overview" description="How this workspace's workflows are running." />
       {intro}
+      {/* how to read the page; open by itself only while there is nothing to read yet */}
+      <PageIntro guide={OVERVIEW} defaultCollapsed={!empty} className="" />
       <div
         role="group"
         aria-label="Dashboard filters"

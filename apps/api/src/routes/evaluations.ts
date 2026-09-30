@@ -31,7 +31,16 @@ import {
 } from "@flowaid/workflow-core";
 import { assertEnvironmentAllowed, canSeeWorkflow, type Principal } from "../auth/principal.js";
 import type { ApiContext } from "../context.js";
-import { IdParams, ListQuery, NoContent, decodeCursor, encodeCursor } from "../dto/common.js";
+import {
+  IdParams,
+  ListQuery,
+  NoContent,
+  PageQuery,
+  afterCursor,
+  decodeCursor,
+  encodeCursor,
+  toPage,
+} from "../dto/common.js";
 import { resolveRunVersion } from "../services/runs.js";
 
 type SetRow = typeof evaluationSets.$inferSelect;
@@ -143,10 +152,14 @@ export function evaluationRoutes(app: FastifyInstance, ctx: ApiContext): void {
         scope: "evaluations:read",
         cli: { noun: "dataset", verb: "list" },
       },
-      schema: { tags: ["datasets"], querystring: z.object({ workflowId: z.uuid().optional() }) },
+      schema: {
+        tags: ["datasets"],
+        querystring: PageQuery.extend({ workflowId: z.uuid().optional() }),
+      },
     },
     async (req) => {
       const p = need(req.principal);
+      const { limit, cursor } = req.query;
       const rows = await ctx.db.tenant(p.workspaceId, (tx) =>
         tx
           .select()
@@ -157,11 +170,24 @@ export function evaluationRoutes(app: FastifyInstance, ctx: ApiContext): void {
               req.query.workflowId
                 ? eq(evaluationSets.workflowId, req.query.workflowId)
                 : undefined,
+              afterCursor(evaluationSets.name, evaluationSets.id, cursor),
             ),
           )
-          .orderBy(asc(evaluationSets.name)),
+          .orderBy(asc(evaluationSets.name), asc(evaluationSets.id))
+          .limit(limit + 1),
       );
-      return rows.filter((s) => !s.workflowId || canSeeWorkflow(p, s.workflowId)).map(setDto);
+      // Sets on workflows the principal cannot see are dropped after paging (as for runs), so a
+      // page can hold fewer than `limit` items while `next_cursor` is still set.
+      const pg = toPage(
+        rows,
+        limit,
+        (s) => [s.name, s.id],
+        (s) => s,
+      );
+      return {
+        items: pg.items.filter((s) => !s.workflowId || canSeeWorkflow(p, s.workflowId)).map(setDto),
+        next_cursor: pg.next_cursor,
+      };
     },
   );
 

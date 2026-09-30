@@ -16,14 +16,18 @@ import {
   ToggleGroupItem,
   UnsavedMark,
 } from "@flowaid/ui/primitives";
-import { del, get, patch, put } from "~/api/client";
+import { del, get, getAll, patch, put } from "~/api/client";
 import type { WorkflowDetail } from "~/api/types";
 import { WorkflowFrame } from "~/admin/WorkflowFrame";
 import { credentialsForSecret, missingRequiredSecrets, parseTags } from "~/admin/logic";
 import type { Credential, EvaluationSet } from "~/admin/types";
 import { DraftProvider, isTabDirty, useDirtyKeys, usePreservedDraft } from "~/admin/drafts";
 import { Notice, QueryView, Section, useMutate, useQueryTab } from "~/admin/ui";
+import { WORKFLOW_SETTINGS } from "~/guide/capabilities/workflow";
+import { PageIntro } from "~/guide/PageIntro";
+import type { Check } from "~/guide/Readiness";
 import { useSession } from "~/session";
+import { useSecretChecks } from "~/workflows/readiness";
 import { ScheduleList } from "~/admin/triggers/Schedules";
 import { WebhookList } from "~/admin/triggers/Webhooks";
 
@@ -43,7 +47,8 @@ function General({ w }: { w: WorkflowDetail }) {
   // kept while another settings section is open; leaving the page asks first
   const { draft, setDraft, dirty, reset } = usePreservedDraft(`general:${w.id}`, {
     name: w.name,
-    description: w.description,
+    // older copies of templates kept their description only in the definition
+    description: w.description || w.draft.description || "",
     tags: w.tags.join(", "),
   });
   const { name, description, tags } = draft;
@@ -277,7 +282,7 @@ function Secrets({ w }: { w: WorkflowDetail }) {
   const s = useSession();
   const creds = useQuery({
     queryKey: ["credentials", s.ws],
-    queryFn: () => get<Credential[]>("/v1/credentials"),
+    queryFn: () => getAll<Credential>("/v1/credentials"),
     enabled: s.can("credentials:read"),
   });
   const declared = w.draft.secrets ?? [];
@@ -339,7 +344,7 @@ function Evaluation({ w }: { w: WorkflowDetail }) {
   const s = useSession();
   const sets = useQuery({
     queryKey: ["evaluation-sets", s.ws],
-    queryFn: () => get<EvaluationSet[]>("/v1/evaluations/sets"),
+    queryFn: () => getAll<EvaluationSet>("/v1/evaluations/sets"),
   });
   const link = useMutate(
     (setId: string | null) => patch(`/v1/workflows/${w.id}`, { evaluationSetId: setId }),
@@ -476,10 +481,38 @@ function Danger({ w }: { w: WorkflowDetail }) {
 }
 
 function Settings({ w }: { w: WorkflowDetail }) {
+  const s = useSession();
   const [tab, setTab] = useQueryTab<Tab>(TABS);
   const dirtyKeys = useDirtyKeys();
+  const triggers = w.draft.triggers ?? [];
+  const checks: Check[] = [
+    ...useSecretChecks(w.id, w.draft.secrets ?? []),
+    {
+      id: "triggers",
+      label: triggers.length
+        ? `${triggers.length} trigger${triggers.length === 1 ? "" : "s"} declared in the draft`
+        : "No triggers declared",
+      state: triggers.length ? "ok" : "optional",
+      detail: triggers.length
+        ? "They start working in an environment when a version declaring them is deployed there."
+        : "Without triggers, runs start from the builder or the API. Add a webhook or schedule in the Triggers section below.",
+    },
+    ...(s.features.evaluations
+      ? [
+          w.evaluationSetId
+            ? ({ id: "evaluation", label: "Evaluation set linked", state: "ok" } satisfies Check)
+            : ({
+                id: "evaluation",
+                label: "No evaluation set linked",
+                state: "optional",
+                detail: "Link one to offer it as a gate when publishing.",
+              } satisfies Check),
+        ]
+      : []),
+  ];
   return (
     <div className="flex flex-col gap-4">
+      <PageIntro guide={WORKFLOW_SETTINGS} checks={checks} defaultCollapsed className="" />
       <ToggleGroup
         type="single"
         value={tab}

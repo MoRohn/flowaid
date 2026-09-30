@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { credentialTypeLabel, keySource, suggestSecretName } from "./keySources";
+import { autoBindSlots, credentialTypeLabel, keySource, suggestSecretName } from "./keySources";
 
 const sources = { server: { typesafe: true, openai: false }, saved: ["anthropic.api_key"] };
 
@@ -27,5 +27,30 @@ describe("secret names and labels", () => {
   it("names known credential types in words", () => {
     expect(credentialTypeLabel("anthropic.api_key")).toBe("Anthropic API key");
     expect(credentialTypeLabel("custom.thing")).toBe("custom.thing");
+  });
+});
+
+describe("autoBindSlots", () => {
+  const slot = { name: "typesafe", types: ["typesafe.api_key"], required: true };
+  it("reuses a secret the workflow already declares for the slot's type", () => {
+    const r = autoBindSlots(
+      [slot],
+      [{ name: "TS", credentialType: "typesafe.api_key", required: true }],
+      sources,
+    );
+    expect(r).toEqual({ credentials: { typesafe: "TS" }, declare: [] });
+  });
+  it("declares an optional secret when the server has the key", () => {
+    expect(autoBindSlots([slot], [], sources)).toEqual({
+      credentials: { typesafe: "TYPESAFE_API_KEY" },
+      declare: [{ name: "TYPESAFE_API_KEY", credentialType: "typesafe.api_key", required: false }],
+    });
+  });
+  it("leaves a slot unbound when nothing answers it, and skips optional slots", () => {
+    const none = { server: {}, saved: [] };
+    expect(autoBindSlots([slot, { ...slot, name: "x", required: false }], [], none)).toEqual({
+      credentials: {},
+      declare: [],
+    });
   });
 });

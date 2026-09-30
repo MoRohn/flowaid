@@ -45,6 +45,19 @@ export interface InsightsReport {
   insights: Insight[];
 }
 
+/**
+ * When "What changed" reports a change: the defaults of `@flowaid/insights` `detectChanges`,
+ * which the API uses unchanged. Shown beside the list so an empty one is read correctly.
+ */
+export const DETECTION_RULES: readonly string[] = [
+  "Each workflow's recent period is compared with the four periods before it, production runs only.",
+  "Failure rate: at least 20 finished runs in both periods, and at least 5 points and 1.5 times higher.",
+  "Speed and cost per run: at least 20 values in both periods, and a median at least 1.25 times higher. Speed counts only runs that never waited for a person.",
+  "Decision confidence: at least 20 decisions in both periods, and a median at least 0.05 lower.",
+  "New error: an error code in at least 3 recent runs that the earlier periods, with at least 20 finished runs, never had.",
+  "Tested changes must also pass a one-sided test with a false discovery rate of 5% across everything tested at once.",
+];
+
 /** The insight window that matches the dashboard's time range (short ranges use 24h). */
 export function insightWindowFor(preset: TimeRangePreset): InsightWindow {
   return preset === "7d" ? "7d" : preset === "30d" || preset === "90d" ? "30d" : "24h";

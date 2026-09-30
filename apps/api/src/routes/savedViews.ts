@@ -16,7 +16,7 @@ import {
 } from "@flowaid/workflow-core";
 import type { Principal } from "../auth/principal.js";
 import type { ApiContext } from "../context.js";
-import { NoContent } from "../dto/common.js";
+import { NoContent, PageQuery, afterCursor, page, toPage } from "../dto/common.js";
 
 const ScopeSchema = z.enum(["runs"]);
 
@@ -63,12 +63,13 @@ export function savedViewRoutes(app: FastifyInstance, ctx: ApiContext): void {
       },
       schema: {
         tags: ["runs"],
-        querystring: z.object({ scope: ScopeSchema }),
-        response: { 200: z.array(SavedViewSchema) },
+        querystring: PageQuery.extend({ scope: ScopeSchema }),
+        response: { 200: page(SavedViewSchema) },
       },
     },
     async (req) => {
       const p = person(req.principal);
+      const { limit, cursor } = req.query;
       const rows = await ctx.db.tenant(p.workspaceId, (tx) =>
         tx
           .select()
@@ -78,11 +79,13 @@ export function savedViewRoutes(app: FastifyInstance, ctx: ApiContext): void {
               eq(savedViews.workspaceId, p.workspaceId),
               eq(savedViews.userId, p.userId),
               eq(savedViews.scope, req.query.scope),
+              afterCursor(savedViews.name, savedViews.id, cursor),
             ),
           )
-          .orderBy(asc(savedViews.name)),
+          .orderBy(asc(savedViews.name), asc(savedViews.id))
+          .limit(limit + 1),
       );
-      return rows.map(dto);
+      return toPage(rows, limit, (v) => [v.name, v.id], dto);
     },
   );
 

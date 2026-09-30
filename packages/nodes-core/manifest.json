@@ -16,9 +16,12 @@
           "agentId": {
             "format": "uuid",
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "title": "Agent preset",
             "type": "string",
             "x-ui": {
-              "help": "An agent preset (Agents page); the node's own settings override it."
+              "help": "Pick an agent preset by name (made under Agents); the step's own settings override it.",
+              "optionsProvider": "agentPresets",
+              "widget": "select"
             }
           },
           "documents": {
@@ -268,7 +271,9 @@
         ]
       },
       "migrations": [],
-      "optionProviders": [],
+      "optionProviders": [
+        "agentPresets"
+      ],
       "outputs": [
         {
           "name": "answer",

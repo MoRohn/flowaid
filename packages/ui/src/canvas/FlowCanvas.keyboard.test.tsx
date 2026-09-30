@@ -226,6 +226,19 @@ describe("FlowCanvas keyboard model", () => {
     expect(await screen.findByRole("dialog", { name: "Add node" })).toBeInTheDocument();
   });
 
+  it("opens the palette with mod+K when focus rests on the page, and hands focus back on close", async () => {
+    const user = userEvent.setup();
+    render(<Harness catalog={SAMPLE_CATALOG} onAddNode={vi.fn()} />);
+    await settle();
+    const canvas = screen.getByRole("application", { name: "Workflow canvas" });
+    (document.activeElement as HTMLElement | null)?.blur();
+    expect(document.activeElement).toBe(document.body);
+    await user.keyboard("{Control>}k{/Control}");
+    expect(await screen.findByRole("dialog", { name: "Add node" })).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(canvas).toHaveFocus());
+  });
+
   it("leaves keys typed into a control inside the canvas alone", async () => {
     const user = userEvent.setup();
     const onPositions = vi.fn();

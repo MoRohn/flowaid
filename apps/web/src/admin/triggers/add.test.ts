@@ -37,6 +37,10 @@ describe("adding a trigger to a draft", () => {
     expect(withTrigger(out.definition, tick)).toHaveProperty("error");
     expect(cronProblem("every day")).not.toBeNull();
     expect(cronProblem("*/15 * * * *")).toBeNull();
+    // values the scheduler would reject at deploy time are caught here
+    expect(cronProblem("99 99 * * *")).not.toBeNull();
+    expect(cronProblem("0 25 * * *")).not.toBeNull();
+    expect(cronProblem("0 9 31 2 *")).toBe("This timetable never matches a real date.");
   });
 
   it("writes a request with the headers each signature scheme needs", () => {

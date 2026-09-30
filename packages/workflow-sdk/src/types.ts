@@ -86,6 +86,21 @@ export interface HumanTask {
   createdAt: string;
 }
 
+/** A published version as `GET /v1/workflows/:id/versions` lists it. */
+export interface VersionSummary {
+  id: string;
+  workflowId: string;
+  kind: "published" | "draft";
+  version: number | null;
+  label: string | null;
+  definitionHash: string;
+  planHash: string;
+  compilerVersion: string;
+  notes: string | null;
+  publishedBy: string | null;
+  createdAt: string;
+}
+
 export interface Page<T> {
   items: T[];
   next_cursor: string | null;

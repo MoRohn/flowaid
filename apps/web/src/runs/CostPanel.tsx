@@ -47,7 +47,7 @@ export function CostPanel({
         <caption className="sr-only">Cost per node run</caption>
         <thead>
           <tr className="border-b border-border text-left text-2xs uppercase tracking-wide text-ink-3">
-            <th className="py-2 font-medium">Node</th>
+            <th className="py-2 font-medium">Step</th>
             <th className="py-2 text-right font-medium">Tokens</th>
             <th className="py-2 text-right font-medium">Latency</th>
             <th className="py-2 text-right font-medium">Cost</th>

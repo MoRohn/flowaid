@@ -6,17 +6,16 @@ import {
   apiKeys,
   createApiKey,
   environments,
-  listApiKeys,
   revokeApiKey,
   rotateApiKey,
   type ApiKeyRow,
 } from "@flowaid/database";
 import { BadRequestError, ForbiddenError, NotFoundError } from "@flowaid/workflow-core";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { generateApiKey } from "../auth/apiKey.js";
 import { ROLE_SCOPES, isScope, roleAtLeast } from "../auth/scopes.js";
 import type { ApiContext } from "../context.js";
-import { IdParams, NoContent } from "../dto/common.js";
+import { IdParams, NoContent, PageQuery, afterCursor, page, toPage } from "../dto/common.js";
 import {
   ApiKeyCreatedSchema,
   ApiKeySummarySchema,
@@ -51,11 +50,35 @@ export function apiKeyRoutes(app: FastifyInstance, ctx: ApiContext): void {
         scope: "api_keys:manage",
         cli: { noun: "api-key", verb: "list" },
       },
-      schema: { tags: ["api-keys"], response: { 200: z.array(ApiKeySummarySchema) } },
+      schema: {
+        tags: ["api-keys"],
+        querystring: PageQuery,
+        response: { 200: page(ApiKeySummarySchema) },
+      },
     },
     async (req) => {
       const ws = req.principal?.workspaceId ?? "";
-      return (await ctx.db.tenant(ws, (tx) => listApiKeys(tx, ws))).map(dto);
+      const { limit, cursor } = req.query;
+      const rows = await ctx.db.tenant(ws, (tx) =>
+        tx
+          .select()
+          .from(apiKeys)
+          .where(
+            and(
+              eq(apiKeys.workspaceId, ws),
+              afterCursor(
+                apiKeys.createdAt,
+                apiKeys.id,
+                cursor,
+                "desc",
+                (v) => new Date(String(v)),
+              ),
+            ),
+          )
+          .orderBy(desc(apiKeys.createdAt), desc(apiKeys.id))
+          .limit(limit + 1),
+      );
+      return toPage(rows, limit, (k) => [k.createdAt.toISOString(), k.id], dto);
     },
   );
 

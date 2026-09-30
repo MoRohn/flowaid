@@ -25,7 +25,7 @@ import { KeyValueEditor } from "@flowaid/ui/forms";
 import { RelativeTime } from "@flowaid/ui/data";
 import { WorkflowDiffSummary } from "@flowaid/ui/inspector";
 import type { WorkflowDiff } from "@flowaid/ui";
-import { get, post, put } from "~/api/client";
+import { get, getAll, post, put } from "~/api/client";
 import type {
   Deployment,
   Environment,
@@ -37,7 +37,11 @@ import { WorkflowFrame } from "~/admin/WorkflowFrame";
 import { missingRequiredSecrets, rowsToVariables, variablesToRows } from "~/admin/logic";
 import type { DeployResult, Schedule, Webhook as WebhookRow } from "~/admin/types";
 import { Notice, Section, useMembers, useMutate } from "~/admin/ui";
+import { WORKFLOW_DEPLOYMENTS } from "~/guide/capabilities/workflow";
+import { PageIntro } from "~/guide/PageIntro";
+import type { Check } from "~/guide/Readiness";
 import { useSession } from "~/session";
+import { publishedCheck, useSecretChecks } from "~/workflows/readiness";
 
 type Target = { env: Environment; versionId: string };
 
@@ -291,7 +295,7 @@ function Deployments({ workflow }: { workflow: WorkflowDetail }) {
   const [result, setResult] = useState<{ r: DeployResult; env: Environment } | null>(null);
   const versions = useQuery({
     queryKey: ["versions", s.ws, workflow.id],
-    queryFn: () => get<VersionSummary[]>(`/v1/workflows/${workflow.id}/versions`),
+    queryFn: () => getAll<VersionSummary>(`/v1/workflows/${workflow.id}/versions`),
   });
   const deployments = useQuery({
     queryKey: ["deployments", s.ws, workflow.id],
@@ -299,12 +303,12 @@ function Deployments({ workflow }: { workflow: WorkflowDetail }) {
   });
   const hooks = useQuery({
     queryKey: ["triggers", s.ws, workflow.id, "webhooks"],
-    queryFn: () => get<WebhookRow[]>(`/v1/webhooks?workflowId=${workflow.id}`),
+    queryFn: () => getAll<WebhookRow>("/v1/webhooks", { workflowId: workflow.id }),
     enabled: s.can("webhooks:write"),
   });
   const schedules = useQuery({
     queryKey: ["triggers", s.ws, workflow.id, "schedules"],
-    queryFn: () => get<Schedule[]>(`/v1/schedules?workflowId=${workflow.id}`),
+    queryFn: () => getAll<Schedule>("/v1/schedules", { workflowId: workflow.id }),
     enabled: s.can("schedules:write"),
   });
   const published = useMemo(
@@ -332,27 +336,53 @@ function Deployments({ workflow }: { workflow: WorkflowDetail }) {
     },
   );
   const versionNo = (vid: string | null) => published.find((v) => v.id === vid)?.version;
+  const secretChecks = useSecretChecks(workflow.id, workflow.draft.secrets ?? []);
+  const checks: Check[] = [
+    publishedCheck(versions.data ? published.length : undefined, s.ws, workflow.id),
+    ...secretChecks,
+    ...(canDeploy
+      ? []
+      : [
+          {
+            id: "role",
+            label: "Your role can see deployments but not deploy or roll back",
+            state: "info",
+          } satisfies Check,
+        ]),
+  ];
+  const intro = (
+    <PageIntro
+      guide={WORKFLOW_DEPLOYMENTS}
+      checks={checks}
+      defaultCollapsed={byEnv.size > 0}
+      className="mb-4"
+    />
+  );
 
   if (published.length === 0)
     return (
-      <EmptyState
-        icon={<Rocket strokeWidth={1.5} />}
-        title="Nothing to deploy yet"
-        description={`Publish the draft in the builder, then deploy that version here to ${s.environments
-          .map((e) => e.name)
-          .join(
-            ", ",
-          )}. API keys, webhooks and schedules run the version deployed to their environment.`}
-        primaryAction={
-          <Button variant="primary" asChild>
-            <Link href={`/${s.ws}/workflows/${workflow.id}`}>Open the builder</Link>
-          </Button>
-        }
-      />
+      <>
+        {intro}
+        <EmptyState
+          icon={<Rocket strokeWidth={1.5} />}
+          title="Nothing to deploy yet"
+          description={`Publish the draft in the builder, then deploy that version here to ${s.environments
+            .map((e) => e.name)
+            .join(
+              ", ",
+            )}. API keys, webhooks and schedules run the version deployed to their environment.`}
+          primaryAction={
+            <Button variant="primary" asChild>
+              <Link href={`/${s.ws}/workflows/${workflow.id}`}>Open the builder</Link>
+            </Button>
+          }
+        />
+      </>
     );
 
   return (
     <div className="flex flex-col gap-4">
+      {intro}
       {s.environments.map((env) => {
         const d = byEnv.get(env.id);
         const envHooks = (hooks.data ?? []).filter((h) => h.environmentId === env.id);

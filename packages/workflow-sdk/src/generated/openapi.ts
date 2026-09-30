@@ -10,7 +10,10 @@ export interface paths {
     };
     get: {
       parameters: {
-        query?: never;
+        query?: {
+          cursor?: string;
+          limit?: number;
+        };
         header?: never;
         path?: never;
         cookie?: never;
@@ -24,16 +27,19 @@ export interface paths {
           };
           content: {
             "application/json": {
-              config: {
-                [key: string]: unknown;
-              };
-              createdAt: string;
-              description: string;
-              /** Format: uuid */
-              id: string;
-              name: string;
-              updatedAt: string;
-            }[];
+              items: {
+                config: {
+                  [key: string]: unknown;
+                };
+                createdAt: string;
+                description: string;
+                /** Format: uuid */
+                id: string;
+                name: string;
+                updatedAt: string;
+              }[];
+              next_cursor: string | null;
+            };
           };
         };
       };
@@ -330,7 +336,10 @@ export interface paths {
     };
     get: {
       parameters: {
-        query?: never;
+        query?: {
+          cursor?: string;
+          limit?: number;
+        };
         header?: never;
         path?: never;
         cookie?: never;
@@ -344,20 +353,23 @@ export interface paths {
           };
           content: {
             "application/json": {
-              createdAt: string;
-              environmentId: string | null;
-              expiresAt: string;
-              /** Format: uuid */
-              id: string;
-              lastUsedAt: string | null;
-              name: string;
-              prefix: string;
-              rateLimitPerMin: number | null;
-              revokedAt: string | null;
-              scopes: string[];
-              serviceAccount: boolean;
-              workflowIds: string[] | null;
-            }[];
+              items: {
+                createdAt: string;
+                environmentId: string | null;
+                expiresAt: string;
+                /** Format: uuid */
+                id: string;
+                lastUsedAt: string | null;
+                name: string;
+                prefix: string;
+                rateLimitPerMin: number | null;
+                revokedAt: string | null;
+                scopes: string[];
+                serviceAccount: boolean;
+                workflowIds: string[] | null;
+              }[];
+              next_cursor: string | null;
+            };
           };
         };
       };
@@ -945,7 +957,9 @@ export interface paths {
     get: {
       parameters: {
         query?: {
+          cursor?: string;
           environmentId?: string;
+          limit?: number;
           type?: string;
         };
         header?: never;
@@ -961,28 +975,31 @@ export interface paths {
           };
           content: {
             "application/json": {
-              allowedWorkflowIds: string[] | null;
-              createdAt: string;
-              environmentId: string | null;
-              externalRef: string | null;
-              hints: {
-                [key: string]: string;
-              };
-              /** Format: uuid */
-              id: string;
-              lastTestedAt: string | null;
-              lastTestOk: boolean | null;
-              lastUsedAt: string | null;
-              name: string;
-              publicFields: {
-                [key: string]: string;
-              };
-              rotatedAt: string | null;
-              scopes: string[];
-              /** @enum {string} */
-              storage: "db" | "external";
-              type: string;
-            }[];
+              items: {
+                allowedWorkflowIds: string[] | null;
+                createdAt: string;
+                environmentId: string | null;
+                externalRef: string | null;
+                hints: {
+                  [key: string]: string;
+                };
+                /** Format: uuid */
+                id: string;
+                lastTestedAt: string | null;
+                lastTestOk: boolean | null;
+                lastUsedAt: string | null;
+                name: string;
+                publicFields: {
+                  [key: string]: string;
+                };
+                rotatedAt: string | null;
+                scopes: string[];
+                /** @enum {string} */
+                storage: "db" | "external";
+                type: string;
+              }[];
+              next_cursor: string | null;
+            };
           };
         };
       };
@@ -1886,6 +1903,8 @@ export interface paths {
     get: {
       parameters: {
         query?: {
+          cursor?: string;
+          limit?: number;
           workflowId?: string;
         };
         header?: never;
@@ -2792,7 +2811,10 @@ export interface paths {
     /** Knowledge sources with document and chunk counts */
     get: {
       parameters: {
-        query?: never;
+        query?: {
+          cursor?: string;
+          limit?: number;
+        };
         header?: never;
         path?: never;
         cookie?: never;
@@ -2806,29 +2828,32 @@ export interface paths {
           };
           content: {
             "application/json": {
-              chunks: number;
-              config: {
-                [key: string]: unknown;
-              };
-              createdAt: string;
-              credentialId: string | null;
-              documents: number;
-              /** Format: uuid */
-              id: string;
-              kind: string;
-              lastError: string | null;
-              lastSyncAt: string | null;
-              name: string;
-              pipeline: {
-                [key: string]: unknown;
-              };
-              stats: {
-                [key: string]: unknown;
-              };
-              /** @enum {string} */
-              status: "new" | "syncing" | "ready" | "stale" | "error";
-              updatedAt: string;
-            }[];
+              items: {
+                chunks: number;
+                config: {
+                  [key: string]: unknown;
+                };
+                createdAt: string;
+                credentialId: string | null;
+                documents: number;
+                /** Format: uuid */
+                id: string;
+                kind: string;
+                lastError: string | null;
+                lastSyncAt: string | null;
+                name: string;
+                pipeline: {
+                  [key: string]: unknown;
+                };
+                stats: {
+                  [key: string]: unknown;
+                };
+                /** @enum {string} */
+                status: "new" | "syncing" | "ready" | "stale" | "error";
+                updatedAt: string;
+              }[];
+              next_cursor: string | null;
+            };
           };
         };
       };
@@ -3334,7 +3359,10 @@ export interface paths {
     };
     get: {
       parameters: {
-        query?: never;
+        query?: {
+          cursor?: string;
+          limit?: number;
+        };
         header?: never;
         path?: never;
         cookie?: never;
@@ -3430,7 +3458,10 @@ export interface paths {
     };
     get: {
       parameters: {
-        query?: never;
+        query?: {
+          cursor?: string;
+          limit?: number;
+        };
         header?: never;
         path?: never;
         cookie?: never;
@@ -4286,7 +4317,24 @@ export interface paths {
           headers: {
             [name: string]: unknown;
           };
-          content?: never;
+          content: {
+            "application/json": {
+              aliases?: string[];
+              capabilities: {
+                [key: string]: boolean;
+              };
+              contextTokens?: number;
+              deprecated?: string;
+              /** @enum {string} */
+              kind: "decision" | "chat" | "embedding" | "rerank";
+              limits?: unknown;
+              longContext?: unknown;
+              maxOutputTokens?: number;
+              model: string;
+              pricing?: unknown;
+              provider: string;
+            }[];
+          };
         };
       };
     };
@@ -4317,6 +4365,33 @@ export interface paths {
       responses: {
         /** @description Default Response */
         200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": ({
+              capabilities: string[];
+              configSchema: unknown;
+              controlPorts: unknown[];
+              credentials: unknown[];
+              id: string;
+              inputs: unknown[];
+              metadata: {
+                category: string;
+                description: string;
+                name: string;
+              } & {
+                [key: string]: unknown;
+              };
+              outputs: unknown[];
+              version: string;
+            } & {
+              [key: string]: unknown;
+            })[];
+          };
+        };
+        /** @description No content */
+        304: {
           headers: {
             [name: string]: unknown;
           };
@@ -4357,7 +4432,27 @@ export interface paths {
           headers: {
             [name: string]: unknown;
           };
-          content?: never;
+          content: {
+            "application/json": {
+              capabilities: string[];
+              configSchema: unknown;
+              controlPorts: unknown[];
+              credentials: unknown[];
+              id: string;
+              inputs: unknown[];
+              metadata: {
+                category: string;
+                description: string;
+                name: string;
+              } & {
+                [key: string]: unknown;
+              };
+              outputs: unknown[];
+              version: string;
+            } & {
+              [key: string]: unknown;
+            };
+          };
         };
       };
     };
@@ -4378,7 +4473,10 @@ export interface paths {
     };
     get: {
       parameters: {
-        query?: never;
+        query?: {
+          cursor?: string;
+          limit?: number;
+        };
         header?: never;
         path?: never;
         cookie?: never;
@@ -4392,19 +4490,22 @@ export interface paths {
           };
           content: {
             "application/json": {
-              config: {
-                [key: string]: unknown;
-              };
-              createdAt: string;
-              enabled: boolean;
-              events: string[];
-              /** Format: uuid */
-              id: string;
-              /** @enum {string} */
-              kind: "email" | "slack_webhook" | "webhook";
-              name: string;
-              secretSet: boolean;
-            }[];
+              items: {
+                config: {
+                  [key: string]: unknown;
+                };
+                createdAt: string;
+                enabled: boolean;
+                events: string[];
+                /** Format: uuid */
+                id: string;
+                /** @enum {string} */
+                kind: "email" | "slack_webhook" | "webhook";
+                name: string;
+                secretSet: boolean;
+              }[];
+              next_cursor: string | null;
+            };
           };
         };
       };
@@ -6345,7 +6446,13 @@ export interface paths {
           headers: {
             [name: string]: unknown;
           };
-          content?: never;
+          content: {
+            "application/json": {
+              configuredOnServer: boolean;
+              id: string;
+              models: number;
+            }[];
+          };
         };
       };
     };
@@ -7170,6 +7277,8 @@ export interface paths {
     get: {
       parameters: {
         query: {
+          cursor?: string;
+          limit?: number;
           scope: "runs";
         };
         header?: never;
@@ -7185,17 +7294,20 @@ export interface paths {
           };
           content: {
             "application/json": {
-              createdAt: string;
-              filters: {
-                [key: string]: unknown;
-              };
-              /** Format: uuid */
-              id: string;
-              name: string;
-              /** @enum {string} */
-              scope: "runs";
-              updatedAt: string;
-            }[];
+              items: {
+                createdAt: string;
+                filters: {
+                  [key: string]: unknown;
+                };
+                /** Format: uuid */
+                id: string;
+                name: string;
+                /** @enum {string} */
+                scope: "runs";
+                updatedAt: string;
+              }[];
+              next_cursor: string | null;
+            };
           };
         };
       };
@@ -7295,6 +7407,8 @@ export interface paths {
     get: {
       parameters: {
         query?: {
+          cursor?: string;
+          limit?: number;
           workflowId?: string;
         };
         header?: never;
@@ -7517,7 +7631,10 @@ export interface paths {
     };
     get: {
       parameters: {
-        query?: never;
+        query?: {
+          cursor?: string;
+          limit?: number;
+        };
         header?: never;
         path?: never;
         cookie?: never;
@@ -7687,7 +7804,23 @@ export interface paths {
           headers: {
             [name: string]: unknown;
           };
-          content?: never;
+          content: {
+            "application/json": ({
+              approvalRequired: boolean;
+              description: string;
+              inputSchema: unknown;
+              name: string;
+              outputSchema?: unknown;
+              source: {
+                /** @enum {string} */
+                kind: "mcp" | "openapi" | "workflow" | "builtin" | "http";
+              } & {
+                [key: string]: unknown;
+              };
+            } & {
+              [key: string]: unknown;
+            })[];
+          };
         };
       };
     };
@@ -7831,11 +7964,41 @@ export interface paths {
       };
       responses: {
         /** @description Default Response */
-        200: {
+        201: {
           headers: {
             [name: string]: unknown;
           };
-          content?: never;
+          content: {
+            "application/json": {
+              createdAt: string;
+              credentialId: string | null;
+              definitions: ({
+                approvalRequired: boolean;
+                description: string;
+                inputSchema: unknown;
+                name: string;
+                outputSchema?: unknown;
+                source: {
+                  /** @enum {string} */
+                  kind: "mcp" | "openapi" | "workflow" | "builtin" | "http";
+                } & {
+                  [key: string]: unknown;
+                };
+              } & {
+                [key: string]: unknown;
+              })[];
+              /** Format: uuid */
+              id: string;
+              /** @enum {string} */
+              kind: "openapi" | "workflow" | "code" | "http";
+              name: string;
+              source: {
+                [key: string]: unknown;
+              };
+              updatedAt: string;
+              version: number;
+            };
+          };
         };
       };
     };
@@ -7855,6 +8018,8 @@ export interface paths {
     get: {
       parameters: {
         query?: {
+          cursor?: string;
+          limit?: number;
           workflowId?: string;
         };
         header?: never;
@@ -9579,7 +9744,15 @@ export interface paths {
           headers: {
             [name: string]: unknown;
           };
-          content?: never;
+          content: {
+            "application/json": {
+              inputs: unknown;
+              outputs: unknown;
+              references: string[];
+              /** Format: uuid */
+              versionId: string;
+            };
+          };
         };
       };
     };
@@ -9661,7 +9834,10 @@ export interface paths {
     };
     get: {
       parameters: {
-        query?: never;
+        query?: {
+          cursor?: string;
+          limit?: number;
+        };
         header?: never;
         path: {
           id: string;
@@ -9677,21 +9853,24 @@ export interface paths {
           };
           content: {
             "application/json": {
-              compilerVersion: string;
-              createdAt: string;
-              definitionHash: string;
-              /** Format: uuid */
-              id: string;
-              /** @enum {string} */
-              kind: "published" | "draft";
-              label: string | null;
-              notes: string | null;
-              planHash: string;
-              publishedBy: string | null;
-              version: number | null;
-              /** Format: uuid */
-              workflowId: string;
-            }[];
+              items: {
+                compilerVersion: string;
+                createdAt: string;
+                definitionHash: string;
+                /** Format: uuid */
+                id: string;
+                /** @enum {string} */
+                kind: "published" | "draft";
+                label: string | null;
+                notes: string | null;
+                planHash: string;
+                publishedBy: string | null;
+                version: number | null;
+                /** Format: uuid */
+                workflowId: string;
+              }[];
+              next_cursor: string | null;
+            };
           };
         };
       };
@@ -10161,7 +10340,10 @@ export interface paths {
     };
     get: {
       parameters: {
-        query?: never;
+        query?: {
+          cursor?: string;
+          limit?: number;
+        };
         header?: never;
         path: {
           id: string;
@@ -10177,15 +10359,18 @@ export interface paths {
           };
           content: {
             "application/json": {
-              email: string;
-              joinedAt: string;
-              name: string;
-              /** @enum {string} */
-              role: "owner" | "admin" | "editor" | "operator" | "viewer";
-              status: string;
-              /** Format: uuid */
-              userId: string;
-            }[];
+              items: {
+                email: string;
+                joinedAt: string;
+                name: string;
+                /** @enum {string} */
+                role: "owner" | "admin" | "editor" | "operator" | "viewer";
+                status: string;
+                /** Format: uuid */
+                userId: string;
+              }[];
+              next_cursor: string | null;
+            };
           };
         };
       };

@@ -1,137 +1,25 @@
 "use client";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { FlaskConical, Plus } from "lucide-react";
-import {
-  Badge,
-  Button,
-  Card,
-  Dialog,
-  DialogBody,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  EmptyState,
-  FieldRow,
-  Input,
-  Select,
-  SelectItem,
-  Textarea,
-} from "@flowaid/ui/primitives";
+import { Badge, Button, Card, EmptyState } from "@flowaid/ui/primitives";
 import { RelativeTime } from "@flowaid/ui/data";
 import { formatPercent } from "@flowaid/ui/lib";
 import { PageHeader } from "@flowaid/ui/shell";
-import { get, post, qs } from "~/api/client";
+import { get, getAll, qs } from "~/api/client";
 import type { Page, WorkflowSummary } from "~/api/types";
 import { runTone } from "~/admin/logic";
 import type { EvaluationRun, EvaluationSet } from "~/admin/types";
-import { QueryView, useMutate, useOpenFromQuery } from "~/admin/ui";
+import { QueryView, useOpenFromQuery } from "~/admin/ui";
+import { NewSetDialog } from "~/evaluations/NewSetDialog";
+import { EVALUATIONS } from "~/guide/capabilities/evaluations";
+import { PageIntro } from "~/guide/PageIntro";
+import type { Check } from "~/guide/Readiness";
 import { useSession } from "~/session";
 import { AppFrame, PageBody } from "~/shell/AppFrame";
 import { HELP } from "~/shell/help";
 import { LearnMore } from "~/shell/LearnMore";
-
-const ANY = "__any";
-
-function NewSetDialog({
-  open,
-  onOpenChange,
-  workflows,
-}: {
-  open: boolean;
-  onOpenChange: (o: boolean) => void;
-  workflows: WorkflowSummary[];
-}) {
-  const s = useSession();
-  const router = useRouter();
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [workflowId, setWorkflowId] = useState(ANY);
-  const create = useMutate(
-    () =>
-      post<EvaluationSet>("/v1/evaluations/sets", {
-        name: name.trim(),
-        description,
-        ...(workflowId !== ANY ? { workflowId } : {}),
-      }),
-    {
-      success: (x) => `Created ${x.name}`,
-      invalidate: [["evaluation-sets", s.ws]],
-      onSuccess: (x) => router.push(`/${s.ws}/evaluations/sets/${x.id}`),
-    },
-  );
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent size="md">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            create.mutate(undefined);
-          }}
-        >
-          <DialogHeader>
-            <DialogTitle>New evaluation set</DialogTitle>
-            <DialogDescription>
-              Cases pair an input with what the run must produce: outputs, decisions, branches,
-              tools, latency and cost.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogBody className="flex flex-col gap-4">
-            <FieldRow label="Name" htmlFor="set-name" required>
-              <Input
-                id="set-name"
-                value={name}
-                maxLength={200}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Refund routing regression"
-              />
-            </FieldRow>
-            <FieldRow label="Description" htmlFor="set-desc">
-              <Textarea
-                id="set-desc"
-                rows={2}
-                maxLength={2000}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              />
-            </FieldRow>
-            <FieldRow
-              label="Workflow"
-              htmlFor="set-wf"
-              hint="Tie the set to one workflow, or keep it reusable"
-            >
-              <Select id="set-wf" value={workflowId} onValueChange={setWorkflowId}>
-                <SelectItem value={ANY}>Any workflow</SelectItem>
-                {workflows.map((w) => (
-                  <SelectItem key={w.id} value={w.id}>
-                    {w.name}
-                  </SelectItem>
-                ))}
-              </Select>
-            </FieldRow>
-          </DialogBody>
-          <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              variant="primary"
-              loading={create.isPending}
-              disabled={!name.trim()}
-            >
-              Create set
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 export default function EvaluationsPage() {
   const s = useSession();
@@ -139,7 +27,7 @@ export default function EvaluationsPage() {
   const canWrite = s.can("evaluations:write");
   const sets = useQuery({
     queryKey: ["evaluation-sets", s.ws],
-    queryFn: () => get<EvaluationSet[]>("/v1/evaluations/sets"),
+    queryFn: () => getAll<EvaluationSet>("/v1/evaluations/sets"),
   });
   const runs = useQuery({
     queryKey: ["evaluation-runs", s.ws, "all"],
@@ -160,6 +48,43 @@ export default function EvaluationsPage() {
   }, [runs.data]);
   const wfName = (id: string | null) =>
     id ? (workflows.data?.find((w) => w.id === id)?.name ?? "a workflow") : null;
+  const checks: Check[] = [
+    workflows.isPending
+      ? { id: "workflow", label: "A workflow to test", state: "checking" }
+      : workflows.data?.length
+        ? {
+            id: "workflow",
+            label: `${workflows.data.length} workflow${workflows.data.length === 1 ? "" : "s"} to test`,
+            state: "ok",
+          }
+        : {
+            id: "workflow",
+            label: "A workflow to test",
+            state: "blocker",
+            detail: "A set can be created now, but running it needs a workflow.",
+            fix: (
+              <Link className="text-accent-text hover:underline" href={`/${s.ws}/workflows`}>
+                Create a workflow
+              </Link>
+            ),
+          },
+    {
+      id: "cost",
+      label: "Running a set runs the workflow once per case",
+      state: "info",
+      detail:
+        "Its steps call their models and tools for real, with the keys of the environment you choose. Nothing runs until you press Start evaluation.",
+    },
+    ...(canWrite
+      ? []
+      : [
+          {
+            id: "role",
+            label: "Your role can read sets and reports but not create or run them",
+            state: "info",
+          } satisfies Check,
+        ]),
+  ];
   const newButton = canWrite ? (
     <Button
       variant="primary"
@@ -178,11 +103,16 @@ export default function EvaluationsPage() {
           title="Evaluations"
           description={
             <>
-              Regression sets that score runs on outputs, decisions and calibration, and gate
+              Regression sets that score runs on outputs, decisions and calibration, and can gate
               publishing. <LearnMore href={HELP.evaluations} />
             </>
           }
           actions={newButton}
+        />
+        <PageIntro
+          guide={EVALUATIONS}
+          checks={checks}
+          defaultCollapsed={(sets.data?.length ?? 0) > 0}
         />
         <div className="mt-4">
           <QueryView query={sets}>
@@ -191,7 +121,7 @@ export default function EvaluationsPage() {
                 <EmptyState
                   icon={<FlaskConical strokeWidth={1.5} />}
                   title="No evaluation sets"
-                  description="Create a set, add cases (or add finished runs as cases from the run page), then run it against a version."
+                  description="Create a set, add cases (or add finished runs as cases from the run page), then run it against a version. New set walks through the choices."
                   primaryAction={newButton}
                 />
               ) : (
@@ -242,8 +172,13 @@ export default function EvaluationsPage() {
           </QueryView>
         </div>
       </PageBody>
-      {workflows.data ? (
-        <NewSetDialog open={creating} onOpenChange={setCreating} workflows={workflows.data} />
+      {creating && workflows.data ? (
+        <NewSetDialog
+          open
+          onOpenChange={setCreating}
+          workflows={workflows.data}
+          existingNames={(sets.data ?? []).map((x) => x.name)}
+        />
       ) : null}
     </AppFrame>
   );

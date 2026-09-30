@@ -10,6 +10,7 @@ import { CheckCircle2, ChevronRight, Hourglass, TriangleAlert } from "lucide-rea
 import { Badge, Panel, Skeleton } from "@flowaid/ui/primitives";
 import { get, qs } from "~/api/client";
 import {
+  DETECTION_RULES,
   ago,
   evidenceLines,
   isInsightsReport,
@@ -145,10 +146,26 @@ function WhatChanged({
         </ul>
       )}
       {report ? (
-        <p className="border-t border-border px-3 py-2 text-2xs text-ink-3">
-          {WINDOW_LABEL[window].replace(/^the l/, "L")} against {BASELINE_LABEL[window]} ·
-          production runs only · computed {ago(report.computedAt, now)}
-        </p>
+        <div className="border-t border-border px-3 py-2 text-2xs text-ink-3">
+          <p className="m-0">
+            {WINDOW_LABEL[window].replace(/^the l/, "L")} against {BASELINE_LABEL[window]} ·
+            production runs only · computed {ago(report.computedAt, now)}
+          </p>
+          <details className="mt-1">
+            <summary className="cursor-pointer select-none rounded-xs hover:text-ink-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
+              How changes are found
+            </summary>
+            <ul className="m-0 mt-1 flex list-disc flex-col gap-0.5 pl-4">
+              {DETECTION_RULES.map((r) => (
+                <li key={r}>{r}</li>
+              ))}
+              <li>
+                Too few runs means nothing is reported, not that nothing changed. A listed change is
+                a signal to look at runs, not a verdict on its cause.
+              </li>
+            </ul>
+          </details>
+        </div>
       ) : null}
     </Panel>
   );

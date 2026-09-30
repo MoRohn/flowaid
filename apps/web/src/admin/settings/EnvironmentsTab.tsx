@@ -71,6 +71,9 @@ function EnvironmentDialog({
             <DialogDescription>
               Variables are available to workflows as <code className="font-mono">$vars</code>;
               deployments can override them.
+              {env
+                ? null
+                : " A new environment starts empty: each workflow still needs a version deployed, its secrets bound and its triggers added there."}
             </DialogDescription>
           </DialogHeader>
           <DialogBody className="flex flex-col gap-4">
@@ -93,14 +96,14 @@ function EnvironmentDialog({
               label="Protected"
               htmlFor="env-protected"
               layout="row"
-              hint="Deploying here needs the publish scope and counts as production"
+              hint="Only admins can deploy here, and it counts as production. Protect every environment that answers real requests."
             >
               <Switch id="env-protected" checked={isProtected} onCheckedChange={setProtected} />
             </FieldRow>
             <FieldRow
               label="Variables"
               error={vars.errors[0]}
-              hint="Values for workflow variables whose source is the environment; nodes read them as $vars.NAME. Secrets belong in credentials, not here."
+              hint="Values for workflow variables whose source is the environment; nodes read them as $vars.NAME. For example SUPPORT_EMAIL = support@example.com, or MAX_REFUND = 200. Keys and passwords belong in Credentials, not here: variables are shown in plain text."
             >
               <KeyValueEditor
                 value={rows}

@@ -11,7 +11,7 @@ import { MetricTile, MetricsGrid } from "@flowaid/ui/observability";
 import { RelativeTime } from "@flowaid/ui/data";
 import type { WorkflowVersionView } from "@flowaid/ui";
 import { PageHeader } from "@flowaid/ui/shell";
-import { get, post, qs } from "~/api/client";
+import { get, getAll, post, qs } from "~/api/client";
 import type { Page, VersionSummary } from "~/api/types";
 import {
   calibrationNote,
@@ -31,6 +31,9 @@ import type {
   RegressionReport,
 } from "~/admin/types";
 import { Notice, QueryView, Section, useMutate } from "~/admin/ui";
+import { checksOnlyCompletion, reportReading } from "~/evaluations/logic";
+import { GuidePanel, Tips, toChecks } from "~/evaluations/SetGuide";
+import { CheckList } from "~/guide/Readiness";
 import { useSession } from "~/session";
 import { AppFrame, PageBody } from "~/shell/AppFrame";
 
@@ -87,7 +90,7 @@ export default function EvaluationRunPage({ params }: { params: Promise<{ evalRu
   });
   const versions = useQuery({
     queryKey: ["versions", s.ws, r?.workflowId],
-    queryFn: () => get<VersionSummary[]>(`/v1/workflows/${r?.workflowId ?? ""}/versions`),
+    queryFn: () => getAll<VersionSummary>(`/v1/workflows/${r?.workflowId ?? ""}/versions`),
     enabled: Boolean(r),
   });
   const chosenBaseline = baselineId ?? r?.baselineEvaluationRunId ?? null;
@@ -125,6 +128,11 @@ export default function EvaluationRunPage({ params }: { params: Promise<{ evalRu
     ? (versionOf(baselineRun.workflowVersionId) ?? draftView(baselineRun))
     : undefined;
   const flips = report?.flips ?? [];
+  const weakCases = useMemo(
+    () => new Set(caseRows.filter((c) => checksOnlyCompletion(c.expected)).map((c) => c.id)),
+    [caseRows],
+  );
+  const reading = summary ? reportReading(summary, results.data ?? [], weakCases) : [];
   const caseLabel = (id: string) => {
     const c = caseRows.find((x) => x.id === id);
     return c ? `Case ${c.ordinal + 1}` : id.slice(0, 8);
@@ -229,6 +237,34 @@ export default function EvaluationRunPage({ params }: { params: Promise<{ evalRu
                     />
                   </MetricsGrid>
                 ) : null}
+                {done && summary ? (
+                  <GuidePanel
+                    id="evaluation-report"
+                    title="How to read this report"
+                    defaultOpen={summary.passed < summary.cases}
+                  >
+                    <div className="grid gap-x-6 gap-y-3 md:grid-cols-2">
+                      <div className="flex flex-col gap-1.5">
+                        <p className="m-0 text-xs font-semibold text-ink">This run</p>
+                        <CheckList checks={toChecks(reading)} aria-label="What this report says" />
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <p className="m-0 text-xs font-semibold text-ink">Reading it</p>
+                        <Tips
+                          items={[
+                            "A pass means every expectation of the case held; it is only as strict as the case. It does not show the answer is good in ways the case does not check.",
+                            "Select a failed case to open its run: the trace shows the step and value behind the failed check.",
+                            "Latency and cost are this run's own. Human steps were answered by the evaluation, so waiting time for people is not in them.",
+                            report?.gate
+                              ? `Gate: this run was held to ${Math.round(report.gate.minPassRate * 100)}% of cases passing. Publishing checks its own gate when you publish.`
+                              : "No gate was set for this run. Publishing can require a pass rate on this set; it checks that when you publish.",
+                            "Calibration (for Decision steps): ECE is the average gap between stated confidence and how often the decision was right; 0 is perfect. A few cases per step make it noisy.",
+                          ]}
+                        />
+                      </div>
+                    </div>
+                  </GuidePanel>
+                ) : null}
                 {done && summary && candidate ? (
                   <>
                     <div className="flex flex-wrap items-center gap-2 text-xs text-ink-2">
@@ -293,7 +329,7 @@ export default function EvaluationRunPage({ params }: { params: Promise<{ evalRu
                     {Object.keys(summary.calibration).length > 0 ? (
                       <Section
                         title="Calibration"
-                        description="Predicted confidence against observed accuracy, per decision node. Points on the diagonal are well calibrated."
+                        description="Predicted confidence against observed accuracy, per decision node. Points on the diagonal are well calibrated; ECE is the average gap (lower is better), and bins with few decisions move a lot between runs."
                       >
                         <div className="grid gap-4 lg:grid-cols-2">
                           {Object.entries(summary.calibration).map(([node, c]) => (

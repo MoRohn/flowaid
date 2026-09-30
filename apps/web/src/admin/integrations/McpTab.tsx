@@ -1,11 +1,11 @@
 "use client";
 /**
- * MCP servers (connect, test, discover, delete), workflows exposed as MCP tools and MCP tokens
- * (service-account keys with `mcp:serve`, shown once).
+ * MCP servers (connect, test, discover, tool policy, delete), workflows exposed as MCP tools and
+ * MCP tokens (service-account keys with `mcp:serve`, shown once).
  */
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState, type FormEvent } from "react";
-import { Plus, Radar, Server, Trash2, Zap } from "lucide-react";
+import { useMemo, useState } from "react";
+import { CheckCircle2, Plus, Radar, Server, ShieldCheck, Trash2, Zap } from "lucide-react";
 import {
   Badge,
   Button,
@@ -34,20 +34,26 @@ import {
   createDataTableColumns,
   type DataTableColumns,
 } from "@flowaid/ui/data";
-import { del, get, post } from "~/api/client";
-import type { Page, WorkflowSummary } from "~/api/types";
+import { del, get, getAll, post } from "~/api/client";
+import type { Page, WorkflowDetail, WorkflowSummary } from "~/api/types";
+import { DraftStatus, GuidedFlow, type FlowStep } from "~/guide/GuidedFlow";
+import { CheckList, QualityNote, type Check } from "~/guide/Readiness";
+import { useKeptDraft } from "~/guide/useKeptDraft";
 import { useSession } from "~/session";
 import { TOOL_NAME } from "../logic";
-import type { CreatedKey, Credential, McpDiscovery, McpExposure, McpServer } from "../types";
+import type { CreatedKey, McpDiscovery, McpExposure, McpServer } from "../types";
 import { Notice, OneTimeSecretDialog, QueryView, Section, useConfirm, useMutate } from "../ui";
+import { inputFields } from "../triggers/guide";
+import { ListHelp } from "../triggers/ListHelp";
 import { toolNamesFrom } from "../triggers/logic";
+import { McpPolicyDialog } from "./McpPolicyDialog";
+import { McpServerDialog } from "./McpServerDialog";
 
 const TRANSPORT_LABEL: Record<McpServer["transport"], string> = {
   streamable_http: "Streamable HTTP",
   sse: "SSE",
   stdio: "stdio",
 };
-const NO_CREDENTIAL = "__none";
 
 function statusTone(status: string): "ok" | "danger" | "warn" | "neutral" {
   if (status === "ok" || status === "connected" || status === "healthy") return "ok";
@@ -65,181 +71,39 @@ export function useWorkflowNames() {
   });
 }
 
+/** The workspace's MCP servers; shared with the Integrations page's checks. */
+export function useMcpServers() {
+  const s = useSession();
+  return useQuery({
+    queryKey: ["mcp-servers", s.ws],
+    queryFn: () => getAll<McpServer>("/v1/mcp/servers"),
+  });
+}
+
 // ── servers ─────────────────────────────────────────────────────────────────────────────────
 
-function NewServerDialog({
-  open,
-  onOpenChange,
-}: {
-  open: boolean;
-  onOpenChange: (o: boolean) => void;
-}) {
-  const s = useSession();
-  const [name, setName] = useState("");
-  const [transport, setTransport] = useState<McpServer["transport"]>("streamable_http");
-  const [url, setUrl] = useState("");
-  const [command, setCommand] = useState("");
-  const [args, setArgs] = useState("");
-  const [authKind, setAuthKind] = useState<McpServer["authKind"]>("none");
-  const [credentialId, setCredentialId] = useState(NO_CREDENTIAL);
-  const creds = useQuery({
-    queryKey: ["credentials", s.ws],
-    queryFn: () => get<Credential[]>("/v1/credentials"),
-    enabled: open && s.can("credentials:read"),
-  });
-  const create = useMutate(
-    (body: Record<string, unknown>) => post<McpServer>("/v1/mcp/servers", body),
-    {
-      success: (m) => `Connected ${m.name}`,
-      invalidate: [["mcp-servers", s.ws]],
-      onSuccess: () => {
-        onOpenChange(false);
-        setName("");
-        setUrl("");
-        setCommand("");
-        setArgs("");
-      },
-    },
-  );
-  const remote = transport !== "stdio";
-  const ready = name.trim() && (remote ? /^https?:\/\//.test(url.trim()) : command.trim());
-  function submit(e: FormEvent) {
-    e.preventDefault();
-    create.mutate({
-      name: name.trim(),
-      transport,
-      ...(remote
-        ? { url: url.trim() }
-        : {
-            command: command.trim(),
-            args: args
-              .split("\n")
-              .map((a) => a.trim())
-              .filter(Boolean),
-          }),
-      authKind,
-      credentialId: credentialId === NO_CREDENTIAL ? null : credentialId,
-    });
-  }
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent size="md">
-        <form onSubmit={submit}>
-          <DialogHeader>
-            <DialogTitle>Connect an MCP server</DialogTitle>
-            <DialogDescription>
-              Its tools become available to MCP nodes and agents once discovered.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogBody className="flex flex-col gap-4">
-            <FieldRow label="Name" htmlFor="mcp-name" required>
-              <Input
-                id="mcp-name"
-                value={name}
-                maxLength={100}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="github"
-              />
-            </FieldRow>
-            <FieldRow label="Transport" htmlFor="mcp-transport">
-              <Select
-                id="mcp-transport"
-                value={transport}
-                onValueChange={(v) => setTransport(v as McpServer["transport"])}
-              >
-                <SelectItem value="streamable_http" description="The current MCP HTTP transport">
-                  Streamable HTTP
-                </SelectItem>
-                <SelectItem value="sse" description="Legacy HTTP + server-sent events">
-                  SSE
-                </SelectItem>
-                <SelectItem
-                  value="stdio"
-                  description="A local process; needs the stdio feature on the server"
-                >
-                  stdio
-                </SelectItem>
-              </Select>
-            </FieldRow>
-            {remote ? (
-              <FieldRow label="URL" htmlFor="mcp-url" required>
-                <Input
-                  id="mcp-url"
-                  type="url"
-                  className="font-mono"
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  placeholder="https://mcp.example.com/mcp"
-                />
-              </FieldRow>
-            ) : (
-              <>
-                <FieldRow
-                  label="Command"
-                  htmlFor="mcp-command"
-                  required
-                  hint="Must be on the server's allow-list"
-                >
-                  <Input
-                    id="mcp-command"
-                    className="font-mono"
-                    value={command}
-                    onChange={(e) => setCommand(e.target.value)}
-                    placeholder="npx"
-                  />
-                </FieldRow>
-                <FieldRow label="Arguments" htmlFor="mcp-args" hint="One per line">
-                  <Textarea
-                    id="mcp-args"
-                    className="font-mono"
-                    rows={3}
-                    value={args}
-                    onChange={(e) => setArgs(e.target.value)}
-                  />
-                </FieldRow>
-              </>
-            )}
-            <FieldRow label="Authentication" htmlFor="mcp-auth">
-              <Select
-                id="mcp-auth"
-                value={authKind}
-                onValueChange={(v) => setAuthKind(v as McpServer["authKind"])}
-              >
-                <SelectItem value="none">None</SelectItem>
-                <SelectItem value="headers" description="Static headers from a credential">
-                  Headers
-                </SelectItem>
-                <SelectItem value="oauth2" description="OAuth 2.1 with PKCE">
-                  OAuth 2
-                </SelectItem>
-              </Select>
-            </FieldRow>
-            {authKind !== "none" ? (
-              <FieldRow label="Credential" htmlFor="mcp-cred">
-                <Select id="mcp-cred" value={credentialId} onValueChange={setCredentialId}>
-                  <SelectItem value={NO_CREDENTIAL}>Choose a credential</SelectItem>
-                  {(creds.data ?? []).map((c) => (
-                    <SelectItem key={c.id} value={c.id} meta={c.type}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </Select>
-              </FieldRow>
-            ) : null}
-          </DialogBody>
-          <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" variant="primary" loading={create.isPending} disabled={!ready}>
-              Connect
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
+const SERVER_TERMS: readonly { term: string; text: string }[] = [
+  {
+    term: "Status",
+    text: "Pending: saved but not discovered yet. Connected: the last discovery worked. Error: the last test or discovery failed; the red line says why.",
+  },
+  {
+    term: "Tools",
+    text: "How many tools the last discovery found. Only discovered tools can be used by MCP steps and agents; discover again after the server adds tools.",
+  },
+  {
+    term: "Test connection",
+    text: "Connects and pings the server. It calls no tool.",
+  },
+  {
+    term: "Tool policy",
+    text: "Which tools may be called, which never, and which are marked as needing approval.",
+  },
+  {
+    term: "Local servers",
+    text: "Addresses on this computer or your network (localhost, 192.168.…) work only when the api and worker run with FLOWAID_ALLOW_PRIVATE_NETWORK=true.",
+  },
+];
 
 function DiscoveryDialog({
   result,
@@ -259,14 +123,14 @@ function DiscoveryDialog({
           </DialogTitle>
           <DialogDescription>
             Discovered tools, after the server's allow and deny policy. Descriptions are sanitised
-            before any model sees them.
+            before any model sees them. MCP steps and agents can use them now.
           </DialogDescription>
         </DialogHeader>
         <DialogBody className="flex max-h-[60vh] flex-col gap-3 overflow-auto">
           {(result?.warnings?.length ?? 0) > 0 ? (
             <Notice>
-              {result?.warnings?.length} warning(s) during discovery; tools with unsafe descriptions
-              were excluded.
+              {result?.warnings?.length} warning(s) during discovery: tools with suspicious
+              descriptions are marked as needing approval.
             </Notice>
           ) : null}
           <ul
@@ -284,7 +148,7 @@ function DiscoveryDialog({
           </ul>
           <p className="text-2xs text-ink-3">
             {result?.resources?.length ?? 0} resources · {result?.prompts?.length ?? 0} prompts ·{" "}
-            {result?.excluded?.length ?? 0} excluded
+            {result?.excluded?.length ?? 0} excluded by the tool policy
           </p>
         </DialogBody>
         <DialogFooter>
@@ -302,11 +166,9 @@ function ServersSection() {
   const canWrite = s.can("mcp:write");
   const [creating, setCreating] = useState(false);
   const [discovery, setDiscovery] = useState<{ server: string; result: McpDiscovery } | null>(null);
+  const [policy, setPolicy] = useState<McpServer | null>(null);
   const confirm = useConfirm<McpServer>();
-  const servers = useQuery({
-    queryKey: ["mcp-servers", s.ws],
-    queryFn: () => get<McpServer[]>("/v1/mcp/servers"),
-  });
+  const servers = useMcpServers();
   const test = useMutate(
     (m: McpServer) => post<{ ok: boolean; message?: string }>(`/v1/mcp/servers/${m.id}/test`),
     {
@@ -321,9 +183,11 @@ function ServersSection() {
     (m: McpServer) => post<McpDiscovery>(`/v1/mcp/servers/${m.id}/discover`),
     {
       onSuccess: (r, m) => setDiscovery({ server: m.name, result: r }),
+      // the tool catalog agents and the builder read (["catalog", "tools", ws] and friends)
       invalidate: [
         ["mcp-servers", s.ws],
-        ["tools-catalog", s.ws],
+        ["catalog", "tools"],
+        ["mcp-server-tools", s.ws],
       ],
       errorTitle: "Discovery failed",
     },
@@ -385,25 +249,37 @@ function ServersSection() {
         col.display({
           id: "actions",
           header: "",
-          size: 120,
+          size: 150,
           cell: ({ row }) =>
             canWrite ? (
               <span className="flex justify-end gap-1">
+                {row.original.transport !== "stdio" ? (
+                  <>
+                    <IconButton
+                      size="sm"
+                      variant="ghost"
+                      label={`Test connection to ${row.original.name}`}
+                      onClick={() => test.mutate(row.original)}
+                    >
+                      <Zap strokeWidth={1.75} />
+                    </IconButton>
+                    <IconButton
+                      size="sm"
+                      variant="ghost"
+                      label={`Discover tools of ${row.original.name}`}
+                      onClick={() => discover.mutate(row.original)}
+                    >
+                      <Radar strokeWidth={1.75} />
+                    </IconButton>
+                  </>
+                ) : null}
                 <IconButton
                   size="sm"
                   variant="ghost"
-                  label="Test connection"
-                  onClick={() => test.mutate(row.original)}
+                  label={`Tool policy of ${row.original.name}`}
+                  onClick={() => setPolicy(row.original)}
                 >
-                  <Zap strokeWidth={1.75} />
-                </IconButton>
-                <IconButton
-                  size="sm"
-                  variant="ghost"
-                  label="Discover tools"
-                  onClick={() => discover.mutate(row.original)}
-                >
-                  <Radar strokeWidth={1.75} />
+                  <ShieldCheck strokeWidth={1.75} />
                 </IconButton>
                 <IconButton
                   size="sm"
@@ -424,7 +300,7 @@ function ServersSection() {
   return (
     <Section
       title="MCP servers"
-      description="Remote tool servers this workspace connects to."
+      description="Tool servers this workspace connects to. Connect one, test it, then discover its tools."
       actions={
         canWrite ? (
           <Button
@@ -444,20 +320,50 @@ function ServersSection() {
               size="sm"
               icon={<Server strokeWidth={1.5} />}
               title="No MCP servers"
-              description="Connect a server to call its tools from workflows."
+              description="Connect a server to call its tools from MCP steps and agents. You need its address, and a key stored under Credentials if it asks for one."
+              primaryAction={
+                canWrite ? (
+                  <Button
+                    variant="primary"
+                    leadingIcon={<Plus strokeWidth={1.75} />}
+                    onClick={() => setCreating(true)}
+                  >
+                    Connect server
+                  </Button>
+                ) : undefined
+              }
             />
           ) : (
-            <DataTable
-              columns={columns}
-              data={rows}
-              getRowId={(r) => r.id}
-              itemLabel={["server", "servers"]}
-              aria-label="MCP servers"
-            />
+            <>
+              <ListHelp terms={SERVER_TERMS} />
+              <DataTable
+                columns={columns}
+                data={rows}
+                getRowId={(r) => r.id}
+                itemLabel={["server", "servers"]}
+                aria-label="MCP servers"
+              />
+            </>
           )
         }
       </QueryView>
-      <NewServerDialog open={creating} onOpenChange={setCreating} />
+      {creating ? (
+        <McpServerDialog
+          open={creating}
+          onOpenChange={setCreating}
+          onDiscovered={(server, result) => setDiscovery({ server, result })}
+        />
+      ) : null}
+      {policy ? (
+        <McpPolicyDialog
+          server={policy}
+          onClose={() => setPolicy(null)}
+          onRediscover={(m) => {
+            setPolicy(null);
+            discover.mutate(m);
+          }}
+        />
+      ) : null}
       <DiscoveryDialog
         result={discovery?.result ?? null}
         server={discovery?.server ?? ""}
@@ -481,59 +387,209 @@ function ServersSection() {
 
 // ── exposures and tokens ────────────────────────────────────────────────────────────────────
 
+interface ExposeDraft {
+  workflowId: string;
+  environmentId: string;
+  toolName: string;
+  description: string;
+}
+
+/**
+ * Expose a workflow as an MCP tool, step by step: which deployed version clients run, how the tool
+ * presents itself to their model, then a review. It takes effect at once; nothing is deployed.
+ */
 function ExposeDialog({
   open,
   onOpenChange,
   workflows,
+  exposures,
+  onExposed,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   workflows: WorkflowSummary[];
+  exposures: readonly McpExposure[];
+  /** the next step: a token for it */
+  onExposed: (e: { workflowId: string; environmentId: string }) => void;
 }) {
   const s = useSession();
-  const [workflowId, setWorkflowId] = useState("");
-  const [environmentId, setEnvironmentId] = useState(s.environments[0]?.id ?? "");
-  const [toolName, setToolName] = useState("");
-  const [description, setDescription] = useState("");
-  const create = useMutate((body: Record<string, string>) => post("/v1/mcp/exposures", body), {
+  const kept = useKeptDraft<ExposeDraft>(`flowaid:draft:${s.ws}:mcp-exposure`, () => ({
+    workflowId: "",
+    environmentId: s.environments[0]?.id ?? "",
+    toolName: "",
+    description: "",
+  }));
+  const { draft, setDraft } = kept;
+  const set = <K extends keyof ExposeDraft>(k: K, v: ExposeDraft[K]) =>
+    setDraft((d) => ({ ...d, [k]: v }));
+  const [created, setCreated] = useState<ExposeDraft | null>(null);
+  const detail = useQuery({
+    queryKey: ["workflow", s.ws, draft.workflowId],
+    queryFn: () => get<WorkflowDetail>(`/v1/workflows/${draft.workflowId}`),
+    enabled: open && Boolean(draft.workflowId),
+  });
+  const create = useMutate((body: ExposeDraft) => post("/v1/mcp/exposures", body), {
     success: "Workflow exposed as an MCP tool",
     invalidate: [["mcp-exposures", s.ws]],
-    onSuccess: () => {
-      onOpenChange(false);
-      setToolName("");
-      setDescription("");
+    errorTitle: "Could not expose the workflow",
+    onSuccess: (_, body) => {
+      kept.discard();
+      setCreated(body);
     },
   });
-  const nameOk = TOOL_NAME.test(toolName);
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent size="md">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            create.mutate({ workflowId, environmentId, toolName, description: description.trim() });
-          }}
-        >
+  const close = (o: boolean) => {
+    onOpenChange(o);
+    if (!o) setCreated(null);
+  };
+  const env = s.environments.find((e) => e.id === draft.environmentId);
+  const deployed = detail.data?.deployments.find((d) => d.environmentId === draft.environmentId);
+  const nameOk = TOOL_NAME.test(draft.toolName);
+  const taken = exposures.some((e) => e.toolName === draft.toolName);
+  const fields = inputFields(detail.data?.draft.inputs);
+
+  if (created)
+    return (
+      <Dialog open={open} onOpenChange={close}>
+        <DialogContent size="md">
           <DialogHeader>
-            <DialogTitle>Expose a workflow as an MCP tool</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle2 strokeWidth={1.75} className="size-4 text-ok-text" aria-hidden />
+              {created.toolName} is exposed
+            </DialogTitle>
             <DialogDescription>
-              MCP clients holding a token for this workflow can call the deployed version in the
-              chosen environment.
+              Clients holding a token for this workflow in{" "}
+              {s.environments.find((e) => e.id === created.environmentId)?.name ??
+                "the environment"}{" "}
+              can list and call it now. Next, give your client a token.
             </DialogDescription>
           </DialogHeader>
-          <DialogBody className="flex flex-col gap-4">
+          <DialogBody>
+            <ol className="m-0 flex list-decimal flex-col gap-1.5 pl-5 text-sm text-ink-2">
+              <li>Mint a token pinned to this workflow and environment. It is shown once.</li>
+              <li>
+                In the client, add an MCP server with the endpoint shown on this page and the token
+                as a Bearer authorization header.
+              </li>
+              <li>Ask the client something that needs the tool, then open the run under Runs.</li>
+            </ol>
+          </DialogBody>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => close(false)}>
+              Done
+            </Button>
+            {s.can("api_keys:manage") ? (
+              <Button
+                variant="primary"
+                onClick={() => {
+                  close(false);
+                  onExposed(created);
+                }}
+              >
+                Mint a token for it
+              </Button>
+            ) : null}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+
+  const deployChecks: Check[] = !draft.workflowId
+    ? []
+    : detail.isPending
+      ? [{ id: "deployed", label: "Checking where it is deployed", state: "checking" }]
+      : detail.isError
+        ? [{ id: "deployed", label: "Could not read the workflow", state: "warning" }]
+        : [
+            deployed
+              ? {
+                  id: "deployed",
+                  label: `Version ${deployed.version ?? "?"} is deployed to ${env?.name ?? "it"}`,
+                  state: "ok",
+                  detail: "Clients run that version; a later deployment changes what they run.",
+                }
+              : {
+                  id: "deployed",
+                  label: `Nothing is deployed to ${env?.name ?? "this environment"} yet`,
+                  state: "warning",
+                  detail:
+                    "Deploy a version first, then expose it. Clients see no tool until something is deployed, and that first deployment switches an exposure made now off again (unless the version declares an MCP trigger).",
+                  fix: (
+                    <a
+                      className="text-accent-text hover:underline"
+                      href={`/${s.ws}/workflows/${draft.workflowId}/deployments`}
+                    >
+                      Open its deployments
+                    </a>
+                  ),
+                },
+          ];
+  const reviewChecks: Check[] = [
+    ...(!draft.workflowId
+      ? [{ id: "wf", label: "Choose a workflow", state: "blocker" } satisfies Check]
+      : []),
+    ...(!nameOk
+      ? [
+          {
+            id: "name",
+            label: "Tool name: letters, digits, _ and - only (64 at most)",
+            state: "blocker",
+          } satisfies Check,
+        ]
+      : taken
+        ? [
+            {
+              id: "name",
+              label: `The tool name ${draft.toolName} is taken`,
+              state: "blocker",
+            } satisfies Check,
+          ]
+        : []),
+    ...(!draft.description.trim()
+      ? [{ id: "desc", label: "Describe what the tool does", state: "blocker" } satisfies Check]
+      : []),
+    ...deployChecks,
+    // said once: without a deployment the warning above already covers it
+    ...(deployed
+      ? [
+          {
+            id: "redeploy",
+            label: `A later deployment of this workflow to ${env?.name ?? "this environment"} switches the tool off, unless that version declares it as an MCP trigger. Expose it again then.`,
+            state: "info",
+          } satisfies Check,
+        ]
+      : []),
+  ];
+  const ready =
+    Boolean(draft.workflowId && draft.environmentId) &&
+    nameOk &&
+    !taken &&
+    draft.description.trim().length > 0;
+
+  const steps: FlowStep[] = [
+    {
+      id: "source",
+      title: "Choose the workflow and environment",
+      why: "Clients run the version deployed to this environment. Pick the one whose version they should use.",
+      done: Boolean(draft.workflowId && draft.environmentId),
+      requirement: "choose a workflow",
+      children: (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2">
             <FieldRow label="Workflow" htmlFor="exp-wf" required>
               <Select
                 id="exp-wf"
-                value={workflowId}
+                value={draft.workflowId}
                 placeholder="Choose a workflow"
                 onValueChange={(v) => {
-                  setWorkflowId(v);
                   const w = workflows.find((x) => x.id === v);
-                  if (w && !toolName)
-                    setToolName(w.slug.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 64));
-                  if (w && !description)
-                    setDescription(w.description || `Runs the ${w.name} workflow`);
+                  setDraft((d) => ({
+                    ...d,
+                    workflowId: v,
+                    toolName:
+                      d.toolName || (w ? w.slug.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 64) : ""),
+                    description:
+                      d.description || (w ? w.description || `Runs the ${w.name} workflow` : ""),
+                  }));
                 }}
               >
                 {workflows.map((w) => (
@@ -544,7 +600,11 @@ function ExposeDialog({
               </Select>
             </FieldRow>
             <FieldRow label="Environment" htmlFor="exp-env" required>
-              <Select id="exp-env" value={environmentId} onValueChange={setEnvironmentId}>
+              <Select
+                id="exp-env"
+                value={draft.environmentId}
+                onValueChange={(v) => set("environmentId", v)}
+              >
                 {s.environments.map((e) => (
                   <SelectItem key={e.id} value={e.id}>
                     {e.name}
@@ -552,48 +612,158 @@ function ExposeDialog({
                 ))}
               </Select>
             </FieldRow>
-            <FieldRow
-              label="Tool name"
-              htmlFor="exp-name"
-              required
-              error={toolName && !nameOk ? "Letters, digits, _ and - only (64 max)" : undefined}
-            >
-              <Input
-                id="exp-name"
-                className="font-mono"
-                value={toolName}
-                onChange={(e) => setToolName(e.target.value)}
+          </div>
+          {deployChecks.length ? (
+            <CheckList checks={deployChecks} aria-label="Where it is deployed" />
+          ) : null}
+        </>
+      ),
+    },
+    {
+      id: "describe",
+      title: "Name and describe the tool",
+      why: "The client's model reads only the name, the description and the arguments when deciding whether to call the tool, so say what it does, when to use it and what it returns.",
+      done: nameOk && !taken && draft.description.trim().length > 0,
+      requirement: "fill in a free tool name and a description",
+      example: (
+        <>
+          <code className="font-mono">refund_triage</code>: “Decides whether a refund request is
+          approved, refused or needs a person. Give it the order id and the customer&apos;s message;
+          it returns the decision and a one-line reason.”
+        </>
+      ),
+      children: (
+        <>
+          <FieldRow
+            label="Tool name"
+            htmlFor="exp-name"
+            required
+            error={
+              draft.toolName && !nameOk
+                ? "Letters, digits, _ and - only (64 max)"
+                : taken
+                  ? "Another tool already has this name"
+                  : undefined
+            }
+          >
+            <Input
+              id="exp-name"
+              className="font-mono"
+              value={draft.toolName}
+              onChange={(e) => set("toolName", e.target.value)}
+            />
+          </FieldRow>
+          <FieldRow
+            label="Description"
+            htmlFor="exp-desc"
+            required
+            hint="What the tool does; clients show it to their model"
+          >
+            <Textarea
+              id="exp-desc"
+              rows={3}
+              maxLength={1000}
+              value={draft.description}
+              onChange={(e) => set("description", e.target.value)}
+            />
+          </FieldRow>
+          {fields.length ? (
+            <div className="text-xs text-ink-2">
+              <p className="m-0 mb-1">
+                Its arguments are the workflow&apos;s input fields (as in the draft; clients get the
+                deployed version&apos;s):
+              </p>
+              <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
+                {fields.map((f) => (
+                  <li key={f.name}>
+                    <code className="font-mono text-ink">{f.name}</code>{" "}
+                    <span className="text-ink-3">
+                      {f.type}
+                      {f.required ? ", required" : ""}
+                      {f.description ? ` · ${f.description}` : " · no description"}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </>
+      ),
+    },
+    {
+      id: "review",
+      doneLabel: "Ready to expose",
+      title: "Review and expose",
+      why: "Exposing takes effect at once for clients that hold a token for this workflow and environment. It does not publish or deploy anything.",
+      done: ready,
+      requirement: "fix the items marked as needed",
+      children: (
+        <>
+          <dl className="m-0 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 rounded-sm border border-border px-3 py-2 text-sm">
+            <dt className="text-ink-3">Workflow</dt>
+            <dd className="m-0 text-ink">
+              {workflows.find((w) => w.id === draft.workflowId)?.name ?? "—"}
+            </dd>
+            <dt className="text-ink-3">Environment</dt>
+            <dd className="m-0 text-ink">{env?.name ?? "—"}</dd>
+            <dt className="text-ink-3">Tool</dt>
+            <dd className="m-0 font-mono text-ink">{draft.toolName || "—"}</dd>
+          </dl>
+          <CheckList checks={reviewChecks} aria-label="Before you expose it" />
+          {create.isError ? (
+            <Notice tone="danger">
+              Not exposed: {create.error.message} Your settings are kept.
+            </Notice>
+          ) : null}
+          <QualityNote>
+            These checks confirm the tool can be listed. Whether a client&apos;s model calls it at
+            the right moments depends on the description: try a few requests from the client.
+          </QualityNote>
+        </>
+      ),
+    },
+  ];
+
+  return (
+    <Dialog open={open} onOpenChange={close}>
+      <DialogContent size="lg">
+        <DialogHeader>
+          <DialogTitle>Expose a workflow as an MCP tool</DialogTitle>
+          <DialogDescription>
+            MCP clients holding a token for this workflow can call the deployed version in the
+            chosen environment.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogBody>
+          <GuidedFlow
+            steps={steps}
+            status={
+              <DraftStatus
+                dirty={kept.dirty}
+                restored={kept.restored}
+                onDiscard={() => {
+                  kept.discard();
+                  create.reset();
+                }}
+                what="the tool"
               />
-            </FieldRow>
-            <FieldRow
-              label="Description"
-              htmlFor="exp-desc"
-              required
-              hint="What the tool does; clients show it to their model"
-            >
-              <Textarea
-                id="exp-desc"
-                rows={3}
-                maxLength={1000}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              />
-            </FieldRow>
-          </DialogBody>
-          <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              variant="primary"
-              loading={create.isPending}
-              disabled={!workflowId || !environmentId || !nameOk || !description.trim()}
-            >
-              Expose
-            </Button>
-          </DialogFooter>
-        </form>
+            }
+          />
+        </DialogBody>
+        <DialogFooter>
+          <Button type="button" variant="ghost" onClick={() => close(false)}>
+            Close
+          </Button>
+          <Button
+            type="button"
+            variant="primary"
+            loading={create.isPending}
+            disabled={!ready}
+            onClick={() => create.mutate(draft)}
+          >
+            Expose
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -603,21 +773,29 @@ function TokenDialog({
   open,
   onOpenChange,
   workflows,
+  exposures,
+  preset,
   onMinted,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   workflows: WorkflowSummary[];
+  exposures: readonly McpExposure[];
+  /** the workflow and environment just exposed */
+  preset: { workflowId: string; environmentId: string } | null;
   onMinted: (key: CreatedKey) => void;
 }) {
   const s = useSession();
   const [name, setName] = useState("");
-  const [environmentId, setEnvironmentId] = useState(s.environments[0]?.id ?? "");
-  const [picked, setPicked] = useState<string[]>([]);
+  const [environmentId, setEnvironmentId] = useState(
+    preset?.environmentId ?? s.environments[0]?.id ?? "",
+  );
+  const [picked, setPicked] = useState<string[]>(preset ? [preset.workflowId] : []);
   const mint = useMutate(
     (body: Record<string, unknown>) => post<CreatedKey>("/v1/mcp/tokens", body),
     {
       invalidate: [["api-keys", s.ws]],
+      errorTitle: "Could not mint the token",
       onSuccess: (k) => {
         onOpenChange(false);
         setName("");
@@ -626,6 +804,36 @@ function TokenDialog({
       },
     },
   );
+  const env = s.environments.find((e) => e.id === environmentId);
+  const toolless = picked.filter(
+    (id) =>
+      !exposures.some((e) => e.workflowId === id && e.environmentId === environmentId && e.enabled),
+  );
+  const checks: Check[] = [
+    picked.length === 0
+      ? { id: "picked", label: "Pick the workflows this client may call", state: "blocker" }
+      : toolless.length
+        ? {
+            id: "picked",
+            label: `No tool in ${env?.name ?? "this environment"} for ${toolless
+              .map((id) => workflows.find((w) => w.id === id)?.name ?? id.slice(0, 8))
+              .join(", ")}`,
+            state: "warning",
+            detail:
+              "The client sees nothing from a workflow until it is exposed in this environment.",
+          }
+        : {
+            id: "picked",
+            label: `Every picked workflow has a tool in ${env?.name ?? "it"}`,
+            state: "ok",
+          },
+    {
+      id: "once",
+      label: "The token is shown once and expires in a year",
+      state: "info",
+      detail: "It is listed under Settings, API keys, where you can revoke it.",
+    },
+  ];
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="md">
@@ -638,8 +846,8 @@ function TokenDialog({
           <DialogHeader>
             <DialogTitle>Mint an MCP token</DialogTitle>
             <DialogDescription>
-              A service-account key with only <code className="font-mono">mcp:serve</code>, pinned
-              to the workflows you pick.
+              A key for one client that can only list and call the exposed tools of the workflows
+              you pick, in one environment (scope <code className="font-mono">mcp:serve</code>).
             </DialogDescription>
           </DialogHeader>
           <DialogBody className="flex flex-col gap-4">
@@ -647,7 +855,7 @@ function TokenDialog({
               label="Name"
               htmlFor="tok-name"
               required
-              hint="The client that will hold it, e.g. claude-desktop"
+              hint="The client that will hold it, e.g. claude-desktop. One token per client lets you revoke one alone."
             >
               <Input
                 id="tok-name"
@@ -684,6 +892,7 @@ function TokenDialog({
                 )}
               </div>
             </fieldset>
+            <CheckList checks={checks} aria-label="Before you mint it" />
           </DialogBody>
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
@@ -709,12 +918,14 @@ export function ExposuresSection() {
   const canWrite = s.can("mcp:write");
   const canMint = s.can("api_keys:manage");
   const [exposing, setExposing] = useState(false);
-  const [minting, setMinting] = useState(false);
+  const [minting, setMinting] = useState<{
+    preset: { workflowId: string; environmentId: string } | null;
+  } | null>(null);
   const [minted, setMinted] = useState<CreatedKey | null>(null);
   const confirm = useConfirm<McpExposure>();
   const exposures = useQuery({
     queryKey: ["mcp-exposures", s.ws],
-    queryFn: () => get<McpExposure[]>("/v1/mcp/exposures"),
+    queryFn: () => getAll<McpExposure>("/v1/mcp/exposures"),
   });
   const workflows = useWorkflowNames();
   const wfName = (id: string) => workflows.data?.find((w) => w.id === id)?.name ?? id.slice(0, 8);
@@ -739,7 +950,7 @@ export function ExposuresSection() {
       actions={
         <>
           {canMint ? (
-            <Button onClick={() => setMinting(true)} disabled={!workflows.data}>
+            <Button onClick={() => setMinting({ preset: null })} disabled={!workflows.data}>
               Mint token
             </Button>
           ) : null}
@@ -785,13 +996,19 @@ export function ExposuresSection() {
               role="list"
             >
               {rows.map((e) => (
-                <li key={e.id} className="flex items-center gap-3 px-3 py-2">
+                <li key={e.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
                   <div className="min-w-0 flex-1">
                     <p className="flex items-center gap-2">
                       <span className="font-mono text-xs text-ink">{e.toolName}</span>
                       {!e.enabled ? <Badge tone="warn">Disabled</Badge> : null}
                     </p>
                     <p className="truncate text-2xs text-ink-3">{e.description}</p>
+                    {!e.enabled ? (
+                      <p className="text-2xs text-warn-text">
+                        A later deployment of the workflow switched it off; clients no longer see
+                        it. Stop exposing it and expose it again.
+                      </p>
+                    ) : null}
                   </div>
                   <a
                     className="shrink-0 text-xs text-accent-text hover:underline"
@@ -816,26 +1033,38 @@ export function ExposuresSection() {
           )
         }
       </QueryView>
-      {workflows.data ? (
-        <>
-          <ExposeDialog open={exposing} onOpenChange={setExposing} workflows={workflows.data} />
-          <TokenDialog
-            open={minting}
-            onOpenChange={setMinting}
-            workflows={workflows.data}
-            onMinted={setMinted}
-          />
-        </>
+      {workflows.data && exposing ? (
+        <ExposeDialog
+          open={exposing}
+          onOpenChange={setExposing}
+          workflows={workflows.data}
+          exposures={exposures.data ?? []}
+          onExposed={(preset) => setMinting({ preset })}
+        />
+      ) : null}
+      {workflows.data && minting ? (
+        <TokenDialog
+          open
+          onOpenChange={(o) => (o ? undefined : setMinting(null))}
+          workflows={workflows.data}
+          exposures={exposures.data ?? []}
+          preset={minting.preset}
+          onMinted={setMinted}
+        />
       ) : null}
       <OneTimeSecretDialog
         secret={minted?.key ?? null}
         title="MCP token created"
+        description="Copy it into your client now: it cannot be shown again. If it is lost, mint a new one and revoke this one under Settings, API keys."
         onClose={() => setMinted(null)}
         extra={
           minted ? (
             <div className="flex flex-col gap-1.5">
               <TryToken endpoint={endpoint} token={minted.key} />
-              <p className="text-xs text-ink-2">Client configuration (Streamable HTTP):</p>
+              <p className="text-xs text-ink-2">
+                Client configuration (Streamable HTTP). Put the token in place of{" "}
+                <code className="font-mono">&lt;token&gt;</code>:
+              </p>
               <pre className="overflow-auto rounded-md border border-border bg-surface-2 p-2 font-mono text-2xs text-ink">
                 {JSON.stringify(
                   { url: endpoint, headers: { Authorization: "Bearer <token>" } },

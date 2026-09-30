@@ -57,7 +57,10 @@ describeDb("agent presets and workflows as tools (Postgres)", () => {
       description: "Answers order and refund questions",
     });
     expect(patched.json()).toMatchObject({ description: "Answers order and refund questions" });
-    expect((await call(t.app, jar, "GET", "/v1/agents")).json()).toHaveLength(1);
+    expect((await call(t.app, jar, "GET", "/v1/agents")).json()).toMatchObject({
+      items: [{ id }],
+      next_cursor: null,
+    });
     expect((await call(t.app, jar, "GET", `/v1/agents/${id}`)).json().name).toBe("Support agent");
 
     const audit = (await call(t.app, jar, "GET", "/v1/audit?action=agent.create")).json() as {
@@ -67,6 +70,25 @@ describeDb("agent presets and workflows as tools (Postgres)", () => {
 
     expect((await call(t.app, jar, "DELETE", `/v1/agents/${id}`)).statusCode).toBe(204);
     expect((await call(t.app, jar, "GET", `/v1/agents/${id}`)).statusCode).toBe(404);
+  });
+
+  it("pages the list by name with a cursor", async () => {
+    for (const name of ["Pager C", "Pager A", "Pager B"])
+      await call(t.app, jar, "POST", "/v1/agents", { name, config: { model } });
+    const first = (await call(t.app, jar, "GET", "/v1/agents?limit=2")).json() as {
+      items: { name: string }[];
+      next_cursor: string | null;
+    };
+    expect(first.items.map((a) => a.name)).toEqual(["Pager A", "Pager B"]);
+    expect(first.next_cursor).toEqual(expect.any(String));
+    const rest = (
+      await call(t.app, jar, "GET", `/v1/agents?limit=2&cursor=${first.next_cursor ?? ""}`)
+    ).json() as { items: { name: string }[]; next_cursor: string | null };
+    expect(rest).toEqual({
+      items: [expect.objectContaining({ name: "Pager C" })],
+      next_cursor: null,
+    });
+    expect((await call(t.app, jar, "GET", "/v1/agents?limit=500")).statusCode).toBe(400);
   });
 
   it("registers a published workflow as a tool with its input schema", async () => {

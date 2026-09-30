@@ -163,11 +163,49 @@ describeDb("webhooks, schedules, events and audit (Postgres)", () => {
     ).toBe(202);
   });
 
+  it("pages webhooks by path and schedules by next run (none last) with a cursor", async () => {
+    const wf = await deployWith("Pager", [
+      { type: "webhook", path: "pager-c" },
+      { type: "webhook", path: "pager-a" },
+      { type: "webhook", path: "pager-b" },
+      { type: "schedule", cron: "0 6 * * *" },
+      { type: "schedule", cron: "0 3 * * *" },
+      { type: "schedule", cron: "0 9 * * *" },
+    ]);
+    type Page = { items: { id: string; path?: string }[]; next_cursor: string | null };
+    const list = async (url: string) => (await call(t.app, jar, "GET", url)).json() as Page;
+
+    const first = await list(`/v1/webhooks?workflowId=${wf.id}&limit=2`);
+    expect(first.items.map((w) => w.path)).toEqual(["dev/pager-a", "dev/pager-b"]);
+    expect(first.next_cursor).toEqual(expect.any(String));
+    const rest = await list(
+      `/v1/webhooks?workflowId=${wf.id}&limit=2&cursor=${first.next_cursor ?? ""}`,
+    );
+    expect(rest.items.map((w) => w.path)).toEqual(["dev/pager-c"]);
+    expect(rest.next_cursor).toBeNull();
+
+    const all = (await list(`/v1/schedules?workflowId=${wf.id}`)).items;
+    expect(all).toHaveLength(3);
+    const off = all[0]?.id as string;
+    await t.db.admin`update schedules set next_run_at = null where id = ${off}`;
+    const ids: string[] = [];
+    let cursor: string | null = null;
+    do {
+      const pg = await list(
+        `/v1/schedules?workflowId=${wf.id}&limit=1${cursor ? `&cursor=${cursor}` : ""}`,
+      );
+      expect(pg.items).toHaveLength(1);
+      ids.push(...pg.items.map((x) => x.id));
+      cursor = pg.next_cursor;
+    } while (cursor);
+    expect(ids).toEqual([...all.slice(1).map((x) => x.id), off]);
+  });
+
   it("edits schedules, refuses cron changes and fires them by hand", async () => {
     const wf = await deployWith("Cronjob", [
       { type: "schedule", cron: "0 6 * * *", input: { message: "morning" } },
     ]);
-    const s = (await call(t.app, jar, "GET", `/v1/schedules?workflowId=${wf.id}`)).json()[0];
+    const s = (await call(t.app, jar, "GET", `/v1/schedules?workflowId=${wf.id}`)).json().items[0];
     expect(s).toMatchObject({ cron: "0 6 * * *", enabled: true, nextRunAt: expect.any(String) });
     expect(
       (await call(t.app, jar, "PATCH", `/v1/schedules/${s.id as string}`, { cron: "* * * * *" }))

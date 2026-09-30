@@ -1,6 +1,8 @@
 "use client";
 import { Suspense } from "react";
 import { PageHeader } from "@flowaid/ui/shell";
+import { RUNS } from "~/guide/capabilities/runs";
+import { PageIntro } from "~/guide/PageIntro";
 import { useSession } from "~/session";
 import { AppFrame, PageBody } from "~/shell/AppFrame";
 import { RunsList } from "~/runs/RunsList";
@@ -14,6 +16,7 @@ export default function RunsPage() {
           title="Runs"
           description="Every run in this workspace, newest first. Active runs refresh live."
         />
+        <PageIntro guide={RUNS} defaultCollapsed />
         <div className="mt-4">
           <Suspense>
             <RunsList />

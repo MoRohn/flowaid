@@ -46,7 +46,10 @@ export const OPERATIONS: readonly CliOperation[] = [
     path: "/v1/agents",
     auth: "session_or_api_key",
     positional: [],
-    query: [],
+    query: [
+      { name: "limit", type: "integer", required: false },
+      { name: "cursor", type: "string", required: false },
+    ],
     body: null,
   },
   {
@@ -110,7 +113,10 @@ export const OPERATIONS: readonly CliOperation[] = [
     path: "/v1/api-keys",
     auth: "session_or_api_key",
     positional: [],
-    query: [],
+    query: [
+      { name: "limit", type: "integer", required: false },
+      { name: "cursor", type: "string", required: false },
+    ],
     body: null,
   },
   {
@@ -304,6 +310,8 @@ export const OPERATIONS: readonly CliOperation[] = [
     auth: "session_or_api_key",
     positional: [],
     query: [
+      { name: "limit", type: "integer", required: false },
+      { name: "cursor", type: "string", required: false },
       { name: "type", type: "string", required: false },
       { name: "environmentId", type: "string", required: false },
     ],
@@ -427,7 +435,11 @@ export const OPERATIONS: readonly CliOperation[] = [
     path: "/v1/evaluations/sets",
     auth: "session_or_api_key",
     positional: [],
-    query: [{ name: "workflowId", type: "string", required: false }],
+    query: [
+      { name: "limit", type: "integer", required: false },
+      { name: "cursor", type: "string", required: false },
+      { name: "workflowId", type: "string", required: false },
+    ],
     body: null,
   },
   {
@@ -786,7 +798,10 @@ export const OPERATIONS: readonly CliOperation[] = [
     summary: "Knowledge sources with document and chunk counts",
     auth: "session_or_api_key",
     positional: [],
-    query: [],
+    query: [
+      { name: "limit", type: "integer", required: false },
+      { name: "cursor", type: "string", required: false },
+    ],
     body: null,
   },
   {
@@ -885,7 +900,10 @@ export const OPERATIONS: readonly CliOperation[] = [
     path: "/v1/mcp/exposures",
     auth: "session_or_api_key",
     positional: [],
-    query: [],
+    query: [
+      { name: "limit", type: "integer", required: false },
+      { name: "cursor", type: "string", required: false },
+    ],
     body: null,
   },
   {
@@ -962,7 +980,10 @@ export const OPERATIONS: readonly CliOperation[] = [
     path: "/v1/mcp/servers",
     auth: "session_or_api_key",
     positional: [],
-    query: [],
+    query: [
+      { name: "limit", type: "integer", required: false },
+      { name: "cursor", type: "string", required: false },
+    ],
     body: null,
   },
   {
@@ -1125,7 +1146,10 @@ export const OPERATIONS: readonly CliOperation[] = [
     path: "/v1/workspaces/{id}/members",
     auth: "session_or_api_key",
     positional: ["id"],
-    query: [],
+    query: [
+      { name: "limit", type: "integer", required: false },
+      { name: "cursor", type: "string", required: false },
+    ],
     body: null,
   },
   {
@@ -1309,7 +1333,10 @@ export const OPERATIONS: readonly CliOperation[] = [
     path: "/v1/notifications",
     auth: "session_or_api_key",
     positional: [],
-    query: [],
+    query: [
+      { name: "limit", type: "integer", required: false },
+      { name: "cursor", type: "string", required: false },
+    ],
     body: null,
   },
   {
@@ -1847,7 +1874,11 @@ export const OPERATIONS: readonly CliOperation[] = [
     path: "/v1/schedules",
     auth: "session_or_api_key",
     positional: [],
-    query: [{ name: "workflowId", type: "string", required: false }],
+    query: [
+      { name: "limit", type: "integer", required: false },
+      { name: "cursor", type: "string", required: false },
+      { name: "workflowId", type: "string", required: false },
+    ],
     body: null,
   },
   {
@@ -2107,7 +2138,10 @@ export const OPERATIONS: readonly CliOperation[] = [
     path: "/v1/tools",
     auth: "session_or_api_key",
     positional: [],
-    query: [],
+    query: [
+      { name: "limit", type: "integer", required: false },
+      { name: "cursor", type: "string", required: false },
+    ],
     body: null,
   },
   {
@@ -2202,7 +2236,10 @@ export const OPERATIONS: readonly CliOperation[] = [
     path: "/v1/workflows/{id}/versions",
     auth: "session_or_api_key",
     positional: ["id"],
-    query: [],
+    query: [
+      { name: "limit", type: "integer", required: false },
+      { name: "cursor", type: "string", required: false },
+    ],
     body: null,
   },
   {
@@ -2250,7 +2287,11 @@ export const OPERATIONS: readonly CliOperation[] = [
     path: "/v1/saved-views",
     auth: "session",
     positional: [],
-    query: [{ name: "scope", type: "string", required: true, enum: ["runs"] }],
+    query: [
+      { name: "limit", type: "integer", required: false },
+      { name: "cursor", type: "string", required: false },
+      { name: "scope", type: "string", required: true, enum: ["runs"] },
+    ],
     body: null,
   },
   {
@@ -2292,7 +2333,11 @@ export const OPERATIONS: readonly CliOperation[] = [
     path: "/v1/webhooks",
     auth: "session_or_api_key",
     positional: [],
-    query: [{ name: "workflowId", type: "string", required: false }],
+    query: [
+      { name: "limit", type: "integer", required: false },
+      { name: "cursor", type: "string", required: false },
+      { name: "workflowId", type: "string", required: false },
+    ],
     body: null,
   },
   {

@@ -23,9 +23,11 @@ import {
 } from "@flowaid/ui/primitives";
 import { JsonView } from "@flowaid/ui/data";
 import { EventLog, LogViewer, RunHeader, TraceTimeline } from "@flowaid/ui/trace";
-import { get, post } from "~/api/client";
+import { get, getAll, post } from "~/api/client";
 import type { VersionSummary } from "~/api/types";
+import { RUN_DETAIL } from "~/guide/capabilities/runs";
 import { explainRun } from "~/guide/explain";
+import { PageIntro } from "~/guide/PageIntro";
 import { useGuideContext } from "~/guide/GuideProvider";
 import { useSession } from "~/session";
 import { ErrorPanel, errorMessage } from "~/shell/states";
@@ -90,7 +92,7 @@ export function TraceViewer({ runId }: { runId: string }) {
   const workflowId = detail.data?.workflowId;
   const published = useQuery({
     queryKey: ["versions", s.ws, workflowId],
-    queryFn: () => get<VersionSummary[]>(`/v1/workflows/${workflowId as string}/versions`),
+    queryFn: () => getAll<VersionSummary>(`/v1/workflows/${workflowId as string}/versions`),
     enabled: Boolean(workflowId),
     staleTime: 60_000,
   });
@@ -162,7 +164,13 @@ export function TraceViewer({ runId }: { runId: string }) {
   };
 
   if (detail.isError)
-    return <ErrorPanel error={detail.error} onRetry={() => void detail.refetch()} />;
+    return (
+      <ErrorPanel
+        error={detail.error}
+        onRetry={() => void detail.refetch()}
+        back={{ href: `/${s.ws}/runs`, label: "All runs" }}
+      />
+    );
   if (events.isError)
     return <ErrorPanel error={events.error} onRetry={() => void events.refetch()} />;
   if (!live0) return <TraceSkeleton />;
@@ -282,6 +290,7 @@ export function TraceViewer({ runId }: { runId: string }) {
           }
         />
         <RunStory run={run} {...(definition ? { definition } : {})} />
+        <PageIntro guide={RUN_DETAIL} defaultCollapsed className="" />
         {stream.status === "reconnecting" || stream.status === "failed" ? (
           <p className="flex items-center gap-2 text-xs text-warn-text" role="status">
             <WifiOff className="size-3.5" strokeWidth={1.75} />

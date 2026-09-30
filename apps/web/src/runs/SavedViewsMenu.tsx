@@ -27,7 +27,7 @@ import {
   Input,
   toast,
 } from "@flowaid/ui/primitives";
-import { del, get, post } from "~/api/client";
+import { del, getAll, post } from "~/api/client";
 import { errorMessage } from "~/shell/states";
 
 export interface SavedView {
@@ -51,7 +51,7 @@ export function SavedViewsMenu({ ws, query, onApply }: SavedViewsMenuProps) {
   const [name, setName] = useState("");
   const views = useQuery({
     queryKey: key,
-    queryFn: () => get<SavedView[]>("/v1/saved-views?scope=runs"),
+    queryFn: () => getAll<SavedView>("/v1/saved-views", { scope: "runs" }),
   });
   const save = useMutation({
     mutationFn: (n: string) =>

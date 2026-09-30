@@ -54,6 +54,31 @@ describeDb("notification channels (Postgres)", () => {
     );
   });
 
+  it("pages the channels by name with a cursor", async () => {
+    for (const name of ["Pager C", "Pager A", "Pager B"])
+      await call(t.app, jar, "POST", "/v1/notifications", {
+        kind: "webhook",
+        name,
+        config: { url: `${base}/pager` },
+        events: ["run.failed"],
+      });
+    type Page = { items: { name: string }[]; next_cursor: string | null };
+    const list = async (q: string) =>
+      (await call(t.app, jar, "GET", `/v1/notifications?${q}`)).json() as Page;
+    const all = (await list("limit=200")).items.map((c) => c.name);
+    expect(all.filter((n) => n.startsWith("Pager"))).toEqual(["Pager A", "Pager B", "Pager C"]);
+    const names: string[] = [];
+    let cursor: string | null = null;
+    do {
+      const pg = await list(`limit=2${cursor ? `&cursor=${cursor}` : ""}`);
+      expect(pg.items.length).toBeLessThanOrEqual(2);
+      names.push(...pg.items.map((c) => c.name));
+      cursor = pg.next_cursor;
+    } while (cursor);
+    expect(names).toEqual(all);
+    expect((await call(t.app, jar, "GET", "/v1/notifications?limit=500")).statusCode).toBe(400);
+  });
+
   it("creates a signed webhook channel, returns the secret once and test-sends to it", async () => {
     const created = await call(t.app, jar, "POST", "/v1/notifications", {
       kind: "webhook",
@@ -68,7 +93,10 @@ describeDb("notification channels (Postgres)", () => {
     };
     expect(signingSecret).toMatch(/^nfsec_/);
     expect(channel).toMatchObject({ secretSet: true, config: { url: `${base}/ops` } });
-    const listed = (await call(t.app, jar, "GET", "/v1/notifications")).json() as unknown[];
+    const listed = (await call(t.app, jar, "GET", "/v1/notifications")).json() as {
+      items: { id: string }[];
+    };
+    expect(listed.items.map((c) => c.id)).toContain(channel.id);
     expect(JSON.stringify(listed)).not.toContain(signingSecret);
 
     const test = await call(t.app, jar, "POST", `/v1/notifications/${channel.id}/test`);
@@ -181,8 +209,10 @@ describeDb("notification channels (Postgres)", () => {
     };
     await call(t.app, jar, "PUT", `/v1/workflows/${w.id}/deployments/${dev}`, { versionId: v.id });
     const hook = (
-      (await call(t.app, jar, "GET", `/v1/webhooks?workflowId=${w.id}`)).json() as { url: string }[]
-    )[0];
+      (await call(t.app, jar, "GET", `/v1/webhooks?workflowId=${w.id}`)).json() as {
+        items: { url: string }[];
+      }
+    ).items[0];
     const path = new URL(hook?.url as string).pathname;
     for (let i = 0; i < 3; i++)
       expect((await t.app.inject({ method: "POST", url: path, payload: "{}" })).statusCode).toBe(
