@@ -81,10 +81,5 @@ compiled API, worker and Docker images run plain `node` on `dist`.
 - V2's open items (live-model evaluation of Ask FlowAId, browser specs for the insights panels
   and the assistant, dashboard filters in the URL, the P2-6 and P3 refactors, a manual
   screen-reader pass) are listed in [project/FLOWAID_V2_FINAL_AUDIT.md](project/FLOWAID_V2_FINAL_AUDIT.md).
-- Workspace retention settings (`settings.retention.runsDays` / `auditDays` / `artifactsDays`) are
-  saved but not read: the retention sweep (`packages/database/src/retention.ts`) uses the per-class
-  `RETENTION_DAYS` (standard 90, short 7, long 400). `settings.budgets.monthlyCostUsd` is read only
-  by the workflow advisor; nothing stops runs or alerts when it is passed. Settings → Workspace
-  says so next to the fields.
 - ⌘K opens the node palette only while focus is inside the canvas (elsewhere it opens the
   command menu); the Add node button is reachable with Tab.

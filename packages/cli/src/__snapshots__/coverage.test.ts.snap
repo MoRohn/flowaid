@@ -247,6 +247,7 @@ workflow signature <id> {--environment-id --version-id --out}
 workflow update <id> {--name --slug --description --tags --evaluation-set-id --body --out}
 workflow validate <id> {--definition --environment-id --level --body --out}
 workspace
+workspace budget <id> {--out}
 workspace create {--name --slug --body --out}
 workspace delete <id> {--out}
 workspace get <id> {--out}

@@ -2687,6 +2687,17 @@ export const OPERATIONS: readonly CliOperation[] = [
   },
   {
     noun: "workspace",
+    verb: "budget",
+    method: "GET",
+    path: "/v1/workspaces/{id}/budget",
+    summary: "This month's run spend (UTC) against the monthly budget",
+    auth: "session_or_api_key",
+    positional: ["id"],
+    query: [],
+    body: null,
+  },
+  {
+    noun: "workspace",
     verb: "create",
     method: "POST",
     path: "/v1/workspaces",
