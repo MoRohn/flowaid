@@ -1,8 +1,8 @@
 # FlowAId status — 2026-10-01
 
-This file records where everything stands so work can restart from a known state. **0.8.0** is
-released. On `main` for the next release: built-in agent tools and the agents' Active switch, and
-the production-readiness pass below. V2's audit, with what was verified and what is open, is
+This file records where everything stands so work can restart from a known state. **0.9.0** is
+released: built-in agent tools, the agents' Active switch and the production-readiness pass below.
+V2's audit, with what was verified and what is open, is
 [project/FLOWAID_V2_FINAL_AUDIT.md](project/FLOWAID_V2_FINAL_AUDIT.md). The repository is
 published at [github.com/MoRohn/flowaid](https://github.com/MoRohn/flowaid); CI, E2E and the
 desktop checks run on every push to `main`.
