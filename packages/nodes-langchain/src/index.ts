@@ -62,8 +62,8 @@ export const LANGCHAIN_NODES: readonly AnyNodeDefinition[] = [
 ] as readonly AnyNodeDefinition[];
 
 /** The package's release and the node SDK range it targets (kept current by `pnpm version-packages`). */
-export const PACKAGE_VERSION = "0.8.0";
-export const SDK_RANGE = "^0.8.0";
+export const PACKAGE_VERSION = "0.9.0";
+export const SDK_RANGE = "^0.9.0";
 
 export const nodePackage: NodePackage = definePackage({
   name: "@flowaid/nodes-langchain",

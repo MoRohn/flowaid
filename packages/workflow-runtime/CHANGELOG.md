@@ -1,5 +1,25 @@
 # @flowaid/workflow-runtime
 
+## 0.9.0
+
+### Patch Changes
+
+- Updated dependencies [b19f9bc]
+- Updated dependencies [d3e7936]
+- Updated dependencies [0778a7b]
+- Updated dependencies [feb43fe]
+- Updated dependencies [371cb0c]
+- Updated dependencies [c630951]
+- Updated dependencies [6b5c535]
+  - @flowaid/credentials@0.9.0
+  - @flowaid/env@0.9.0
+  - @flowaid/providers@0.9.0
+  - @flowaid/workflow-compiler@0.9.0
+  - @flowaid/workflow-core@0.9.0
+  - @flowaid/node-sdk@0.9.0
+  - @flowaid/observability@0.9.0
+  - @flowaid/shared@0.9.0
+
 ## 0.8.0
 
 ### Patch Changes

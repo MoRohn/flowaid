@@ -1,5 +1,15 @@
 # @flowaid/knowledge
 
+## 0.9.0
+
+### Patch Changes
+
+- Updated dependencies [0778a7b]
+- Updated dependencies [feb43fe]
+- Updated dependencies [6b5c535]
+  - @flowaid/workflow-core@0.9.0
+  - @flowaid/shared@0.9.0
+
 ## 0.8.0
 
 ### Patch Changes

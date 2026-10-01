@@ -5,6 +5,105 @@ release publishes the `ghcr.io/morohn/flowaid-api`, `-worker` and `-web` images 
 Sections are added by `pnpm version-packages` from the changesets merged since the last release
 (see [docs/operations/RELEASING.md](docs/operations/RELEASING.md)); each package also keeps its own `CHANGELOG.md`.
 
+## 0.9.0 — 2026-10-01
+
+- Built-in agent tools, and agents you can switch on and off.
+  - Three tools every agent can use without connecting anything: `calculator` (exact arithmetic,
+    parsed rather than evaluated), `current_time` (date, time, weekday and offset in any IANA time
+    zone) and `web_fetch` (a public web page's title and main text as Markdown, through the guarded
+    fetch, GET only, 15 s, 2 MB, 20 000 characters at most). Their schemas use only `type`,
+    `properties`, `required` and `description`, which every provider's function calling accepts, and
+    a bad argument comes back as a message the model can act on. They are in every workspace's tool
+    catalog; the New agent dialog lists them under "Built into FlowAId", apart from your own tools,
+    with a note on what reading the web means for private data.
+  - Agents have an Active switch on the Agents page. An active agent appears by name in every
+    workflow's Add node (Agent group); adding it creates an Agent step that uses the agent and
+    overrides none of its settings. Switching it off hides it there without breaking the steps that
+    already use it. `GET /v1/agents?active=true|false` filters by it, and `PATCH /v1/agents/:id`
+    takes `active`. New agents start active; migration `0011_agent_active` adds the column.
+- Evaluation judge checks now run, and schedules catch up and check their input as documented.
+  - Judge checks in an evaluation are graded by the same model the AI builder uses: the workspace's
+    chosen model, else the first of Anthropic, OpenAI or Ollama with a key (a workspace credential
+    or the server's own). Judge calls are priced like any model call: each case's result carries
+    `judgeCostUsd`, and the summary's `costUsd` gains `judge`, counted in `total` but not in
+    `perCase` (the workflow's own cost, which the regression report compares). Cancelling an
+    evaluation stops judge calls in progress. Without a usable model a judge check fails with "no
+    judge model available: add an OpenAI, Anthropic or Ollama key".
+  - Schedule catch-up modes now differ. After downtime with missed run times, Skip starts none of
+    them and waits for the next run time (a run time at most 60 seconds late still counts as on
+    time); Run once starts exactly one run for all of them; Run all starts one per missed time, the
+    most recent ones up to the limit, which is at most 100. Skipped runs are noted on the schedule.
+  - A schedule's input is checked against the workflow's inputs: deploying a version whose schedule
+    trigger has an input that does not match is refused with a pointer to that trigger
+    (`/triggers/<i>/input`), and a schedule that fires with such an input starts no run and records
+    the reason (and sends the schedule-failed alert) instead.
+- MCP tools that survive deploys, and stdio MCP servers you can test and discover.
+  A workflow exposed as an MCP tool under Triggers, MCP tools now stays exposed when you deploy,
+  redeploy or roll back the workflow. It keeps its tool name and description, and clients see it
+  whenever a version is deployed to its environment. Each tool in the list has an On/Off switch,
+  so a switched-off tool can be switched back on; deploys leave the switch as you set it. A tool
+  made before anything is deployed says it is waiting for a deployment. A tool declared by a
+  version's own MCP trigger works as before: a later version without the trigger switches it off,
+  and switching it back on makes it yours. Tools that a deploy switched off before this release are
+  switched back on (migration 0015). `PATCH /v1/mcp/exposures/:id` takes `enabled` and
+  `description`, and the exposure list reports `source`, `deployed` and `active`.
+  stdio MCP servers can now be tested and discovered. The api never starts a program itself: it
+  hands the test or discovery to the worker, which checks the command against its allow-list again,
+  starts it, and stores the tools it lists on the server, so they reach agents and the MCP tool
+  step. Each start is recorded in the audit log by name only. If no worker answers within 45
+  seconds, the test says so.
+  The Connect MCP server dialog can test the settings before saving them
+  (`POST /v1/mcp/servers/test`, for HTTP and stdio servers); nothing is stored by the test.
+- Security and reliability hardening (P3-3, P3-4, P3-6, P3-7):
+  - With `REDIS_URL`, request rate limits, sign-in throttles and the webhook replay cache are kept in Redis, so they hold across api replicas.
+  - Migration 0012 gates the row-level-security bypass on membership in the new `flowaid_rls_bypass` role (granted to `flowaid_app` and the owner, never to the sandbox host's `flowaid_code`). A migrating role without `CREATEROLE` needs the role created first (see `docker/postgres-init/01-roles.sql`).
+  - Each mutation's audit row is written inside the transaction that makes the change.
+  - `flowaid keys rotate-master` (`pnpm keys`, `node dist/keys.js` in the api image) re-wraps every key-encryption key and re-seals every credential under a new master key, verified and resumable.
+  - Timers are due by the database clock, not the worker's.
+- A key set in the server's environment (TYPESAFE_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY,
+  OLLAMA_HOST) now answers a workflow's required secret of that type when nothing is bound in the
+  environment. Runs start, deploys (including Publish with deploy) go through, and steps use the
+  server key, so the built-in templates run without saving and binding the key first. The builder,
+  templates, Deployments and Secrets pages no longer ask you to bind such a secret.
+  The monthly budget in Settings → Workspace is now enforced. Once the runs started this calendar
+  month (UTC) have cost the budget, new runs are refused with HTTP 409 from every source (the
+  builder, the API, webhooks, schedules, MCP and evaluations) until next month or until the budget is
+  raised; runs already going finish. Two new notification events, "80% of the monthly budget is
+  spent" and "The monthly budget is used up", reach subscribed channels at most once a month each.
+  Settings → Workspace shows this month's spend next to the budget, also available from
+  `GET /v1/workspaces/:id/budget` (`flowaid workspace budget`).
+  The retention days in Settings → Workspace now apply at the nightly clean-up: runs keep their data
+  for the workspace's run days instead of 90 (workflows set to short or long retention keep theirs),
+  the audit log keeps entries for the audit days (400 when empty, which the clean-up now also
+  applies), and files runs write are deleted after the artifact days even while the run is kept.
+- `RATE_LIMIT_MAX` now sets the per-session request limit as documented, with API keys allowed
+  double and unauthenticated requests (webhooks, sign-in) a fifth per address; unset, the limits are
+  unchanged (600, 1 200 and 120 a minute). `pnpm loadtest` measures read and end-to-end run capacity
+  of a running API, and docs/operations/PERFORMANCE.md records the first results. Migration 0015 can
+  run again safely on a database that already has its columns.
+- Plugin hosts run under the Node permission model in development too, and plugins reach the
+  network only through `ctx.http`.
+  - A development checkout bundles the plugin host with esbuild and starts the bundle with the same
+    flags as the compiled host: `--permission`, reads limited to the host's code, the provided
+    packages and the plugin's own directory (no longer the repository root, so not `.env` or
+    `.flowaid/`), and no writes, child processes, worker threads, addons, WASI or inspector.
+  - Installed plugin code may import only an allow-list of built-ins (`net`, `http`, `dns`,
+    `child_process`, `module`, `vm` and the like are refused with `E_PLUGIN_BUILTIN_DENIED`);
+    the global `fetch`, `WebSocket` and `EventSource` throw `E_PLUGIN_NETWORK_DENIED`; and
+    `process.kill` only signals the host. On Node 25+ the permission model also refuses sockets.
+  - `@flowaid/node-sdk`, `@flowaid/workflow-core` and `zod` imported by a plugin resolve to the
+    host's own instances.
+- AWS KMS master keys and AWS Secrets Manager references, without the AWS SDK.
+  - `FLOWAID_MASTER_KEY_PROVIDER=aws-kms` with a key or alias ARN in `FLOWAID_MASTER_KEY_ID` wraps
+    the key-encryption keys with KMS `Encrypt`/`Decrypt` (`Decrypt` pinned to the configured key).
+    `aws-sm:<secret ARN>[#<json key>]` external references resolve through Secrets Manager
+    `GetSecretValue`.
+  - Requests are signed with Signature Version 4 over `node:crypto` (checked against AWS's
+    published test-suite vectors) and sent through the injected fetch. Credentials come from
+    `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`/`AWS_SESSION_TOKEN`, else the ECS task role
+    (`AWS_CONTAINER_CREDENTIALS_RELATIVE_URI`), else the EC2 instance profile (IMDSv2); the region
+    is the ARN's. `AWS_ENDPOINT_URL` points both services at LocalStack or a VPC endpoint.
+
 ## 0.8.0 — 2026-09-30
 
 - Fill with AI in the builder's Run tab.

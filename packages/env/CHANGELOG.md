@@ -1,5 +1,30 @@
 # @flowaid/env
 
+## 0.9.0
+
+### Minor Changes
+
+- b19f9bc: AWS KMS master keys and AWS Secrets Manager references, without the AWS SDK.
+
+  - `FLOWAID_MASTER_KEY_PROVIDER=aws-kms` with a key or alias ARN in `FLOWAID_MASTER_KEY_ID` wraps
+    the key-encryption keys with KMS `Encrypt`/`Decrypt` (`Decrypt` pinned to the configured key).
+    `aws-sm:<secret ARN>[#<json key>]` external references resolve through Secrets Manager
+    `GetSecretValue`.
+  - Requests are signed with Signature Version 4 over `node:crypto` (checked against AWS's
+    published test-suite vectors) and sent through the injected fetch. Credentials come from
+    `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`/`AWS_SESSION_TOKEN`, else the ECS task role
+    (`AWS_CONTAINER_CREDENTIALS_RELATIVE_URI`), else the EC2 instance profile (IMDSv2); the region
+    is the ARN's. `AWS_ENDPOINT_URL` points both services at LocalStack or a VPC endpoint.
+
+### Patch Changes
+
+- c630951: `RATE_LIMIT_MAX` now sets the per-session request limit as documented, with API keys allowed
+  double and unauthenticated requests (webhooks, sign-in) a fifth per address; unset, the limits are
+  unchanged (600, 1 200 and 120 a minute). `pnpm loadtest` measures read and end-to-end run capacity
+  of a running API, and docs/operations/PERFORMANCE.md records the first results. Migration 0015 can
+  run again safely on a database that already has its columns.
+- @flowaid/shared@0.9.0
+
 ## 0.8.0
 
 ### Patch Changes

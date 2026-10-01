@@ -1,6 +1,6 @@
 {
   "name": "@flowaid/pageindex",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "private": true,
   "description": "PageIndex document intelligence for flowaid: the typed client of the PageIndex service (protocol v1), evidence retrieval by navigating a document's section tree with a decision provider, and citation checks against the evidence.",
   "license": "Apache-2.0",
