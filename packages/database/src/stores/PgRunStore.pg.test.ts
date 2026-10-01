@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, inArray, sql } from "drizzle-orm";
 import { uuidv7 } from "@flowaid/shared";
 import { WorkerLostError, type DurableRunEvent } from "@flowaid/workflow-core";
 import { reproject } from "../reproject.js";
@@ -305,6 +305,42 @@ describeDb("PgRunStore", () => {
       );
       expect(fired.filter(Boolean)).toHaveLength(1);
       expect(await played.store.cancelTimer(played.ids.expiryTimer)).toBe(false);
+    });
+
+    it("decides which timers are due by the database clock, not the caller's", async () => {
+      const soon = uuidv7();
+      const past = uuidv7();
+      await t.app.system((tx) =>
+        tx.insert(runTimers).values([
+          // 10 minutes ahead of the database clock, and 10 minutes behind it
+          {
+            id: soon,
+            runId: played.run.id,
+            purpose: "wait",
+            fireAt: sql`now() + interval '10 minutes'`,
+          },
+          {
+            id: past,
+            runId: played.run.id,
+            purpose: "wait",
+            fireAt: sql`now() - interval '10 minutes'`,
+          },
+        ]),
+      );
+      // A worker whose clock runs an hour fast must not fire the future timer early…
+      const fast = await played.store.dueTimers(new Date(Date.now() + 3_600_000), 100);
+      expect(fast.map((d) => d.id)).not.toContain(soon);
+      expect(fast.map((d) => d.id)).toContain(past);
+      // …and one whose clock runs an hour slow still fires the past one.
+      const slow = await played.store.dueTimers(new Date(Date.now() - 3_600_000), 100);
+      expect(slow.map((d) => d.id)).toContain(past);
+      expect(slow.map((d) => d.id)).not.toContain(soon);
+      await t.app.system((tx) =>
+        tx
+          .update(runTimers)
+          .set({ cancelledAt: sql`now()` })
+          .where(inArray(runTimers.id, [soon, past])),
+      );
     });
 
     it("responds to a human task exactly once (compare-and-set)", async () => {

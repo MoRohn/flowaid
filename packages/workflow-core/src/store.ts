@@ -101,7 +101,9 @@ export interface RunStore {
   acquireLease(runId: string, workerId: string, ttlMs: number): Promise<LeaseInfo | null>;
   renewLease(runId: string, workerId: string, ttlMs: number): Promise<boolean>;
   releaseLease(runId: string, workerId: string): Promise<void>;
+  /** Expired leases; a store with a shared clock (PostgreSQL's `now()`) uses it instead of `now`. */
   expiredLeases(now: Date, limit: number): Promise<LeaseInfo[]>;
+  /** Unfired, uncancelled timers due by `now`, or by the store's shared clock when it has one. */
   dueTimers(now: Date, limit: number): Promise<RunTimer[]>;
   markTimerFired(timerId: string): Promise<boolean>;
   cancelRequest(runId: string): Promise<{ by: string; reason: string | null; at: string } | null>;
