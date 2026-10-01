@@ -135,7 +135,7 @@ describeDb("workspace alerts from the worker reach subscribed, enabled channels 
       // one decision of the fake provider costs $0.00002: the first run reaches the budget
       await tx
         .update(workspaces)
-        .set({ settings: { budgets: { monthlyCostUsd: 0.00002 } } })
+        .set({ settings: { budgets: { monthlyCostUsd: 0.00002 } } as never })
         .where(eq(workspaces.id, h.workspaceId));
     });
     const judge = await h.deploy("Costs", {

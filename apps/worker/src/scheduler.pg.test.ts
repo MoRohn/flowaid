@@ -138,7 +138,7 @@ describeDb("scheduler (Postgres)", () => {
       await tx.update(runs).set({ costUsd: "2" }).where(eq(runs.id, earlier));
       await tx
         .update(workspaces)
-        .set({ settings: { budgets: { monthlyCostUsd: 2 } } })
+        .set({ settings: { budgets: { monthlyCostUsd: 2 } } as never })
         .where(eq(workspaces.id, h.workspaceId));
     });
     const scheduleId = uuidv7();
