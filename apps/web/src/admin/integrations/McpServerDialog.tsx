@@ -1,8 +1,9 @@
 "use client";
 /**
  * Connect an MCP server, step by step (or all at once): where it runs, how FlowAId signs in, then
- * a review. The API can only test and discover a saved server, so saving ends on those two
- * explicit buttons rather than calling the server on its own. The unsent draft is kept in this
+ * a review. The review can test the settings before anything is saved (`POST /v1/mcp/servers/test`
+ * stores nothing; the worker starts a stdio program for it). Saving ends on explicit Test and
+ * Discover buttons rather than calling the server on its own. The unsent draft is kept in this
  * browser tab (it holds a credential's id, never its value).
  */
 import { useQuery } from "@tanstack/react-query";
@@ -93,6 +94,22 @@ const AUTH: readonly {
 type Outcome =
   { kind: "test"; ok: boolean; message?: string } | { kind: "discover"; result: McpDiscovery };
 
+interface TestAnswer {
+  ok: boolean;
+  message?: string;
+  server?: { name: string; version: string } | null;
+  toolCount?: number;
+}
+
+/** What to try when a server did not answer. */
+function testFix(transport: McpServerDraft["transport"], url: string): string {
+  if (transport === "stdio")
+    return "Check the command and its arguments against FLOWAID_MCP_STDIO_ALLOWED_COMMANDS, and that the worker is running: it starts the program.";
+  return isPrivateUrl(url)
+    ? "If it runs on this computer, the api needs FLOWAID_ALLOW_PRIVATE_NETWORK=true."
+    : "Check the address and the credential, then test again.";
+}
+
 export function McpServerDialog({
   open,
   onOpenChange,
@@ -138,6 +155,19 @@ export function McpServerDialog({
       },
     },
   );
+  // Testing the unsaved settings: the answer belongs to the settings it was given.
+  const body = serverBody(draft);
+  const bodyKey = JSON.stringify(body);
+  const [tried, setTried] = useState<{ key: string; answer: TestAnswer } | null>(null);
+  const tryIt = useMutate(
+    (b: Record<string, unknown>) =>
+      post<TestAnswer>("/v1/mcp/servers/test", b.name ? b : { ...b, name: undefined }),
+    {
+      onSuccess: (answer, b) => setTried({ key: JSON.stringify(b), answer }),
+      errorTitle: "The test did not run",
+    },
+  );
+  const triedNow = tried?.key === bodyKey ? tried.answer : null;
   const test = useMutate(
     (m: McpServer) => post<{ ok: boolean; message?: string }>(`/v1/mcp/servers/${m.id}/test`),
     {
@@ -165,7 +195,6 @@ export function McpServerDialog({
   };
 
   if (created) {
-    const http = created.transport !== "stdio";
     return (
       <Dialog open={open} onOpenChange={close}>
         <DialogContent size="md">
@@ -175,80 +204,74 @@ export function McpServerDialog({
               {created.name} is saved
             </DialogTitle>
             <DialogDescription>
-              {http
-                ? "Nothing has contacted it yet. Test that FlowAId can reach it, then discover its tools: only discovered tools can be used."
-                : "The worker starts it when a workflow calls one of its tools. This version cannot test or list a stdio server's tools from here."}
+              {created.transport === "stdio"
+                ? "Discover its tools now: only discovered tools can be used. The worker starts the program for the test and for discovery, and again when a workflow calls one of its tools."
+                : "Test that FlowAId can reach it, then discover its tools: only discovered tools can be used."}
             </DialogDescription>
           </DialogHeader>
           <DialogBody className="flex flex-col gap-3">
-            {http ? (
-              <>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    variant="secondary"
-                    leadingIcon={<Zap strokeWidth={1.75} />}
-                    loading={test.isPending}
-                    onClick={() => test.mutate(created)}
-                  >
-                    Test connection
-                  </Button>
-                  <Button
-                    variant="primary"
-                    leadingIcon={<Radar strokeWidth={1.75} />}
-                    loading={discover.isPending}
-                    onClick={() => discover.mutate(created)}
-                  >
-                    Discover tools
-                  </Button>
-                </div>
-                {outcome?.kind === "test" ? (
-                  outcome.ok ? (
-                    <CheckList
-                      aria-label="Test result"
-                      checks={[{ id: "test", label: `${created.name} answered`, state: "ok" }]}
-                    />
-                  ) : (
-                    <CheckList
-                      aria-label="Test result"
-                      checks={[
-                        {
-                          id: "test",
-                          label: `${created.name} did not answer`,
-                          state: "blocker",
-                          detail: outcome.message,
-                          fix: isPrivateUrl(created.url ?? "")
-                            ? "If it runs on this computer, the api needs FLOWAID_ALLOW_PRIVATE_NETWORK=true."
-                            : "Check the address and the credential, then test again. The server stays saved.",
-                        },
-                      ]}
-                    />
-                  )
-                ) : outcome?.kind === "discover" ? (
-                  <CheckList
-                    aria-label="Discovery result"
-                    checks={[
-                      {
-                        id: "discover",
-                        label: `${outcome.result.tools.length} tool${outcome.result.tools.length === 1 ? "" : "s"} found`,
-                        state: outcome.result.tools.length ? "ok" : "warning",
-                        detail: outcome.result.tools.length
-                          ? "They now appear in agents' tool lists and in the MCP tool step's tool choice."
-                          : "The server offered none, or the tool policy excluded them all.",
-                      },
-                    ]}
-                  />
-                ) : null}
-                {outcome?.kind === "discover" && outcome.result.tools.length ? (
-                  <Button
-                    variant="link"
-                    size="sm"
-                    className="self-start"
-                    onClick={() => onDiscovered(created.name, outcome.result)}
-                  >
-                    See the tools
-                  </Button>
-                ) : null}
-              </>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="secondary"
+                leadingIcon={<Zap strokeWidth={1.75} />}
+                loading={test.isPending}
+                onClick={() => test.mutate(created)}
+              >
+                Test connection
+              </Button>
+              <Button
+                variant="primary"
+                leadingIcon={<Radar strokeWidth={1.75} />}
+                loading={discover.isPending}
+                onClick={() => discover.mutate(created)}
+              >
+                Discover tools
+              </Button>
+            </div>
+            {outcome?.kind === "test" ? (
+              outcome.ok ? (
+                <CheckList
+                  aria-label="Test result"
+                  checks={[{ id: "test", label: `${created.name} answered`, state: "ok" }]}
+                />
+              ) : (
+                <CheckList
+                  aria-label="Test result"
+                  checks={[
+                    {
+                      id: "test",
+                      label: `${created.name} did not answer`,
+                      state: "blocker",
+                      detail: outcome.message,
+                      fix: `${testFix(created.transport, created.url ?? "")} The server stays saved.`,
+                    },
+                  ]}
+                />
+              )
+            ) : outcome?.kind === "discover" ? (
+              <CheckList
+                aria-label="Discovery result"
+                checks={[
+                  {
+                    id: "discover",
+                    label: `${outcome.result.tools.length} tool${outcome.result.tools.length === 1 ? "" : "s"} found`,
+                    state: outcome.result.tools.length ? "ok" : "warning",
+                    detail: outcome.result.tools.length
+                      ? "They now appear in agents' tool lists and in the MCP tool step's tool choice."
+                      : "The server offered none, or the tool policy excluded them all.",
+                  },
+                ]}
+              />
+            ) : null}
+            {outcome?.kind === "discover" && outcome.result.tools.length ? (
+              <Button
+                variant="link"
+                size="sm"
+                className="self-start"
+                onClick={() => onDiscovered(created.name, outcome.result)}
+              >
+                See the tools
+              </Button>
             ) : null}
           </DialogBody>
           <DialogFooter>
@@ -425,7 +448,7 @@ export function McpServerDialog({
       id: "review",
       doneLabel: "Ready to save",
       title: "Review and save",
-      why: "Saving stores the server entry only. Then test it and discover its tools; workflows and agents can use a tool only after discovery.",
+      why: "Test the settings first if you like: nothing is stored until you save. Then discover its tools; workflows and agents can use a tool only after discovery.",
       done: !blocked,
       requirement: "fix the items marked as needed",
       children: (
@@ -446,14 +469,57 @@ export function McpServerDialog({
             </dd>
           </dl>
           <CheckList checks={reviewChecks} aria-label="Before you save" />
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              leadingIcon={<Zap strokeWidth={1.75} />}
+              loading={tryIt.isPending}
+              disabled={blocked}
+              onClick={() => tryIt.mutate(body)}
+            >
+              Test connection
+            </Button>
+            <span className="text-xs text-ink-3">
+              {draft.transport === "stdio"
+                ? "Optional. The worker starts the program once to check it answers; nothing is saved."
+                : "Optional. Checks the server answers with these settings; nothing is saved."}
+            </span>
+          </div>
+          {triedNow ? (
+            <CheckList
+              aria-label="Test result"
+              checks={[
+                triedNow.ok
+                  ? {
+                      id: "try",
+                      label: `${draft.name.trim() || "The server"} answered${
+                        triedNow.toolCount !== undefined
+                          ? ` and lists ${triedNow.toolCount} tool${triedNow.toolCount === 1 ? "" : "s"}`
+                          : ""
+                      }`,
+                      state: "ok",
+                      detail: "Save it, then discover its tools to use them.",
+                    }
+                  : {
+                      id: "try",
+                      label: `${draft.name.trim() || "The server"} did not answer`,
+                      state: "blocker",
+                      detail: triedNow.message,
+                      fix: `${testFix(draft.transport, draft.url)} You can still save it and test it later.`,
+                    },
+              ]}
+            />
+          ) : null}
           {create.isError ? (
             <Notice tone="danger">
               Not saved: {create.error.message} Your settings are kept; fix them and save again.
             </Notice>
           ) : null}
           <QualityNote>
-            These checks confirm the entry can be saved. Whether the server answers, and which tools
-            it offers, shows only when you test and discover it next.
+            These checks confirm the entry can be saved. Test connection shows whether the server
+            answers; which tools it offers shows when you discover them after saving.
           </QualityNote>
         </>
       ),

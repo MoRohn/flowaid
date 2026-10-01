@@ -260,7 +260,8 @@ export function exportRoutes(app: FastifyInstance, ctx: ApiContext): void {
           .where(and(eq(jobs.id, req.params.id), eq(jobs.workspaceId, p.workspaceId))),
       );
       const workflowId = (job?.payload as { workflowId?: string } | undefined)?.workflowId;
-      if (!job || (workflowId && !canSeeWorkflow(p, workflowId)))
+      // MCP probes are the API's own short-lived rows, not jobs anyone polls
+      if (!job || job.kind !== "export.package" || (workflowId && !canSeeWorkflow(p, workflowId)))
         throw new NotFoundError("job not found");
       return {
         id: job.id,

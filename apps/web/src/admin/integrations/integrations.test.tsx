@@ -267,5 +267,118 @@ describe("exposing a workflow as an MCP tool", () => {
     );
     expect(screen.getByText(/No tool in dev for Refund desk/)).toBeTruthy();
     expect(callsTo(fetchMock, "POST /v1/mcp/tokens")).toHaveLength(0);
+    // what was said before exposing: the tool waits for a deployment, and later ones keep it
+    expect(screen.queryByText(/switches the tool off/)).toBeNull();
+  });
+
+  it("switches an exposure back on, and says when it waits for a deployment", async () => {
+    const { ExposuresSection } = await import("./McpTab");
+    const base = {
+      workflowId: "wf-1",
+      environmentId: "env-dev",
+      description: "Runs Refund desk",
+      source: "manual",
+      url: "/mcp/acme",
+    };
+    const fetchMock = stubApi({
+      "GET /v1/mcp/exposures": () => ({
+        items: [
+          { ...base, id: "e-1", toolName: "refund", enabled: false, deployed: true, active: false },
+          { ...base, id: "e-2", toolName: "later", enabled: true, deployed: false, active: false },
+        ],
+        next_cursor: null,
+      }),
+      "GET /v1/workflows": () => ({
+        items: [{ id: "wf-1", name: "Refund desk", slug: "refund-desk", description: "" }],
+        next_cursor: null,
+      }),
+      "PATCH /v1/mcp/exposures/e-1": () => ({
+        ...base,
+        id: "e-1",
+        toolName: "refund",
+        enabled: true,
+        deployed: true,
+        active: true,
+      }),
+    });
+    render(withClient(<ExposuresSection />));
+    expect(await screen.findByText("Off")).toBeTruthy();
+    expect(screen.getByText("Waiting for a deployment")).toBeTruthy();
+    expect(screen.getByText(/Clients see it once a version is deployed to dev/)).toBeTruthy();
+    expect(screen.getByText(/deployments leave the switch as you set it/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("switch", { name: "Expose refund" }));
+    await waitFor(() => expect(callsTo(fetchMock, "PATCH /v1/mcp/exposures/e-1")).toHaveLength(1));
+    expect(bodyOf(callsTo(fetchMock, "PATCH /v1/mcp/exposures/e-1")[0]?.[1])).toEqual({
+      enabled: true,
+    });
+  });
+});
+
+describe("testing an MCP server before saving it", () => {
+  it("tests the unsaved settings and saves nothing", async () => {
+    const fetchMock = stubApi({
+      "GET /v1/credentials": () => ({ items: [], next_cursor: null }),
+      "POST /v1/mcp/servers/test": () => ({
+        ok: true,
+        server: { name: "files", version: "1.0.0" },
+        toolCount: 3,
+      }),
+    });
+    render(
+      withClient(
+        <McpServerDialog open onOpenChange={() => undefined} onDiscovered={() => undefined} />,
+      ),
+    );
+    fireEvent.change(screen.getByLabelText(/^Name/), { target: { value: "files" } });
+    fireEvent.change(screen.getByLabelText(/^URL/), {
+      target: { value: "https://mcp.example.com/mcp" },
+    });
+    const rail = screen.getByRole("navigation", { name: "Steps" });
+    fireEvent.click(within(rail).getByRole("button", { name: /Review and save/ }));
+    fireEvent.click(button("Test connection"));
+    expect(await screen.findByText("files answered and lists 3 tools")).toBeTruthy();
+    expect(bodyOf(callsTo(fetchMock, "POST /v1/mcp/servers/test")[0]?.[1])).toEqual({
+      name: "files",
+      transport: "streamable_http",
+      url: "https://mcp.example.com/mcp",
+      authKind: "none",
+      credentialId: null,
+    });
+    expect(callsTo(fetchMock, "POST /v1/mcp/servers")).toHaveLength(0);
+    // the answer belongs to the settings it was given
+    fireEvent.click(within(rail).getByRole("button", { name: /Say where it runs/ }));
+    fireEvent.change(screen.getByLabelText(/^URL/), {
+      target: { value: "https://other.example.com/mcp" },
+    });
+    fireEvent.click(within(rail).getByRole("button", { name: /Review and save/ }));
+    expect(screen.queryByText("files answered and lists 3 tools")).toBeNull();
+  });
+
+  it("explains a stdio program that did not answer", async () => {
+    stubApi({
+      "GET /v1/credentials": () => ({ items: [], next_cursor: null }),
+      "POST /v1/mcp/servers/test": () => ({ ok: false, message: "spawn ENOENT" }),
+    });
+    scopes.add("admin");
+    try {
+      render(
+        withClient(
+          <McpServerDialog open onOpenChange={() => undefined} onDiscovered={() => undefined} />,
+        ),
+      );
+      fireEvent.change(screen.getByLabelText(/^Name/), { target: { value: "local" } });
+      fireEvent.click(screen.getByRole("radio", { name: /stdio/ }));
+      fireEvent.change(screen.getByLabelText(/^Command/), {
+        target: { value: "/usr/local/bin/mcp-files" },
+      });
+      const rail = screen.getByRole("navigation", { name: "Steps" });
+      fireEvent.click(within(rail).getByRole("button", { name: /Review and save/ }));
+      fireEvent.click(button("Test connection"));
+      expect(await screen.findByText("local did not answer")).toBeTruthy();
+      expect(screen.getByText("spawn ENOENT")).toBeTruthy();
+      expect(screen.getByText(/the worker is running: it starts the program/)).toBeTruthy();
+    } finally {
+      scopes.delete("admin");
+    }
   });
 });

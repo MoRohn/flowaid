@@ -5,6 +5,13 @@
  * tool names or event names another workflow of the workspace already uses (`E_TRIGGER_CONFLICT`).
  * A schedule's stored input must match the deployed version's inputs schema (`E_SCHEMA` at
  * `/triggers/<i>/input`): the scheduler checks it again at every fire.
+ *
+ * MCP exposures made by hand (`source='manual'`, Triggers → MCP tools) are not the version's to
+ * switch: a deploy leaves their `enabled` alone, so they stay on across deploys and rollbacks and
+ * are served whenever some version is deployed to their environment. A version that declares the
+ * same tool name updates its description and environment, as it does for its own
+ * (`source='trigger'`) rows, which it switches on and a later version without the trigger switches
+ * off.
  */
 import { Cron } from "croner";
 import { and, eq, ne } from "drizzle-orm";
@@ -219,10 +226,15 @@ export async function materialiseTriggers(
       );
     let id: string;
     if (sameName) {
-      // One exposure per tool name: it follows the latest environment deployed with it.
+      // One exposure per tool name: it follows the latest environment deployed with it. A manual
+      // exposure keeps the switch its owner set.
       await tx
         .update(mcpExposures)
-        .set({ description: t.description, enabled: true, environmentId: i.environmentId })
+        .set({
+          description: t.description,
+          environmentId: i.environmentId,
+          ...(sameName.source === "trigger" ? { enabled: true } : {}),
+        })
         .where(eq(mcpExposures.id, sameName.id));
       id = sameName.id;
     } else {
@@ -234,13 +246,14 @@ export async function materialiseTriggers(
         environmentId: i.environmentId,
         toolName: t.toolName,
         description: t.description,
+        source: "trigger",
       });
     }
     keepExposures.add(id);
     out.mcpExposures.push({ id, toolName: t.toolName });
   }
   for (const e of ownExposures)
-    if (!keepExposures.has(e.id) && e.enabled) {
+    if (!keepExposures.has(e.id) && e.enabled && e.source === "trigger") {
       await tx.update(mcpExposures).set({ enabled: false }).where(eq(mcpExposures.id, e.id));
       out.disabled.push({ kind: "mcp", id: e.id });
     }

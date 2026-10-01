@@ -850,12 +850,13 @@ export const jobs = pgTable(
     workspaceId: uuid("workspace_id")
       .notNull()
       .references(() => workspaces.id, { onDelete: "cascade" }),
-    kind: text("kind", { enum: ["export.package"] }).notNull(),
+    kind: text("kind", { enum: ["export.package", "mcp.test", "mcp.discover"] }).notNull(), // mcp.*: stdio MCP checks the API hands to the worker (it never spawns); the API waits for the row and deletes it
     status: text("status", { enum: ["queued", "running", "completed", "failed"] })
       .notNull()
       .default("queued"),
     payload: jsonb("payload").$type<JsonObject>().notNull(), // { workflowId, versionId | draftRevision, mode, includeSampleFromRunId?, includeRecordedRunId? }
     artifactId: uuid("artifact_id").references(() => artifacts.id, { onDelete: "set null" }),
+    result: jsonb("result").$type<JsonObject>(), // a job's answer when it is not an artifact (mcp.test / mcp.discover)
     error: jsonb("error").$type<ErrorInfo>(),
     createdBy: text("created_by").notNull(),
     createdAt: createdAt(),
@@ -964,6 +965,9 @@ export const mcpExposures = pgTable(
     toolName: text("tool_name").notNull(),
     description: text("description").notNull(),
     enabled: boolean("enabled").notNull().default(true), // v1.1: tokens belong to the principal (api_keys rows with scope mcp:serve and workflow_ids pins), not to the exposure
+    source: text("source", { enum: ["manual", "trigger"] })
+      .notNull()
+      .default("manual"), // manual: made in Triggers → MCP tools (or switched there), `enabled` is the person's switch and survives deploys; trigger: materialised from a version's `triggers[].type='mcp'`, switched off when a deployed version drops it. Either is served only while a version is deployed to its environment
     createdAt: createdAt(),
   },
   (t) => [

@@ -77,7 +77,8 @@ export const TRIGGERS_MCP: CapabilityGuide = {
     title: "Reading this list",
     items: [
       "Each tool runs one workflow in one environment, and clients see it only while that environment has a deployed version.",
-      "Disabled: a later deployment of the workflow to that environment switched it off. Stop exposing it and expose it again.",
+      "The switch on each tool is yours: deploying, redeploying or rolling back the workflow leaves it as you set it. An Off tool stays listed here but clients do not see it.",
+      "Waiting for a deployment: the tool is on, but nothing is deployed to its environment yet, so clients do not see it.",
       "Tokens are listed under Settings, API keys, as “mcp: <name>”. Revoke one there; they expire after a year.",
     ],
   },

@@ -92,6 +92,7 @@ mcp-exposure
 mcp-exposure create {--workflow-id --environment-id --tool-name --description --body --out}
 mcp-exposure delete <id> {--out}
 mcp-exposure list {--limit --cursor --out}
+mcp-exposure update <id> {--enabled --description --body --out}
 mcp-server
 mcp-server call <id> <name> {--args --body --out}
 mcp-server create {--name --transport --url --command --args --env --auth-kind --credential-id --body --out}
@@ -104,6 +105,7 @@ mcp-server prompts <id> {--out}
 mcp-server resources <id> {--out}
 mcp-server test <id> {--out}
 mcp-server tools <id> {--out}
+mcp-server try {--name --transport --url --command --args --env --auth-kind --credential-id --body --out}
 mcp-server update <id> {--name --transport --url --command --args --env --auth-kind --credential-id --status --body --out}
 mcp-token
 mcp-token create {--name --workflow-ids --environment-id --expires-at --body --out}

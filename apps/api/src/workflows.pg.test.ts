@@ -336,6 +336,168 @@ describeDb("workflows, versions and deployments (Postgres)", () => {
     expect(deployments).toEqual([expect.objectContaining({ environment: "dev", version: 1 })]);
   });
 
+  it("keeps a hand-made MCP exposure across deploys and rollbacks; it is live while a version is deployed", async () => {
+    const w = await blank("Exposed by hand");
+    const v1 = (await call(t.app, jar, "POST", `/v1/workflows/${w.id}/publish`, {})).json();
+    const made = await call(t.app, jar, "POST", "/v1/mcp/exposures", {
+      workflowId: w.id,
+      environmentId: envs.dev,
+      toolName: "by_hand",
+      description: "Made in Triggers",
+    });
+    expect(made.statusCode).toBe(201);
+    const exposureId = made.json().exposure.id as string;
+    const key = (
+      await call(t.app, jar, "POST", "/v1/mcp/tokens", {
+        name: "client",
+        workflowIds: [w.id],
+        environmentId: envs.dev,
+      })
+    ).json().key as string;
+    let n = 0;
+    const listed = async () => {
+      const res = await t.app.inject({
+        method: "POST",
+        url: "/mcp/default",
+        headers: {
+          authorization: `Bearer ${key}`,
+          accept: "application/json, text/event-stream",
+          "content-type": "application/json",
+        },
+        payload: { jsonrpc: "2.0", id: ++n, method: "tools/list", params: {} },
+      });
+      return (res.json().result.tools as { name: string }[]).map((x) => x.name);
+    };
+    const state = async () =>
+      (
+        (await call(t.app, jar, "GET", "/v1/mcp/exposures?limit=200")).json().items as {
+          id: string;
+        }[]
+      ).find((e) => e.id === exposureId);
+
+    // made before anything is deployed: on, but clients see nothing until a deploy
+    expect(await state()).toMatchObject({ enabled: true, deployed: false, active: false });
+    expect(await listed()).not.toContain("by_hand");
+
+    const dep1 = (
+      await call(t.app, jar, "PUT", `/v1/workflows/${w.id}/deployments/${envs.dev}`, {
+        versionId: v1.id,
+      })
+    ).json();
+    expect(dep1.triggers.disabled).toEqual([]);
+    expect(await state()).toMatchObject({ enabled: true, deployed: true, active: true });
+    expect(await listed()).toContain("by_hand");
+
+    // a second version without an MCP trigger leaves it on
+    const c2 = (await call(t.app, jar, "GET", `/v1/workflows/${w.id}`)).json();
+    await call(
+      t.app,
+      jar,
+      "PUT",
+      `/v1/workflows/${w.id}/draft`,
+      { definition: { ...c2.draft, description: "Second version" } },
+      { "if-match": String(c2.draftRevision) },
+    );
+    const v2 = (await call(t.app, jar, "POST", `/v1/workflows/${w.id}/publish`, {})).json();
+    expect(v2.id).not.toBe(v1.id);
+    const dep2 = (
+      await call(t.app, jar, "PUT", `/v1/workflows/${w.id}/deployments/${envs.dev}`, {
+        versionId: v2.id,
+      })
+    ).json();
+    expect(dep2.triggers.disabled).toEqual([]);
+    expect(await state()).toMatchObject({
+      enabled: true,
+      active: true,
+      source: "manual",
+      description: "Made in Triggers",
+    });
+
+    // and so does rolling back
+    const rolled = await call(
+      t.app,
+      jar,
+      "POST",
+      `/v1/workflows/${w.id}/deployments/${envs.dev}/rollback`,
+      {},
+    );
+    expect(rolled.json()).toMatchObject({ versionId: v1.id, triggers: { disabled: [] } });
+    expect(await state()).toMatchObject({ enabled: true, active: true });
+    expect(await listed()).toContain("by_hand");
+
+    // switched off by hand, a deploy does not switch it back on
+    await call(t.app, jar, "PATCH", `/v1/mcp/exposures/${exposureId}`, { enabled: false });
+    await call(t.app, jar, "PUT", `/v1/workflows/${w.id}/deployments/${envs.dev}`, {
+      versionId: v2.id,
+    });
+    expect(await state()).toMatchObject({ enabled: false, deployed: true, active: false });
+    expect(await listed()).not.toContain("by_hand");
+    await call(t.app, jar, "PATCH", `/v1/mcp/exposures/${exposureId}`, { enabled: true });
+    expect(await listed()).toContain("by_hand");
+  });
+
+  it("re-enables a trigger exposure a later version dropped; it then stays on as a manual one", async () => {
+    const w = await blank("Trigger exposed");
+    const cur = (await call(t.app, jar, "GET", `/v1/workflows/${w.id}`)).json();
+    const withTrigger = {
+      ...cur.draft,
+      triggers: [{ type: "mcp", toolName: "declared_tool", description: "Declared" }],
+    };
+    await call(
+      t.app,
+      jar,
+      "PUT",
+      `/v1/workflows/${w.id}/draft`,
+      { definition: withTrigger },
+      { "if-match": String(cur.draftRevision) },
+    );
+    const v1 = (await call(t.app, jar, "POST", `/v1/workflows/${w.id}/publish`, {})).json();
+    const dep1 = (
+      await call(t.app, jar, "PUT", `/v1/workflows/${w.id}/deployments/${envs.dev}`, {
+        versionId: v1.id,
+      })
+    ).json();
+    const exposureId = dep1.triggers.mcpExposures[0].id as string;
+    const c2 = (await call(t.app, jar, "GET", `/v1/workflows/${w.id}`)).json();
+    await call(
+      t.app,
+      jar,
+      "PUT",
+      `/v1/workflows/${w.id}/draft`,
+      { definition: { ...withTrigger, triggers: [] } },
+      { "if-match": String(c2.draftRevision) },
+    );
+    const v2 = (await call(t.app, jar, "POST", `/v1/workflows/${w.id}/publish`, {})).json();
+    const dep2 = (
+      await call(t.app, jar, "PUT", `/v1/workflows/${w.id}/deployments/${envs.dev}`, {
+        versionId: v2.id,
+      })
+    ).json();
+    // the version's own exposure goes with its trigger, as before
+    expect(dep2.triggers.disabled).toEqual([{ kind: "mcp", id: exposureId }]);
+    const on = await call(t.app, jar, "PATCH", `/v1/mcp/exposures/${exposureId}`, {
+      enabled: true,
+    });
+    expect(on.json()).toMatchObject({ enabled: true, source: "manual", active: true });
+    const dep3 = (
+      await call(t.app, jar, "PUT", `/v1/workflows/${w.id}/deployments/${envs.dev}`, {
+        versionId: v2.id,
+      })
+    ).json();
+    expect(dep3.triggers.disabled).toEqual([]);
+    // a version declaring it again updates its description and keeps the owner's switch
+    await call(t.app, jar, "PATCH", `/v1/mcp/exposures/${exposureId}`, { enabled: false });
+    await call(t.app, jar, "PUT", `/v1/workflows/${w.id}/deployments/${envs.dev}`, {
+      versionId: v1.id,
+    });
+    const after = (
+      (await call(t.app, jar, "GET", "/v1/mcp/exposures?limit=200")).json().items as {
+        id: string;
+      }[]
+    ).find((e) => e.id === exposureId);
+    expect(after).toMatchObject({ enabled: false, source: "manual", description: "Declared" });
+  });
+
   it("checks secret bindings on deploy and binding types", async () => {
     const w = await blank("Needs secret");
     const cur = (await call(t.app, jar, "GET", `/v1/workflows/${w.id}`)).json();
