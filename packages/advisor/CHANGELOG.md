@@ -1,5 +1,17 @@
 # @flowaid/advisor
 
+## 0.9.0
+
+### Patch Changes
+
+- Updated dependencies [d3e7936]
+- Updated dependencies [0778a7b]
+- Updated dependencies [feb43fe]
+- Updated dependencies [6b5c535]
+  - @flowaid/workflow-compiler@0.9.0
+  - @flowaid/workflow-core@0.9.0
+  - @flowaid/shared@0.9.0
+
 ## 0.8.0
 
 ### Minor Changes

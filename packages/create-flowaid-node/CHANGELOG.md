@@ -1,5 +1,12 @@
 # @flowaid/create-flowaid-node
 
+## 0.9.0
+
+### Patch Changes
+
+- Updated dependencies [371cb0c]
+  - @flowaid/node-sdk@0.9.0
+
 ## 0.8.0
 
 ### Patch Changes

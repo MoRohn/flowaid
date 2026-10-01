@@ -1,6 +1,6 @@
 {
   "name": "@flowaid/langchain",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "private": true,
   "description": "LangChain adapters for FlowAId, in both directions: LangChain chat models, embeddings and decisions as FlowAId providers; FlowAId providers, tools and workflows as LangChain models and tools; a callback handler that puts LangChain work into run traces and budgets; the LCEL runnable registry and schema/message bridges (docs/design/LANGCHAIN.md §2).",
   "license": "Apache-2.0",
