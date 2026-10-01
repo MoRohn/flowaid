@@ -182,12 +182,44 @@ grows while the workers are healthy.
 - **A credential's secret values** can be replaced: `POST /v1/credentials/:id/rotate` (CLI
   `flowaid credential rotate <id>`) stores new values and re-encrypts them under the active key.
   Credentials stored in an external secret manager are rotated there.
-- **The master key** cannot be rotated yet. `@flowaid/credentials` implements re-wrapping every
-  key-encryption key under a new master key, but no CLI command or API route runs it (the
-  `flowaid keys rotate-master` command in ARCHITECTURE.md §10.6 is planned, not available).
-  Until it is, keep the master key where it is and back it up
-  ([BACKUP_AND_RESTORE.md](BACKUP_AND_RESTORE.md)); replacing `master.key` or
-  `FLOWAID_MASTER_KEY` makes the api and worker refuse to start with `E_MASTER_KEY_MISMATCH`.
+- **The master key** is rotated with `flowaid keys rotate-master`, which runs with the api's
+  environment (its current master key and `DATABASE_URL`) while the api and the worker are
+  stopped (it refuses to start while they are connected; `--force` overrides). It re-wraps every
+  key-encryption key (KEK) under the new master in one transaction, checking each against the
+  current key's key check value and round-tripping it under the new one; adds a new KEK version
+  under the new master; then re-seals every stored credential's data key under that version, one
+  credential at a time, opening each re-sealed value before writing it. Both steps are audited
+  (`master_key.rotate`, `master_key.reseal`). Running it again is safe: KEKs already under the
+  new key are skipped and credentials still under an older version are picked up, so an
+  interrupted run is finished by running the same command again. `--keks-only` stops after the
+  first step.
+
+  ```sh
+  # compose: stop the key holders, rotate with the api image, point the stack at the new key
+  docker compose stop api worker
+  docker compose run --rm api node dist/keys.js rotate-master \
+    --new-key-file /data/master.key.new --generate
+  # back up /data/master.key.new, then swap the files (compose points both services at
+  # /data/master.key) and start the key holders; keep master.key.old until they run
+  docker compose run --rm api sh -c \
+    'mv /data/master.key /data/master.key.old && mv /data/master.key.new /data/master.key'
+  docker compose up -d api worker
+
+  # from source (./flowaid): stop FlowAId; the master key is FLOWAID_MASTER_KEY in .flowaid/dev.env
+  new_key=$(openssl rand -base64 32) && echo "$new_key"   # back it up now
+  FLOWAID_NEW_MASTER_KEY=$new_key DATABASE_URL=<the database> FLOWAID_MASTER_KEY=<the current key> \
+    pnpm keys rotate-master --new-key-env FLOWAID_NEW_MASTER_KEY
+  # then replace FLOWAID_MASTER_KEY in .flowaid/dev.env with the new key and start FlowAId
+  ```
+
+  Until the api and the worker get the new key they refuse to start with
+  `E_MASTER_KEY_MISMATCH`, so keep the old key until they are running on the new one, and back
+  up the new key before anything else ([BACKUP_AND_RESTORE.md](BACKUP_AND_RESTORE.md)). A
+  credential that does not open under its current key is reported, left as it was, and the
+  command exits 1. With a key service (`vault-transit`, `azure-keyvault`, `gcp-kms`) the current
+  key comes from `FLOWAID_MASTER_KEY_PROVIDER`; the new key is a local one (`--new-key-file` or
+  `--new-key-env`).
+
 - **The JWT signing keys** (`/data/keys`) can be replaced by deleting the pair and restarting
   the api, which generates a new one; session tokens signed with the old pair stop being
   accepted.
