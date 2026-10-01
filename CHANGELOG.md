@@ -5,6 +5,13 @@ release publishes the `ghcr.io/morohn/flowaid-api`, `-worker` and `-web` images 
 Sections are added by `pnpm version-packages` from the changesets merged since the last release
 (see [docs/operations/RELEASING.md](docs/operations/RELEASING.md)); each package also keeps its own `CHANGELOG.md`.
 
+## 0.9.1 — 2026-10-01
+
+- Starting FlowAId while it is already running finds it at once on every platform: the second start
+  asks the running launcher's control channel instead of a slow Windows process query, which could
+  take over a minute on a busy machine. A start that stops processes an earlier FlowAId left behind
+  now waits for their ports to be released before checking them.
+
 ## 0.9.0 — 2026-10-01
 
 - Built-in agent tools, and agents you can switch on and off.

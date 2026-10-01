@@ -1,5 +1,35 @@
 # @flowaid/worker
 
+## 0.9.1
+
+### Patch Changes
+
+- @flowaid/codegen@0.9.1
+  - @flowaid/credentials@0.9.1
+  - @flowaid/database@0.9.1
+  - @flowaid/env@0.9.1
+  - @flowaid/evaluation@0.9.1
+  - @flowaid/knowledge@0.9.1
+  - @flowaid/mcp@0.9.1
+  - @flowaid/node-sdk@0.9.1
+  - @flowaid/nodes-core@0.9.1
+  - @flowaid/nodes-langchain@0.9.1
+  - @flowaid/observability@0.9.1
+  - @flowaid/openapi-tools@0.9.1
+  - @flowaid/pageindex@0.9.1
+  - @flowaid/plugins@0.9.1
+  - @flowaid/provider-anthropic@0.9.1
+  - @flowaid/provider-ollama@0.9.1
+  - @flowaid/provider-openai@0.9.1
+  - @flowaid/provider-typesafe@0.9.1
+  - @flowaid/providers@0.9.1
+  - @flowaid/sandbox@0.9.1
+  - @flowaid/shared@0.9.1
+  - @flowaid/storage@0.9.1
+  - @flowaid/workflow-compiler@0.9.1
+  - @flowaid/workflow-core@0.9.1
+  - @flowaid/workflow-runtime@0.9.1
+
 ## 0.9.0
 
 ### Minor Changes

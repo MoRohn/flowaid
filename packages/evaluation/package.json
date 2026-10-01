@@ -1,6 +1,6 @@
 {
   "name": "@flowaid/evaluation",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "private": true,
   "description": "Evaluation for flowaid workflows: typed expectations, a bounded-concurrency runner over an injected run launcher, scorers per matcher (incl. an LLM/TypeSafe judge), calibration (ECE), comparison and regression reports (ARCHITECTURE.md §10.4).",
   "license": "Apache-2.0",

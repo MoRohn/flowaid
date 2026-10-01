@@ -15,7 +15,7 @@ import { registerWorkflowCommands } from "./commands/workflow.js";
 import { registerOperations } from "./generatedCommands.js";
 import type { CliIO } from "./io.js";
 
-export const CLI_VERSION = "0.9.0";
+export const CLI_VERSION = "0.9.1";
 
 /**
  * Generated verbs a hand-written command takes over: the export/stream operations need the

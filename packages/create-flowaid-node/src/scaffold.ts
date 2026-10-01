@@ -7,8 +7,8 @@ import { z } from "zod";
 import { defineNode, ok, toManifest, type AnyNodeDefinition } from "@flowaid/node-sdk";
 
 /** The node SDK range generated packages declare (this platform's SDK major/minor). */
-export const SDK_RANGE = "^0.9.0";
-const SDK_VERSION = "0.9.0";
+export const SDK_RANGE = "^0.9.1";
+const SDK_VERSION = "0.9.1";
 
 export interface ScaffoldOptions {
   /** npm package name, e.g. `@acme/nodes-crm` or `flowaid-node-weather` */

@@ -1,6 +1,6 @@
 {
   "name": "@flowaid/insights",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "private": true,
   "description": "Change detection over run history for flowaid: exact and rank-based tests, Benjamini–Hochberg control, and per-workflow insights with their evidence. Pure and browser-safe; the caller supplies the data.",
   "license": "Apache-2.0",

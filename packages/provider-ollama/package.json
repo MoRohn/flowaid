@@ -1,6 +1,6 @@
 {
   "name": "@flowaid/provider-ollama",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "private": true,
   "description": "Ollama generation and embedding provider for flowaid: /api/chat NDJSON streaming, JSON-schema format, tools, /api/embed and /api/tags discovery; local models cost nothing (ARCHITECTURE.md §6.6).",
   "license": "Apache-2.0",

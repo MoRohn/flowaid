@@ -1,6 +1,6 @@
 {
   "name": "@flowaid/sandbox",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "private": true,
   "description": "Sandboxed code execution for the flowaid code pool: isolated-vm isolates with memory, CPU and wall-clock limits and scoped bridges, and a container executor (no network, read-only, bounded) for code and shell (ARCHITECTURE.md §10.7, RFC-0019).",
   "license": "Apache-2.0",
