@@ -2,12 +2,14 @@ import { mkdtempSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   endLeftovers,
   readInstance,
   removeInstance,
+  controlAnswers,
+  findRunningLauncher,
   runningLauncher,
   writeInstance,
   type InstanceRecord,
@@ -40,6 +42,48 @@ describe("the launcher record", () => {
     expect(readInstance(path)).toBeNull();
     removeInstance(path);
     expect(readInstance(path)).toBeNull();
+  });
+});
+
+describe("findRunningLauncher", () => {
+  const answering =
+    (status: number, seen: string[] = []): typeof fetch =>
+    (input, init) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      seen.push(`${url} ${new Headers(init?.headers).get("authorization") ?? ""}`);
+      return Promise.resolve(new Response("{}", { status }));
+    };
+
+  it("trusts a launcher whose control channel answers with its token, without reading command lines", async () => {
+    const rec = record({ pid: process.ppid });
+    const seen: string[] = [];
+    const cmd = vi.fn(() => null);
+    expect(await findRunningLauncher(rec, { fetch: answering(200, seen), cmd })).toEqual(rec);
+    expect(seen).toEqual([`${rec.control.url}/status Bearer ${rec.control.token}`]);
+    expect(cmd).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the command line when the channel does not answer", async () => {
+    const rec = record({ pid: process.ppid });
+    const down: typeof fetch = () => Promise.reject(new Error("ECONNREFUSED"));
+    expect(
+      await findRunningLauncher(rec, { fetch: down, cmd: () => "node scripts/start.ts" }),
+    ).toEqual(rec);
+    expect(
+      await findRunningLauncher(rec, { fetch: answering(401), cmd: () => "vim notes.txt" }),
+    ).toBeNull();
+  });
+
+  it("ignores a dead pid and itself", async () => {
+    const fetchSpy = vi.fn(answering(200));
+    expect(await findRunningLauncher(record({ pid: 999_999_9 }), { fetch: fetchSpy })).toBeNull();
+    expect(await findRunningLauncher(record({ pid: process.pid }), { fetch: fetchSpy })).toBeNull();
+    expect(await findRunningLauncher(null)).toBeNull();
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("controlAnswers is false without a channel", async () => {
+    expect(await controlAnswers({ ...record(), control: { url: "", token: "" } })).toBe(false);
   });
 });
 

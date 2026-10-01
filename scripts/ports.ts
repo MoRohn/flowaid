@@ -52,6 +52,24 @@ export async function portIsFree(host: string, port: number): Promise<boolean> {
   return !heard.includes(true);
 }
 
+/**
+ * Waits until every port is free (processes that were just ended can hold theirs for a moment),
+ * polling every 200 ms; true when they all freed within `timeoutMs`.
+ */
+export async function waitForPortsFree(
+  host: string,
+  ports: readonly number[],
+  timeoutMs = 10_000,
+): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const free = await Promise.all(ports.map((p) => portIsFree(host, p)));
+    if (free.every(Boolean)) return true;
+    if (Date.now() >= deadline) return false;
+    await new Promise((r) => setTimeout(r, 200));
+  }
+}
+
 export interface PortRequest {
   /** The port wanted: a default, or what the user passed. */
   port: number;

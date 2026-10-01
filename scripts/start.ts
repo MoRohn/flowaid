@@ -66,12 +66,12 @@ import {
   endLeftovers,
   readInstance,
   removeInstance,
-  runningLauncher,
+  findRunningLauncher,
   writeInstance,
   type InstanceProcess,
   type InstanceRecord,
 } from "./instance.ts";
-import { DEFAULT_API_PORT, DEFAULT_WEB_PORT } from "./ports.ts";
+import { DEFAULT_API_PORT, DEFAULT_WEB_PORT, waitForPortsFree } from "./ports.ts";
 
 const HELP = `Usage: ./flowaid [options]   (or: pnpm start [options])
 
@@ -503,7 +503,7 @@ console.log(
 // One FlowAId per checkout: open the running one's window, or end what a crashed run left behind
 if (!opts.playground) {
   const previous = readInstance(INSTANCE);
-  const running = runningLauncher(previous);
+  const running = await findRunningLauncher(previous);
   if (running) {
     console.log(`\n${paint(32, "→")} FlowAId is already running at ${paint(1, running.webUrl)}`);
     if (opts.open !== false) {
@@ -523,7 +523,14 @@ if (!opts.playground) {
   }
   if (previous) {
     const ended = endLeftovers(previous);
-    if (ended.length > 0) warn(`stopped what an earlier FlowAId left running: ${ended.join(", ")}`);
+    if (ended.length > 0) {
+      warn(`stopped what an earlier FlowAId left running: ${ended.join(", ")}`);
+      // what was just ended can hold its ports for a moment: wait before checking them
+      const ports = [previous.webUrl, previous.apiUrl]
+        .map((u) => Number(new URL(u).port))
+        .filter((p) => Number.isInteger(p) && p > 0);
+      await waitForPortsFree(host, ports);
+    }
     removeInstance(INSTANCE);
   }
 }

@@ -2,7 +2,13 @@ import { createServer, type Server } from "node:net";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { DEFAULT_API_PORT, DEFAULT_WEB_PORT, choosePort, portIsFree } from "./ports.ts";
+import {
+  DEFAULT_API_PORT,
+  DEFAULT_WEB_PORT,
+  choosePort,
+  portIsFree,
+  waitForPortsFree,
+} from "./ports.ts";
 
 /** A fake port table: every port listed is taken. */
 const taken =
@@ -99,5 +105,16 @@ describe("portIsFree", () => {
     });
     if (port === 0) return; // no IPv6 on this machine
     expect(await portIsFree("127.0.0.1", port)).toBe(false);
+  });
+});
+
+describe("waitForPortsFree", () => {
+  it("returns once a busy port is released, and gives up at the deadline", async () => {
+    const server = createServer();
+    await new Promise<void>((r) => server.listen({ host: "127.0.0.1", port: 0 }, r));
+    const port = (server.address() as { port: number }).port;
+    expect(await waitForPortsFree("127.0.0.1", [port], 300)).toBe(false);
+    setTimeout(() => server.close(), 200);
+    expect(await waitForPortsFree("127.0.0.1", [port], 5000)).toBe(true);
   });
 });

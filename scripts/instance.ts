@@ -77,11 +77,52 @@ export function commandLine(pid: number, platform: string = process.platform): s
             "-Command",
             `(Get-CimInstance Win32_Process -Filter "ProcessId=${pid}").CommandLine`,
           ],
-          { encoding: "utf8", windowsHide: true },
+          // WMI can take tens of seconds on a busy machine: give up rather than hang a launch
+          { encoding: "utf8", windowsHide: true, timeout: COMMAND_LINE_TIMEOUT_MS },
         )
-      : spawnSync("ps", ["-o", "command=", "-p", String(pid)], { encoding: "utf8" });
+      : spawnSync("ps", ["-o", "command=", "-p", String(pid)], {
+          encoding: "utf8",
+          timeout: COMMAND_LINE_TIMEOUT_MS,
+        });
   const line = result.status === 0 ? result.stdout.trim() : "";
   return line ? line : null;
+}
+
+const COMMAND_LINE_TIMEOUT_MS = 15_000;
+
+/**
+ * Whether the record's control channel answers with its token: proof that the recorded process is
+ * a live FlowAId launcher (a reused pid cannot know the token), and fast on every platform.
+ */
+export async function controlAnswers(
+  rec: InstanceRecord,
+  fetchImpl: typeof fetch = fetch,
+): Promise<boolean> {
+  if (!rec.control?.url || !rec.control.token) return false;
+  try {
+    const res = await fetchImpl(`${rec.control.url}/status`, {
+      headers: { authorization: `Bearer ${rec.control.token}` },
+      signal: AbortSignal.timeout(3000),
+    });
+    await res.body?.cancel();
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The running launcher the record names, if any: its control channel answers first, and only
+ * when it does not (an older record, a launcher that is still starting) is the process's command
+ * line read, which on Windows means a slow WMI query.
+ */
+export async function findRunningLauncher(
+  rec: InstanceRecord | null,
+  o: { fetch?: typeof fetch; cmd?: (pid: number) => string | null } = {},
+): Promise<InstanceRecord | null> {
+  if (!rec || !isAlive(rec.pid) || rec.pid === process.pid) return null;
+  if (await controlAnswers(rec, o.fetch)) return rec;
+  return runningLauncher(rec, o.cmd);
 }
 
 /** The launcher named by the record, when it is still running (not a process that reused its pid). */
