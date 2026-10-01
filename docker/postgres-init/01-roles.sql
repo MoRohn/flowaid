@@ -23,6 +23,12 @@ WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'flowaid_app') \gexec
 SELECT format('CREATE ROLE flowaid_code LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT CONNECTION LIMIT 32 PASSWORD %L', :'code_password')
 WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'flowaid_code') \gexec
 
+-- Only members of this NOLOGIN role may lift row-level security with app.bypass_rls
+-- (migrations/0012_rls_bypass_role.sql). The api and worker are; the sandbox host never is.
+SELECT 'CREATE ROLE flowaid_rls_bypass NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT'
+WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'flowaid_rls_bypass') \gexec
+GRANT flowaid_rls_bypass TO flowaid_app;
+
 -- Rotations: re-running with a new POSTGRES_*_PASSWORD only applies to a fresh volume; change
 -- an existing password with ALTER ROLE ... PASSWORD (or wipe the volume).
 

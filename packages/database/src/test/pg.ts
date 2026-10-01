@@ -38,6 +38,12 @@ async function ensureRoles(admin: Sql): Promise<void> {
         `${verb} ROLE ${role} LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE PASSWORD '${password}'`,
       );
     }
+    // The owner has no CREATEROLE, so the bypass role of 0012_rls_bypass_role.sql is prepared
+    // here, as docker/postgres-init/01-roles.sql does in the compose stack.
+    const bypass = await tx`select 1 from pg_roles where rolname = 'flowaid_rls_bypass'`;
+    if (!bypass.length) await tx.unsafe(`CREATE ROLE flowaid_rls_bypass NOLOGIN NOINHERIT`);
+    await tx.unsafe(`GRANT flowaid_rls_bypass TO flowaid_app, flowaid_owner`);
+    await tx.unsafe(`REVOKE flowaid_rls_bypass FROM flowaid_code`);
   });
 }
 
