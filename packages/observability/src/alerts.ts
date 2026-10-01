@@ -2,7 +2,7 @@
  * Observability alerts (ARCHITECTURE.md §10.5, UPGRADE_PLAN P6-04): the workspace's notification
  * channels (`notifications` rows: `email`, `slack_webhook`, `webhook`) receive alerts for the
  * events they subscribe to — `human_task.created`, `run.failed`, `trace_review.page`,
- * `schedule.failed`, `webhook.rejected`.
+ * `schedule.failed`, `webhook.rejected`, `budget.warning`, `budget.exceeded`.
  *
  * `AlertDispatcher` is storage-agnostic: the app injects how channels are listed, how a delivery
  * is claimed (a unique `(channel, key)` so a retried job or a second worker never sends twice)
@@ -20,6 +20,8 @@ export const ALERT_EVENTS = [
   "trace_review.page",
   "schedule.failed",
   "webhook.rejected",
+  "budget.warning",
+  "budget.exceeded",
 ] as const;
 export type AlertEvent = (typeof ALERT_EVENTS)[number];
 
@@ -405,4 +407,43 @@ export class AlertDispatcher {
     }
     return result;
   }
+}
+
+// ─── budget ─────────────────────────────────────────────────────────────────────────────────
+
+/** The share of the monthly budget at which `budget.warning` goes out. */
+export const BUDGET_WARNING_RATIO = 0.8;
+
+/**
+ * The budget alert this month's spend calls for, or null: `budget.exceeded` once the spend
+ * reaches the budget, `budget.warning` from 80 %. The key names the workspace, event and month, so
+ * the dispatcher's `(channel, key)` claim sends each one at most once per month.
+ */
+export function budgetAlert(
+  workspaceId: string,
+  s: { month: string; spentUsd: number; monthlyCostUsd: number | null },
+  url?: string,
+): { key: string; message: AlertMessage } | null {
+  const budget = s.monthlyCostUsd;
+  if (budget === null || budget <= 0) return null;
+  const ratio = s.spentUsd / budget;
+  if (ratio < BUDGET_WARNING_RATIO) return null;
+  const exceeded = ratio >= 1;
+  const event = exceeded ? "budget.exceeded" : "budget.warning";
+  const usd = (n: number) => `$${n.toFixed(2)}`;
+  return {
+    key: `${event}:${workspaceId}:${s.month}`,
+    message: {
+      event,
+      severity: exceeded ? "critical" : "warning",
+      title: exceeded
+        ? `Monthly budget reached (${s.month})`
+        : `${Math.floor(ratio * 100)}% of the monthly budget spent (${s.month})`,
+      text: exceeded
+        ? `Runs have cost ${usd(s.spentUsd)} this month against a budget of ${usd(budget)}. New runs are refused until next month or until the budget is raised; runs already going finish.`
+        : `Runs have cost ${usd(s.spentUsd)} this month against a budget of ${usd(budget)}. New runs are refused once it is reached.`,
+      ...(url ? { url } : {}),
+      data: { month: s.month, spentUsd: s.spentUsd, monthlyCostUsd: budget },
+    },
+  };
 }

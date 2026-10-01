@@ -14,6 +14,7 @@ import {
   RUN_EVENTS_CHANNEL,
   environments,
   runs,
+  budgetStatusIfSet,
   workspaces,
   workflowDeployments,
   workflowVersions,
@@ -78,7 +79,12 @@ import {
   readDelegatedResult,
 } from "./delegation.js";
 import { runTraceReviewJob, wantsReview } from "./jobs/traceReview.js";
-import { recordRunMetrics, type AlertDispatcher, type Instruments } from "@flowaid/observability";
+import {
+  budgetAlert,
+  recordRunMetrics,
+  type AlertDispatcher,
+  type Instruments,
+} from "@flowaid/observability";
 import { runIngestJob } from "./jobs/ingest.js";
 import {
   isMaintenanceJob,
@@ -386,6 +392,16 @@ export function createWorker(deps: WorkerDeps): Worker {
           nodeId: run.error?.nodeId ?? null,
         },
       });
+    }
+    // a run that cost something may have crossed 80 % or 100 % of the monthly budget; the alert
+    // key names the month, so each goes out once per month and channel
+    if (deps.alerts && run.costUsd > 0) {
+      const status = await deps.db.system((tx) =>
+        budgetStatusIfSet(tx, run.workspaceId, new Date(run.createdAt)),
+      );
+      const url = link(slug, "settings?tab=workspace");
+      const alert = status ? budgetAlert(run.workspaceId, status, url) : null;
+      if (alert) await deps.alerts.dispatch(run.workspaceId, alert.key, alert.message);
     }
     if (await wantsReview(deps.db, run))
       await deps.queue.enqueue(

@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { describeDb } from "@flowaid/database/testing";
-import { notifications } from "@flowaid/database";
+import { notifications, workspaces } from "@flowaid/database";
+import { eq } from "drizzle-orm";
 import { uuidv7 } from "@flowaid/shared";
 import { createAlertDispatcher } from "./services/alerts.js";
 import { createHarness, type Harness } from "./test/setup.js";
@@ -120,5 +121,67 @@ describeDb("workspace alerts from the worker reach subscribed, enabled channels 
       title: expect.stringMatching(/^Run failed in /),
       text: expect.stringContaining("one is not greater than two"),
     });
+  });
+  it("sends budget.exceeded once a month when finished runs reach the monthly budget", async () => {
+    await h.db.app.system(async (tx) => {
+      await tx.insert(notifications).values({
+        id: uuidv7(),
+        workspaceId: h.workspaceId,
+        kind: "webhook",
+        name: "finance",
+        config: { url: "https://hooks.example.com/finance" },
+        events: ["budget.warning", "budget.exceeded"],
+      });
+      // one decision of the fake provider costs $0.00002: the first run reaches the budget
+      await tx
+        .update(workspaces)
+        .set({ settings: { budgets: { monthlyCostUsd: 0.00002 } } })
+        .where(eq(workspaces.id, h.workspaceId));
+    });
+    const judge = await h.deploy("Costs", {
+      inputs: { type: "object", properties: { message: { type: "string" } } },
+      outputs: { type: "object", properties: { urgent: {} } },
+      secrets: [{ name: "TYPESAFE_API_KEY", credentialType: "typesafe.api_key", required: false }],
+      nodes: [
+        { id: "start", kind: "input", name: "Input" },
+        {
+          id: "judge",
+          kind: "task",
+          type: "flowaid.decision.boolean",
+          typeVersion: "1.0.0",
+          name: "Urgent?",
+          config: { instructions: "Is this message urgent?" },
+          inputs: { state: ref("start", "message") },
+          credentials: { typesafe: "TYPESAFE_API_KEY" },
+        },
+        {
+          id: "done",
+          kind: "output",
+          name: "Done",
+          value: { kind: "object", fields: { urgent: ref("judge", "decision", "/value") } },
+        },
+      ],
+    });
+    try {
+      for (const message of ["one", "two"]) {
+        const id = await h.start(judge.workflowId, judge.versionId, { message });
+        expect((await h.waitFor(id, ["completed", "failed"])).status).toBe("completed");
+      }
+      const finance = () => delivered.filter((d) => d.url === "https://hooks.example.com/finance");
+      const deadline = Date.now() + 5_000;
+      while (finance().length < 1 && Date.now() < deadline)
+        await new Promise((r) => setTimeout(r, 50));
+      await new Promise((r) => setTimeout(r, 300));
+      expect(finance().map((d) => d.body.event)).toEqual(["budget.exceeded"]);
+      expect(finance()[0]?.body).toMatchObject({
+        severity: "critical",
+        title: expect.stringMatching(/^Monthly budget reached \(\d{4}-\d{2}\)$/),
+        url: expect.stringMatching(/\/settings\?tab=workspace$/),
+      });
+    } finally {
+      await h.db.app.system((tx) =>
+        tx.update(workspaces).set({ settings: {} }).where(eq(workspaces.id, h.workspaceId)),
+      );
+    }
   });
 });

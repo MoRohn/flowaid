@@ -1,7 +1,8 @@
 /**
  * Starting runs (API.md §4): validate the input against the plan (400, nothing created), resolve
  * the version (pinned, the environment's deployment, or the compiled draft as a deduplicated draft
- * version), check required secret bindings (422 E_SECRET_UNBOUND), apply backpressure (429),
+ * version), check required secret bindings (422 E_SECRET_UNBOUND; a server key for the secret's
+ * type counts), refuse once the monthly budget is spent (409), apply backpressure (429),
  * honour `Idempotency-Key` (same body → the same run, different body → 409), write the run and
  * `RUN_CREATED` in one transaction, then enqueue `run.start`.
  */
@@ -41,6 +42,7 @@ import {
 import { assertEnvironmentAllowed, type Principal } from "../auth/principal.js";
 import type { ApiContext } from "../context.js";
 import { catalogSnapshot, compileIn } from "./compile.js";
+import { assertWithinBudget } from "./budget.js";
 import { serverCredentialTypes, unboundRequiredSecrets } from "./serverKeys.js";
 import { visibleWorkflow } from "./workflows.js";
 
@@ -237,6 +239,13 @@ export async function startRun(
       .select({ settings: workspaces.settings })
       .from(workspaces)
       .where(eq(workspaces.id, p.workspaceId));
+    // the monthly budget: refused once this month's spend reaches it (runs in flight continue)
+    await assertWithinBudget(
+      ctx,
+      tx,
+      { id: p.workspaceId, slug: p.workspaceSlug },
+      ws?.settings ?? {},
+    );
     const maxQueued = Number((ws?.settings as JsonObject | undefined)?.maxQueuedRuns ?? 1000);
     const [{ n } = { n: 0 }] = await tx
       .select({ n: count() })

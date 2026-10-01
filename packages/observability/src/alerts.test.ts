@@ -2,6 +2,7 @@ import { createServer, type Server } from "node:net";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   AlertDispatcher,
+  budgetAlert,
   channelSecret,
   sendAlert,
   sendMail,
@@ -233,5 +234,36 @@ describe("envelopeAddress", () => {
       "notifications@example.com",
     );
     expect(envelopeAddress("alerts@example.com")).toBe("alerts@example.com");
+  });
+});
+
+describe("budgetAlert", () => {
+  const at = (spentUsd: number, monthlyCostUsd: number | null = 100) => ({
+    month: "2030-03",
+    spentUsd,
+    monthlyCostUsd,
+  });
+  it("is quiet below 80 % and without a budget", () => {
+    expect(budgetAlert("ws", at(79.99))).toBeNull();
+    expect(budgetAlert("ws", at(500, null))).toBeNull();
+  });
+  it("warns from 80 % and reports the budget used up from 100 %, keyed once per month", () => {
+    expect(budgetAlert("ws", at(80), "https://x/settings")).toMatchObject({
+      key: "budget.warning:ws:2030-03",
+      message: {
+        event: "budget.warning",
+        severity: "warning",
+        title: "80% of the monthly budget spent (2030-03)",
+        url: "https://x/settings",
+        data: { month: "2030-03", spentUsd: 80, monthlyCostUsd: 100 },
+      },
+    });
+    expect(budgetAlert("ws", at(100))).toMatchObject({
+      key: "budget.exceeded:ws:2030-03",
+      message: { event: "budget.exceeded", severity: "critical" },
+    });
+    expect(budgetAlert("ws", { ...at(100), month: "2030-04" })?.key).toBe(
+      "budget.exceeded:ws:2030-04",
+    );
   });
 });

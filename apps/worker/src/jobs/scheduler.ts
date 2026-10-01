@@ -3,7 +3,7 @@
  * LOCKED` (so replicas never fire one twice), starts a run per fire (origin `schedule`,
  * idempotency key `schedule:<id>:<fireAt>`), honours `overlap` (skip while the last run is still
  * active), `catch_up` (skip / one / all up to `max_catch_up`) and `jitter_ms`, and records
- * `last_error` when a fire cannot start.
+ * `last_error` when a fire cannot start (including when the workspace's monthly budget is spent).
  */
 import { Cron } from "croner";
 import { and, eq, inArray, lte } from "drizzle-orm";
@@ -13,11 +13,12 @@ import {
   schedules,
   workflowDeployments,
   workflowVersions,
+  budgetStatusIfSet,
   type Database,
   type Tx,
 } from "@flowaid/database";
 import { uuidv7 } from "@flowaid/shared";
-import type { QueueDriver, Run } from "@flowaid/workflow-core";
+import { BudgetExceededError, type QueueDriver, type Run } from "@flowaid/workflow-core";
 
 const ACTIVE: Run["status"][] = [
   "queued",
@@ -84,6 +85,10 @@ async function planScheduledRun(
       ),
     );
   if (!dep) throw new Error("the workflow is not deployed to this schedule's environment");
+  // the monthly budget: a fire is refused (recorded as last_error, schedule.failed) once it is spent
+  const budget = await budgetStatusIfSet(tx, s.workspaceId, (o.now ?? (() => new Date()))());
+  if (budget?.reached && budget.monthlyCostUsd !== null)
+    throw new BudgetExceededError(budget.month, budget.spentUsd, budget.monthlyCostUsd);
   const key = `schedule:${s.id}:${fireAt.toISOString()}`;
   const [existing] = await tx
     .select({ id: runs.id })

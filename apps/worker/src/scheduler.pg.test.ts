@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { describeDb } from "@flowaid/database/testing";
-import { runs, schedules } from "@flowaid/database";
+import { runs, schedules, workspaces } from "@flowaid/database";
 import { uuidv7 } from "@flowaid/shared";
 import { eq } from "drizzle-orm";
 import { dueFires, tickSchedules } from "./jobs/scheduler.js";
@@ -122,5 +122,54 @@ describeDb("scheduler (Postgres)", () => {
       tx.select().from(schedules).where(eq(schedules.id, scheduleId)),
     );
     expect(row?.lastError).toMatch(/not deployed/);
+  });
+  it("refuses a fire once the workspace's monthly budget is spent", async () => {
+    const { workflowId, versionId } = await h.deploy("Over budget", {
+      inputs: { type: "object", properties: {} },
+      outputs: { type: "object", properties: {} },
+      nodes: [
+        { id: "start", kind: "input", name: "Input" },
+        { id: "done", kind: "output", name: "Done", value: { kind: "object", fields: {} } },
+      ],
+    });
+    const earlier = await h.start(workflowId, versionId, {});
+    await h.waitFor(earlier, ["completed", "failed"]);
+    await h.db.app.system(async (tx) => {
+      await tx.update(runs).set({ costUsd: "2" }).where(eq(runs.id, earlier));
+      await tx
+        .update(workspaces)
+        .set({ settings: { budgets: { monthlyCostUsd: 2 } } })
+        .where(eq(workspaces.id, h.workspaceId));
+    });
+    const scheduleId = uuidv7();
+    await h.db.app.system((tx) =>
+      tx.insert(schedules).values({
+        id: scheduleId,
+        workspaceId: h.workspaceId,
+        workflowId,
+        environmentId: h.environmentId,
+        cron: "0 3 * * *",
+        nextRunAt: new Date(Date.now() - 1000),
+      }),
+    );
+    const failed: string[] = [];
+    try {
+      expect(
+        await tickSchedules({
+          db: h.db.app,
+          queue: h.queue,
+          onFailed: (f) => failed.push(f.error),
+        }),
+      ).toEqual([]);
+      const [row] = await h.db.app.system((tx) =>
+        tx.select().from(schedules).where(eq(schedules.id, scheduleId)),
+      );
+      expect(row?.lastError).toMatch(/monthly budget of \$2\.00 is used up/);
+      expect(failed).toHaveLength(1);
+    } finally {
+      await h.db.app.system((tx) =>
+        tx.update(workspaces).set({ settings: {} }).where(eq(workspaces.id, h.workspaceId)),
+      );
+    }
   });
 });

@@ -54,13 +54,15 @@ function WorkspaceIntro() {
             id: "budget",
             label: `Monthly budget: $${budget}`,
             state: "ok",
-            detail: "The workflow advisor compares each workflow's cost per run with it.",
+            detail:
+              "New runs are refused once this month's spend reaches it; the workflow advisor compares each workflow's cost per run with it.",
           }
         : {
             id: "budget",
             label: "No monthly budget",
             state: "optional",
-            detail: "Without one the advisor cannot say whether a workflow's cost fits.",
+            detail:
+              "Without one runs are never refused for cost, and the advisor cannot say whether a workflow's cost fits.",
           },
     ...(s.can("admin") ? [] : [role("Your role can see these settings but not change them")]),
   ];

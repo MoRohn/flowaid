@@ -131,6 +131,13 @@ export interface Workspace {
   settings: Record<string, unknown>;
   createdAt: string;
 }
+/** `GET /v1/workspaces/:id/budget`: this calendar month's (UTC) run spend against the budget. */
+export interface WorkspaceBudget {
+  month: string;
+  spentUsd: number;
+  monthlyCostUsd: number | null;
+  reached: boolean;
+}
 export interface WorkspaceSettings {
   retention?: { runsDays?: number; auditDays?: number; artifactsDays?: number };
   maxQueuedRuns?: number;
@@ -216,7 +223,9 @@ export type NotificationEvent =
   | "run.failed"
   | "trace_review.page"
   | "schedule.failed"
-  | "webhook.rejected";
+  | "webhook.rejected"
+  | "budget.warning"
+  | "budget.exceeded";
 
 export interface NotificationChannel {
   id: string;
