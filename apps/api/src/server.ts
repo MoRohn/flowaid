@@ -10,7 +10,7 @@ import helmet from "@fastify/helmet";
 import { serializerCompiler, validatorCompiler } from "fastify-type-provider-zod";
 import { uuidv7 } from "@flowaid/shared";
 import type { ApiContext } from "./context.js";
-import { registerAudit } from "./plugins/audit.js";
+import { registerAudit, type AuditCompletion } from "./plugins/audit.js";
 import { registerAuth } from "./plugins/auth.js";
 import { registerErrorHandling } from "./plugins/errors.js";
 import { registerRouteGuard } from "./plugins/guard.js";
@@ -50,6 +50,8 @@ export interface BuildOptions {
   logger?: FastifyServerOptions["logger"];
   /** extra route modules (later slices, tests) */
   routes?: ((app: FastifyInstance, ctx: ApiContext) => void)[];
+  /** completes audit rows when the response is known (tests simulate a crash after commit) */
+  auditCompletion?: AuditCompletion;
 }
 
 export async function buildServer(ctx: ApiContext, o: BuildOptions = {}): Promise<FastifyInstance> {
@@ -105,7 +107,7 @@ export async function buildServer(ctx: ApiContext, o: BuildOptions = {}): Promis
   registerRouteGuard(app);
   registerAuth(app, ctx);
   await registerRateLimit(app, ctx);
-  registerAudit(app, ctx);
+  registerAudit(app, ctx, o.auditCompletion);
   await registerOpenApi(app);
 
   healthRoutes(app, ctx);
