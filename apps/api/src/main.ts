@@ -6,6 +6,7 @@
 import { PgEventBus, PgQueueDriver, createDatabaseFromEnv, migrate } from "@flowaid/database";
 import { BullMqQueueDriver, RedisEventBus } from "@flowaid/workflow-runtime";
 import { RunEventHub } from "./services/hub.js";
+import { RedisLimitStore } from "./services/limits.js";
 import {
   createCredentialService,
   externalFromEnv,
@@ -57,6 +58,8 @@ async function main(): Promise<void> {
     : new PgQueueDriver(db.sql);
   const commits = new PgEventBus(db.sql);
   const bus = redisUrl ? new RedisEventBus(redisUrl) : commits;
+  // rate limits, login throttles and webhook replays are shared by every replica in Redis (P3-3)
+  const limits = redisUrl ? RedisLimitStore.connect(redisUrl) : null;
   // commit notices always come from Postgres (sent with the append transaction)
   const hub = new RunEventHub(bus, commits);
   const credentials = await createCredentialService(
@@ -94,6 +97,7 @@ async function main(): Promise<void> {
         ),
     }),
     ...(smtp ? { smtp } : {}),
+    ...(limits ? { limits } : {}),
     // a publish nobody listens to proves Redis answers (/v1/ready bounds the wait)
     ...(redisUrl ? { pingRedis: () => bus.publish("ready.ping", null) } : {}),
   };
@@ -131,6 +135,7 @@ async function main(): Promise<void> {
     await app.close();
     await hub.close();
     await queue.close();
+    await limits?.close();
     await db.close();
     await metricsListener?.close();
     await telemetry.shutdown().catch(() => undefined);

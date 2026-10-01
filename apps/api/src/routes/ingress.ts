@@ -35,7 +35,7 @@ import {
   type JsonValue,
 } from "@flowaid/workflow-core";
 import type { Principal } from "../auth/principal.js";
-import type { ApiContext } from "../context.js";
+import { limitStore, type ApiContext } from "../context.js";
 import { envelope } from "../plugins/errors.js";
 import { startRun, waitForRun } from "../services/runs.js";
 
@@ -57,21 +57,6 @@ export function signWebhook(secret: string, body: Buffer, timestamp?: string): s
   return `sha256=${mac.digest("hex")}`;
 }
 
-class ReplayCache {
-  private readonly seen = new Map<string, number>();
-  constructor(private readonly now: () => number) {}
-  /** false when the key was seen within the TTL */
-  add(key: string): boolean {
-    const t = this.now();
-    if (this.seen.size > 50_000)
-      for (const [k, exp] of this.seen) if (exp <= t) this.seen.delete(k);
-    const exp = this.seen.get(key);
-    if (exp !== undefined && exp > t) return false;
-    this.seen.set(key, t + REPLAY_TTL_MS);
-    return true;
-  }
-}
-
 function webhookPrincipal(w: typeof webhooks.$inferSelect, slug: string): Principal {
   return {
     type: "webhook",
@@ -87,7 +72,8 @@ function webhookPrincipal(w: typeof webhooks.$inferSelect, slug: string): Princi
 }
 
 export function ingressRoutes(app: FastifyInstance, ctx: ApiContext): void {
-  const replays = new ReplayCache(() => ctx.clock.now());
+  // Each signature is accepted once across every api replica (Redis with REDIS_URL, P3-3).
+  const replays = limitStore(ctx);
 
   void app.register((scope, _opts, done) => {
     // Raw bytes for signature checks; parsing happens after verification.
@@ -193,7 +179,8 @@ export function ingressRoutes(app: FastifyInstance, ctx: ApiContext): void {
             } else if (w.requireTimestamp) return reject("missing X-Timestamp");
             const expected = signWebhook(secret, raw, typeof ts === "string" ? ts : undefined);
             if (!safeEqual(given, expected)) return reject("bad signature");
-            if (!replays.add(`webhook:${w.id}:${createHash("sha256").update(given).digest("hex")}`))
+            const signature = createHash("sha256").update(given).digest("hex");
+            if (!(await replays.claimOnce(`replay:webhook:${w.id}:${signature}`, REPLAY_TTL_MS)))
               return reject("replayed signature");
           }
         }
