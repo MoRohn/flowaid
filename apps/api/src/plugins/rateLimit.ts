@@ -1,8 +1,9 @@
 /**
  * Per-principal rate limits (API.md §1): session 600/min, API key 1 200/min (or its own), public by
  * IP. With `REDIS_URL` the counters live in Redis (P3-3), so the limits hold across api replicas;
- * a Redis error lets the request through (logged) rather than failing every request, while the
- * login throttles and the webhook replay cache fail closed.
+ * a Redis error lets the request through rather than failing every request (ioredis reports the
+ * connection error, and /v1/ready turns unavailable), while the login throttles and the webhook
+ * replay cache fail closed.
  */
 import type { FastifyInstance } from "fastify";
 import rateLimit from "@fastify/rate-limit";
