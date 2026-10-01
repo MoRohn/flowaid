@@ -40,8 +40,6 @@ only an explicitly labelled button does. No cost or quality estimates without re
 ## Known gaps (backend)
 
 - Evaluation judge checks always fail: the worker is not given a judge provider.
-- `POST /v1/workflows/:id/publish` with `deployTo` does not check required secrets (the dialog
-  blocks it client-side); `PUT /deployments/:env` does.
 - An MCP exposure is switched off by the next deploy of its workflow unless the version declares
   an MCP trigger, which the builder cannot add; there is no endpoint to re-enable it.
 - stdio MCP servers are never tested or discovered, so their tools never reach the catalog; a

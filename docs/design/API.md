@@ -282,7 +282,7 @@ export const RunCompletedSchema = z.object({
 });
 ```
 
-Flow: validate `input` against `plan.inputs` with ajv (400, no run created) → resolve version (deployment for the environment, or `versionId`, or compile the draft into a `kind='draft'` version deduplicated by `planHash`) → check every required secret is bound for the environment (422 `E_SECRET_UNBOUND` with the list) → backpressure check (429) → insert `runs` + `RUN_CREATED` in one transaction → enqueue `run.start` → respond:
+Flow: validate `input` against `plan.inputs` with ajv (400, no run created) → resolve version (deployment for the environment, or `versionId`, or compile the draft into a `kind='draft'` version deduplicated by `planHash`) → check every required secret is bound for the environment or answered by a key the server has for its `credentialType` (`TYPESAFE_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `OLLAMA_HOST`; the same keys `GET /v1/providers` reports as `configuredOnServer`) (422 `E_SECRET_UNBOUND` with the list; deploys, including publish with `deployTo`, check the same) → backpressure check (429) → insert `runs` + `RUN_CREATED` in one transaction → enqueue `run.start` → respond:
 
 | mode                  | outcome                          | response                                                                                                                                                            |
 | --------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

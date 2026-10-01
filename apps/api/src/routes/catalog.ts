@@ -26,6 +26,7 @@ import {
 } from "../dto/catalog.js";
 import { visibleWorkflow } from "../services/workflows.js";
 import { loadEnabledPlugins } from "../services/plugins.js";
+import { serverProviders } from "../services/serverKeys.js";
 
 const CORE_HASH = createHash("sha256").update(JSON.stringify(coreManifests)).digest("base64url");
 
@@ -234,16 +235,10 @@ export function catalogRoutes(app: FastifyInstance, ctx: ApiContext): void {
       },
     },
     () => {
-      const flags = ctx.env?.flags;
       const byProvider = new Map<string, number>();
       for (const m of models.list())
         byProvider.set(m.provider, (byProvider.get(m.provider) ?? 0) + 1);
-      const configured: Record<string, boolean> = {
-        typesafe: flags?.hasTypeSafe ?? false,
-        openai: flags?.hasOpenAI ?? false,
-        anthropic: flags?.hasAnthropic ?? false,
-        ollama: flags?.hasOllama ?? false,
-      };
+      const configured = serverProviders(ctx.env);
       return [...byProvider].map(([id, modelCount]) => ({
         id,
         models: modelCount,

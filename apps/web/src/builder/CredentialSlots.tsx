@@ -180,8 +180,9 @@ export function CredentialSlots({
         onClose={() => setDeclaring(null)}
         onDeclare={(slot, name, credentialType) => {
           store.getState().updateDefinition((d) => {
-            // runs refuse to start while a required secret is unbound; the server's own key only
-            // answers for an optional one, so a key the server has is declared optional
+            // a key the server has (or none needed) is declared optional: the step runs on the
+            // server key, or on a credential bound later, and removing the server key does not
+            // block deploys of a workflow that can still bind one
             const fallback = keySource(credentialType, sources).kind;
             if (!d.secrets.some((x) => x.name === name))
               d.secrets.push({

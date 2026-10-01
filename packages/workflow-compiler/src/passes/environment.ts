@@ -144,9 +144,12 @@ export function environmentPass(ctx: CompileContext): void {
 
   if (options.boundSecrets) {
     const bound = options.boundSecrets;
+    const served = options.serverCredentialTypes;
     definition.secrets.forEach((secret, i) => {
       if (!ctx.usedSecrets.has(secret.name) || bound.has(secret.name)) return;
       if (!secret.required) return;
+      // the server's own key for this type answers a run when no binding does
+      if (served?.has(secret.credentialType)) return;
       diagnostics.add(
         publish ? "E_SECRET_UNBOUND" : "W_SECRET_UNBOUND",
         `Secret '${secret.name}' is not bound to a credential in this environment`,

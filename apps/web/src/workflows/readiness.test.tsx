@@ -28,6 +28,16 @@ describe("secretChecks", () => {
     expect(checks[1]?.label).toBe("prod: OPENAI_KEY not bound");
   });
 
+  it("counts a required secret the server has a key for as ready", () => {
+    const checks = secretChecks(
+      [{ name: "TS", required: true, credentialType: "typesafe.api_key" }],
+      envs,
+      () => ({}),
+      { ...opts, served: new Set(["typesafe.api_key"]) },
+    );
+    expect(checks.map((c) => c.state)).toEqual(["ok", "ok"]);
+  });
+
   it("shows unknown bindings as checking while they load, and leaves them out after", () => {
     const declared = [{ name: "OPENAI_KEY", required: true }];
     expect(

@@ -81,13 +81,6 @@ compiled API, worker and Docker images run plain `node` on `dist`.
 - V2's open items (live-model evaluation of Ask FlowAId, browser specs for the insights panels
   and the assistant, dashboard filters in the URL, the P2-6 and P3 refactors, a manual
   screen-reader pass) are listed in [project/FLOWAID_V2_FINAL_AUDIT.md](project/FLOWAID_V2_FINAL_AUDIT.md).
-- A run does not start while a workflow's _required_ secret is unbound in its environment, even
-  when the server has that provider's key (`apps/api/src/services/runs.ts`, `E_SECRET_UNBOUND`);
-  the worker falls back to the server key only for optional secrets. So the built-in templates,
-  which declare `TYPESAFE_API_KEY` as required, need the key saved as a credential and bound per
-  environment. The Message triage starter declares it optional, and keys added from the builder
-  are optional when the server has the key. The smallest backend change: let the run-start check
-  accept an unbound required secret whose `credentialType` the server has a key for.
 - Workspace retention settings (`settings.retention.runsDays` / `auditDays` / `artifactsDays`) are
   saved but not read: the retention sweep (`packages/database/src/retention.ts`) uses the per-class
   `RETENTION_DAYS` (standard 90, short 7, long 400). `settings.budgets.monthlyCostUsd` is read only

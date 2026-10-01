@@ -34,13 +34,23 @@ describe("templateNeeds", () => {
     ]);
   });
 
-  it("a required secret needs a bound credential even when the server has the key", () => {
-    const [need] = templateNeeds(
+  it("a required secret runs on the server's key too", () => {
+    const needs = templateNeeds(
       row({ requiredSecrets: [{ name: "TYPESAFE_API_KEY", credentialType: "typesafe.api_key" }] }),
       have,
     );
+    expect(needs).toEqual([
+      { label: "TypeSafe API key", ready: true, detail: "uses the key set on this server" },
+    ]);
+  });
+
+  it("a required secret the server has no key for needs a credential or a server key", () => {
+    const [need] = templateNeeds(
+      row({ requiredSecrets: [{ name: "OPENAI_API_KEY", credentialType: "openai.api_key" }] }),
+      { ...have, keys: { server: {}, saved: [] } },
+    );
     expect(need?.ready).toBe(false);
-    expect(need?.detail).toMatch(/not used for a required secret/);
+    expect(need?.detail).toMatch(/or set the key in the server's environment/);
   });
 
   it("lists MCP servers and documents the workspace does not have yet", () => {

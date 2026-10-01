@@ -34,10 +34,17 @@ export class RunCredentialCache {
   }
 }
 
+/**
+ * A node's credential slots: the credential bound to the slot's secret in the run's environment,
+ * else the server's own key for the secret's credential type (the same fallback providers use, and
+ * the reason a run starts with a required secret unbound when the server has its key).
+ */
 export function credentialAccessFor(
   call: ExecutionCall,
   repo: CredentialRepository,
   cache: RunCredentialCache,
+  plan?: ExecutionPlan,
+  keys: ServerKeys = {},
 ): CredentialAccess {
   const op = call.node.op;
   const slots = op.kind === "task" ? op.credentials : {};
@@ -48,11 +55,15 @@ export function credentialAccessFor(
       if (!secret)
         throw new CredentialError(`credential slot '${slot}' is not bound in this workflow`);
       const credentialId = await repo.resolveBinding(call.workflowId, call.environmentId, secret);
-      if (!credentialId)
-        throw new CredentialError(
-          `secret ${secret} is not bound in environment ${call.environment}`,
-        );
-      return cache.for(call.runId).get(credentialId);
+      if (credentialId) return cache.for(call.runId).get(credentialId);
+      const type = plan?.secrets.find((s) => s.name === secret)?.credentialType;
+      const fallback = type ? serverKeyCredential(type, keys) : undefined;
+      if (fallback) return { ...fallback };
+      throw new CredentialError(
+        `secret ${secret} is not bound in environment ${call.environment}${
+          type ? ` and the server has no key for ${type}` : ""
+        }`,
+      );
     },
   };
 }

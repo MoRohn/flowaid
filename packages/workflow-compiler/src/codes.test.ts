@@ -679,6 +679,24 @@ describe("diagnostic codes", () => {
   });
 });
 
+describe("unbound secrets the server has a key for", () => {
+  const unbound = (serverCredentialTypes?: ReadonlySet<string>) =>
+    compile(clone(), {
+      catalog: catalogOf(FIXTURE_MANIFESTS),
+      level: "publish",
+      boundSecrets: new Set(),
+      ...(serverCredentialTypes ? { serverCredentialTypes } : {}),
+    })
+      .diagnostics.filter((d) => d.code === "E_SECRET_UNBOUND")
+      .map((d) => d.location.path);
+
+  it("count a required secret as bound when the server serves its credential type", () => {
+    expect(unbound()).toEqual(["/secrets/0", "/secrets/1"]);
+    expect(unbound(new Set(["typesafe.api_key"]))).toEqual(["/secrets/1"]);
+    expect(unbound(new Set(["typesafe.api_key", "openai.api_key"]))).toEqual([]);
+  });
+});
+
 describe("controlPortsFromConfig with an unset field", () => {
   const routes = (ports: Doc) =>
     manifestLike("flowaid.test.routes", {

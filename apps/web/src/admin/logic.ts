@@ -221,12 +221,24 @@ export function credentialsForSecret(
   );
 }
 
-/** Required secrets with no binding: they block a deploy to that environment. */
+/**
+ * Required secrets with no binding that no server key answers: they block a deploy to that
+ * environment and a run there. `served` are the credential types the server has its own key for
+ * (`serverCredentialTypes`); a secret of such a type runs on that key when nothing is bound.
+ */
 export function missingRequiredSecrets(
-  declared: readonly { name: string; required?: boolean }[],
+  declared: readonly { name: string; required?: boolean; credentialType?: string }[],
   bound: Record<string, string>,
+  served: ReadonlySet<string> = new Set(),
 ): string[] {
-  return declared.filter((d) => d.required !== false && !bound[d.name]).map((d) => d.name);
+  return declared
+    .filter(
+      (d) =>
+        d.required !== false &&
+        !bound[d.name] &&
+        !(d.credentialType !== undefined && served.has(d.credentialType)),
+    )
+    .map((d) => d.name);
 }
 
 // ── versions ────────────────────────────────────────────────────────────────────────────────

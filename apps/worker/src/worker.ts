@@ -235,6 +235,12 @@ export function createWorker(deps: WorkerDeps): Worker {
   const plans = new Map<string, ExecutionPlan>();
   const registry = new NodeRegistry([...(deps.nodes ?? [coreNodes])]);
   const serverKeys = deps.serverKeys ?? {};
+  // server keys reach nodes and providers like decrypted credentials: never into events or logs
+  deps.credentials.redactor.learn(
+    [serverKeys.typesafe, serverKeys.openai, serverKeys.anthropic].filter(
+      (v): v is string => typeof v === "string",
+    ),
+  );
   const pools = new Set<WorkerPool>(deps.pools ?? ALL_POOLS);
   const localPools = new Set([...pools].filter((p) => p !== "general"));
   const storage = deps.storage ?? artifactStorage(new LocalArtifactStore(deps.artifactsDir));
@@ -262,7 +268,8 @@ export function createWorker(deps: WorkerDeps): Worker {
   };
 
   const services: NodeServices = {
-    credentials: (call) => credentialAccessFor(call, repo, cache),
+    credentials: (call) =>
+      credentialAccessFor(call, repo, cache, plans.get(call.workflowVersionId), serverKeys),
     providers: (call) =>
       registryProviderAccess(providers, call, {
         http: deps.http,

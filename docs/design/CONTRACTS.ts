@@ -1686,6 +1686,8 @@ export interface CompileOptions {
   providers?: ProviderAvailability;
   /** Secret names bound in the target environment; enables E_SECRET_UNBOUND (publish) / W_SECRET_UNBOUND (draft). */
   boundSecrets?: ReadonlySet<SecretName>;
+  /** Credential types the server has its own key for: a required secret of such a type counts as bound. */
+  serverCredentialTypes?: ReadonlySet<string>;
   /** Workspace default decision chain used when the definition's is empty. */
   defaultDecisions?: { primary: ProviderHop; failover: ProviderHop[] };
   level: 'draft' | 'publish';

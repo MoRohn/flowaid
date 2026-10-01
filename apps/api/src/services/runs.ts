@@ -41,6 +41,7 @@ import {
 import { assertEnvironmentAllowed, type Principal } from "../auth/principal.js";
 import type { ApiContext } from "../context.js";
 import { catalogSnapshot, compileIn } from "./compile.js";
+import { serverCredentialTypes, unboundRequiredSecrets } from "./serverKeys.js";
 import { visibleWorkflow } from "./workflows.js";
 
 const Ajv2020 = Ajv2020Module.default;
@@ -99,6 +100,7 @@ async function resolveVersion(
   workflowId: string,
   environmentId: string,
   r: StartRunRequest,
+  served?: ReadonlySet<string>,
 ): Promise<WorkflowVersionRow> {
   if (r.versionId) {
     const v = await getVersion(tx, r.versionId);
@@ -113,6 +115,7 @@ async function resolveVersion(
       workspaceId: p.workspaceId,
       environmentId,
       level: "draft",
+      ...(served ? { serverCredentialTypes: served } : {}),
     });
     if (!result.ok) throw new WorkflowValidationError(result.diagnostics);
     return draftVersion(tx, {
@@ -145,8 +148,16 @@ export function resolveRunVersion(
   workflowId: string,
   environmentId: string,
   r: { versionId?: string | undefined; draft?: boolean | undefined },
+  served?: ReadonlySet<string>,
 ): Promise<WorkflowVersionRow> {
-  return resolveVersion(tx, p, workflowId, environmentId, { input: null, mode: "async", ...r });
+  return resolveVersion(
+    tx,
+    p,
+    workflowId,
+    environmentId,
+    { input: null, mode: "async", ...r },
+    served,
+  );
 }
 
 export function hashRequest(workflowId: string, r: StartRunRequest): string {
@@ -194,7 +205,8 @@ export async function startRun(
       }
     }
     const environmentId = await resolveEnvironment(tx, p, r.environmentId);
-    const version = await resolveVersion(tx, p, workflowId, environmentId, r);
+    const served = serverCredentialTypes(ctx.env);
+    const version = await resolveVersion(tx, p, workflowId, environmentId, r, served);
     const validate = ajv.compile(version.plan.inputs as object);
     if (!validate(r.input))
       throw new BadRequestError("the input does not match the workflow's inputs schema", {
@@ -210,13 +222,14 @@ export async function startRun(
         .filter((b) => b.environmentId === environmentId)
         .map((b) => b.secretName),
     );
-    const missing = version.plan.secrets.filter((s) => s.required && !bound.has(s.name));
+    // a required secret the server has a key for runs on that key (the worker's fallback)
+    const missing = unboundRequiredSecrets(version.plan.secrets, bound, served);
     if (missing.length > 0)
       throw new WorkflowValidationError(
         missing.map((s) => ({
           code: "E_SECRET_UNBOUND" as const,
           severity: "error" as const,
-          message: `secret ${s.name} is not bound in this environment`,
+          message: `secret ${s.name} is not bound in this environment and the server has no key for ${s.credentialType}`,
           location: { path: "/secrets" },
         })),
       );

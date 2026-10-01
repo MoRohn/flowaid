@@ -36,6 +36,7 @@ import {
 import { ApiError, get, getAll, post } from "~/api/client";
 import type { Environment, VersionDetail, VersionSummary } from "~/api/types";
 import { missingRequiredSecrets } from "~/admin/logic";
+import { useServerCredentialTypes } from "./useServerKeys";
 import { CheckList, QualityNote, blockers } from "~/guide/Readiness";
 import { useSession } from "~/session";
 import { publishChecks, publishOutcome } from "./publishReview";
@@ -84,7 +85,8 @@ export function PublishDialog(p: PublishDialogProps) {
   }, [latest.data, p.draft]);
   const errors = p.diagnostics.filter((d) => d.severity === "error");
   const warnings = p.diagnostics.filter((d) => d.severity === "warning");
-  // required secrets per ticked environment (the Deployments page refuses a deploy without them)
+  // required secrets per ticked environment that no binding or server key answers (publishing
+  // with deploy refuses them, like the Deployments page)
   const canSeeSecrets = s.can("secrets:bind");
   const bindings = useQueries({
     queries: deployTo.map((envId) => ({
@@ -93,13 +95,16 @@ export function PublishDialog(p: PublishDialogProps) {
       enabled: p.open && canSeeSecrets && (p.draft.secrets ?? []).length > 0,
     })),
   });
+  const served = useServerCredentialTypes();
   const needsSecrets = (p.draft.secrets ?? []).some((x) => x.required !== false);
   const targets = deployTo.map((envId, i) => {
     const bound = bindings[i]?.data;
     return {
       name: p.environments.find((e) => e.id === envId)?.name ?? "that environment",
       missingSecrets:
-        bound && needsSecrets ? missingRequiredSecrets(p.draft.secrets ?? [], bound) : undefined,
+        bound && needsSecrets
+          ? missingRequiredSecrets(p.draft.secrets ?? [], bound, served)
+          : undefined,
     };
   });
   const latestVersion = p.latestVersionId === null ? null : (latest.data?.version ?? undefined);

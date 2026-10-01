@@ -173,6 +173,18 @@ describe("secrets", () => {
       ),
     ).toEqual(["A"]);
   });
+  it("does not count a required secret the server has a key for", () => {
+    expect(
+      missingRequiredSecrets(
+        [
+          { name: "TS", credentialType: "typesafe.api_key" },
+          { name: "OPENAI", credentialType: "openai.api_key", required: true },
+        ],
+        {},
+        new Set(["typesafe.api_key"]),
+      ),
+    ).toEqual(["OPENAI"]);
+  });
 });
 
 describe("versions", () => {

@@ -60,7 +60,7 @@ export const WORKFLOW_DEPLOYMENTS: CapabilityGuide = {
   what: "Choose which published version runs in each environment, with its variable overrides, and roll back or promote between environments.",
   when: "After publishing a version you have tried, to make it live; or to undo a bad release with Roll back.",
   needs:
-    "A published version, and every required secret bound for the environment (Settings, Secrets). Protected environments need an admin.",
+    "A published version, and every required secret bound for the environment (Settings, Secrets) unless the server has the key for its type. Protected environments need an admin.",
   start:
     "Press Deploy on an environment, pick the version, check the changes and press Deploy in the dialog. Nothing deploys without that last press.",
   result:

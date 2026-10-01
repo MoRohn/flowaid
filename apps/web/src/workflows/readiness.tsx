@@ -1,22 +1,28 @@
 "use client";
 /**
  * "What you need" lines for a workflow's own pages: whether each environment has its required
- * secrets bound (deploys are refused without them) and whether anything is published yet.
+ * secrets bound or answered by a server key (deploys are refused without them) and whether anything is published yet.
  */
 import { useQueries } from "@tanstack/react-query";
 import type { SecretDecl } from "@flowaid/workflow-core";
 import { get } from "~/api/client";
 import type { Environment } from "~/api/types";
 import { missingRequiredSecrets } from "~/admin/logic";
+import { useServerCredentialTypes } from "~/builder/useServerKeys";
 import type { Check } from "~/guide/Readiness";
 import { useSession } from "~/session";
 
 /** One line per environment; unknown bindings (loading, or no permission to read them) show as checking or are left out. */
 export function secretChecks(
-  declared: readonly Pick<SecretDecl, "name" | "required">[],
+  declared: readonly (Pick<SecretDecl, "name" | "required"> & { credentialType?: string })[],
   environments: readonly Pick<Environment, "id" | "name">[],
   bound: (envId: string) => Record<string, string> | undefined,
-  { ws, workflowId, loading }: { ws: string; workflowId: string; loading: boolean },
+  {
+    ws,
+    workflowId,
+    loading,
+    served = new Set(),
+  }: { ws: string; workflowId: string; loading: boolean; served?: ReadonlySet<string> },
 ): Check[] {
   if (!declared.some((d) => d.required !== false))
     return [
@@ -33,14 +39,14 @@ export function secretChecks(
       return loading
         ? [{ id: `secrets:${e.id}`, label: `Secrets in ${e.name}`, state: "checking" }]
         : [];
-    const missing = missingRequiredSecrets(declared, b);
+    const missing = missingRequiredSecrets(declared, b, served);
     return [
       missing.length
         ? {
             id: `secrets:${e.id}`,
             label: `${e.name}: ${missing.join(", ")} not bound`,
             state: "warning",
-            detail: `Deploying to ${e.name} is refused until every required secret is bound to a credential.`,
+            detail: `Deploying to ${e.name} is refused until every required secret is bound to a credential, or the server has the key for its type.`,
             fix: (
               <a
                 className="text-accent-text hover:underline"
@@ -67,10 +73,12 @@ export function useSecretChecks(workflowId: string, declared: readonly SecretDec
       enabled: canRead && declared.length > 0,
     })),
   });
+  const served = useServerCredentialTypes();
   const byEnv = new Map(s.environments.map((e, i) => [e.id, results[i]?.data]));
   const checks = secretChecks(declared, s.environments, (id) => byEnv.get(id), {
     ws: s.ws,
     workflowId,
+    served,
     loading: canRead && results.some((r) => r.isPending),
   });
   return canRead || !declared.length

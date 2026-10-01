@@ -89,7 +89,8 @@ export function describeRunError(e: unknown): RunStartError {
       kind: "secrets",
       title:
         "A key this workflow needs is not connected for this environment, so the run did not start.",
-      action: "Bind a saved credential to it in the workflow's Secrets settings, then run again.",
+      action:
+        "Bind a saved credential to it in the workflow's Secrets settings, or set the provider's key in the server's environment, then run again.",
       items: unbound.map((d) => d.message),
     };
   }

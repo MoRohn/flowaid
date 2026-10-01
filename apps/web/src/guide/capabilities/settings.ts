@@ -44,7 +44,7 @@ export const SETTINGS_ENVIRONMENTS: CapabilityGuide = {
   start:
     "Edit an environment to add variables or protect it, or press New environment for another stage.",
   result:
-    "An environment workflows can deploy to. A deploy only succeeds when every required secret is bound there; webhooks and schedules start the version deployed to their environment.",
+    "An environment workflows can deploy to. A deploy only succeeds when every required secret is bound there or answered by a key set on the server; webhooks and schedules start the version deployed to their environment.",
   reading: {
     title: "How the stages differ",
     items: [
