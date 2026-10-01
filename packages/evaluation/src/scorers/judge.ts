@@ -13,8 +13,13 @@ import type {
 export interface JudgeVerdict {
   passed: boolean;
   pYes: number;
+  /** what the judge call cost (the provider's priced usage) */
+  costUsd: number;
   message?: string;
 }
+
+/** The check message when no judge model can be used (the worker found no key for one). */
+export const NO_JUDGE_MODEL = "no judge model available: add an OpenAI, Anthropic or Ollama key";
 
 export async function judge(
   provider: DecisionProvider,
@@ -39,6 +44,7 @@ export async function judge(
   return {
     passed: d.value,
     pYes: d.pYes,
+    costUsd: d.costUsd,
     ...(d.value ? {} : { message: `judge answered no (pYes ${d.pYes.toFixed(2)})` }),
   };
 }

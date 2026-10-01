@@ -157,8 +157,9 @@ export function ExpectationHelp() {
         <Term name="maxLatencyMs / maxCostUsd">Upper bounds for one run.</Term>
       </dl>
       <p className="m-0 mt-2 text-ink-3">
-        Judge matchers need a judge model, which the evaluation worker in this release does not
-        configure: they fail with “no judge provider is configured”.
+        Judge matchers are graded by the AI builder's model (the one set in Settings, else the first
+        OpenAI, Anthropic or Ollama key found); their calls are added to the evaluation's cost.
+        Without such a key they fail with “no judge model available”.
       </p>
     </details>
   );

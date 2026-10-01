@@ -86,6 +86,7 @@ export function summarize(results: readonly CaseResult[]): EvaluationSummary {
   const launched = results.filter((r) => r.runId !== null);
   const latencies = launched.map((r) => r.metrics.latencyMs);
   const cost = results.reduce((a, r) => a + r.metrics.costUsd, 0);
+  const judgeCost = results.reduce((a, r) => a + (r.metrics.judgeCostUsd ?? 0), 0);
   return {
     cases: n,
     passed,
@@ -104,6 +105,6 @@ export function summarize(results: readonly CaseResult[]): EvaluationSummary {
       p95: percentile(latencies, 95),
       p99: percentile(latencies, 99),
     },
-    costUsd: { total: cost, perCase: n === 0 ? 0 : cost / n },
+    costUsd: { total: cost + judgeCost, perCase: n === 0 ? 0 : cost / n, judge: judgeCost },
   };
 }

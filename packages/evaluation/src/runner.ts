@@ -73,7 +73,11 @@ export async function runEvaluation(o: RunEvaluationOptions): Promise<Evaluation
           human: humanResponsesFor(c),
           signal,
         });
-        result = await scoreCase(c, run, o);
+        // judge calls stop with the evaluation unless the caller gave them their own signal
+        result = await scoreCase(c, run, {
+          ...o,
+          judgeContext: { signal: o.judgeContext?.signal ?? signal },
+        });
       } catch (error) {
         result = launchFailed(c, error);
       }

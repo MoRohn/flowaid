@@ -26,6 +26,8 @@ export function reportToMarkdown(r: RegressionReport): string {
   row("human review rate", s.humanReviewRate, b?.humanReviewRate, pct);
   row("p95 latency (ms)", s.latency.p95, b?.latency.p95, (x) => String(Math.round(x)));
   row("cost per case (USD)", s.costUsd.perCase, b?.costUsd.perCase, (x) => x.toFixed(5));
+  if (s.costUsd.judge > 0 || (b?.costUsd.judge ?? 0) > 0)
+    row("judge checks (USD)", s.costUsd.judge, b?.costUsd.judge, (x) => x.toFixed(5));
   for (const [node, acc] of Object.entries(s.accuracy))
     row(`accuracy · ${node}`, acc, b?.accuracy[node], pct);
   for (const [node, cal] of Object.entries(s.calibration))

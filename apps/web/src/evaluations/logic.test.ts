@@ -85,7 +85,7 @@ describe("case checks", () => {
         tags: ["escalate"],
       }),
     ]);
-    expect(ids(good)).toEqual(["weak:ok", "from-runs:ok", "tags:ok", "judge:warning"]);
+    expect(ids(good)).toEqual(["weak:ok", "from-runs:ok", "tags:ok", "judge:info"]);
   });
 });
 
@@ -154,5 +154,24 @@ describe("reportReading", () => {
       "judge:warning",
       "human:info",
     ]);
+  });
+
+  it("recognises judge checks that could not run, old and new wording, and reports judge cost", () => {
+    const failed = (message: string) =>
+      result({
+        passed: false,
+        checks: [{ id: "output:/:judge", kind: "output", passed: false, message }],
+      });
+    const notes = reportReading(
+      summary({ costUsd: { total: 0.03, perCase: 0.005, judge: 0.01 } }),
+      [
+        failed("no judge provider is configured"),
+        failed("no judge model available: anthropic/x could not be used (bad key)"),
+      ],
+      new Set(),
+    );
+    expect(ids(notes)).toEqual(["finished:ok", "passed:info", "judge:warning", "judge-cost:info"]);
+    expect(notes[2]?.message).toMatch(/^2 cases have judge checks that could not run/);
+    expect(notes[3]?.message).toContain("$0.0100");
   });
 });

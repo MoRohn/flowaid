@@ -10,7 +10,12 @@ import { anthropicFactory } from "@flowaid/provider-anthropic";
 import { ollamaEmbeddingFactory, ollamaFactory } from "@flowaid/provider-ollama";
 import { openaiFactories } from "@flowaid/provider-openai";
 import { typesafeFactory } from "@flowaid/provider-typesafe";
-import { DefaultModelCatalog, ProviderRegistry, type ResolveContext } from "@flowaid/providers";
+import {
+  DefaultModelCatalog,
+  ProviderRegistry,
+  selectGenerationModel,
+  type ResolveContext,
+} from "@flowaid/providers";
 import { z } from "zod";
 import {
   ProviderHopSchema,
@@ -109,13 +114,6 @@ export function resolveContext(
   };
 }
 
-/** Defaults tried in order when the workspace names no advisor model. */
-const DEFAULT_MODELS: readonly (ModelRef & { credentialType: string })[] = [
-  { provider: "anthropic", model: "claude-sonnet-5", credentialType: "anthropic.api_key" },
-  { provider: "openai", model: "gpt-5.5", credentialType: "openai.api_key" },
-  { provider: "ollama", model: "qwen3:8b", credentialType: "ollama.host" },
-];
-
 export interface AdvisorModel {
   ref: ModelRef;
   /** the model accepts `responseFormat: json_schema` */
@@ -149,21 +147,13 @@ export async function advisorModel(
     return { ref, jsonSchema: info?.capabilities.jsonSchema ?? false };
   };
   return ctx.db.tenant(workspaceId, async (tx) => {
-    const configured = (await settingsOf(tx, workspaceId)).advisorModel as
-      { provider?: unknown; model?: unknown } | undefined;
-    if (typeof configured?.provider === "string" && typeof configured.model === "string") {
-      const ref = { provider: configured.provider, model: configured.model };
-      return factories.some((f) => f.id === ref.provider) ? describe(ref) : null;
-    }
-    for (const d of DEFAULT_MODELS) {
-      if (!factories.some((f) => f.id === d.provider)) continue;
-      if (
-        serverKey(ctx, d.credentialType) ||
-        (await workspaceCredentialId(tx, workspaceId, d.credentialType))
-      )
-        return describe({ provider: d.provider, model: d.model });
-    }
-    return null;
+    const ref = await selectGenerationModel({
+      configured: (await settingsOf(tx, workspaceId)).advisorModel,
+      registered: factories.map((f) => f.id),
+      hasKey: async (type) =>
+        Boolean(serverKey(ctx, type) || (await workspaceCredentialId(tx, workspaceId, type))),
+    });
+    return ref ? describe(ref) : null;
   });
 }
 

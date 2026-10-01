@@ -43,7 +43,7 @@ const SERVER_KEY: Record<string, (k: ServerKeys) => Record<string, string> | und
 };
 
 /** The newest workspace-wide credential of a type (a passing test ranks first). */
-async function workspaceCredential(
+export async function workspaceCredential(
   db: Database,
   workspaceId: string,
   type: string,
