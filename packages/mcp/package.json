@@ -1,6 +1,6 @@
 {
   "name": "@flowaid/mcp",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "private": true,
   "description": "MCP client for flowaid: pooled sessions (streamable HTTP, SSE, policy-gated stdio), discovery with sanitisation and injection flags, tool policy, OAuth 2.1 PKCE helpers, and workflows exposed as MCP tools (ARCHITECTURE.md §10.2).",
   "license": "Apache-2.0",

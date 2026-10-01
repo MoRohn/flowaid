@@ -1,6 +1,6 @@
 {
   "name": "@flowaid/plugins",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "private": true,
   "description": "Plugin discovery, resolution and installation (ARCHITECTURE.md \u00a73.5): the npm registry client (packuments, search), the allow-list, semver ranges, tarball integrity (SRI) and safe tgz extraction. Never loads plugin code.",
   "license": "Apache-2.0",

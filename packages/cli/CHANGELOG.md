@@ -1,5 +1,24 @@
 # @flowaid/cli
 
+## 0.9.1
+
+### Patch Changes
+
+- @flowaid/importer@0.9.1
+  - @flowaid/nodes-core@0.9.1
+  - @flowaid/plugins@0.9.1
+  - @flowaid/provider-anthropic@0.9.1
+  - @flowaid/provider-ollama@0.9.1
+  - @flowaid/provider-openai@0.9.1
+  - @flowaid/provider-typesafe@0.9.1
+  - @flowaid/providers@0.9.1
+  - @flowaid/sandbox@0.9.1
+  - @flowaid/shared@0.9.1
+  - @flowaid/workflow-compiler@0.9.1
+  - @flowaid/workflow-core@0.9.1
+  - @flowaid/workflow-runtime@0.9.1
+  - @flowaid/workflow-sdk@0.9.1
+
 ## 0.9.0
 
 ### Minor Changes

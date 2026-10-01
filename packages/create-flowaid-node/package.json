@@ -1,6 +1,6 @@
 {
   "name": "@flowaid/create-flowaid-node",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "private": true,
   "description": "Scaffold a publishable FlowAId node package: `npm create flowaid-node @acme/nodes-crm` (defineNode example, harness test, manifest check, flowaid-node keyword and the flowaid package.json field).",
   "license": "Apache-2.0",

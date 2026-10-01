@@ -1,5 +1,14 @@
 # @flowaid/langchain
 
+## 0.9.1
+
+### Patch Changes
+
+- @flowaid/node-sdk@0.9.1
+  - @flowaid/providers@0.9.1
+  - @flowaid/shared@0.9.1
+  - @flowaid/workflow-core@0.9.1
+
 ## 0.9.0
 
 ### Patch Changes

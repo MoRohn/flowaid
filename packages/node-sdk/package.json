@@ -1,6 +1,6 @@
 {
   "name": "@flowaid/node-sdk",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "private": true,
   "description": "The flowaid node SDK: defineNode/definePackage, toManifest (Zod → JSON NodeManifest), the capability-scoped ExecutionContext, NodeResult helpers and a test harness that runs nodes like the runtime does (CONTRACTS.ts §16, ARCHITECTURE.md §3). Browser-safe; depends only on @flowaid/workflow-core, @flowaid/shared and zod.",
   "license": "Apache-2.0",

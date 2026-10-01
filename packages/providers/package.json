@@ -1,6 +1,6 @@
 {
   "name": "@flowaid/providers",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "private": true,
   "description": "flowaid provider infrastructure: the provider registry, model catalog and pricing, failover chains, health tracking with a circuit breaker, rate limiting, the LLM and rule decision providers, an OpenAI-compatible client and a record/replay provider for deterministic runs (ARCHITECTURE.md §6).",
   "license": "Apache-2.0",

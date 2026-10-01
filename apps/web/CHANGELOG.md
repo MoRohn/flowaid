@@ -1,5 +1,18 @@
 # @flowaid/web
 
+## 0.9.1
+
+### Patch Changes
+
+- cd266b1: Starting FlowAId while it is already running finds it at once on every platform: the second start
+  asks the running launcher's control channel instead of a slow Windows process query, which could
+  take over a minute on a busy machine. A start that stops processes an earlier FlowAId left behind
+  now waits for their ports to be released before checking them.
+- @flowaid/shared@0.9.1
+  - @flowaid/ui@0.9.1
+  - @flowaid/workflow-compiler@0.9.1
+  - @flowaid/workflow-core@0.9.1
+
 ## 0.9.0
 
 ### Minor Changes
