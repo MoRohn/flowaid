@@ -32,8 +32,17 @@ export interface WireResponse {
 }
 
 export type ToHost =
-  /** `modulePath`: an installed package's entry file (the worker resolved it); else allow-listed */
-  | { type: "init"; packageName: string; version?: string; modulePath?: string }
+  /**
+   * `modulePath`: an installed package's entry file (the worker resolved it); else allow-listed.
+   * `pluginRoot`: the installed package's directory (real path), whose code the guard restricts.
+   */
+  | {
+      type: "init";
+      packageName: string;
+      version?: string;
+      modulePath?: string;
+      pluginRoot?: string;
+    }
   | {
       type: "execute";
       id: string;

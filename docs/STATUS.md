@@ -69,15 +69,12 @@ compiled API, worker and Docker images run plain `node` on `dist`.
 - **Phase 4:** complete; P4-02's UI items shipped with the web app.
 - **Phase 5:** complete: the journey runs against the production builds with provider-fixture
   replay and secret-canary log checks, and the UI accessibility gallery gates every push.
-- **Phase 6:** complete; of P6-07 only the Azure/GCP key services shipped (identity is out of
-  scope for a local-first app).
+- **Phase 6:** complete; of P6-07 the key services shipped (AWS KMS and Secrets Manager, Azure,
+  GCP; identity is out of scope for a local-first app).
 - **Track J:** J-01 to J-07 in `@flowaid/jev`. **Track L:** designed, not started.
 
 ## Known gaps
 
-- AWS KMS and Secrets Manager need an AWS SDK client the apps do not wire yet; the other master key
-  providers (`local`, `vault-transit`, `azure-keyvault`, `gcp-kms`) and external references
-  (`env:`, `vault:`, `azure-kv:`, `gcp-sm:`) are configured from the environment.
 - V2's open items (live-model evaluation of Ask FlowAId, browser specs for the insights panels
   and the assistant, dashboard filters in the URL, the P2-6 and P3 refactors, a manual
   screen-reader pass) are listed in [project/FLOWAID_V2_FINAL_AUDIT.md](project/FLOWAID_V2_FINAL_AUDIT.md).

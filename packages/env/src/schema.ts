@@ -591,6 +591,10 @@ export function siteOf(url: URL): string {
  * key requirements and must not hold a master key.
  */
 const MASTER_KEY_ID_FORMAT: Record<string, { re: RegExp; shape: string }> = {
+  "aws-kms": {
+    re: /^arn:aws[a-z-]*:kms:[a-z0-9-]+:\d{12}:(?:key|alias)\/[A-Za-z0-9/_-]+$/,
+    shape: "a KMS key or alias ARN (arn:aws:kms:<region>:<account>:key/<id>)",
+  },
   "vault-transit": { re: /^[A-Za-z0-9_.-]+$/, shape: "a Transit key name" },
   "azure-keyvault": {
     re: /^https:\/\/[a-z0-9-]{3,24}\.(?:vault|managedhsm)\.(?:azure\.net|azure\.cn|usgovcloudapi\.net)\/keys\/[A-Za-z0-9-]{1,127}(?:\/[0-9a-f]{32})?$/,
@@ -646,6 +650,16 @@ function masterKeyIssues(
   if (has("AZURE_CLIENT_SECRET"))
     for (const name of ["AZURE_TENANT_ID", "AZURE_CLIENT_ID"] as const)
       if (!has(name)) issues.push({ path: name, message: "is required with AZURE_CLIENT_SECRET" });
+  if (has("AWS_ACCESS_KEY_ID") !== has("AWS_SECRET_ACCESS_KEY"))
+    issues.push({
+      path: has("AWS_ACCESS_KEY_ID") ? "AWS_SECRET_ACCESS_KEY" : "AWS_ACCESS_KEY_ID",
+      message: "AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY must be set together",
+    });
+  if (has("AWS_SESSION_TOKEN") && !has("AWS_ACCESS_KEY_ID"))
+    issues.push({
+      path: "AWS_SESSION_TOKEN",
+      message: "requires AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY",
+    });
   return issues;
 }
 
@@ -804,6 +818,8 @@ export function crossFieldIssues(vars: Partial<Record<EnvVarName, unknown>>): Cr
       "VAULT_TOKEN",
       "AZURE_CLIENT_SECRET",
       "GOOGLE_APPLICATION_CREDENTIALS",
+      "AWS_SECRET_ACCESS_KEY",
+      "AWS_SESSION_TOKEN",
     ] as const) {
       if (has(name) && !isDefault(name)) {
         issues.push({
@@ -928,6 +944,13 @@ export const EnvSchema = z
     AZURE_CLIENT_ID: optionalString("AZURE_CLIENT_ID"),
     AZURE_CLIENT_SECRET: optionalString("AZURE_CLIENT_SECRET"),
     GOOGLE_APPLICATION_CREDENTIALS: optionalString("GOOGLE_APPLICATION_CREDENTIALS"),
+    AWS_ACCESS_KEY_ID: optionalString("AWS_ACCESS_KEY_ID"),
+    AWS_SECRET_ACCESS_KEY: optionalString("AWS_SECRET_ACCESS_KEY"),
+    AWS_SESSION_TOKEN: optionalString("AWS_SESSION_TOKEN"),
+    AWS_CONTAINER_CREDENTIALS_RELATIVE_URI: optionalString(
+      "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI",
+    ),
+    AWS_ENDPOINT_URL: optionalUrl("AWS_ENDPOINT_URL", /^https?$/, "http:// or https://"),
 
     SANDBOX_MODE: enumWithDefault("SANDBOX_MODE", SANDBOX_MODES),
     MCP_STDIO_ENABLED: boolWithDefault("MCP_STDIO_ENABLED"),

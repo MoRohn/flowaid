@@ -3,15 +3,22 @@
  * nodes. The node's `ctx` is a proxy — every service call becomes a JSON message the worker
  * answers with the node's real, scoped services; logs, events and deltas are one-way notes.
  * Nothing here holds a credential, a database connection or the worker's environment.
+ *
+ * The process runs under the Node permission model (see `plugins/host.ts`), and `init` installs
+ * the in-process guard (`plugins/guard.ts`) before the package is imported.
  */
 import { pathToFileURL } from "node:url";
+import * as nodeSdk from "@flowaid/node-sdk";
 import { normalizePackage, type AnyNodeDefinition, type ExecutionContext } from "@flowaid/node-sdk";
+import * as workflowCore from "@flowaid/workflow-core";
 import {
   SchemaValidationError,
   type JsonObject,
   type JsonValue,
   type ModelRef,
 } from "@flowaid/workflow-core";
+import * as zod from "zod";
+import { installPluginGuard } from "./plugins/guard.js";
 import { errorInfo, fromErrorInfo } from "./plugins/host.js";
 import { BUNDLED_LOADERS } from "./plugins/loaders.js";
 import {
@@ -251,6 +258,14 @@ function contextFor(id: string, snap: ContextSnapshot, signal: AbortSignal): Exe
 async function init(m: Extract<ToHost, { type: "init" }>): Promise<void> {
   let module: Record<string, unknown>;
   let version: string;
+  installPluginGuard({
+    pluginRoots: m.pluginRoot ? [m.pluginRoot] : [],
+    provided: {
+      "@flowaid/node-sdk": nodeSdk,
+      "@flowaid/workflow-core": workflowCore,
+      zod: zod,
+    },
+  });
   if (m.modulePath) {
     module = (await import(pathToFileURL(m.modulePath).href)) as Record<string, unknown>;
     version = m.version ?? "0.0.0";

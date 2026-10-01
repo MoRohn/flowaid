@@ -32,6 +32,7 @@ export const SANDBOX_MODES = ["isolated-vm", "container"] as const;
  */
 export const MASTER_KEY_PROVIDERS = [
   "local",
+  "aws-kms",
   "vault-transit",
   "azure-keyvault",
   "gcp-kms",
@@ -469,7 +470,7 @@ const docs = {
   FLOWAID_MASTER_KEY_PROVIDER: {
     group: "security",
     description:
-      "Where the master key that wraps the key-encryption keys lives. `local`: `FLOWAID_MASTER_KEY` or `FLOWAID_MASTER_KEY_FILE`. `vault-transit`: a HashiCorp Vault Transit key (`VAULT_ADDR`, `VAULT_TOKEN`). `azure-keyvault`: an Azure Key Vault or Managed HSM RSA key (managed identity, or `AZURE_TENANT_ID`/`AZURE_CLIENT_ID`/`AZURE_CLIENT_SECRET`). `gcp-kms`: a Cloud KMS symmetric key (the metadata server's service account, or `GOOGLE_APPLICATION_CREDENTIALS`). With a key service the master never leaves it; `FLOWAID_MASTER_KEY_ID` names the key. Changing providers needs a master rotation, not an edit: KEKs wrapped by one provider do not unwrap with another.",
+      "Where the master key that wraps the key-encryption keys lives. `local`: `FLOWAID_MASTER_KEY` or `FLOWAID_MASTER_KEY_FILE`. `aws-kms`: an AWS KMS symmetric key (`AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`, else the ECS task role or the EC2 instance profile). `vault-transit`: a HashiCorp Vault Transit key (`VAULT_ADDR`, `VAULT_TOKEN`). `azure-keyvault`: an Azure Key Vault or Managed HSM RSA key (managed identity, or `AZURE_TENANT_ID`/`AZURE_CLIENT_ID`/`AZURE_CLIENT_SECRET`). `gcp-kms`: a Cloud KMS symmetric key (the metadata server's service account, or `GOOGLE_APPLICATION_CREDENTIALS`). With a key service the master never leaves it; `FLOWAID_MASTER_KEY_ID` names the key. Changing providers needs a master rotation, not an edit: KEKs wrapped by one provider do not unwrap with another.",
     default: "local",
     required: false,
     example: "azure-keyvault",
@@ -479,7 +480,7 @@ const docs = {
   FLOWAID_MASTER_KEY_ID: {
     group: "security",
     description:
-      "The key of `FLOWAID_MASTER_KEY_PROVIDER`: the Transit key name (`vault-transit`), the key URL `https://<vault>.vault.azure.net/keys/<name>[/<version>]` (`azure-keyvault`), or `projects/<p>/locations/<l>/keyRings/<r>/cryptoKeys/<k>` (`gcp-kms`). Required unless the provider is `local`.",
+      "The key of `FLOWAID_MASTER_KEY_PROVIDER`: the key or alias ARN `arn:aws:kms:<region>:<account>:key/<id>` (`aws-kms`, whose region is the ARN's), the Transit key name (`vault-transit`), the key URL `https://<vault>.vault.azure.net/keys/<name>[/<version>]` (`azure-keyvault`), or `projects/<p>/locations/<l>/keyRings/<r>/cryptoKeys/<k>` (`gcp-kms`). Required unless the provider is `local`.",
     required: false,
     example: "https://acme-flowaid.vault.azure.net/keys/master",
     secret: false,
@@ -545,6 +546,45 @@ const docs = {
       "Path of a service-account key file for Cloud KMS (the `gcp-kms` master key) and Secret Manager (`gcp-sm:` references). Unset uses the metadata server's service account (GCE, GKE, Cloud Run).",
     required: false,
     example: "/var/run/secrets/gcp/flowaid.json",
+    secret: false,
+  },
+  AWS_ACCESS_KEY_ID: {
+    group: "security",
+    description:
+      "AWS access key id for the `aws-kms` master key and `aws-sm:` external references (signed with SigV4, no AWS SDK). Set with `AWS_SECRET_ACCESS_KEY`; leave both unset to use the ECS task role (`AWS_CONTAINER_CREDENTIALS_RELATIVE_URI`) or the EC2 instance profile (IMDSv2). The region of each call is the one in the key's or secret's ARN.",
+    required: false,
+    example: "AKIAIOSFODNN7EXAMPLE",
+    secret: false,
+  },
+  AWS_SECRET_ACCESS_KEY: {
+    group: "security",
+    description: "Secret access key of `AWS_ACCESS_KEY_ID`; the two are set together.",
+    required: false,
+    example: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+    secret: true,
+  },
+  AWS_SESSION_TOKEN: {
+    group: "security",
+    description:
+      "Session token of temporary credentials (STS); requires `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.",
+    required: false,
+    example: "IQoJb3JpZ2luX2VjE...",
+    secret: true,
+  },
+  AWS_CONTAINER_CREDENTIALS_RELATIVE_URI: {
+    group: "security",
+    description:
+      "Set by Amazon ECS for tasks with a task role: the path on `169.254.170.2` that serves the role's temporary credentials. Used when no access key is set; you do not set it yourself.",
+    required: false,
+    example: "/v2/credentials/1d2e3f4a-5b6c-7d8e-9f0a-1b2c3d4e5f6a",
+    secret: false,
+  },
+  AWS_ENDPOINT_URL: {
+    group: "security",
+    description:
+      "Replaces `https://<service>.<region>.amazonaws.com` for KMS and Secrets Manager calls: LocalStack, a VPC endpoint or a proxy. Requests are still signed for the ARN's region.",
+    required: false,
+    example: "http://localhost:4566",
     secret: false,
   },
   "FLOWAID_SECRET_<NAME>": {

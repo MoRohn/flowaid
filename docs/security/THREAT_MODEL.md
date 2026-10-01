@@ -33,7 +33,7 @@ LAN-takeover finding (S1).
 | workflow → network (SSRF)               | Nodes reaching internal services or cloud metadata     | Addresses are checked at connect time (DNS rebinding included) with a complete IPv4/IPv6 blocklist. Credential headers are stripped on cross-origin redirects. The database query node goes through the same guard. `FLOWAID_ALLOW_PRIVATE_NETWORK` is an explicit opt-in.                                                                                        |
 | workflow → code                         | Sandbox escape, resource abuse                         | isolated-vm with memory, CPU and wall-clock limits, on a separate `worker-code` host without the master key. It fails closed when isolates are unavailable.                                                                                                                                                                                                       |
 | MCP stdio servers                       | Arbitrary commands, environment hijack                 | Off by default. Absolute-path allow-list, anchored argument patterns. Credential fields may not set system or loader variables (`PATH`, `LD_*`, `NODE_OPTIONS`, `JAVA_TOOL_OPTIONS`, …). Only the worker spawns: the API checks the policy (admin scope) and hands tests and discovery, saved or not, to the worker, which checks it again and audits each spawn. |
-| plugins                                 | Malicious packages                                     | Admin-only install, scope allow-list, sha512 verification, plugin host processes. Plugins are trusted code: see "Accepted risks".                                                                                                                                                                                                                                 |
+| plugins                                 | Malicious packages                                     | Admin-only install, scope allow-list, sha512 verification, plugin host processes under the Node permission model with a built-in allow-list. What remains: see "Accepted risks".                                                                                                                                                                                  |
 | data → model (agents, RAG, Ask FlowAId) | Prompt injection through tool output or retrieved text | Shared untrusted-content envelope with caps. Agents treat it as data. Ask FlowAId's tools are read-only and unknown tools are refused. The evaluation set has an injection case.                                                                                                                                                                                  |
 | Ask FlowAId → workspace data            | The assistant exposing data the caller cannot see      | Tools run in the caller's tenant transaction with their pins. No node inputs or outputs. Database errors are not relayed. It is audited without the question.                                                                                                                                                                                                     |
 | AI → spend                              | Runaway cost                                           | Streamed generations are priced (V2). Agents check their limits before each turn (V2). Runs have `maxCostUsd`. Ask FlowAId allows 6 rounds and $0.25 per question, 20 per minute. AI builder generation and critique are rate limited.                                                                                                                            |
@@ -56,8 +56,31 @@ named in the commits.
 
 ## Accepted risks and open items
 
-- **Plugins run as trusted code.** In development (tsx) mode the plugin host has no Node
-  permission model, and in either mode plugins can open network connections directly.
+- **Plugins are admin-installed code in a restricted process, not a sandbox.** Each package runs
+  in its own plugin host process (`apps/worker/src/plugins/host.ts`), in production and in
+  development alike (a development checkout runs an esbuild bundle of the host, because a
+  TypeScript loader cannot run under the permission model). `isolation.test.ts` proves each
+  enforced item below with a hostile plugin.
+  - **Enforced by Node's permission model:** reads only of the host's code, the packages
+    provided to plugins and the plugin's own directory (not the repository root, `.env`,
+    `.flowaid/`, `/data` or the master key file); no file writes; no child processes, worker
+    threads, native addons, WASI or inspector; no `process.binding`. On Node 25+ (`--allow-net`
+    exists and is withheld) no sockets or DNS either.
+  - **Enforced only in-process on Node 24** (the release images' runtime, whose permission model
+    has no network scope): plugin code may import only an allow-list of built-ins (no `net`,
+    `tls`, `http(s)`, `http2`, `dgram`, `dns`, `child_process`, `worker_threads`, `cluster`,
+    `module`, `vm`, `v8`, `os`...), checked by a module hook that covers `import`, `require` and
+    `process.getBuiltinModule`; the global `fetch`, `WebSocket` and `EventSource` throw; and
+    `process.kill` only signals the host itself. This runs in the plugin's own realm, so it is
+    defence in depth: an object that leaks a denied module (from the host or a provided package)
+    would bypass it. The supported way out is `ctx.http`, the worker's SSRF-guarded fetch under
+    the workspace egress policy.
+  - **Not covered:** CPU time (a plugin can spin; only the node's timeout and the 512 MiB heap
+    cap bound it), the IPC channel itself (a plugin can send the worker well-formed requests for
+    the context services the executing node may use, including the credential slots it
+    declared), and side channels within the host process (the other nodes of the same package
+    run there). Bundled packages (`@flowaid/nodes-langchain`) ship with the worker and are not
+    held to the built-in allow-list.
 - **The row-level-security bypass is a custom setting.** Any database role could set it,
   including the sandbox host's role. Gating it on role membership is open (P3-4).
 - **Rate limits and login throttles are in memory.** They are per process, which is fine locally.

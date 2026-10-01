@@ -12,7 +12,7 @@ export function identityKcv(identity: string): string {
   return createHash("sha256").update(identity).digest().subarray(0, 8).toString("base64");
 }
 
-/** The two KMS calls the provider needs; the worker adapts the AWS SDK client to it. */
+/** The two KMS calls the provider needs; `awsKmsClient` (aws/client.ts) implements them. */
 export interface KmsClient {
   encrypt(keyId: string, plaintext: Uint8Array): Promise<Uint8Array>;
   decrypt(keyId: string, ciphertext: Uint8Array): Promise<Uint8Array>;

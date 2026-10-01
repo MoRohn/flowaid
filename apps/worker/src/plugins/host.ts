@@ -1,19 +1,39 @@
 /**
  * Plugin host processes (ARCHITECTURE.md §3.5, D21): plugin node code runs in a child process per
  * package, never in the orchestrator. `PluginHost` forks `plugin-host` with a scrubbed
- * environment, a heap cap, no code generation from strings and — for compiled builds — the Node
- * permission model limited to reading the application. The node's `ctx` is proxied over the IPC
- * channel as JSON: the host asks for every service call (credentials, providers, tools, state,
- * artifacts, http, sandbox) and the worker performs it with the real, node-scoped services.
+ * environment, a heap cap, no code generation from strings and the Node permission model, in
+ * production and in development alike:
+ *
+ * - `--permission` with `--allow-fs-read` limited to the host's code (the compiled app and its
+ *   `node_modules`, or the development bundle), the packages provided to plugins and the plugin's
+ *   own directory. No `--allow-fs-write`, `--allow-child-process`, `--allow-worker`,
+ *   `--allow-addons`, `--allow-wasi` or `--allow-inspector`: the runtime refuses them all.
+ * - Network: on Node versions whose permission model knows `--allow-net` (25+), it is withheld,
+ *   so the runtime refuses sockets and DNS. Node 24's permission model does not cover the
+ *   network; there the in-process guard (`guard.ts`) refuses network built-ins and globals.
+ *   Either way a plugin's way out is `ctx.http`, proxied to the worker's guarded fetch.
+ *
+ * A TypeScript loader cannot run under the permission model (it needs worker threads and reads
+ * outside any narrow allow-list), so a development checkout bundles `plugin-host.ts` with esbuild
+ * first and runs the bundle exactly like the compiled entry.
+ *
+ * The node's `ctx` is proxied over the IPC channel as JSON: the host asks for every service call
+ * (credentials, providers, tools, state, artifacts, http, sandbox) and the worker performs it with
+ * the real, node-scoped services.
  *
  * A crashed host fails its in-flight executions with a retryable NODE_EXECUTION_ERROR
  * (`details.reason: "PLUGIN_HOST_CRASHED"`) and is restarted for the next execution. This is a
- * process boundary for admin-trusted code, not a sandbox: user code belongs in the `code` pool.
+ * process boundary with the permission model, for admin-installed code; user code belongs in the
+ * `code` pool's sandbox. What the isolation does and does not cover is listed in
+ * docs/security/THREAT_MODEL.md.
  */
 import { fork, type ChildProcess } from "node:child_process";
+import { createHash } from "node:crypto";
 import { existsSync, realpathSync } from "node:fs";
+import { mkdir, rename, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import type * as Esbuild from "esbuild";
 import type {
   AnyNodeDefinition,
   ExecutionContext,
@@ -69,17 +89,15 @@ export function fromErrorInfo(info: ErrorInfo): FlowaidError {
 const toBase64 = (data: Uint8Array | string) =>
   Buffer.from(typeof data === "string" ? new TextEncoder().encode(data) : data).toString("base64");
 
-/** Where the host entry lives: `dist/plugin-host.js`, or the TypeScript source under tests. */
-function hostEntry(): { file: string; execArgv: string[]; compiled: boolean } {
-  const here = dirname(fileURLToPath(import.meta.url));
-  const js = resolve(here, "../plugin-host.js");
-  if (existsSync(js)) return { file: js, execArgv: [], compiled: true };
-  return {
-    file: resolve(here, "../plugin-host.ts"),
-    execArgv: ["--import", "tsx", "--conditions=development"],
-    compiled: false,
-  };
-}
+/** Packages the platform provides to plugins (`installed.ts` links them; the guard maps them). */
+export const PROVIDED_PACKAGES = ["@flowaid/node-sdk", "@flowaid/workflow-core", "zod"] as const;
+
+/** Whether this Node's permission model covers the network (`--allow-net`, Node 25+). */
+export const PERMISSION_COVERS_NETWORK = process.allowedNodeEnvironmentFlags.has("--allow-net");
+
+const here = dirname(fileURLToPath(import.meta.url));
+/** This module runs compiled (`dist/plugins/host.js`) rather than from TypeScript sources. */
+const COMPILED = fileURLToPath(import.meta.url).endsWith(".js");
 
 /** The directory `pnpm-workspace.yaml` sits in, if any (a monorepo checkout). */
 function workspaceRoot(from: string): string | null {
@@ -90,6 +108,98 @@ function workspaceRoot(from: string): string | null {
     if (up === dir) return null;
     dir = up;
   }
+}
+
+/** The root directory of a package this module resolves (where its package.json is). */
+function packageDirOf(name: string): string | null {
+  try {
+    let dir = dirname(fileURLToPath(import.meta.resolve(name)));
+    while (!existsSync(join(dir, "package.json"))) {
+      const up = dirname(dir);
+      if (up === dir) return null;
+      dir = up;
+    }
+    return dir;
+  } catch {
+    return null;
+  }
+}
+
+let devBundle: Promise<string> | null = null;
+
+/**
+ * Development: bundles `plugin-host.ts` (workspace sources under the `development` condition,
+ * third-party packages inlined) into one ES module under `node_modules/.cache`, named by its
+ * content hash so concurrent workers and test files share it.
+ */
+function bundleForDevelopment(source: string, appDir: string): Promise<string> {
+  devBundle ??= (async () => {
+    // a development-only tool (a root devDependency): never reached from the compiled worker
+    const tool = "esbuild";
+    const esbuild = (await import(tool)) as typeof Esbuild;
+    const result = await esbuild.build({
+      entryPoints: [source],
+      bundle: true,
+      platform: "node",
+      format: "esm",
+      target: `node${process.versions.node.split(".")[0] ?? "24"}`,
+      conditions: ["development"],
+      write: false,
+      logLevel: "silent",
+      legalComments: "none",
+      // CommonJS dependencies inlined into an ES module still call require for built-ins
+      banner: {
+        js: 'import { createRequire as __flowaidCreateRequire } from "node:module"; const require = __flowaidCreateRequire(import.meta.url);',
+      },
+    });
+    const code = result.outputFiles[0]?.contents;
+    if (!code) throw new Error("esbuild produced no plugin host bundle");
+    const hash = createHash("sha256").update(code).digest("hex").slice(0, 16);
+    const dir = join(appDir, "node_modules", ".cache", "flowaid-plugin-host");
+    const file = join(dir, `plugin-host-${hash}.mjs`);
+    if (!existsSync(file)) {
+      await mkdir(dir, { recursive: true });
+      const tmp = `${file}.${process.pid}.tmp`;
+      await writeFile(tmp, code);
+      await rename(tmp, file);
+    }
+    return file;
+  })().catch((error: unknown) => {
+    devBundle = null;
+    throw error;
+  });
+  return devBundle;
+}
+
+/**
+ * The host entry and the paths it may read: `dist/plugin-host.js` with the app (and, in a
+ * monorepo, the workspace packages and `node_modules`, never the repository root with its `.env`
+ * and `.flowaid/`); in development, the bundle alone.
+ */
+async function hostEntry(): Promise<{ file: string; readable: string[] }> {
+  const appDir = resolve(here, "../..");
+  if (COMPILED) {
+    const root = workspaceRoot(appDir);
+    return {
+      file: resolve(here, "../plugin-host.js"),
+      readable: [
+        appDir,
+        ...(root && root !== appDir ? [join(root, "packages"), join(root, "node_modules")] : []),
+      ],
+    };
+  }
+  const file = await bundleForDevelopment(resolve(here, "../plugin-host.ts"), appDir);
+  return { file, readable: [file] };
+}
+
+/** The flags the host process starts with (exported for the isolation tests). */
+export function hostExecArgv(readable: string[], maxOldSpaceMb: number): string[] {
+  return [
+    "--permission",
+    ...readable.map((d) => `--allow-fs-read=${d}`),
+    "--disallow-code-generation-from-strings",
+    `--max-old-space-size=${maxOldSpaceMb}`,
+  ];
 }
 
 /** `{ provider, model }` objects anywhere in a config (the model refs a node will ask for). */
@@ -140,26 +250,22 @@ export class PluginHost {
     return this.starting;
   }
 
-  private spawn(): Promise<ChildProcess> {
-    const entry = hostEntry();
-    const appDir = resolve(dirname(entry.file), "..");
+  private async spawn(): Promise<ChildProcess> {
+    const entry = await hostEntry();
+    const pluginRoot =
+      this.o.packageDir ?? (this.o.modulePath ? dirname(this.o.modulePath) : undefined);
+    const real = (d: string) => (existsSync(d) ? realpathSync(d) : d);
     const readable = [
-      appDir,
-      workspaceRoot(appDir),
-      this.o.packageDir ?? (this.o.modulePath ? dirname(this.o.modulePath) : null),
+      ...entry.readable,
+      // `zod/v4` and other subpaths of the provided packages, through the plugin's links
+      ...(pluginRoot ? PROVIDED_PACKAGES.map(packageDirOf) : []),
+      pluginRoot ?? null,
     ]
       .filter((d): d is string => d !== null)
-      // the permission model compares real paths (symlinked dirs, /var → /private/var)
-      .map((d) => (existsSync(d) ? realpathSync(d) : d));
-    const execArgv = [
-      ...entry.execArgv,
-      "--disallow-code-generation-from-strings",
-      `--max-old-space-size=${this.o.maxOldSpaceMb ?? 512}`,
-      // The permission model needs the compiled entry (a TypeScript loader writes a cache).
-      ...(entry.compiled ? ["--permission", ...readable.map((d) => `--allow-fs-read=${d}`)] : []),
-    ];
+      // the permission model compares real paths (symlinked dirs, /var -> /private/var)
+      .map(real);
     const child = fork(entry.file, [], {
-      execArgv,
+      execArgv: hostExecArgv([...new Set(readable)], this.o.maxOldSpaceMb ?? 512),
       env: this.o.env ?? { NODE_ENV: "production", LOG_LEVEL: "info" },
       serialization: "json",
       stdio: ["ignore", "inherit", "inherit", "ipc"],
@@ -188,7 +294,9 @@ export class PluginHost {
         type: "init",
         packageName: this.o.packageName,
         ...(this.o.version ? { version: this.o.version } : {}),
-        ...(this.o.modulePath ? { modulePath: this.o.modulePath } : {}),
+        // real paths: the guard compares importers against the real plugin root
+        ...(this.o.modulePath ? { modulePath: real(this.o.modulePath) } : {}),
+        ...(pluginRoot ? { pluginRoot: real(pluginRoot) } : {}),
       });
     });
   }

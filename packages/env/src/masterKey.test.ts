@@ -41,6 +41,31 @@ describe("master key providers", () => {
     ]);
   });
 
+  it("takes an AWS KMS key or alias ARN, and AWS keys as a pair", () => {
+    expect(
+      issues({ FLOWAID_MASTER_KEY_PROVIDER: "aws-kms", FLOWAID_MASTER_KEY_ID: "alias/flowaid" }),
+    ).toEqual([
+      "FLOWAID_MASTER_KEY_ID: must be a KMS key or alias ARN (arn:aws:kms:<region>:<account>:key/<id>)",
+    ]);
+    for (const arn of [
+      "arn:aws:kms:eu-west-1:123456789012:key/1234abcd-12ab-34cd-56ef-1234567890ab",
+      "arn:aws-us-gov:kms:us-gov-west-1:123456789012:alias/flowaid/master",
+    ])
+      expect(
+        issues({ FLOWAID_MASTER_KEY_PROVIDER: "aws-kms", FLOWAID_MASTER_KEY_ID: arn }),
+      ).toEqual([]);
+    expect(issues({ AWS_ACCESS_KEY_ID: "AKIA" })).toEqual([
+      "AWS_SECRET_ACCESS_KEY: AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY must be set together",
+    ]);
+    expect(issues({ AWS_SESSION_TOKEN: "t" })).toEqual([
+      "AWS_SESSION_TOKEN: requires AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY",
+    ]);
+    expect(issues({ AWS_ENDPOINT_URL: "localstack:4566" })).toHaveLength(1);
+    expect(
+      issues({ AWS_ACCESS_KEY_ID: "AKIA", AWS_SECRET_ACCESS_KEY: "s", AWS_SESSION_TOKEN: "t" }),
+    ).toEqual([]);
+  });
+
   it("does not ask production for a local master key when a key service holds it", () => {
     const prod = {
       NODE_ENV: "production",

@@ -8,6 +8,8 @@ import {
 // The worker. src/test/ holds test-only fixtures
 // (never exported, excluded from the build), so it gets the same allowance as the tests.
 export default [
+  // the hostile test plugin's CommonJS probes are inputs to the isolation tests, not sources
+  { ignores: ["src/plugins/test/hostile/*.cjs"] },
   ...base,
   boundaryConfig("worker"),
   testBoundaryConfig("worker"),
