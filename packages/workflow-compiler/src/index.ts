@@ -20,3 +20,4 @@ export {
 } from "./guards.js";
 export { describeGuard } from "./passes/controlflow.js";
 export { classifiedPointers } from "./redaction.js";
+export { inputIssues, describeInputIssues, type InputIssue } from "./inputs.js";

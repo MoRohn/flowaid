@@ -39,14 +39,12 @@ only an explicitly labelled button does. No cost or quality estimates without re
 
 ## Known gaps (backend)
 
-- Evaluation judge checks always fail: the worker is not given a judge provider.
 - `POST /v1/workflows/:id/publish` with `deployTo` does not check required secrets (the dialog
   blocks it client-side); `PUT /deployments/:env` does.
 - An MCP exposure is switched off by the next deploy of its workflow unless the version declares
   an MCP trigger, which the builder cannot add; there is no endpoint to re-enable it.
 - stdio MCP servers are never tested or discovered, so their tools never reach the catalog; a
   server can only be tested after it is saved.
-- Schedule catch-up `skip` and `one` behave the same; scheduled runs skip input validation.
 - A knowledge source's chunking and embedding can change through the API but not the UI.
 - Email delivery (`SMTP_URL`) and retention are not visible to or applied from the web app.
 - `GET /v1/workflow-versions/:id` returns no execution plan, so a run's graph draws data
