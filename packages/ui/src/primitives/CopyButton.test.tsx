@@ -38,7 +38,8 @@ describe("CopyButton", () => {
     const user = userEvent.setup();
     writeText = mockClipboard();
     const onCopied = vi.fn();
-    render(<CopyButton value="run_01j8x2" timeout={60} onCopied={onCopied} tooltip={false} />);
+    // long enough that a loaded machine still sees "Copied" before it reverts
+    render(<CopyButton value="run_01j8x2" timeout={500} onCopied={onCopied} tooltip={false} />);
     const btn = screen.getByRole("button", { name: "Copy" });
     await user.click(btn);
     await act(async () => {
@@ -47,8 +48,9 @@ describe("CopyButton", () => {
     expect(writeText).toHaveBeenCalledWith("run_01j8x2");
     expect(onCopied).toHaveBeenCalledWith(true);
     expect(screen.getByRole("button", { name: "Copied" })).toHaveAttribute("data-copied", "true");
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Copy" })).not.toHaveAttribute("data-copied"),
+    await waitFor(
+      () => expect(screen.getByRole("button", { name: "Copy" })).not.toHaveAttribute("data-copied"),
+      { timeout: 3000 },
     );
   });
 

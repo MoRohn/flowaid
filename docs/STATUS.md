@@ -1,12 +1,37 @@
-# FlowAId status — 2026-09-29
+# FlowAId status — 2026-10-01
 
-This file records where everything stands so work can restart from a known state. **0.4.0** is
-released (V2: insights, Ask FlowAId, PageIndex, the desktop app); its audit, with what was
-verified and what is open, is [project/FLOWAID_V2_FINAL_AUDIT.md](project/FLOWAID_V2_FINAL_AUDIT.md).
-On `main` for the next release: the first-run experience (the Message triage starter, keys added
-from the builder, run feedback) and the four business flows with the builder's workflow panel.
-The repository is published at [github.com/MoRohn/flowaid](https://github.com/MoRohn/flowaid);
-CI, E2E and the desktop checks run on every push to `main`.
+This file records where everything stands so work can restart from a known state. **0.8.0** is
+released. On `main` for the next release: built-in agent tools and the agents' Active switch, and
+the production-readiness pass below. V2's audit, with what was verified and what is open, is
+[project/FLOWAID_V2_FINAL_AUDIT.md](project/FLOWAID_V2_FINAL_AUDIT.md). The repository is
+published at [github.com/MoRohn/flowaid](https://github.com/MoRohn/flowaid); CI, E2E and the
+desktop checks run on every push to `main`.
+
+## Production-readiness pass (2026-10-01)
+
+Fixed, each with tests:
+
+- A required secret is satisfied by the server's own key for its type (run start, deploy, publish
+  with `deployTo`, and node credential slots at run time).
+- The workspace's monthly budget is enforced: new runs are refused once it is spent, with
+  `budget.warning` (80%) and `budget.exceeded` alerts once a month; `GET /v1/workspaces/:id/budget`.
+- Workspace retention settings (runs, audit, artifacts) are applied by the retention sweep.
+- Evaluation judge checks run on the workspace's text model and are priced into the run's cost.
+- Schedule catch-up `skip`, `one` and `all` differ as documented; a schedule's input is checked at
+  deploy and at every fire.
+- MCP exposures made by hand survive deploys and can be switched on and off; stdio MCP servers are
+  tested and discovered by the worker; a server can be tested before it is saved.
+- Rate limits, login throttles and the webhook replay cache are stored in Redis when `REDIS_URL`
+  is set; `RATE_LIMIT_MAX` scales the session, API-key and unauthenticated limits.
+- Audit rows are written in the same transaction as the change.
+- The row-level-security bypass requires membership of `flowaid_rls_bypass` (migration 0012).
+- `flowaid keys rotate-master` re-wraps every key and re-seals every credential, resumably.
+- Timers fire on the database clock.
+- AWS KMS master keys and Secrets Manager references work, signed with SigV4 and no AWS SDK.
+- Plugin hosts run under Node's permission model in development as well as production, with
+  network access only through the platform's guarded fetch (enforced by the runtime on Node 25+,
+  in-process on Node 24).
+- Measured capacity: [operations/PERFORMANCE.md](operations/PERFORMANCE.md).
 
 ## Gates
 
@@ -91,5 +116,11 @@ What stays open is in [security/THREAT_MODEL.md](security/THREAT_MODEL.md#accept
 - V2's open items (live-model evaluation of Ask FlowAId, browser specs for the insights panels
   and the assistant, dashboard filters in the URL, the P2-6 and P3 refactors, a manual
   screen-reader pass) are listed in [project/FLOWAID_V2_FINAL_AUDIT.md](project/FLOWAID_V2_FINAL_AUDIT.md).
-- ⌘K opens the node palette only while focus is inside the canvas (elsewhere it opens the
-  command menu); the Add node button is reachable with Tab.
+- Not run: the live-model evaluation of Ask FlowAId (needs a provider key in the environment:
+  `ANTHROPIC_API_KEY=… pnpm eval:assistant`) and a manual screen-reader pass (automated axe
+  checks gate every push).
+- Accepted for a local-first app, listed in
+  [security/THREAT_MODEL.md](security/THREAT_MODEL.md#accepted-risks-and-open-items): the API and
+  the worker share one database role; on Node 24 the plugin network guard runs in-process;
+  the global request limit fails open when Redis is down; master-key rotation needs the API and
+  worker stopped. Single sign-on, invitations and MFA are out of scope by decision.

@@ -118,7 +118,7 @@ export function configFromEnv(env: Env): ApiConfig {
       typeof trust === "boolean" || typeof trust === "string" || Array.isArray(trust)
         ? (trust as boolean | string | string[])
         : false,
-    rateLimit: { session: 600, apiKey: 1200, public: Number(env.RATE_LIMIT_MAX ?? 120) },
+    rateLimit: rateLimitsFrom(env.RATE_LIMIT_MAX),
     sseMaxStreamsPerPrincipal: Number(env.FLOWAID_SSE_MAX_STREAMS_PER_PRINCIPAL ?? 20),
     featuresDisabled: env.FLOWAID_FEATURES_DISABLED ?? [],
     hasRedis: env.flags.hasRedis,
@@ -204,4 +204,14 @@ export function defaultConfig(over: Partial<ApiConfig> = {}): ApiConfig {
     mcpStdio: { enabled: false, allowedCommands: [], envAllowlist: [] },
     ...over,
   };
+}
+
+/**
+ * Requests per minute: `RATE_LIMIT_MAX` per session principal (default 600), double for API keys
+ * and a fifth for unauthenticated requests (webhooks, sign-in) per address, as API.md §1 states.
+ */
+export function rateLimitsFrom(max: unknown): { session: number; apiKey: number; public: number } {
+  const n = Number(max ?? 600);
+  const session = Number.isFinite(n) && n >= 1 ? Math.floor(n) : 600;
+  return { session, apiKey: session * 2, public: Math.max(1, Math.floor(session / 5)) };
 }

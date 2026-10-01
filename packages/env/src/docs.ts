@@ -229,7 +229,7 @@ const docs = {
   RATE_LIMIT_MAX: {
     group: "core",
     description:
-      "Requests per minute allowed per session principal (api keys get double, webhooks half; API.md §1). Stored in Redis when `REDIS_URL` is set, otherwise in memory per api replica.",
+      "Requests per minute allowed per session principal; API keys get double and unauthenticated requests (webhooks, sign-in) a fifth per address (API.md §1). Stored in Redis when `REDIS_URL` is set, otherwise in memory per api replica.",
     default: "600",
     required: false,
     example: "600",

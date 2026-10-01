@@ -1,5 +1,5 @@
-ALTER TABLE "jobs" ADD COLUMN "result" jsonb;--> statement-breakpoint
-ALTER TABLE "mcp_exposures" ADD COLUMN "source" text DEFAULT 'manual' NOT NULL;--> statement-breakpoint
+ALTER TABLE "jobs" ADD COLUMN IF NOT EXISTS "result" jsonb;--> statement-breakpoint
+ALTER TABLE "mcp_exposures" ADD COLUMN IF NOT EXISTS "source" text DEFAULT 'manual' NOT NULL;--> statement-breakpoint
 -- Exposures a version of their workflow declared as an MCP trigger keep following the versions.
 UPDATE "mcp_exposures" e SET "source" = 'trigger'
 WHERE EXISTS (

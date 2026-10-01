@@ -12,6 +12,7 @@
   "scripts": {
     "start": "node --disable-warning=ExperimentalWarning scripts/start.ts",
     "preflight": "node --disable-warning=ExperimentalWarning scripts/preflight-cli.ts",
+    "loadtest": "node --disable-warning=ExperimentalWarning scripts/loadtest.ts",
     "check": "pnpm audit --prod --audit-level=high && pnpm boundaries && pnpm pageindex:test && pnpm env:check && pnpm sdk:check && pnpm ui:inventory:check && pnpm docs:check && pnpm format:check && pnpm lint:root && pnpm typecheck:root && turbo run typecheck lint build test",
     "build": "turbo run build",
     "docs:check": "pnpm --filter @flowaid/docs check",

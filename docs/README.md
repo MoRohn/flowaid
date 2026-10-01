@@ -38,6 +38,7 @@ specification; `project/` keeps the plans, reviews and audits that shaped the co
 | [BACKUP_AND_RESTORE.md](operations/BACKUP_AND_RESTORE.md) | Backing up the database and the master key together, restoring them, and checking the key after restore |
 | [UPGRADES.md](operations/UPGRADES.md)                     | Pinning image tags, upgrading, how migrations run, and rolling back by restoring                        |
 | [RUNBOOK.md](operations/RUNBOOK.md)                       | Health checks, logs, metrics, stuck runs, the queue, scaling workers and key rotation                   |
+| [PERFORMANCE.md](operations/PERFORMANCE.md)               | The load test and its latest results                                                                    |
 | [RELEASING.md](operations/RELEASING.md)                   | Changesets, the release workflow, the published images and how to verify them                           |
 
 ## AI, data and security (`ai/`, `data/`, `security/`, `architecture/`)

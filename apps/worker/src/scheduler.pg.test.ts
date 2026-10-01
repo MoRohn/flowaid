@@ -307,15 +307,20 @@ describeDb("scheduler (Postgres)", () => {
         nextRunAt: new Date(Date.now() - 1000),
       }),
     );
+    // other tests leave schedules that are due on the real clock: count only this one
     const failed: string[] = [];
     try {
-      expect(
-        await tickSchedules({
-          db: h.db.app,
-          queue: h.queue,
-          onFailed: (f) => failed.push(f.error),
-        }),
-      ).toEqual([]);
+      await tickSchedules({
+        db: h.db.app,
+        queue: h.queue,
+        onFailed: (f) => {
+          if (f.scheduleId === scheduleId) failed.push(f.error);
+        },
+      });
+      const fired = await h.db.app.system((tx) =>
+        tx.select({ labels: runs.labels }).from(runs).where(eq(runs.workflowId, workflowId)),
+      );
+      expect(fired.filter((r) => r.labels.scheduleId === scheduleId)).toEqual([]);
       const [row] = await h.db.app.system((tx) =>
         tx.select().from(schedules).where(eq(schedules.id, scheduleId)),
       );
