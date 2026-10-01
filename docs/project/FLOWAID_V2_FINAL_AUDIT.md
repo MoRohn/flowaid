@@ -30,16 +30,16 @@ Run on 2026-09-28 against the final tree, before this document was committed.
 
 ## Engineering
 
-| area              | status   | notes                                                                                                                                                                                                                                                                           |
-| ----------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Architecture      | complete | V2 adds two modules within the existing boundaries: `@flowaid/insights`, which is pure and browser-safe, and the assistant loop in `@flowaid/advisor`. There are no new tables or services. See [architecture/V2_OVERVIEW.md](../architecture/V2_OVERVIEW.md).                  |
-| P0 stabilisation  | complete | P0-1 to P0-7, each with a test that failed before the fix: loopback-only local mode, the commit-notice bus, retention, busy triggers, queue dead-letters, streamed pricing, the release gate.                                                                                   |
-| P1 foundational   | complete | P1-1 to P1-12, except P1-12's dashboard filters in the URL (partial, below).                                                                                                                                                                                                    |
-| P2 strategic      | partial  | Done: P2-1 Kish n + Bonferroni, P2-2 McNemar, P2-3 unpriced models, P2-4 MCP env and IPv6, P2-5 CI suites, sleeps and cache. **Open:** P2-6 (move publish, deploy and gate logic from routes into services).                                                                    |
-| P3 optimisation   | deferred | P3-1 builder bundle lazy-loading, P3-2 pagination everywhere, P3-3 Redis-backed limits, P3-4 lineage foreign keys and RLS bypass gating, P3-5 unused dependencies, P3-6 audit outbox, P3-7 `keys rotate-master`. None blocks V2; all are listed in the threat model or roadmap. |
-| Code quality      | complete | 0 `as any`, 0 `@ts-ignore`, 0 TODO/FIXME. New code follows the non-null-assertion ban and the `process.env` boundary (one documented exemption, for the `eval:assistant` developer command).                                                                                    |
-| Dependency health | complete | No new third-party dependencies. `pnpm audit --prod --audit-level=high` passes.                                                                                                                                                                                                 |
-| Repository drift  | complete | `pnpm db:migrate` and `db:generate` run again. Migration numbers in comments are corrected. The dead OIDC settings and routes are removed. STATUS records migrations through 0009.                                                                                              |
+| area              | status   | notes                                                                                                                                                                                                                                                                                                                             |
+| ----------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Architecture      | complete | V2 adds two modules within the existing boundaries: `@flowaid/insights`, which is pure and browser-safe, and the assistant loop in `@flowaid/advisor`. There are no new tables or services. See [architecture/V2_OVERVIEW.md](../architecture/V2_OVERVIEW.md).                                                                    |
+| P0 stabilisation  | complete | P0-1 to P0-7, each with a test that failed before the fix: loopback-only local mode, the commit-notice bus, retention, busy triggers, queue dead-letters, streamed pricing, the release gate.                                                                                                                                     |
+| P1 foundational   | complete | P1-1 to P1-12, except P1-12's dashboard filters in the URL (partial, below).                                                                                                                                                                                                                                                      |
+| P2 strategic      | partial  | Done: P2-1 Kish n + Bonferroni, P2-2 McNemar, P2-3 unpriced models, P2-4 MCP env and IPv6, P2-5 CI suites, sleeps and cache. **Open:** P2-6 (move publish, deploy and gate logic from routes into services).                                                                                                                      |
+| P3 optimisation   | deferred | P3-1 builder bundle lazy-loading, P3-2 pagination everywhere, P3-4 lineage foreign keys, P3-5 unused dependencies. Done after the audit: P3-3 Redis-backed limits, P3-4 RLS bypass gating, P3-6 audit rows in the change's transaction, P3-7 `keys rotate-master`. None blocks V2; all are listed in the threat model or roadmap. |
+| Code quality      | complete | 0 `as any`, 0 `@ts-ignore`, 0 TODO/FIXME. New code follows the non-null-assertion ban and the `process.env` boundary (one documented exemption, for the `eval:assistant` developer command).                                                                                                                                      |
+| Dependency health | complete | No new third-party dependencies. `pnpm audit --prod --audit-level=high` passes.                                                                                                                                                                                                                                                   |
+| Repository drift  | complete | `pnpm db:migrate` and `db:generate` run again. Migration numbers in comments are corrected. The dead OIDC settings and routes are removed. STATUS records migrations through 0009.                                                                                                                                                |
 
 ## Product
 
@@ -111,10 +111,15 @@ risks and open items are listed in
 [security/THREAT_MODEL.md](../security/THREAT_MODEL.md#accepted-risks-and-open-items):
 
 - plugins are trusted code;
-- the RLS bypass is a custom setting;
-- rate limits are in memory;
-- audit rows are written after commit;
-- there is no master-key rotation command.
+- the api and the worker share the database role that may lift RLS;
+- mutations that commit nothing through the database are audited after the fact;
+- the request rate limit fails open on a Redis error;
+- master-key rotation needs the api and the worker stopped.
+
+Fixed after the audit (2026-10-01): the RLS bypass is gated on membership in
+`flowaid_rls_bypass`, which the sandbox host's role lacks (P3-4); rate limits, login throttles and
+webhook replays are shared through Redis with `REDIS_URL` (P3-3); audit rows are written in the
+change's transaction (P3-6); `flowaid keys rotate-master` exists (P3-7).
 
 ## Performance
 
@@ -137,9 +142,9 @@ risks and open items are listed in
   - database-clock lease expiry;
   - readiness with Redis;
   - queue and worker gauges;
-  - backup and restore runbook.
+  - backup and restore runbook;
+  - database-clock timers (`PgRunStore.dueTimers`, fixed after the audit).
 - **Open:**
-  - `PgRunStore.dueTimers` still uses the worker's clock;
   - Compose worker replicas share one heartbeat file (documented in the runbook).
 
 ## Testing
@@ -173,7 +178,7 @@ risks and open items are listed in
 - SECURITY and CONTRIBUTING;
 - RELEASING;
 - API.md and UI.md, with the dead routes removed;
-- ARCHITECTURE: rotate-master marked as planned;
+- ARCHITECTURE: rotate-master marked as planned (shipped after the audit);
 - DATABASE.md;
 - the env README (generated).
 
