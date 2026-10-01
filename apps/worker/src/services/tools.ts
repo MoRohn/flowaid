@@ -1,6 +1,7 @@
 /**
  * `ctx.tools` in the worker: MCP tools and the resource/prompt builtins through the session pool,
- * OpenAPI operations through `executeOperation`, each call reported as TOOL_CALLED/TOOL_RETURNED.
+ * OpenAPI operations through `executeOperation`, the built-in agent tools (calculator, current_time,
+ * web_fetch through the guarded fetch), each call reported as TOOL_CALLED/TOOL_RETURNED.
  * Credentials: the node's `mcp`/`auth` slot when bound, else the tool's own credential.
  */
 import { and, eq } from "drizzle-orm";
@@ -14,7 +15,12 @@ import {
 } from "@flowaid/mcp";
 import { executeOperation, type OperationSpec } from "@flowaid/openapi-tools";
 import { agents, mcpServers, tools, type Database } from "@flowaid/database";
-import { AGENT_PRESET_BUILTIN } from "@flowaid/nodes-core";
+import {
+  AGENT_PRESET_BUILTIN,
+  BUILTIN_AGENT_TOOLS,
+  isBuiltinAgentTool,
+  runBuiltinTool,
+} from "@flowaid/nodes-core";
 import type { ToolAccess } from "@flowaid/node-sdk";
 import { uuidv7 } from "@flowaid/shared";
 import {
@@ -159,7 +165,12 @@ export function toolAccessFor(deps: ToolDeps, call: ExecutionCall): ToolAccess {
             .where(eq(tools.workspaceId, call.workspaceId)),
         ]),
       );
-      return [...servers.flatMap((s) => s.tools), ...sets.flatMap((s) => s.defs)];
+      // the workspace's own tools first, so a connected tool of the same name is the one used
+      return [
+        ...servers.flatMap((s) => s.tools),
+        ...sets.flatMap((s) => s.defs),
+        ...BUILTIN_AGENT_TOOLS,
+      ];
     },
     call: async (source, name, args, opts) => {
       const toolCallId = uuidv7();
@@ -179,6 +190,12 @@ export function toolAccessFor(deps: ToolDeps, call: ExecutionCall): ToolAccess {
         if (source.kind === "openapi") result = await openapi(source, args, opts?.timeoutMs);
         else if (source.kind === "builtin" && source.id === AGENT_PRESET_BUILTIN)
           result = await preset(args);
+        else if (source.kind === "builtin" && isBuiltinAgentTool(source.id))
+          result = await runBuiltinTool(source.id, args, {
+            fetch: deps.http,
+            signal: call.signal,
+            ...(opts?.timeoutMs ? { timeoutMs: opts.timeoutMs } : {}),
+          });
         else if (source.kind === "workflow") {
           if (!deps.workflows) throw new NotFoundError("workflow tools are not available here");
           result = await callWorkflowTool(

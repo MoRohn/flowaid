@@ -33,6 +33,9 @@ export const coreManifests: readonly NodeManifest[] = (file as unknown as { node
   .nodes;
 export const coreManifestPackage = { name: file.package, version: file.version };
 
+/** The tools built into FlowAId that any agent may use (definitions only; the worker runs them). */
+export { BUILTIN_AGENT_TOOLS, isBuiltinAgentTool } from "./tools/builtins/definitions.js";
+
 export interface CoreTemplate {
   id: string;
   name: string;

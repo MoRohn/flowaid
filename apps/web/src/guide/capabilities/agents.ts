@@ -6,11 +6,11 @@ export const AGENTS: CapabilityGuide = {
   what: "Set up reusable AI helpers that decide for themselves which tools to call, such as looking up an order or opening a ticket, within limits you choose.",
   when: "When a step has to work something out in several moves, like answering “where is my order?” by checking the order system and then the shipping carrier. For one fixed question, a Decision or Generate step is simpler, faster and cheaper.",
   needs:
-    "A text model with a key (OpenAI, Anthropic or Ollama). Tools are optional: connect an MCP server or import an OpenAPI document under Integrations, or expose a workflow as a tool under Triggers.",
+    "A text model with a key (OpenAI, Anthropic or Ollama). Three tools are built in: calculator, current_time and web_fetch. For your own systems, connect an MCP server or import an OpenAPI document under Integrations, or expose a workflow as a tool under Triggers.",
   start:
     "Press New agent. Five short steps cover its job, model, instructions, tools and limits, then you review it before creating.",
   result:
-    "A saved agent preset. On its own it does nothing: add an Agent step to a workflow, pick this preset, and run the draft. The run's trace shows every model turn and tool call.",
+    "A saved agent. While it is Active it appears by name in every workflow's Add node; add it, connect it and run the draft. Switch it to Inactive to hide it there without breaking the steps that already use it. The run's trace shows every model turn and tool call.",
   quality: {
     title: "What makes an agent work well",
     items: [

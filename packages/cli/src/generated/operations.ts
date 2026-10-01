@@ -16,6 +16,7 @@ export const OPERATIONS: readonly CliOperation[] = [
         { name: "name", type: "string", required: true },
         { name: "description", type: "string", required: false },
         { name: "config", type: "object", required: true },
+        { name: "active", type: "boolean", required: false },
       ],
     },
   },
@@ -49,6 +50,7 @@ export const OPERATIONS: readonly CliOperation[] = [
     query: [
       { name: "limit", type: "integer", required: false },
       { name: "cursor", type: "string", required: false },
+      { name: "active", type: "string", required: false, enum: ["true", "false"] },
     ],
     body: null,
   },
@@ -66,6 +68,7 @@ export const OPERATIONS: readonly CliOperation[] = [
         { name: "name", type: "string", required: false },
         { name: "description", type: "string", required: false },
         { name: "config", type: "object", required: false },
+        { name: "active", type: "boolean", required: false },
       ],
     },
   },
@@ -2088,7 +2091,8 @@ export const OPERATIONS: readonly CliOperation[] = [
     verb: "catalog",
     method: "GET",
     path: "/v1/tools/catalog",
-    summary: "Tool signatures the compiler resolves (MCP, OpenAPI, workflows)",
+    summary:
+      "Tools agents can call: built in (calculator, current time, web pages), MCP, OpenAPI, workflows",
     auth: "session_or_api_key",
     positional: [],
     query: [],

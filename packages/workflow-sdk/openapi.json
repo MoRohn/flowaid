@@ -1625,7 +1625,7 @@
     },
     "/v1/tools/catalog": {
       "get": {
-        "summary": "Tool signatures the compiler resolves (MCP, OpenAPI, workflows)",
+        "summary": "Tools agents can call: built in (calculator, current time, web pages), MCP, OpenAPI, workflows",
         "tags": ["catalog"],
         "x-cli": { "noun": "tool", "verb": "catalog" },
         "x-auth": "session_or_api_key",
@@ -8260,6 +8260,12 @@
             "in": "query",
             "name": "cursor",
             "required": false
+          },
+          {
+            "schema": { "type": "string", "enum": ["true", "false"] },
+            "in": "query",
+            "name": "active",
+            "required": false
           }
         ],
         "x-cli": { "noun": "agent", "verb": "list" },
@@ -8290,6 +8296,7 @@
                             "propertyNames": { "type": "string" },
                             "additionalProperties": {}
                           },
+                          "active": { "type": "boolean" },
                           "createdAt": { "type": "string" },
                           "updatedAt": { "type": "string" }
                         },
@@ -8298,6 +8305,7 @@
                           "name",
                           "description",
                           "config",
+                          "active",
                           "createdAt",
                           "updatedAt"
                         ],
@@ -8406,7 +8414,8 @@
                     },
                     "required": ["model"],
                     "additionalProperties": false
-                  }
+                  },
+                  "active": { "default": true, "type": "boolean" }
                 },
                 "required": ["name", "config"]
               }
@@ -8436,10 +8445,19 @@
                       "propertyNames": { "type": "string" },
                       "additionalProperties": {}
                     },
+                    "active": { "type": "boolean" },
                     "createdAt": { "type": "string" },
                     "updatedAt": { "type": "string" }
                   },
-                  "required": ["id", "name", "description", "config", "createdAt", "updatedAt"],
+                  "required": [
+                    "id",
+                    "name",
+                    "description",
+                    "config",
+                    "active",
+                    "createdAt",
+                    "updatedAt"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -8486,10 +8504,19 @@
                       "propertyNames": { "type": "string" },
                       "additionalProperties": {}
                     },
+                    "active": { "type": "boolean" },
                     "createdAt": { "type": "string" },
                     "updatedAt": { "type": "string" }
                   },
-                  "required": ["id", "name", "description", "config", "createdAt", "updatedAt"],
+                  "required": [
+                    "id",
+                    "name",
+                    "description",
+                    "config",
+                    "active",
+                    "createdAt",
+                    "updatedAt"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -8589,7 +8616,8 @@
                     },
                     "required": ["model"],
                     "additionalProperties": false
-                  }
+                  },
+                  "active": { "type": "boolean" }
                 }
               }
             }
@@ -8630,10 +8658,19 @@
                       "propertyNames": { "type": "string" },
                       "additionalProperties": {}
                     },
+                    "active": { "type": "boolean" },
                     "createdAt": { "type": "string" },
                     "updatedAt": { "type": "string" }
                   },
-                  "required": ["id", "name", "description", "config", "createdAt", "updatedAt"],
+                  "required": [
+                    "id",
+                    "name",
+                    "description",
+                    "config",
+                    "active",
+                    "createdAt",
+                    "updatedAt"
+                  ],
                   "additionalProperties": false
                 }
               }

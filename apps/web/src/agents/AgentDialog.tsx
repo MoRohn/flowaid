@@ -6,7 +6,7 @@
  */
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { CheckCircle2 } from "lucide-react";
 import type { ToolDefinition } from "@flowaid/workflow-core";
 import { ModelFallbacks } from "@flowaid/ui/forms";
@@ -120,6 +120,8 @@ export function AgentDialog({
       draft.tools.map((t) => (t.name === name ? { ...t, approval } : t)),
     );
   const available = useMemo(() => catalog.data ?? [], [catalog.data]);
+  const builtin = useMemo(() => available.filter(isBuiltinTool), [available]);
+  const own = useMemo(() => available.filter((t) => !isBuiltinTool(t)), [available]);
   const changes = useMemo(
     () => new Map(available.map((t) => [t.name, changesData(t)])),
     [available],
@@ -270,87 +272,57 @@ export function AgentDialog({
               {errors.tools}
             </p>
           ) : null}
-          {available.length === 0 ? (
-            catalog.isPending ? (
-              <p className="text-sm text-ink-3">Loading tools…</p>
-            ) : catalog.isError ? (
-              <p className="text-sm text-danger-text" role="alert">
-                Could not load the tool list.{" "}
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="link"
-                  onClick={() => void catalog.refetch()}
-                >
-                  Try again
-                </Button>
-              </p>
-            ) : (
-              <p className="rounded-sm border border-dashed border-border px-3 py-2.5 text-sm text-ink-3">
-                No tools yet. An agent without tools only writes answers. Your draft is kept while
-                you{" "}
-                <a className="text-accent-text hover:underline" href={`/${s.ws}/integrations`}>
-                  connect an MCP server
-                </a>
-                ,{" "}
-                <a
-                  className="text-accent-text hover:underline"
-                  href={`/${s.ws}/integrations?tab=openapi`}
-                >
-                  import an OpenAPI document
-                </a>{" "}
-                or{" "}
-                <a className="text-accent-text hover:underline" href={`/${s.ws}/triggers?tab=mcp`}>
-                  expose a workflow as a tool
-                </a>
-                ; come back and it is here.
-              </p>
-            )
+          {catalog.isPending ? (
+            <p className="text-sm text-ink-3">Loading tools…</p>
+          ) : catalog.isError ? (
+            <p className="text-sm text-danger-text" role="alert">
+              Could not load the tool list.{" "}
+              <Button type="button" size="sm" variant="link" onClick={() => void catalog.refetch()}>
+                Try again
+              </Button>
+            </p>
           ) : (
-            <ul className="flex flex-col divide-y divide-border rounded-sm border border-border">
-              {available.map((t) => {
-                const chosen = draft.tools.find((x) => x.name === t.name);
-                return (
-                  <li
-                    key={`${t.source.kind}:${t.name}`}
-                    className="flex items-center gap-3 px-3 py-2"
-                  >
-                    <Checkbox
-                      id={`tool-${t.name}`}
-                      checked={Boolean(chosen)}
-                      onCheckedChange={(v) => toggleTool(t.name, v === true)}
-                    />
-                    <label htmlFor={`tool-${t.name}`} className="min-w-0 flex-1">
-                      <span className="block font-mono text-sm text-ink">
-                        {t.name}
-                        {changesData(t) ? (
-                          <span className="ml-1.5 font-sans text-2xs text-warn-text">
-                            changes data
-                          </span>
-                        ) : null}
-                      </span>
-                      <span className="block truncate text-xs text-ink-3">
-                        {t.source.kind} · {t.description}
-                      </span>
-                    </label>
-                    {chosen ? (
-                      <Select
-                        size="sm"
-                        value={chosen.approval}
-                        onValueChange={(v) => setApproval(t.name, v as ApprovalMode)}
-                        aria-label={`Approval for ${t.name}`}
-                      >
-                        {(Object.keys(APPROVAL_LABEL) as ApprovalMode[]).map((m) => (
-                          <SelectItem key={m} value={m}>
-                            {APPROVAL_LABEL[m]}
-                          </SelectItem>
-                        ))}
-                      </Select>
-                    ) : null}
-                  </li>
-                );
-              })}
-            </ul>
+            <>
+              <ToolGroup
+                title="Built into FlowAId"
+                hint="Ready in every workspace, nothing to connect. Each only reads: none changes data."
+                tools={builtin}
+                chosen={draft.tools}
+                onToggle={toggleTool}
+                onApproval={setApproval}
+              />
+              <ToolGroup
+                title="Your tools"
+                hint="From connected MCP servers, imported OpenAPI documents and workflows exposed as tools."
+                tools={own}
+                chosen={draft.tools}
+                onToggle={toggleTool}
+                onApproval={setApproval}
+                empty={
+                  <p className="m-0 rounded-sm border border-dashed border-border px-3 py-2.5 text-sm text-ink-3">
+                    None yet. Your draft is kept while you{" "}
+                    <a className="text-accent-text hover:underline" href={`/${s.ws}/integrations`}>
+                      connect an MCP server
+                    </a>
+                    ,{" "}
+                    <a
+                      className="text-accent-text hover:underline"
+                      href={`/${s.ws}/integrations?tab=openapi`}
+                    >
+                      import an OpenAPI document
+                    </a>{" "}
+                    or{" "}
+                    <a
+                      className="text-accent-text hover:underline"
+                      href={`/${s.ws}/triggers?tab=mcp`}
+                    >
+                      expose a workflow as a tool
+                    </a>
+                    ; come back and it is here.
+                  </p>
+                }
+              />
+            </>
           )}
         </fieldset>
       ),
@@ -552,5 +524,105 @@ export function AgentDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** The tools built into FlowAId (calculator, current_time, web_fetch), as the catalog marks them. */
+const isBuiltinTool = (t: ToolDefinition) => t.source.kind === "builtin";
+
+const SOURCE_LABEL: Record<string, string> = {
+  builtin: "Built in",
+  mcp: "MCP server",
+  openapi: "OpenAPI",
+  workflow: "Workflow",
+  http: "HTTP",
+};
+
+/** What a person should know before giving an agent a built-in tool. */
+const BUILTIN_NOTE: Record<string, string> = {
+  web_fetch:
+    "Reaches the public internet. A page can contain instructions meant for the agent, and an address can carry data out: choose Always ask for agents that handle private data.",
+};
+
+function ToolGroup({
+  title,
+  hint,
+  tools,
+  chosen,
+  onToggle,
+  onApproval,
+  empty,
+}: {
+  title: string;
+  hint: string;
+  tools: readonly ToolDefinition[];
+  chosen: readonly { name: string; approval: ApprovalMode }[];
+  onToggle: (name: string, on: boolean) => void;
+  onApproval: (name: string, mode: ApprovalMode) => void;
+  empty?: ReactNode;
+}) {
+  const headingId = useId();
+  if (tools.length === 0 && !empty) return null;
+  return (
+    <section aria-labelledby={headingId} className="flex flex-col gap-1.5">
+      <div>
+        <h4 id={headingId} className="m-0 text-xs font-semibold text-ink">
+          {title}
+        </h4>
+        <p className="m-0 text-2xs text-ink-3">{hint}</p>
+      </div>
+      {tools.length === 0 ? (
+        empty
+      ) : (
+        <ul className="m-0 flex list-none flex-col divide-y divide-border rounded-sm border border-border p-0">
+          {tools.map((t) => {
+            const pick = chosen.find((x) => x.name === t.name);
+            const note = t.source.kind === "builtin" ? BUILTIN_NOTE[t.name] : undefined;
+            return (
+              <li key={`${t.source.kind}:${t.name}`} className="flex items-start gap-3 px-3 py-2">
+                <Checkbox
+                  id={`tool-${t.name}`}
+                  className="mt-0.5"
+                  checked={Boolean(pick)}
+                  onCheckedChange={(v) => onToggle(t.name, v === true)}
+                />
+                <label htmlFor={`tool-${t.name}`} className="min-w-0 flex-1">
+                  <span className="block font-mono text-sm text-ink">
+                    {t.name}
+                    {changesData(t) ? (
+                      <span className="ml-1.5 font-sans text-2xs text-warn-text">changes data</span>
+                    ) : null}
+                  </span>
+                  <span className="block text-xs text-ink-3">
+                    <span className="text-ink-2">
+                      {SOURCE_LABEL[t.source.kind] ?? t.source.kind}
+                    </span>
+                    {" · "}
+                    <span className="line-clamp-2">{t.description}</span>
+                  </span>
+                  {note && pick ? (
+                    <span className="mt-1 block text-2xs text-warn-text">{note}</span>
+                  ) : null}
+                </label>
+                {pick ? (
+                  <Select
+                    size="sm"
+                    value={pick.approval}
+                    onValueChange={(v) => onApproval(t.name, v as ApprovalMode)}
+                    aria-label={`Approval for ${t.name}`}
+                  >
+                    {(Object.keys(APPROVAL_LABEL) as ApprovalMode[]).map((m) => (
+                      <SelectItem key={m} value={m}>
+                        {APPROVAL_LABEL[m]}
+                      </SelectItem>
+                    ))}
+                  </Select>
+                ) : null}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
   );
 }

@@ -59,17 +59,21 @@ const AgentBody = z.object({
   name: z.string().min(1).max(100),
   description: z.string().max(2000).default(""),
   config: AgentPresetConfigSchema,
+  /** offered as its own step in the builder's Add node (default on) */
+  active: z.boolean().default(true),
 });
 const AgentPatch = z.object({
   name: z.string().min(1).max(100).optional(),
   description: z.string().max(2000).optional(),
   config: AgentPresetConfigSchema.optional(),
+  active: z.boolean().optional(),
 });
 const AgentDto = z.object({
   id: z.uuid(),
   name: z.string(),
   description: z.string(),
   config: z.record(z.string(), z.unknown()),
+  active: z.boolean(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -80,6 +84,7 @@ const agentDto = (a: AgentRow) => ({
   name: a.name,
   description: a.description,
   config: a.config,
+  active: a.active,
   createdAt: a.createdAt.toISOString(),
   updatedAt: a.updatedAt.toISOString(),
 });
@@ -105,18 +110,29 @@ export function agentRoutes(app: FastifyInstance, ctx: ApiContext): void {
         scope: "tools:read",
         cli: { noun: "agent", verb: "list" },
       },
-      schema: { tags: ["agents"], querystring: PageQuery, response: { 200: page(AgentDto) } },
+      schema: {
+        tags: ["agents"],
+        querystring: PageQuery.extend({
+          /** only the presets the builder offers as steps (true) or the switched-off ones (false) */
+          active: z.enum(["true", "false"]).optional(),
+        }),
+        response: { 200: page(AgentDto) },
+      },
     },
     async (req) => {
       enabled();
       const p = need(req.principal);
-      const { limit, cursor } = req.query;
+      const { limit, cursor, active } = req.query;
       const rows = await ctx.db.tenant(p.workspaceId, (tx) =>
         tx
           .select()
           .from(agents)
           .where(
-            and(eq(agents.workspaceId, p.workspaceId), afterCursor(agents.name, agents.id, cursor)),
+            and(
+              eq(agents.workspaceId, p.workspaceId),
+              afterCursor(agents.name, agents.id, cursor),
+              active === undefined ? undefined : eq(agents.active, active === "true"),
+            ),
           )
           .orderBy(asc(agents.name), asc(agents.id))
           .limit(limit + 1),
@@ -149,6 +165,7 @@ export function agentRoutes(app: FastifyInstance, ctx: ApiContext): void {
               name: req.body.name,
               description: req.body.description,
               config: req.body.config as JsonObject,
+              active: req.body.active,
             })
             .returning(),
         );
@@ -208,6 +225,7 @@ export function agentRoutes(app: FastifyInstance, ctx: ApiContext): void {
               ...(req.body.name !== undefined ? { name: req.body.name } : {}),
               ...(req.body.description !== undefined ? { description: req.body.description } : {}),
               ...(req.body.config !== undefined ? { config: req.body.config } : {}),
+              ...(req.body.active !== undefined ? { active: req.body.active } : {}),
               updatedAt: new Date(),
             })
             .where(and(eq(agents.id, req.params.id), eq(agents.workspaceId, p.workspaceId)))

@@ -4,7 +4,7 @@ import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { and, eq } from "drizzle-orm";
-import { coreManifests } from "@flowaid/nodes-core/manifest";
+import { BUILTIN_AGENT_TOOLS, coreManifests } from "@flowaid/nodes-core/manifest";
 import { DefaultModelCatalog } from "@flowaid/providers";
 import {
   environments,
@@ -102,7 +102,8 @@ export function catalogRoutes(app: FastifyInstance, ctx: ApiContext): void {
       },
       schema: {
         tags: ["catalog"],
-        summary: "Tool signatures the compiler resolves (MCP, OpenAPI, workflows)",
+        summary:
+          "Tools agents can call: built in (calculator, current time, web pages), MCP, OpenAPI, workflows",
         response: { 200: z.array(ToolDefinitionDtoSchema) },
       },
     },
@@ -110,7 +111,8 @@ export function catalogRoutes(app: FastifyInstance, ctx: ApiContext): void {
       const p = req.principal;
       if (!p) throw new ForbiddenError("no principal");
       return ctx.db.tenant(p.workspaceId, async (tx) => {
-        const out: ToolDefinition[] = [];
+        // the built-in tools need nothing connected, so every workspace has them
+        const out: ToolDefinition[] = [...BUILTIN_AGENT_TOOLS];
         for (const s of await tx
           .select()
           .from(mcpServers)

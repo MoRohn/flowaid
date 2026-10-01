@@ -883,6 +883,8 @@ export const agents = pgTable(
     name: text("name").notNull(),
     description: text("description").notNull().default(""),
     config: jsonb("config").$type<JsonObject>().notNull(), // { model: ModelRef, system, tools: ToolRef[], bounds, approval }
+    // active presets are offered as their own steps in the builder's Add node palette
+    active: boolean("active").notNull().default(true),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

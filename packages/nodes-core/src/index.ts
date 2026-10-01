@@ -145,6 +145,14 @@ export {
   type ApprovalMode,
 } from "./ai/agent.js";
 export { DOCUMENT_TOOL_NAMES } from "./ai/agentDocuments.js";
+export {
+  BUILTIN_AGENT_TOOLS,
+  CALCULATOR_TOOL,
+  CURRENT_TIME_TOOL,
+  WEB_FETCH_TOOL,
+  isBuiltinAgentTool,
+} from "./tools/builtins/definitions.js";
+export { evaluateArithmetic, runBuiltinTool, type BuiltinToolDeps } from "./tools/builtins/run.js";
 export { indexEventName } from "./retrieval/pageindex.js";
 
 /** Every core node, in palette order. */

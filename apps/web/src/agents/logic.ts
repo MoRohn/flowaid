@@ -7,6 +7,8 @@ export interface AgentPreset {
   name: string;
   description: string;
   config: Record<string, unknown>;
+  /** offered as its own step in the builder's Add node; older servers leave it out (active) */
+  active?: boolean;
   createdAt: string;
   updatedAt: string;
 }

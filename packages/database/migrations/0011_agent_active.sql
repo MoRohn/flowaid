@@ -1,0 +1,1 @@
+ALTER TABLE "agents" ADD COLUMN "active" boolean DEFAULT true NOT NULL;

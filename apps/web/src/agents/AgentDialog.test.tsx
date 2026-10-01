@@ -172,3 +172,45 @@ describe("editing an agent", () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 });
+
+describe("the tools step", () => {
+  it("lists the built-in tools apart from the workspace's own, with a note for web pages", async () => {
+    stubApi({
+      "GET /v1/models": () => [],
+      "GET /v1/providers": () => [],
+      "GET /v1/credentials": () => ({ items: [], next_cursor: null }),
+      "GET /v1/tools/catalog": () => [
+        {
+          name: "web_fetch",
+          description: "Reads a public web page.",
+          inputSchema: {},
+          idempotency: "safe",
+          approvalRequired: false,
+          source: { kind: "builtin", id: "web_fetch" },
+        },
+        {
+          name: "refund",
+          description: "Refund an order",
+          inputSchema: {},
+          idempotency: "none",
+          approvalRequired: false,
+          source: { kind: "openapi" },
+        },
+      ],
+    });
+    open();
+    act(() => {
+      fireEvent.click(screen.getByRole("radio", { name: /All fields/ }));
+    });
+    const builtIn = await screen.findByRole("region", { name: "Built into FlowAId" });
+    const own = screen.getByRole("region", { name: "Your tools" });
+    expect(builtIn.textContent).toContain("web_fetch");
+    expect(builtIn.textContent).not.toContain("refund");
+    expect(own.textContent).toContain("OpenAPI");
+    expect(screen.queryByText(/Reaches the public internet/)).toBeNull();
+    act(() => {
+      fireEvent.click(screen.getByRole("checkbox", { name: /web_fetch/ }));
+    });
+    expect(screen.getByText(/Reaches the public internet/)).toBeTruthy();
+  });
+});

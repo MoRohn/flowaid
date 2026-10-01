@@ -18,6 +18,7 @@ import {
 import { PageHeader } from "@flowaid/ui/shell";
 import { del, get, getAll } from "~/api/client";
 import { QueryView, useConfirm, useMutate } from "~/admin/ui";
+import { AgentActiveSwitch } from "~/agents/AgentActiveSwitch";
 import { AgentDialog } from "~/agents/AgentDialog";
 import {
   APPROVAL_LABEL,
@@ -90,7 +91,7 @@ export default function AgentsPage() {
       <PageBody>
         <PageHeader
           title="Agents"
-          description="Tool-using agents: a model, instructions, the tools it may call and when a person approves a call. Add an Agent node to a workflow and pick one."
+          description="Tool-using agents: a model, instructions, the tools it may call and when a person approves a call. Active agents appear as their own steps in every workflow's Add node."
           actions={newButton}
         />
         <PageIntro guide={AGENTS} checks={checks} defaultCollapsed={(list.data?.length ?? 0) > 0} />
@@ -113,9 +114,12 @@ export default function AgentsPage() {
                     }[];
                     return (
                       <li key={a.id}>
-                        <Card>
+                        <Card className={a.active === false ? "opacity-80" : undefined}>
                           <CardHeader>
-                            <CardTitle>{a.name}</CardTitle>
+                            <div className="flex items-start justify-between gap-3">
+                              <CardTitle>{a.name}</CardTitle>
+                              <AgentActiveSwitch agent={a} disabled={!canWrite} />
+                            </div>
                             {a.description ? (
                               <CardDescription>{a.description}</CardDescription>
                             ) : null}

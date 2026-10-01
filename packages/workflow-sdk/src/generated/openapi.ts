@@ -11,6 +11,7 @@ export interface paths {
     get: {
       parameters: {
         query?: {
+          active?: "true" | "false";
           cursor?: string;
           limit?: number;
         };
@@ -28,6 +29,7 @@ export interface paths {
           content: {
             "application/json": {
               items: {
+                active: boolean;
                 config: {
                   [key: string]: unknown;
                 };
@@ -55,6 +57,8 @@ export interface paths {
       requestBody: {
         content: {
           "application/json": {
+            /** @default true */
+            active?: boolean;
             config: {
               maxCostUsd?: number;
               maxOutputTokens?: number;
@@ -111,6 +115,7 @@ export interface paths {
           };
           content: {
             "application/json": {
+              active: boolean;
               config: {
                 [key: string]: unknown;
               };
@@ -156,6 +161,7 @@ export interface paths {
           };
           content: {
             "application/json": {
+              active: boolean;
               config: {
                 [key: string]: unknown;
               };
@@ -206,6 +212,7 @@ export interface paths {
       requestBody: {
         content: {
           "application/json": {
+            active?: boolean;
             config?: {
               maxCostUsd?: number;
               maxOutputTokens?: number;
@@ -261,6 +268,7 @@ export interface paths {
           };
           content: {
             "application/json": {
+              active: boolean;
               config: {
                 [key: string]: unknown;
               };
@@ -7789,7 +7797,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Tool signatures the compiler resolves (MCP, OpenAPI, workflows) */
+    /** Tools agents can call: built in (calculator, current time, web pages), MCP, OpenAPI, workflows */
     get: {
       parameters: {
         query?: never;

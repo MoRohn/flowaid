@@ -2,11 +2,11 @@
 
 exports[`generated CLI > matches the command tree snapshot 1`] = `
 "agent
-agent create {--name --description --config --body --out}
+agent create {--name --description --config --active --body --out}
 agent delete <id> {--out}
 agent get <id> {--out}
-agent list {--limit --cursor --out}
-agent update <id> {--name --description --config --body --out}
+agent list {--limit --cursor --active --out}
+agent update <id> {--name --description --config --active --body --out}
 alerts
 alerts deliveries {--limit --before --out}
 api-key

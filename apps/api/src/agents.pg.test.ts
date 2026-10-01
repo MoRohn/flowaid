@@ -72,6 +72,60 @@ describeDb("agent presets and workflows as tools (Postgres)", () => {
     expect((await call(t.app, jar, "GET", `/v1/agents/${id}`)).statusCode).toBe(404);
   });
 
+  it("is active when created, can be switched off and on, and lists by that", async () => {
+    const a = (
+      await call(t.app, jar, "POST", "/v1/agents", { name: "Toggle agent", config: { model } })
+    ).json();
+    expect(a.active).toBe(true);
+    const off = await call(t.app, jar, "PATCH", `/v1/agents/${a.id as string}`, { active: false });
+    expect(off.statusCode).toBe(200);
+    expect(off.json()).toMatchObject({ active: false, name: "Toggle agent" });
+    const names = async (q: string) =>
+      (
+        (await call(t.app, jar, "GET", `/v1/agents?limit=200${q}`)).json().items as {
+          name: string;
+        }[]
+      ).map((x) => x.name);
+    expect(await names("&active=true")).not.toContain("Toggle agent");
+    expect(await names("&active=false")).toContain("Toggle agent");
+    expect(await names("")).toContain("Toggle agent");
+    // other settings stay as they were
+    const on = await call(t.app, jar, "PATCH", `/v1/agents/${a.id as string}`, { active: true });
+    expect(on.json()).toMatchObject({ active: true, config: { model } });
+    expect(await names("&active=true")).toContain("Toggle agent");
+    const off2 = (
+      await call(t.app, jar, "POST", "/v1/agents", {
+        name: "Off",
+        config: { model },
+        active: false,
+      })
+    ).json();
+    expect(off2.active).toBe(false);
+    // leave the list as the other tests expect it
+    for (const id of [a.id, off2.id] as string[])
+      await call(t.app, jar, "DELETE", `/v1/agents/${id}`);
+  });
+
+  it("offers the built-in tools in every workspace's catalog, before its own", async () => {
+    const catalog = (await call(t.app, jar, "GET", "/v1/tools/catalog")).json() as {
+      name: string;
+      source: { kind: string; id?: string };
+      approvalRequired: boolean;
+    }[];
+    expect(catalog.slice(0, 3)).toEqual([
+      expect.objectContaining({
+        name: "calculator",
+        source: { kind: "builtin", id: "calculator" },
+      }),
+      expect.objectContaining({
+        name: "current_time",
+        source: { kind: "builtin", id: "current_time" },
+      }),
+      expect.objectContaining({ name: "web_fetch", source: { kind: "builtin", id: "web_fetch" } }),
+    ]);
+    expect(catalog.slice(0, 3).every((c) => !c.approvalRequired)).toBe(true);
+  });
+
   it("pages the list by name with a cursor", async () => {
     for (const name of ["Pager C", "Pager A", "Pager B"])
       await call(t.app, jar, "POST", "/v1/agents", { name, config: { model } });

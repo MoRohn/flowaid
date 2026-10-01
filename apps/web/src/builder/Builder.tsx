@@ -50,7 +50,7 @@ import {
   EmptyState,
   toast,
 } from "@flowaid/ui/primitives";
-import { ApiError, del, get, patch, post, put } from "~/api/client";
+import { ApiError, del, get, getAll, patch, post, put } from "~/api/client";
 import type { WorkflowDetail } from "~/api/types";
 import { useSession } from "~/session";
 import { AppFrame } from "~/shell/AppFrame";
@@ -87,6 +87,9 @@ import { explainRun } from "~/guide/explain";
 import { NodeInspector } from "./NodeInspector";
 import { useKeySources } from "./CredentialSlots";
 import { autoBindSlots } from "./keySources";
+import { agentPaletteDescription, agentPresetKind, agentStepFor, presetIdOf } from "./agentSteps";
+import { activeAgentsKey } from "~/agents/AgentActiveSwitch";
+import type { AgentPreset } from "~/agents/logic";
 import { PublishDialog } from "./PublishDialog";
 import { RunTab, missingRequired } from "./RunTab";
 import { CostTab, ReviewTab, advisorAvailability, costDiagnostics, useAdvisor } from "./advisor";
@@ -438,6 +441,13 @@ function BuilderView({
   );
 
   // --- palette ---
+  // active agents (Agents page) are offered as steps of their own, set up to use that agent
+  const activeAgents = useQuery({
+    queryKey: activeAgentsKey(s.ws),
+    queryFn: () => getAll<AgentPreset>("/v1/agents", { active: "true" }),
+    enabled: s.features.agents !== false && s.can("tools:read"),
+    staleTime: 30_000,
+  });
   const palette: NodeDefinitionView[] = useMemo(
     () => [
       ...STRUCTURAL_KINDS.map((k) => ({
@@ -455,8 +465,18 @@ function BuilderView({
           category: m.metadata.category,
           description: m.metadata.description,
         })),
+      ...(activeAgents.data ?? [])
+        .filter((a) => a.active !== false)
+        .map((a) => ({
+          kind: agentPresetKind(a.id),
+          name: a.name,
+          category: "agent" as const,
+          description: agentPaletteDescription(a),
+          // shown where other steps show their type id
+          provider: "your agent",
+        })),
     ],
-    [catalog],
+    [catalog, activeAgents.data],
   );
   // Quick add: a new step follows the selected one (placed beside it and connected from its
   // first free port); otherwise it goes where asked, moved clear of other steps.
@@ -468,13 +488,17 @@ function BuilderView({
       const d = st.definition;
       const sel = st.selection.nodes.length === 1 ? st.selection.nodes[0] : undefined;
       const after = sel ? d.nodes.find((n) => n.id === sel) : undefined;
-      const node = newNode(
-        d,
-        def.kind,
-        catalog,
-        (schema) => withDefaults(schema as never, {}),
-        after?.parent,
-      );
+      const presetId = presetIdOf(def.kind);
+      const preset = presetId ? activeAgents.data?.find((a) => a.id === presetId) : undefined;
+      const node = preset
+        ? agentStepFor(d, preset, catalog, after?.parent)
+        : newNode(
+            d,
+            def.kind,
+            catalog,
+            (schema) => withDefaults(schema as never, {}),
+            after?.parent,
+          );
       if (!node) return;
       const port = after
         ? freeControlPort(d, after, defaultControlOuts(after, catalog))
@@ -494,7 +518,7 @@ function BuilderView({
       );
       setRecentKinds((prev) => rememberRecentKind(prev, def.kind));
     },
-    [store, catalog, keySources],
+    [store, catalog, keySources, activeAgents.data],
   );
 
   // --- save (autosave, ⌘S, before run/publish) ---
