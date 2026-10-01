@@ -16,6 +16,7 @@ import {
   evaluationRuns,
   humanTasks,
   workflowVersions,
+  budgetStatusIfSet,
   type Database,
 } from "@flowaid/database";
 import {
@@ -28,7 +29,13 @@ import {
   type RunRecord,
 } from "@flowaid/evaluation";
 import { uuidv7 } from "@flowaid/shared";
-import type { DecisionProvider, JsonObject, QueueDriver, Run } from "@flowaid/workflow-core";
+import {
+  BudgetExceededError,
+  type DecisionProvider,
+  type JsonObject,
+  type QueueDriver,
+  type Run,
+} from "@flowaid/workflow-core";
 import { evaluationJudge, type JudgeDeps } from "../services/judge.js";
 
 const TERMINAL = new Set<Run["status"]>(["completed", "failed", "cancelled", "timed_out"]);
@@ -129,6 +136,10 @@ export async function runEvaluationJob(
 
   const launcher: RunLauncher = {
     async launch(req) {
+      // each case is a new run: none start once the workspace's monthly budget is spent
+      const budget = await db.system((tx) => budgetStatusIfSet(tx, row.workspaceId, new Date()));
+      if (budget?.reached && budget.monthlyCostUsd !== null)
+        throw new BudgetExceededError(budget.month, budget.spentUsd, budget.monthlyCostUsd);
       const id = uuidv7();
       const now = new Date().toISOString();
       const run: Run = {

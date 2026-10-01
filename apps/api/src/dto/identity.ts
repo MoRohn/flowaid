@@ -61,6 +61,17 @@ export const WorkspaceSettingsSchema = z
   })
   .loose();
 
+/** This calendar month's (UTC) run spend against the monthly budget. */
+export const WorkspaceBudgetSchema = z.object({
+  /** `YYYY-MM` (UTC) */
+  month: z.string(),
+  spentUsd: z.number(),
+  /** null: no budget set */
+  monthlyCostUsd: z.number().nullable(),
+  /** the spend reached the budget: new runs are refused until next month */
+  reached: z.boolean(),
+});
+
 export const WorkspaceSchema = z.object({
   id: z.uuid(),
   slug: z.string(),

@@ -42,6 +42,8 @@ import {
   toPage,
 } from "../dto/common.js";
 import { resolveRunVersion } from "../services/runs.js";
+import { assertWithinBudget } from "../services/budget.js";
+import { serverCredentialTypes } from "../services/serverKeys.js";
 
 type SetRow = typeof evaluationSets.$inferSelect;
 type CaseRow = typeof evaluationCases.$inferSelect;
@@ -481,10 +483,16 @@ export function evaluationRoutes(app: FastifyInstance, ctx: ApiContext): void {
           )[0]?.id;
         if (!envId) throw new BadRequestError("pass environmentId");
         assertEnvironmentAllowed(p, envId);
-        const version = await resolveRunVersion(tx, p, workflowId, envId, {
-          versionId: b.versionId,
-          draft: b.draft,
-        });
+        const version = await resolveRunVersion(
+          tx,
+          p,
+          workflowId,
+          envId,
+          { versionId: b.versionId, draft: b.draft },
+          serverCredentialTypes(ctx.env),
+        );
+        // every case is a run: none start once the monthly budget is spent
+        await assertWithinBudget(ctx, tx, { id: p.workspaceId, slug: p.workspaceSlug });
         const [created] = await tx
           .insert(evaluationRuns)
           .values({

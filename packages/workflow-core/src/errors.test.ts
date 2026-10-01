@@ -4,6 +4,7 @@ import {
   BadRequestError,
   BoundsExceededError,
   CancelledError,
+  BudgetExceededError,
   ConflictError,
   CredentialError,
   ErrorEnvelopeSchema,
@@ -162,6 +163,12 @@ const CASES: { error: FlowaidError; code: ErrorCode; httpStatus: number; retryab
   { error: new NetworkError("net"), code: "NETWORK_ERROR", httpStatus: 502, retryable: true },
   { error: new NotFoundError("nf"), code: "NOT_FOUND", httpStatus: 404, retryable: false },
   { error: new ConflictError("conflict"), code: "CONFLICT", httpStatus: 409, retryable: false },
+  {
+    error: new BudgetExceededError("2030-03", 101.5, 100),
+    code: "CONFLICT",
+    httpStatus: 409,
+    retryable: false,
+  },
   {
     error: new UnauthorizedError("unauth"),
     code: "UNAUTHORIZED",

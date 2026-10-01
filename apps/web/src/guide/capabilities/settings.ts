@@ -4,12 +4,12 @@ import type { CapabilityGuide } from "./types";
 export const SETTINGS_WORKSPACE: CapabilityGuide = {
   id: "settings-workspace",
   title: "Workspace settings",
-  what: "Name the workspace and set its limits: how many runs may wait in the queue and the monthly budget the workflow advisor measures cost against.",
-  when: "Once when you set FlowAId up, and again when runs start being turned away (the queue limit) or you want the advisor to judge cost against a budget.",
+  what: "Name the workspace and set its limits: how long old run data and the audit log are kept, how many runs may wait in the queue, and the monthly budget runs may spend.",
+  when: "Once when you set FlowAId up, and again when runs start being turned away (the queue limit or the budget) or you want to keep data for a different time.",
   needs: "Admin rights. Every field is optional: empty ones use the server's defaults.",
   start: "Change a field and press Save changes. Switching tabs keeps unsaved edits.",
   result:
-    "Saved settings. The queue limit applies to the next run; the budget is advice only and never stops a run. Retention values are saved but not applied yet.",
+    "Saved settings. The queue limit and the budget apply to the next run: once this month's spend reaches the budget, new runs are refused until next month. Retention values apply at the next nightly clean-up.",
 };
 
 export const SETTINGS_API_KEYS: CapabilityGuide = {
@@ -44,7 +44,7 @@ export const SETTINGS_ENVIRONMENTS: CapabilityGuide = {
   start:
     "Edit an environment to add variables or protect it, or press New environment for another stage.",
   result:
-    "An environment workflows can deploy to. A deploy only succeeds when every required secret is bound there; webhooks and schedules start the version deployed to their environment.",
+    "An environment workflows can deploy to. A deploy only succeeds when every required secret is bound there or answered by a key set on the server; webhooks and schedules start the version deployed to their environment.",
   reading: {
     title: "How the stages differ",
     items: [

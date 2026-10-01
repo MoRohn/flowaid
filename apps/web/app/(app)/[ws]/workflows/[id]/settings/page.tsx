@@ -20,6 +20,7 @@ import { del, get, getAll, patch, put } from "~/api/client";
 import type { WorkflowDetail } from "~/api/types";
 import { WorkflowFrame } from "~/admin/WorkflowFrame";
 import { credentialsForSecret, missingRequiredSecrets, parseTags } from "~/admin/logic";
+import { useServerCredentialTypes } from "~/builder/useServerKeys";
 import type { Credential, EvaluationSet } from "~/admin/types";
 import { DraftProvider, isTabDirty, useDirtyKeys, usePreservedDraft } from "~/admin/drafts";
 import { Notice, QueryView, Section, useMutate, useQueryTab } from "~/admin/ui";
@@ -183,7 +184,8 @@ function EnvSecretsForm({
       invalidate: [["secret-bindings", s.ws, w.id, envId]],
     },
   );
-  const missing = missingRequiredSecrets(declared, draft);
+  const served = useServerCredentialTypes();
+  const missing = missingRequiredSecrets(declared, draft, served);
   return (
     <Section
       title={
@@ -246,8 +248,10 @@ function EnvSecretsForm({
                   <Select
                     aria-label={`Credential for ${d.name} in ${env?.name ?? ""}`}
                     value={draft[d.name] ?? NONE}
-                    invalid={d.required !== false && !draft[d.name]}
-                    placeholder="Not bound"
+                    invalid={
+                      d.required !== false && !draft[d.name] && !served.has(d.credentialType)
+                    }
+                    placeholder={served.has(d.credentialType) ? "Server key" : "Not bound"}
                     onValueChange={(v) =>
                       setDraft((x) => {
                         const next = { ...x };
@@ -257,7 +261,9 @@ function EnvSecretsForm({
                       })
                     }
                   >
-                    <SelectItem value={NONE}>Not bound</SelectItem>
+                    <SelectItem value={NONE}>
+                      {served.has(d.credentialType) ? "Server key" : "Not bound"}
+                    </SelectItem>
                     {options.map((c) => (
                       <SelectItem
                         key={c.id}
@@ -299,8 +305,9 @@ function Secrets({ w }: { w: WorkflowDetail }) {
   return (
     <div className="flex flex-col gap-4">
       <p className="text-xs text-ink-3">
-        Each declared secret resolves to a credential per environment. Deploys are refused while a
-        required secret is unbound.{" "}
+        Each declared secret resolves to a credential per environment. A secret nothing is bound to
+        uses the server&apos;s own key for its type (TYPESAFE_API_KEY, OPENAI_API_KEY, …) when there
+        is one; deploys and runs are refused while a required secret has neither.{" "}
         {s.features.credentials ? (
           <Link className="text-accent-text hover:underline" href={`/${s.ws}/credentials`}>
             Manage credentials

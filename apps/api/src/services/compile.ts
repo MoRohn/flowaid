@@ -44,6 +44,8 @@ export interface CompileContextInput {
   workspaceId: string;
   environmentId?: string | null;
   level: "draft" | "publish";
+  /** credential types the server has a key for (`serverCredentialTypes`): those secrets count as bound */
+  serverCredentialTypes?: ReadonlySet<string>;
 }
 
 /** Loads everything `compile()` resolves against, inside the caller's tenant transaction. */
@@ -173,6 +175,7 @@ export async function loadCompileContext(tx: Tx, i: CompileContextInput) {
       return true;
     },
     ...(boundSecrets ? { boundSecrets } : {}),
+    ...(i.serverCredentialTypes ? { serverCredentialTypes: i.serverCredentialTypes } : {}),
     ...(defaultDecisions ? { defaultDecisions } : {}),
     level: i.level,
     compilerVersion: COMPILER_VERSION,

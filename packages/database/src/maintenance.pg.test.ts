@@ -295,6 +295,125 @@ describeDb("credentials, artifacts, retention and seeds", () => {
     expect((await store.latestCheckpoint(run.id, 99))?.seq).toBe(4);
   });
 
+  describe("workspace retention settings", () => {
+    const store = () => new PgRunStore(t.app);
+    const withSettings = async (settings: Record<string, unknown>) => {
+      const w = await seedTenant(t.app);
+      await t.admin`update workspaces set settings = ${t.admin.json(settings as never)} where id = ${w.workspaceId}`;
+      return w;
+    };
+    /** a finished run that ended `endedDaysAgo` days ago, with `expires_at` from its class */
+    const finished = async (
+      w: Tenant,
+      endedDaysAgo: number,
+      retentionClass: "standard" | "short" | "long" = "standard",
+    ) => {
+      const { run, created } = newRun(w);
+      await store().createRun(run, created);
+      const classDays = { standard: 90, short: 7, long: 400 }[retentionClass];
+      await t.admin`
+        update runs set status = 'completed', retention_class = ${retentionClass},
+          ended_at = now() - ${endedDaysAgo} * interval '1 day',
+          expires_at = now() - ${endedDaysAgo} * interval '1 day' + ${classDays} * interval '1 day'
+        where id = ${run.id}`;
+      return run.id;
+    };
+    const swept = async (ids: string[]) =>
+      Object.fromEntries(
+        (
+          await t.admin<{ id: string; input: unknown }[]>`
+            select id, input from runs where id in ${t.admin(ids)}`
+        ).map((r) => [r.id, r.input === null]),
+      );
+
+    it("expires standard runs after the workspace's runsDays, longer or shorter than 90", async () => {
+      const short = await withSettings({ retention: { runsDays: 30 } });
+      const long = await withSettings({ retention: { runsDays: 365 } });
+      const invalid = await withSettings({ retention: { runsDays: 0 } });
+      const plain = await seedTenant(t.app);
+      const ids = {
+        shortOld: await finished(short, 40),
+        shortRecent: await finished(short, 10),
+        shortLongClass: await finished(short, 40, "long"),
+        shortShortClass: await finished(short, 8, "short"),
+        longPast90: await finished(long, 100),
+        longPastIts: await finished(long, 370),
+        invalidPast90: await finished(invalid, 100),
+        plainPast90: await finished(plain, 100),
+        plainRecent: await finished(plain, 40),
+      };
+      await sweepRetention(t.app);
+      expect(await swept(Object.values(ids))).toEqual({
+        [ids.shortOld]: true,
+        [ids.shortRecent]: false,
+        [ids.shortLongClass]: false, // the workflow's own class wins
+        [ids.shortShortClass]: true,
+        [ids.longPast90]: false, // 365 days replaces 90
+        [ids.longPastIts]: true,
+        [ids.invalidPast90]: true, // out of bounds: the default applies
+        [ids.plainPast90]: true,
+        [ids.plainRecent]: false,
+      });
+    });
+
+    it("deletes audit entries past auditDays (at least 90), else past 400 days", async () => {
+      const custom = await withSettings({ retention: { auditDays: 120 } });
+      const tooShort = await withSettings({ retention: { auditDays: 30 } });
+      const plain = await seedTenant(t.app);
+      const entry = async (workspaceId: string | null, daysAgo: number) => {
+        const id = uuidv7();
+        await t.admin`
+          insert into audit_events (id, workspace_id, actor_type, actor_id, action, resource_type, resource_id, at)
+          values (${id}, ${workspaceId}, 'system', 'test', 'test.retention', 'workspace', 'x',
+                  now() - ${daysAgo} * interval '1 day')`;
+        return id;
+      };
+      const ids = {
+        customOld: await entry(custom.workspaceId, 130),
+        customKept: await entry(custom.workspaceId, 100),
+        tooShortKept: await entry(tooShort.workspaceId, 100),
+        plainOld: await entry(plain.workspaceId, 401),
+        plainKept: await entry(plain.workspaceId, 399),
+        signInOld: await entry(null, 401),
+      };
+      const result = await sweepRetention(t.app);
+      expect(result.auditEvents).toBeGreaterThanOrEqual(3);
+      const left = (
+        await t.admin<{ id: string }[]>`
+          select id from audit_events where id in ${t.admin(Object.values(ids))}`
+      ).map((r) => r.id);
+      expect(left.sort()).toEqual([ids.customKept, ids.tooShortKept, ids.plainKept].sort());
+    });
+
+    it("expires run artifacts after artifactsDays; uploads and other workspaces keep theirs", async () => {
+      const custom = await withSettings({ retention: { artifactsDays: 5 } });
+      const plain = await seedTenant(t.app);
+      const customRun = await finished(custom, 1);
+      const plainRun = await finished(plain, 1);
+      const artifact = async (w: Tenant, runId: string | null, daysAgo: number) => {
+        const id = uuidv7();
+        await t.admin`
+          insert into artifacts (id, workspace_id, run_id, name, mime_type, bytes, sha256, storage, storage_key, kind, created_at)
+          values (${id}, ${w.workspaceId}, ${runId}, 'out.json', 'application/json', 2, 'x', 'local',
+                  ${`ws/${w.workspaceId}/${id}`}, ${runId ? "file" : "upload"},
+                  now() - ${daysAgo} * interval '1 day')`;
+        return id;
+      };
+      const ids = {
+        old: await artifact(custom, customRun, 6),
+        recent: await artifact(custom, customRun, 2),
+        upload: await artifact(custom, null, 30),
+        otherWorkspace: await artifact(plain, plainRun, 60),
+      };
+      expect((await sweepRetention(t.app)).expiredArtifacts).toBe(1);
+      const expired = await t.admin<{ id: string }[]>`
+        select id from artifacts where id in ${t.admin(Object.values(ids))}
+          and expires_at is not null and expires_at <= now()`;
+      expect(expired.map((r) => r.id)).toEqual([ids.old]);
+      expect((await sweepRetention(t.app)).expiredArtifacts).toBe(0);
+    });
+  });
+
   it("upserts built-in templates by slug", async () => {
     const definition = {
       name: "Support triage",

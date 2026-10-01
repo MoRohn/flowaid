@@ -1490,7 +1490,7 @@ export const alertDeliveries = pgTable(
     channelId: uuid("channel_id")
       .notNull()
       .references(() => notifications.id, { onDelete: "cascade" }),
-    event: text("event").notNull(), // 'human_task.created' | 'run.failed' | 'trace_review.page' | 'schedule.failed' | 'webhook.rejected' | 'test'
+    event: text("event").notNull(), // 'human_task.created' | 'run.failed' | 'trace_review.page' | 'schedule.failed' | 'webhook.rejected' | 'budget.warning' | 'budget.exceeded' | 'test'
     key: text("key").notNull(), // stable id of the occurrence, e.g. 'run.failed:<runId>'
     status: text("status", { enum: ["pending", "sent", "failed"] })
       .notNull()

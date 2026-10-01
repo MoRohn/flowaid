@@ -14,6 +14,7 @@ import {
   RUN_EVENTS_CHANNEL,
   environments,
   runs,
+  budgetStatusIfSet,
   workspaces,
   workflowDeployments,
   workflowVersions,
@@ -79,7 +80,12 @@ import {
   readDelegatedResult,
 } from "./delegation.js";
 import { runTraceReviewJob, wantsReview } from "./jobs/traceReview.js";
-import { recordRunMetrics, type AlertDispatcher, type Instruments } from "@flowaid/observability";
+import {
+  budgetAlert,
+  recordRunMetrics,
+  type AlertDispatcher,
+  type Instruments,
+} from "@flowaid/observability";
 import { runIngestJob } from "./jobs/ingest.js";
 import {
   isMaintenanceJob,
@@ -244,6 +250,12 @@ export function createWorker(deps: WorkerDeps): Worker {
   const plans = new Map<string, ExecutionPlan>();
   const registry = new NodeRegistry([...(deps.nodes ?? [coreNodes])]);
   const serverKeys = deps.serverKeys ?? {};
+  // server keys reach nodes and providers like decrypted credentials: never into events or logs
+  deps.credentials.redactor.learn(
+    [serverKeys.typesafe, serverKeys.openai, serverKeys.anthropic].filter(
+      (v): v is string => typeof v === "string",
+    ),
+  );
   const pools = new Set<WorkerPool>(deps.pools ?? ALL_POOLS);
   const localPools = new Set([...pools].filter((p) => p !== "general"));
   const storage = deps.storage ?? artifactStorage(new LocalArtifactStore(deps.artifactsDir));
@@ -271,7 +283,8 @@ export function createWorker(deps: WorkerDeps): Worker {
   };
 
   const services: NodeServices = {
-    credentials: (call) => credentialAccessFor(call, repo, cache),
+    credentials: (call) =>
+      credentialAccessFor(call, repo, cache, plans.get(call.workflowVersionId), serverKeys),
     providers: (call) =>
       registryProviderAccess(providers, call, {
         http: deps.http,
@@ -388,6 +401,16 @@ export function createWorker(deps: WorkerDeps): Worker {
           nodeId: run.error?.nodeId ?? null,
         },
       });
+    }
+    // a run that cost something may have crossed 80 % or 100 % of the monthly budget; the alert
+    // key names the month, so each goes out once per month and channel
+    if (deps.alerts && run.costUsd > 0) {
+      const status = await deps.db.system((tx) =>
+        budgetStatusIfSet(tx, run.workspaceId, new Date(run.createdAt)),
+      );
+      const url = link(slug, "settings?tab=workspace");
+      const alert = status ? budgetAlert(run.workspaceId, status, url) : null;
+      if (alert) await deps.alerts.dispatch(run.workspaceId, alert.key, alert.message);
     }
     if (await wantsReview(deps.db, run))
       await deps.queue.enqueue(

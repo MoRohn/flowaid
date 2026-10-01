@@ -16,6 +16,8 @@ export const NOTIFICATION_EVENT_LABELS: Readonly<Record<NotificationEvent, strin
   "trace_review.page": "A trace review needs attention",
   "schedule.failed": "A schedule could not start its run",
   "webhook.rejected": "A webhook call was rejected",
+  "budget.warning": "80% of the monthly budget is spent",
+  "budget.exceeded": "The monthly budget is used up and new runs are refused",
 };
 
 export type NotificationKind = "email" | "slack_webhook" | "webhook";

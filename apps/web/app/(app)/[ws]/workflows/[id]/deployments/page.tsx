@@ -35,6 +35,7 @@ import type {
 } from "~/api/types";
 import { WorkflowFrame } from "~/admin/WorkflowFrame";
 import { missingRequiredSecrets, rowsToVariables, variablesToRows } from "~/admin/logic";
+import { useServerCredentialTypes } from "~/builder/useServerKeys";
 import type { DeployResult, Schedule, Webhook as WebhookRow } from "~/admin/types";
 import { Notice, Section, useMembers, useMutate } from "~/admin/ui";
 import { WORKFLOW_DEPLOYMENTS } from "~/guide/capabilities/workflow";
@@ -82,9 +83,10 @@ function DeployDialog({
       get<WorkflowDiff>(`/v1/workflow-versions/${versionId}/diff/${current?.versionId ?? ""}`),
     enabled: Boolean(versionId && current && current.versionId !== versionId),
   });
+  const served = useServerCredentialTypes();
   const missing =
     version.data && bound.data
-      ? missingRequiredSecrets(version.data.definition.secrets ?? [], bound.data)
+      ? missingRequiredSecrets(version.data.definition.secrets ?? [], bound.data, served)
       : [];
   const vars = rowsToVariables(rows);
   const deploy = useMutate(
@@ -147,7 +149,7 @@ function DeployDialog({
               >
                 Bind them
               </Link>{" "}
-              before deploying.
+              before deploying, or set the key in the server&apos;s environment.
             </Notice>
           ) : null}
           {same ? (

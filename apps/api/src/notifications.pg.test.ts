@@ -48,6 +48,8 @@ describeDb("notification channels (Postgres)", () => {
       "trace_review.page",
       "schedule.failed",
       "webhook.rejected",
+      "budget.warning",
+      "budget.exceeded",
     ]);
     expect((await call(t.app, jar, "GET", "/v1/me")).json().features.settings_notifications).toBe(
       true,

@@ -12,7 +12,8 @@
  * - `all` starts one run per due fire, the newest `max_catch_up` of them (at most 100).
  *
  * Before starting a run the schedule's input is checked against the deployed version's inputs
- * schema; an input that does not match records `last_error` (and `schedule.failed`) instead.
+ * schema; an input that does not match records `last_error` (and `schedule.failed`) instead, as
+ * does a fire once the workspace's monthly budget is spent.
  */
 import { Cron } from "croner";
 import { and, eq, inArray, lte, sql } from "drizzle-orm";
@@ -22,12 +23,18 @@ import {
   schedules,
   workflowDeployments,
   workflowVersions,
+  budgetStatusIfSet,
   type Database,
   type Tx,
 } from "@flowaid/database";
 import { uuidv7 } from "@flowaid/shared";
 import { describeInputIssues, inputIssues } from "@flowaid/workflow-compiler";
-import type { JsonSchema, QueueDriver, Run } from "@flowaid/workflow-core";
+import {
+  BudgetExceededError,
+  type JsonSchema,
+  type QueueDriver,
+  type Run,
+} from "@flowaid/workflow-core";
 
 const ACTIVE: Run["status"][] = [
   "queued",
@@ -150,6 +157,10 @@ async function planScheduledRun(
     throw new Error(
       `the schedule's input does not match the deployed version's inputs, so no run was started: ${describeInputIssues(issues)}`,
     );
+  // the monthly budget: a fire is refused (recorded as last_error, schedule.failed) once it is spent
+  const budget = await budgetStatusIfSet(tx, s.workspaceId, (o.now ?? (() => new Date()))());
+  if (budget?.reached && budget.monthlyCostUsd !== null)
+    throw new BudgetExceededError(budget.month, budget.spentUsd, budget.monthlyCostUsd);
   const key = `schedule:${s.id}:${fireAt.toISOString()}`;
   const [existing] = await tx
     .select({ id: runs.id })

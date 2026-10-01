@@ -40,7 +40,6 @@ export function templateNeeds(t: TemplateRow, have: WorkspaceResources): Templat
       credentialTypeLabel(secret.credentialType) +
       ((typeCount.get(secret.credentialType) ?? 0) > 1 ? ` for ${secret.name}` : "");
     const source = keySource(secret.credentialType, have.keys, required);
-    const serverHasIt = required && keySource(secret.credentialType, have.keys).kind === "server";
     if (!required && source.kind === "missing") continue; // optional and absent: runs without it
     needs.push(
       source.kind === "server"
@@ -57,13 +56,9 @@ export function templateNeeds(t: TemplateRow, have: WorkspaceResources): Templat
             : {
                 label,
                 ready: false,
-                state: serverHasIt ? "needs a saved credential" : "to set up",
+                state: "to set up",
                 where: "credentials",
-                detail: `save it under Credentials, then bind it to ${secret.name} under Settings → Secrets${
-                  serverHasIt
-                    ? " (the key in the server's environment is not used for a required secret)"
-                    : ""
-                }`,
+                detail: `save it under Credentials, then bind it to ${secret.name} under Settings → Secrets, or set the key in the server's environment`,
               },
     );
   }

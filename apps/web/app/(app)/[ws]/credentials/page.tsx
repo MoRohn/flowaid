@@ -80,7 +80,7 @@ export default function CredentialsPage() {
               : "No keys set on the server",
             state: "info",
             detail:
-              "Keys in the server's environment (.env.local) answer steps whose secret is optional. A credential here takes their place wherever a workflow binds it.",
+              "Keys in the server's environment (.env.local) answer any secret of their type that is not bound in the run's environment. A credential here takes their place wherever a workflow binds it.",
           } satisfies Check,
         ]
       : []),

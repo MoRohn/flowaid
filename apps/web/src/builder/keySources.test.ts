@@ -1,19 +1,46 @@
 import { describe, expect, it } from "vitest";
-import { autoBindSlots, credentialTypeLabel, keySource, suggestSecretName } from "./keySources";
+import {
+  autoBindSlots,
+  credentialTypeLabel,
+  keySource,
+  serverCredentialTypes,
+  suggestSecretName,
+} from "./keySources";
 
 const sources = { server: { typesafe: true, openai: false }, saved: ["anthropic.api_key"] };
 
 describe("keySource", () => {
-  it("counts the server's key and 'no key' only for an optional secret", () => {
+  it("counts the server's key for optional and required secrets alike", () => {
     expect(keySource("typesafe.api_key", sources)).toEqual({
       kind: "server",
       provider: "typesafe",
     });
-    expect(keySource("ollama.none", sources)).toEqual({ kind: "none" });
-    // a run refuses to start while a required secret is unbound, whatever the server has
-    expect(keySource("typesafe.api_key", sources, true)).toEqual({ kind: "missing" });
+    // a run starts with a required secret unbound when the server has its key
+    expect(keySource("typesafe.api_key", sources, true)).toEqual({
+      kind: "server",
+      provider: "typesafe",
+    });
     expect(keySource("anthropic.api_key", sources, true)).toEqual({ kind: "saved" });
     expect(keySource("openai.api_key", sources)).toEqual({ kind: "missing" });
+  });
+
+  it("counts 'no key' for an optional Ollama secret, a required one only with OLLAMA_HOST", () => {
+    expect(keySource("ollama.none", sources)).toEqual({ kind: "none" });
+    expect(keySource("ollama.none", sources, true)).toEqual({ kind: "missing" });
+    const ollama = { server: { ollama: true }, saved: [] };
+    expect(keySource("ollama.none", ollama, true)).toEqual({ kind: "none" });
+    expect(keySource("ollama.host", ollama, true)).toEqual({ kind: "server", provider: "ollama" });
+  });
+});
+
+describe("serverCredentialTypes", () => {
+  it("lists the credential types the server's keys answer", () => {
+    expect([...serverCredentialTypes({ typesafe: true, openai: false, ollama: true })]).toEqual([
+      "typesafe.api_key",
+      "ollama.host",
+      "ollama.none",
+    ]);
+    expect(serverCredentialTypes({}).size).toBe(0);
   });
 });
 

@@ -1,14 +1,15 @@
 "use client";
 /**
  * Workspace name and `WorkspaceSettingsSchema` (retention, queue limit, budget). Each hint says
- * what the server actually does with the value today.
+ * what the server actually does with the value: the nightly retention sweep reads the retention
+ * days, and run start refuses new runs once this month's spend reaches the budget.
  */
 import { useQuery } from "@tanstack/react-query";
 import type { FormEvent } from "react";
 import { Button, FieldRow, Input, NumberInput } from "@flowaid/ui/primitives";
 import { get, patch } from "~/api/client";
 import { useSession } from "~/session";
-import type { Workspace, WorkspaceSettings } from "../types";
+import type { Workspace, WorkspaceBudget, WorkspaceSettings } from "../types";
 import { usePreservedDraft } from "../drafts";
 import { Notice, QueryView, Section, useMutate } from "../ui";
 
@@ -20,6 +21,19 @@ type Draft = {
   maxQueuedRuns: number | null;
   monthlyCostUsd: number | null;
 };
+
+const usd = (n: number) =>
+  n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 });
+
+/** "This month (UTC): $12.40 of $100.00 (12%)", or the spend alone without a budget. */
+export function spendLine(b: WorkspaceBudget): string {
+  if (b.monthlyCostUsd === null)
+    return `Spent this month (UTC): ${usd(b.spentUsd)}; no budget set.`;
+  const pct = Math.floor((b.spentUsd / b.monthlyCostUsd) * 100);
+  return `Spent this month (UTC): ${usd(b.spentUsd)} of ${usd(b.monthlyCostUsd)} (${pct}%)${
+    b.reached ? ". New runs are refused until next month." : "."
+  }`;
+}
 
 const fromWorkspace = (w: Workspace): Draft => {
   const st = w.settings as WorkspaceSettings;
@@ -85,6 +99,10 @@ function WorkspaceForm({ w }: { w: Workspace }) {
       ],
     },
   );
+  const budget = useQuery({
+    queryKey: ["workspace-budget", s.ws],
+    queryFn: () => get<WorkspaceBudget>(`/v1/workspaces/${w.id}/budget`),
+  });
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setDraft((d) => ({ ...d, [k]: v }));
   const auditTooShort = draft.auditDays !== null && draft.auditDays < 90;
 
@@ -118,15 +136,15 @@ function WorkspaceForm({ w }: { w: Workspace }) {
       </Section>
       <Section
         title="Retention"
-        description="How long to keep old data. Leave a field empty for the server default."
+        description="How long the nightly clean-up keeps old data. Leave a field empty for the server default."
       >
         <div className="flex flex-col gap-4">
-          <Notice tone="info">
-            Not applied yet: these values are saved, but the nightly clean-up does not read them.
-            Finished runs keep their data for 90 days (7 with short retention, 400 with long).
-          </Notice>
           <div className="grid gap-4 sm:grid-cols-3">
-            <FieldRow label="Runs" htmlFor="ret-runs" hint="1–3650 days">
+            <FieldRow
+              label="Runs"
+              htmlFor="ret-runs"
+              hint="1–3650 days after a run finishes, then its inputs, outputs, steps and files are cleared (the run stays listed with its cost). Empty: 90. Workflows set to short (7) or long (400) retention keep theirs."
+            >
               <NumberInput
                 id="ret-runs"
                 value={draft.runsDays}
@@ -140,7 +158,7 @@ function WorkspaceForm({ w }: { w: Workspace }) {
             <FieldRow
               label="Audit log"
               htmlFor="ret-audit"
-              hint="90–3650 days"
+              hint="90–3650 days, then entries are deleted. Empty: 400."
               error={auditTooShort ? "At least 90 days" : undefined}
             >
               <NumberInput
@@ -154,7 +172,11 @@ function WorkspaceForm({ w }: { w: Workspace }) {
                 onValueChange={(v) => set("auditDays", v)}
               />
             </FieldRow>
-            <FieldRow label="Artifacts" htmlFor="ret-art" hint="1–3650 days">
+            <FieldRow
+              label="Artifacts"
+              htmlFor="ret-art"
+              hint="1–3650 days, then files runs wrote are deleted even while the run is kept. Empty: files go with their run."
+            >
               <NumberInput
                 id="ret-art"
                 value={draft.artifactsDays}
@@ -187,7 +209,7 @@ function WorkspaceForm({ w }: { w: Workspace }) {
           <FieldRow
             label="Monthly budget"
             htmlFor="lim-budget"
-            hint="The workflow advisor uses it to judge whether a workflow's cost per run fits. Runs are not stopped and no alert is sent when spending passes it."
+            hint="Once this calendar month's run spend (UTC) reaches it, new runs are refused (HTTP 409) from every source, the builder, the API, webhooks, schedules, MCP and evaluations, until next month or a higher budget. Runs already going finish. Channels subscribed to budget events hear at 80% and 100%, once a month each. The workflow advisor also compares each workflow's cost with it. Empty or 0: no budget."
           >
             <NumberInput
               id="lim-budget"
@@ -199,6 +221,14 @@ function WorkspaceForm({ w }: { w: Workspace }) {
               disabled={!canEdit}
               onValueChange={(v) => set("monthlyCostUsd", v)}
             />
+            {budget.data ? (
+              <p
+                className={budget.data.reached ? "text-xs text-danger-text" : "text-xs text-ink-3"}
+                role="status"
+              >
+                {spendLine(budget.data)}
+              </p>
+            ) : null}
           </FieldRow>
         </div>
       </Section>

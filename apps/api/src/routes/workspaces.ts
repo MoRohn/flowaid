@@ -14,6 +14,7 @@ import {
   updateWorkspaceSettings,
   users,
   workspaces,
+  workspaceBudgetStatus,
   bumpTokenVersion,
   type EnvironmentRow,
   type WorkspaceRow,
@@ -33,6 +34,7 @@ import {
   MemberRequestSchema,
   MemberSchema,
   PatchWorkspaceRequestSchema,
+  WorkspaceBudgetSchema,
   WorkspaceSchema,
   WorkspaceSummarySchema,
 } from "../dto/identity.js";
@@ -168,6 +170,34 @@ export function workspaceRoutes(app: FastifyInstance, ctx: ApiContext): void {
       if (!w) throw new NotFoundError("workspace not found");
       req.audit.details = { fields: Object.keys(req.body) };
       return wsDto(w);
+    },
+  );
+
+  r.get(
+    "/v1/workspaces/:id/budget",
+    {
+      config: {
+        auth: "session_or_api_key",
+        cli: { noun: "workspace", verb: "budget", positional: ["id"] },
+      },
+      schema: {
+        tags: ["workspaces"],
+        summary: "This month's run spend (UTC) against the monthly budget",
+        params: IdParams,
+        response: { 200: WorkspaceBudgetSchema },
+      },
+    },
+    async (req) => {
+      sameWorkspace(req.principal?.workspaceId ?? "", req.params.id);
+      const s = await ctx.db.tenant(req.params.id, (tx) =>
+        workspaceBudgetStatus(tx, req.params.id, new Date(ctx.clock.now())),
+      );
+      return {
+        month: s.month,
+        spentUsd: Number(s.spentUsd.toFixed(6)),
+        monthlyCostUsd: s.monthlyCostUsd,
+        reached: s.reached,
+      };
     },
   );
 

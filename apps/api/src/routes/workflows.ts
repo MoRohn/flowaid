@@ -59,7 +59,8 @@ import {
   uniqueSlug,
   visibleWorkflow,
 } from "../services/workflows.js";
-import { versionDto } from "./versions.js";
+import { serverCredentialTypes } from "../services/serverKeys.js";
+import { missingSecrets, versionDto } from "./versions.js";
 
 const counts = (d: Diagnostic[]) => ({
   errors: d.filter((x) => x.severity === "error").length,
@@ -616,6 +617,7 @@ export function workflowRoutes(app: FastifyInstance, ctx: ApiContext): void {
             workspaceId: p.workspaceId,
             environmentId: req.body.environmentId ?? null,
             level: req.body.level,
+            serverCredentialTypes: serverCredentialTypes(ctx.env),
           });
           return {
             ok: result.ok,
@@ -723,6 +725,23 @@ export function workflowRoutes(app: FastifyInstance, ctx: ApiContext): void {
           if (!env) throw new BadRequestError(`unknown environment ${envId}`);
           if (env.protected && !hasScope(p, "admin"))
             throw new ForbiddenError(`deploying to ${env.name} requires admin`);
+          // the same check as PUT /deployments/:env: required secrets bound or served by a server key
+          const missing = await missingSecrets(
+            tx,
+            w.id,
+            envId,
+            w.draft.secrets,
+            serverCredentialTypes(ctx.env),
+          );
+          if (missing.length > 0)
+            throw new WorkflowValidationError(
+              missing.map((name) => ({
+                code: "E_SECRET_UNBOUND" as const,
+                severity: "error" as const,
+                message: `secret ${name} is not bound in ${env.name}`,
+                location: { path: "/secrets" },
+              })),
+            );
           await deploy(tx, {
             workflowId: w.id,
             environmentId: envId,

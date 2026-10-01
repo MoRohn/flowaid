@@ -863,6 +863,46 @@
         "responses": { "204": { "description": "No content" } }
       }
     },
+    "/v1/workspaces/{id}/budget": {
+      "get": {
+        "summary": "This month's run spend (UTC) against the monthly budget",
+        "tags": ["workspaces"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "x-cli": { "noun": "workspace", "verb": "budget", "positional": ["id"] },
+        "x-auth": "session_or_api_key",
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "month": { "type": "string" },
+                    "spentUsd": { "type": "number" },
+                    "monthlyCostUsd": { "type": ["number", "null"] },
+                    "reached": { "type": "boolean" }
+                  },
+                  "required": ["month", "spentUsd", "monthlyCostUsd", "reached"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/workspaces/{id}/members": {
       "get": {
         "tags": ["workspaces"],
@@ -7546,7 +7586,7 @@
                   },
                   "events": {
                     "minItems": 1,
-                    "maxItems": 5,
+                    "maxItems": 7,
                     "type": "array",
                     "items": {
                       "type": "string",
@@ -7555,7 +7595,9 @@
                         "run.failed",
                         "trace_review.page",
                         "schedule.failed",
-                        "webhook.rejected"
+                        "webhook.rejected",
+                        "budget.warning",
+                        "budget.exceeded"
                       ]
                     }
                   },
@@ -7639,7 +7681,7 @@
                   },
                   "events": {
                     "minItems": 1,
-                    "maxItems": 5,
+                    "maxItems": 7,
                     "type": "array",
                     "items": {
                       "type": "string",
@@ -7648,7 +7690,9 @@
                         "run.failed",
                         "trace_review.page",
                         "schedule.failed",
-                        "webhook.rejected"
+                        "webhook.rejected",
+                        "budget.warning",
+                        "budget.exceeded"
                       ]
                     }
                   },

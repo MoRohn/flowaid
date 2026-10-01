@@ -8,9 +8,39 @@
  * Tables the retention table does not list: `queue_jobs` keep finished jobs 7 days (like `jobs`)
  * and `alert_deliveries` 30 days (like `webhook_deliveries`). Expired `runs` keep their row
  * (metrics); the sweep never deletes runs.
+ *
+ * Workspace settings (`settings.retention`, validated by the API; out-of-range or non-numeric
+ * values are ignored here) override the defaults for that workspace:
+ * - `runsDays` replaces the `standard` class's 90 days, counted from the run's end (workflows with
+ *   the `short`, `long` or `none` class keep theirs);
+ * - `auditDays` (≥ 90) replaces the audit log's 400 days;
+ * - `artifactsDays` expires files runs wrote that many days after they were written, even while
+ *   the run is kept (without it they go with their run).
  */
 import { sql } from "drizzle-orm";
 import type { Database, Tx } from "./db.js";
+
+/** Bounds of the workspace retention settings, in days (the API validates the same). */
+export const WORKSPACE_RETENTION_BOUNDS = {
+  runsDays: [1, 3650],
+  auditDays: [90, 3650],
+  artifactsDays: [1, 3650],
+} as const;
+
+/** Days audit entries are kept when the workspace does not say (DATABASE.md, "Retention"). */
+export const AUDIT_RETENTION_DAYS = 400;
+
+/**
+ * `w.settings.retention.<key>` as whole days when it is a number within its bounds, else null
+ * (so the default applies). `w` is the `workspaces` row in the surrounding query.
+ */
+const workspaceDays = (key: keyof typeof WORKSPACE_RETENTION_BOUNDS) => {
+  const [min, max] = WORKSPACE_RETENTION_BOUNDS[key];
+  return sql`(case
+    when jsonb_typeof(w.settings->'retention'->${key}::text) = 'number'
+      and (w.settings->'retention'->>${key}::text)::numeric between ${min}::int and ${max}::int
+    then floor((w.settings->'retention'->>${key}::text)::numeric)::int end)`;
+};
 
 export interface SweepOptions {
   /** Rows per step (default 1 000). */
@@ -29,6 +59,10 @@ export interface SweepResult {
   alertDeliveries: number;
   stateEntries: number;
   idempotencyKeys: number;
+  /** audit entries past the workspace's audit retention (default 400 days) */
+  auditEvents: number;
+  /** run artifacts marked expired by the workspace's `artifactsDays` (their bytes go next) */
+  expiredArtifacts: number;
   jobs: number;
   queueJobs: number;
   userTokens: number;
@@ -90,14 +124,29 @@ export async function sweepRetention(
   const steps: Record<Step, () => Promise<number>> = {
     // Expired runs keep their row (metrics) with I/O nulled; their history goes, with their
     // `run:<id>` state. Artifacts are marked expired so the artifact sweep deletes their bytes
-    // before the rows.
+    // before the rows. A workspace's `runsDays` replaces the standard class's days: its standard
+    // runs expire that many days after they ended instead of at `expires_at`.
     expiredRuns: () =>
       count(
         database,
-        sql`with expired as materialized (
-              select id from runs where expires_at is not null and expires_at <= now()
-              order by expires_at limit ${batch} for update skip locked
+        sql`with overrides as materialized (
+              select w.id, ${workspaceDays("runsDays")} as days from workspaces w
             ),
+            by_class as materialized (
+              select r.id from runs r
+              where r.expires_at is not null and r.expires_at <= now()
+                and not (r.retention_class = 'standard' and r.workspace_id in (
+                  select id from overrides where days is not null))
+              order by r.expires_at limit ${batch} for update of r skip locked
+            ),
+            by_workspace as materialized (
+              select r.id from runs r join overrides o on o.id = r.workspace_id
+              where o.days is not null and r.retention_class = 'standard'
+                and r.expires_at is not null and r.ended_at is not null
+                and r.ended_at <= now() - o.days * interval '1 day'
+              order by r.ended_at limit ${batch} for update of r skip locked
+            ),
+            expired as (select id from by_class union all select id from by_workspace),
             e as (delete from run_events where run_id in (select id from expired)),
             n as (delete from node_runs where run_id in (select id from expired)),
             c as (delete from run_checkpoints where run_id in (select id from expired)),
@@ -199,6 +248,32 @@ export async function sweepRetention(
             update runs r set idempotency_key = null, idempotency_hash = null from picked
             where r.id = picked.id
             returning r.id`,
+      ),
+    // The audit log: the workspace's `auditDays`, else 400 days (sign-ins without a workspace too).
+    auditEvents: () =>
+      deletePicked(
+        database,
+        "audit_events",
+        sql`select a.id from audit_events a left join workspaces w on w.id = a.workspace_id
+            where a.at < now() - coalesce(${workspaceDays("auditDays")}, ${AUDIT_RETENTION_DAYS}::int)
+                  * interval '1 day'
+            order by a.at limit ${batch}`,
+      ),
+    // Files runs wrote, older than the workspace's `artifactsDays`: marked expired, so the artifact
+    // sweep deletes their bytes and then their rows. Uploads and exports have no run and are kept.
+    expiredArtifacts: () =>
+      count(
+        database,
+        sql`with picked as materialized (
+              select a.id from artifacts a join workspaces w on w.id = a.workspace_id
+              where a.run_id is not null and ${workspaceDays("artifactsDays")} is not null
+                and a.created_at < now() - ${workspaceDays("artifactsDays")} * interval '1 day'
+                and (a.expires_at is null or a.expires_at > now())
+              order by a.created_at limit ${batch}
+              for update of a skip locked
+            )
+            update artifacts a set expires_at = now() from picked where a.id = picked.id
+            returning a.id`,
       ),
     jobs: () =>
       deletePicked(

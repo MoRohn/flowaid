@@ -285,6 +285,22 @@ export class ConflictError extends FlowaidError {
   readonly retryable = false;
   override readonly httpStatus = 409;
 }
+/**
+ * The workspace's monthly budget (`settings.budgets.monthlyCostUsd`) is spent (409): new runs are
+ * refused until the next calendar month (UTC) or a higher budget; runs in flight continue.
+ */
+export class BudgetExceededError extends ConflictError {
+  constructor(
+    readonly month: string,
+    readonly spentUsd: number,
+    readonly monthlyCostUsd: number,
+  ) {
+    super(
+      `the workspace's monthly budget of $${monthlyCostUsd.toFixed(2)} is used up ($${spentUsd.toFixed(2)} spent in ${month}); new runs start again next month or when the budget is raised in Settings, Workspace`,
+      { reason: "budget_exceeded", month, spentUsd, monthlyCostUsd },
+    );
+  }
+}
 /** Missing or invalid authentication (401). */
 export class UnauthorizedError extends FlowaidError {
   readonly code = "UNAUTHORIZED" as const;

@@ -4632,6 +4632,8 @@ export interface paths {
               | "trace_review.page"
               | "schedule.failed"
               | "webhook.rejected"
+              | "budget.warning"
+              | "budget.exceeded"
             )[];
             /** @enum {string} */
             kind: "email" | "slack_webhook" | "webhook";
@@ -4729,6 +4731,8 @@ export interface paths {
               | "trace_review.page"
               | "schedule.failed"
               | "webhook.rejected"
+              | "budget.warning"
+              | "budget.exceeded"
             )[];
             name?: string;
             /** Format: uri */
@@ -10502,6 +10506,49 @@ export interface paths {
         };
       };
     };
+    trace?: never;
+  };
+  "/v1/workspaces/{id}/budget": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** This month's run spend (UTC) against the monthly budget */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              month: string;
+              monthlyCostUsd: number | null;
+              reached: boolean;
+              spentUsd: number;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
     trace?: never;
   };
   "/v1/workspaces/{id}/members": {

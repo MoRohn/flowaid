@@ -47,6 +47,7 @@ import {
 import { materialiseTriggers } from "../services/triggers.js";
 import { deploymentDto, deploymentsOf, visibleWorkflow } from "../services/workflows.js";
 import type { Tx } from "@flowaid/database";
+import { serverCredentialTypes, unboundRequiredSecrets } from "../services/serverKeys.js";
 
 export function versionDto(v: WorkflowVersionRow, withPlan = false) {
   return {
@@ -75,19 +76,23 @@ async function visibleVersion(tx: Tx, p: Principal, id: string): Promise<Workflo
   return v;
 }
 
-/** Declared secrets not bound in the environment (required ones block deploys). */
-async function missingSecrets(
+/**
+ * Required secrets that block a deploy: not bound in the environment and not answered by a key
+ * the server has for their credential type (a run falls back to that key).
+ */
+export async function missingSecrets(
   tx: Tx,
   workflowId: string,
   environmentId: string,
   declared: readonly SecretDecl[],
+  served: ReadonlySet<string>,
 ): Promise<string[]> {
   const bound = new Set(
     (await listSecretBindings(tx, workflowId))
       .filter((b) => b.environmentId === environmentId)
       .map((b) => b.secretName),
   );
-  return declared.filter((s) => s.required && !bound.has(s.name)).map((s) => s.name);
+  return unboundRequiredSecrets(declared, bound, served).map((s) => s.name);
 }
 
 export function versionRoutes(app: FastifyInstance, ctx: ApiContext): void {
@@ -294,7 +299,13 @@ export function versionRoutes(app: FastifyInstance, ctx: ApiContext): void {
     const v = await getVersion(tx, versionId);
     if (!v || v.workflowId !== w.id || v.kind !== "published")
       throw new BadRequestError("versionId is not a published version of this workflow");
-    const missing = await missingSecrets(tx, w.id, environmentId, v.definition.secrets);
+    const missing = await missingSecrets(
+      tx,
+      w.id,
+      environmentId,
+      v.definition.secrets,
+      serverCredentialTypes(ctx.env),
+    );
     if (missing.length > 0)
       throw new WorkflowValidationError(
         missing.map((name) => ({

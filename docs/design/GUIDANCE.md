@@ -39,8 +39,6 @@ only an explicitly labelled button does. No cost or quality estimates without re
 
 ## Known gaps (backend)
 
-- `POST /v1/workflows/:id/publish` with `deployTo` does not check required secrets (the dialog
-  blocks it client-side); `PUT /deployments/:env` does.
 - A knowledge source's chunking and embedding can change through the API but not the UI.
 - Email delivery (`SMTP_URL`) and retention are not visible to or applied from the web app.
 - `GET /v1/workflow-versions/:id` returns no execution plan, so a run's graph draws data

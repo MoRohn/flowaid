@@ -5,7 +5,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { installDomStubs } from "@/primitives/testStubs";
 import { ApiError } from "~/api/client";
 import { fieldLabel } from "./credentials/CredentialDialogs";
-import { settingsPatch } from "./settings/WorkspaceTab";
+import { settingsPatch, spendLine } from "./settings/WorkspaceTab";
 import { Notice, OneTimeSecretDialog, QueryView } from "./ui";
 
 beforeAll(() => installDomStubs());
@@ -126,5 +126,18 @@ describe("workspace settings patch", () => {
       retention: { runsDays: 30 },
       budgets: { monthlyCostUsd: 250 },
     });
+  });
+});
+
+describe("spend against the monthly budget", () => {
+  it("says what was spent, of how much, and when runs are refused", () => {
+    const b = { month: "2030-03", spentUsd: 12.4, monthlyCostUsd: 100, reached: false };
+    expect(spendLine(b)).toBe("Spent this month (UTC): $12.40 of $100.00 (12%).");
+    expect(spendLine({ ...b, spentUsd: 100, reached: true })).toBe(
+      "Spent this month (UTC): $100.00 of $100.00 (100%). New runs are refused until next month.",
+    );
+    expect(spendLine({ ...b, monthlyCostUsd: null })).toBe(
+      "Spent this month (UTC): $12.40; no budget set.",
+    );
   });
 });

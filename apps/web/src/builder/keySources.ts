@@ -58,22 +58,40 @@ export type KeySource =
   /** nothing yet: add a credential, then bind it */
   | { kind: "missing" };
 
-const providerOf = (type: string) => {
-  const [provider, kind] = type.split(".");
-  return kind === "api_key" ? provider : undefined;
+/** provider id → the credential types its server key answers (the worker's fallbacks). */
+const SERVER_KEY_TYPES: Readonly<Record<string, readonly string[]>> = {
+  typesafe: ["typesafe.api_key"],
+  openai: ["openai.api_key"],
+  anthropic: ["anthropic.api_key"],
+  ollama: ["ollama.host", "ollama.none"],
 };
 
+const providerOf = (type: string) =>
+  Object.keys(SERVER_KEY_TYPES).find((p) => SERVER_KEY_TYPES[p]?.includes(type));
+
 /**
- * Where a secret of this type gets its value at run time, as far as the workspace shows. A run
- * does not start while a *required* secret is unbound in its environment, so the server's own key
- * and "no key" only count for an optional one; a required one always needs a bound credential.
+ * Credential types the server's own keys answer: a secret of one of these types needs no binding,
+ * even a required one (the run-start and deploy checks accept it, and the run uses the server key).
+ */
+export function serverCredentialTypes(
+  server: Readonly<Record<string, boolean>>,
+): ReadonlySet<string> {
+  return new Set(
+    Object.entries(SERVER_KEY_TYPES).flatMap(([p, types]) => (server[p] ? types : [])),
+  );
+}
+
+/**
+ * Where a secret of this type gets its value at run time, as far as the workspace shows. The
+ * server's own key answers any secret of its type, required or not, when the environment binds
+ * nothing. "No key" (Ollama on this computer) counts for an optional secret; a required one needs
+ * the server's OLLAMA_HOST or a bound credential.
  */
 export function keySource(type: string, sources: KeySources, required = false): KeySource {
-  if (!required) {
-    if (type === "ollama.none") return { kind: "none" };
-    const provider = providerOf(type);
-    if (provider && sources.server[provider]) return { kind: "server", provider };
-  }
+  const provider = providerOf(type);
+  const served = provider !== undefined && sources.server[provider] === true;
+  if (type === "ollama.none" && (!required || served)) return { kind: "none" };
+  if (provider && served) return { kind: "server", provider };
   if (sources.saved.includes(type)) return { kind: "saved" };
   return { kind: "missing" };
 }

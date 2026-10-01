@@ -48,6 +48,8 @@ export const NOTIFICATION_EVENTS: readonly { id: NotificationEvent; label: strin
   { id: "schedule.failed", label: "A schedule could not start its run" },
   { id: "webhook.rejected", label: "A webhook call was rejected" },
   { id: "trace_review.page", label: "A trace review needs attention" },
+  { id: "budget.warning", label: "80% of the monthly budget is spent" },
+  { id: "budget.exceeded", label: "The monthly budget is used up and new runs are refused" },
 ];
 
 export const KIND_LABEL: Readonly<Record<NotificationChannel["kind"], string>> = {

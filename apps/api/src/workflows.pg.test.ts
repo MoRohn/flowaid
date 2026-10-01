@@ -570,6 +570,68 @@ describeDb("workflows, versions and deployments (Postgres)", () => {
     ]);
   });
 
+  it("counts a required secret the server has a key for as satisfied (deploy, publish, run)", async () => {
+    const w = await blank("Server key");
+    const cur = (await call(t.app, jar, "GET", `/v1/workflows/${w.id}`)).json();
+    await call(
+      t.app,
+      jar,
+      "PUT",
+      `/v1/workflows/${w.id}/draft`,
+      {
+        definition: {
+          ...cur.draft,
+          secrets: [{ name: "TYPESAFE_API_KEY", credentialType: "typesafe.api_key" }],
+        },
+      },
+      { "if-match": String(cur.draftRevision) },
+    );
+    const v = (await call(t.app, jar, "POST", `/v1/workflows/${w.id}/publish`, {})).json();
+    const deployTo = (env: string) =>
+      call(t.app, jar, "PUT", `/v1/workflows/${w.id}/deployments/${env}`, { versionId: v.id });
+    const runIn = (env: string) =>
+      call(t.app, jar, "POST", `/v1/workflows/${w.id}/run`, {
+        input: { message: "hi" },
+        versionId: v.id,
+        environmentId: env,
+      });
+    const previous = t.ctx.env;
+    try {
+      // no server key: deploys, publish-and-deploy and runs refuse the unbound required secret
+      const blocked = await deployTo(envs.staging as string);
+      expect(blocked.statusCode).toBe(422);
+      expect(JSON.stringify(blocked.json())).toContain("E_SECRET_UNBOUND");
+      const blockedRun = await runIn(envs.staging as string);
+      expect(blockedRun.statusCode).toBe(422);
+      expect(JSON.stringify(blockedRun.json())).toContain("E_SECRET_UNBOUND");
+      const draft = (await call(t.app, jar, "GET", `/v1/workflows/${w.id}`)).json();
+      await call(
+        t.app,
+        jar,
+        "PUT",
+        `/v1/workflows/${w.id}/draft`,
+        { definition: { ...draft.draft, description: "v2" } },
+        { "if-match": String(draft.draftRevision) },
+      );
+      const publishBlocked = await call(t.app, jar, "POST", `/v1/workflows/${w.id}/publish`, {
+        deployTo: [envs.staging],
+      });
+      expect(publishBlocked.statusCode).toBe(422);
+      expect(JSON.stringify(publishBlocked.json())).toContain("E_SECRET_UNBOUND");
+
+      // TYPESAFE_API_KEY on the server answers the secret everywhere
+      t.ctx.env = { ...(previous ?? {}), flags: { hasTypeSafe: true } } as never;
+      expect((await deployTo(envs.staging as string)).statusCode).toBe(200);
+      expect((await runIn(envs.staging as string)).statusCode).toBe(202);
+      const published = await call(t.app, jar, "POST", `/v1/workflows/${w.id}/publish`, {
+        deployTo: [envs.staging],
+      });
+      expect(published.statusCode).toBe(201);
+    } finally {
+      t.ctx.env = previous as never;
+    }
+  });
+
   it("pinned API keys see only their workflows; import/export round-trips; clone and archive", async () => {
     const a = await blank("Pinned A");
     await blank("Pinned B");
