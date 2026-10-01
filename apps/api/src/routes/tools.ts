@@ -6,10 +6,14 @@ import { z } from "zod";
 import { and, asc, eq } from "drizzle-orm";
 import {
   connectSession,
-  discoverTools,
+  discoverSession,
   evaluatePolicy,
+  failedTest,
   planStdioSpawn,
+  testSession,
+  type McpDiscoveryAnswer,
   type McpServerConfig,
+  type McpTestAnswer,
 } from "@flowaid/mcp";
 import {
   OpenApiImportError,
@@ -23,9 +27,11 @@ import {
   createApiKey,
   credentials,
   environments,
+  jobs,
   mcpExposures,
   mcpServers,
   tools,
+  workflowDeployments,
   workflows,
   type Tx,
 } from "@flowaid/database";
@@ -35,7 +41,10 @@ import {
   ConflictError,
   ForbiddenError,
   NotFoundError,
+  TimeoutError,
+  ToolExecutionError,
   toFlowaidError,
+  type ErrorInfo,
   type JsonObject,
   type JsonValue,
   type ToolDefinition,
@@ -76,6 +85,23 @@ const mcpDto = (s: McpRow) => ({
   lastError: s.lastError,
   lastCheckedAt: s.lastCheckedAt?.toISOString() ?? null,
   createdAt: s.createdAt.toISOString(),
+});
+
+/**
+ * `active`: MCP clients see the tool now — it is switched on and some version of the workflow is
+ * deployed to its environment (`deployed`).
+ */
+const exposureDto = (e: typeof mcpExposures.$inferSelect, deployed: boolean, url: string) => ({
+  id: e.id,
+  workflowId: e.workflowId,
+  environmentId: e.environmentId,
+  toolName: e.toolName,
+  description: e.description,
+  enabled: e.enabled,
+  source: e.source,
+  deployed,
+  active: e.enabled && deployed,
+  url,
 });
 
 const McpServerRequest = z.object({
@@ -456,17 +482,88 @@ export function toolRoutes(app: FastifyInstance, ctx: ApiContext): void {
     toolPolicy: s.toolPolicy,
     timeoutMs: 30_000,
   });
-  const sessionFor = async (s: McpRow) => {
+  /** An HTTP session (stdio servers run only in the worker: see `viaWorker`). */
+  const sessionFor = async (
+    s: Pick<McpRow, "transport" | "credentialId">,
+    config: McpServerConfig,
+  ) => {
     if (s.transport === "stdio")
-      throw new BadRequestError(
-        "stdio MCP servers run only in the worker; discovery for them is a worker job",
-      );
+      throw new BadRequestError("stdio MCP servers run only in the worker; test-calls need HTTP");
     const fields = s.credentialId ? await ctx.credentials.decrypt(s.credentialId) : undefined;
-    return connectSession(configOf(s), fields, {
+    return connectSession(config, fields, {
       fetch: ctx.http,
       timeoutMs: 30_000,
       signal: AbortSignal.timeout(30_000),
     });
+  };
+  /**
+   * Hands a stdio server's test or discovery to the worker (`mcp.probe` on the `jobs` queue) and
+   * waits for its answer in the `jobs` row, which is removed afterwards — also when no worker
+   * answered in time, so a late worker finds nothing to run.
+   */
+  const viaWorker = async (
+    p: Principal,
+    kind: "mcp.test" | "mcp.discover",
+    payload: JsonObject,
+  ): Promise<{
+    status: "completed" | "failed" | "waiting";
+    result?: JsonObject;
+    error?: ErrorInfo;
+  }> => {
+    const id = uuidv7();
+    await ctx.db.tenant(p.workspaceId, (tx) =>
+      tx
+        .insert(jobs)
+        .values({ id, workspaceId: p.workspaceId, kind, payload, createdBy: `${p.type}:${p.id}` }),
+    );
+    try {
+      await ctx.queue.enqueue("jobs", { type: "mcp.probe", jobId: id });
+      const deadline = Date.now() + (ctx.config.mcpWorkerWaitMs ?? 45_000);
+      for (let delay = 50; ; delay = Math.min(delay * 2, 500)) {
+        const [row] = await ctx.db.tenant(p.workspaceId, (tx) =>
+          tx.select().from(jobs).where(eq(jobs.id, id)),
+        );
+        if (row?.status === "completed" || row?.status === "failed")
+          return {
+            status: row.status,
+            ...(row.result ? { result: row.result } : {}),
+            ...(row.error ? { error: row.error } : {}),
+          };
+        if (Date.now() >= deadline) return { status: "waiting" };
+        await new Promise((r) =>
+          setTimeout(r, Math.min(delay, Math.max(0, deadline - Date.now()))),
+        );
+      }
+    } finally {
+      await ctx.db.tenant(p.workspaceId, (tx) => tx.delete(jobs).where(eq(jobs.id, id)));
+    }
+  };
+  const NO_WORKER =
+    "no worker answered: stdio servers are started by the worker, so check that it is running";
+  /** Tests a server: HTTP from here, stdio through the worker. */
+  const testServer = async (
+    p: Principal,
+    s: Pick<McpRow, "transport" | "credentialId">,
+    config: McpServerConfig,
+    payload: JsonObject,
+  ): Promise<McpTestAnswer> => {
+    if (s.transport === "stdio") {
+      const out = await viaWorker(p, "mcp.test", payload);
+      if (out.status === "waiting") return { ok: false, message: NO_WORKER };
+      if (out.status === "failed")
+        return failedTest(new Error(out.error?.message ?? "the test failed"));
+      return out.result as unknown as McpTestAnswer;
+    }
+    try {
+      const session = await sessionFor(s, config);
+      try {
+        return await testSession(session, { timeoutMs: 10_000 });
+      } finally {
+        await session.close();
+      }
+    } catch (error) {
+      return failedTest(toFlowaidError(error));
+    }
   };
 
   r.get(
@@ -638,6 +735,63 @@ export function toolRoutes(app: FastifyInstance, ctx: ApiContext): void {
     },
   );
 
+  const TestAnswer = z.object({
+    ok: z.boolean(),
+    message: z.string().optional(),
+    server: z.unknown().optional(),
+    toolCount: z.number().int().optional(),
+  });
+
+  r.post(
+    "/v1/mcp/servers/test",
+    {
+      config: {
+        auth: "session_or_api_key",
+        scope: "mcp:write",
+        audit: { action: "mcp_server.test_unsaved", resource: "mcp_server" },
+        cli: { noun: "mcp-server", verb: "try" },
+      },
+      schema: {
+        tags: ["mcp"],
+        summary:
+          "Test a server configuration before saving it (HTTP from the API, stdio through the worker); nothing is stored",
+        body: McpServerRequest.extend({ name: z.string().min(1).max(100).default("unsaved") }),
+        response: { 200: TestAnswer },
+      },
+    },
+    async (req) => {
+      const p = need(req.principal);
+      const b = req.body;
+      if (b.transport !== "stdio" && !b.url)
+        throw new BadRequestError("url is required for HTTP transports");
+      if (b.transport === "stdio") checkStdio(p, b);
+      await ctx.db.tenant(p.workspaceId, (tx) => credentialOf(tx, p, b.credentialId));
+      req.audit = { resourceId: "unsaved", details: { transport: b.transport } };
+      const config: McpServerConfig = {
+        id: "unsaved",
+        name: b.name,
+        transport: b.transport,
+        ...(b.url ? { url: b.url } : {}),
+        timeoutMs: 30_000,
+      };
+      return testServer(
+        p,
+        { transport: b.transport, credentialId: b.credentialId ?? null },
+        config,
+        {
+          config: {
+            name: b.name,
+            transport: b.transport,
+            ...(b.command ? { command: b.command } : {}),
+            args: b.args ?? [],
+            env: b.env ?? {},
+            credentialId: b.credentialId ?? null,
+          },
+        },
+      );
+    },
+  );
+
   r.post(
     "/v1/mcp/servers/:id/test",
     {
@@ -647,32 +801,12 @@ export function toolRoutes(app: FastifyInstance, ctx: ApiContext): void {
         audit: { action: "mcp_server.test", resource: "mcp_server" },
         cli: { noun: "mcp-server", verb: "test", positional: ["id"] },
       },
-      schema: {
-        tags: ["mcp"],
-        params: IdParams,
-        response: {
-          200: z.object({
-            ok: z.boolean(),
-            message: z.string().optional(),
-            server: z.unknown().optional(),
-          }),
-        },
-      },
+      schema: { tags: ["mcp"], params: IdParams, response: { 200: TestAnswer } },
     },
     async (req) => {
       const p = need(req.principal);
       const s = await ctx.db.tenant(p.workspaceId, (tx) => loadServer(tx, p, req.params.id));
-      try {
-        const session = await sessionFor(s);
-        try {
-          await session.ping({ timeoutMs: 10_000 });
-          return { ok: true, server: session.serverInfo ?? null };
-        } finally {
-          await session.close();
-        }
-      } catch (error) {
-        return { ok: false, message: toFlowaidError(error).message.slice(0, 500) };
-      }
+      return testServer(p, s, configOf(s), { serverId: s.id });
     },
   );
 
@@ -690,44 +824,37 @@ export function toolRoutes(app: FastifyInstance, ctx: ApiContext): void {
     async (req) => {
       const p = need(req.principal);
       const s = await ctx.db.tenant(p.workspaceId, (tx) => loadServer(tx, p, req.params.id));
+      if (s.transport === "stdio") {
+        // the worker stores the tools on the server row (or its error) itself
+        const out = await viaWorker(p, "mcp.discover", { serverId: s.id });
+        if (out.status === "waiting") throw new TimeoutError(NO_WORKER);
+        if (out.status === "failed" || !out.result)
+          throw new ToolExecutionError(out.error?.message ?? "discovery failed", true, "mcp");
+        const answer = out.result as unknown as McpDiscoveryAnswer;
+        req.audit.details = { tools: answer.tools.length, warnings: answer.warnings.length };
+        return answer;
+      }
       try {
-        const session = await sessionFor(s);
+        const session = await sessionFor(s, configOf(s));
         try {
-          const d = await discoverTools(session, configOf(s), { timeoutMs: 30_000 });
-          const warnings = d.warnings.map(
-            (w) => `W_MCP_TOOL_SUSPICIOUS ${w.tool}: ${w.reasons.join("; ")}`,
-          );
-          // Keep the server's own names next to the sanitised ones for tools/call.
-          const tools = d.tools.map((t) => ({
-            ...t,
-            ...(d.nameMap[t.name] && d.nameMap[t.name] !== t.name
-              ? { "x-mcp-name": d.nameMap[t.name] }
-              : {}),
-          })) as ToolDefinition[];
+          const d = await discoverSession(session, configOf(s), { timeoutMs: 30_000 });
           await ctx.db.tenant(p.workspaceId, (tx) =>
             tx
               .update(mcpServers)
               .set({
                 status: "connected",
-                discoveredTools: tools,
-                discoveredResources: d.resources as unknown as JsonValue,
-                discoveredPrompts: d.prompts as unknown as JsonValue,
-                warnings,
+                ...d.stored,
                 lastError: null,
                 lastCheckedAt: new Date(),
                 updatedAt: new Date(),
               })
               .where(eq(mcpServers.id, s.id)),
           );
-          req.audit.details = { tools: d.tools.length, warnings: warnings.length };
-          return {
-            tools: d.tools,
-            excluded: d.excluded,
-            resources: d.resources,
-            prompts: d.prompts,
-            warnings: d.warnings,
-            server: d.server,
+          req.audit.details = {
+            tools: d.answer.tools.length,
+            warnings: d.answer.warnings.length,
           };
+          return d.answer;
         } finally {
           await session.close();
         }
@@ -820,7 +947,7 @@ export function toolRoutes(app: FastifyInstance, ctx: ApiContext): void {
       const verdict = evaluatePolicy(s.toolPolicy, original);
       if (!verdict.allowed) throw new ForbiddenError(verdict.reason);
       const started = Date.now();
-      const session = await sessionFor(s);
+      const session = await sessionFor(s, configOf(s));
       try {
         const res = await session.callTool(original, req.body.args as JsonValue, {
           timeoutMs: 30_000,
@@ -854,8 +981,16 @@ export function toolRoutes(app: FastifyInstance, ctx: ApiContext): void {
       const { limit, cursor } = req.query;
       const rows = await ctx.db.tenant(p.workspaceId, (tx) =>
         tx
-          .select()
+          .select({ e: mcpExposures, deployedVersionId: workflowDeployments.versionId })
           .from(mcpExposures)
+          .leftJoin(
+            workflowDeployments,
+            and(
+              eq(workflowDeployments.workflowId, mcpExposures.workflowId),
+              eq(workflowDeployments.environmentId, mcpExposures.environmentId),
+              eq(workflowDeployments.active, true),
+            ),
+          )
           .where(
             and(
               eq(mcpExposures.workspaceId, p.workspaceId),
@@ -869,16 +1004,68 @@ export function toolRoutes(app: FastifyInstance, ctx: ApiContext): void {
       return toPage(
         rows,
         limit,
-        (e) => [e.toolName, e.id],
-        (e) => ({
-          id: e.id,
-          workflowId: e.workflowId,
-          environmentId: e.environmentId,
-          toolName: e.toolName,
-          description: e.description,
-          enabled: e.enabled,
-          url,
-        }),
+        (r) => [r.e.toolName, r.e.id],
+        (r) => exposureDto(r.e, r.deployedVersionId !== null, url),
+      );
+    },
+  );
+
+  r.patch(
+    "/v1/mcp/exposures/:id",
+    {
+      config: {
+        auth: "session_or_api_key",
+        scope: "mcp:write",
+        audit: { action: "mcp_exposure.update", resource: "mcp_exposure" },
+        cli: { noun: "mcp-exposure", verb: "update", positional: ["id"] },
+      },
+      schema: {
+        tags: ["mcp"],
+        summary:
+          "Switch an exposure on or off, or change its description; switching makes it manual, so deploys leave the switch alone",
+        params: IdParams,
+        body: z
+          .object({
+            enabled: z.boolean().optional(),
+            description: z.string().min(1).max(1000).optional(),
+          })
+          .refine((b) => b.enabled !== undefined || b.description !== undefined, {
+            message: "set enabled or description",
+          }),
+      },
+    },
+    async (req) => {
+      const p = need(req.principal);
+      const b = req.body;
+      const row = await ctx.db.tenant(p.workspaceId, async (tx) => {
+        const [u] = await tx
+          .update(mcpExposures)
+          .set({
+            ...(b.enabled !== undefined ? { enabled: b.enabled, source: "manual" as const } : {}),
+            ...(b.description !== undefined ? { description: b.description } : {}),
+          })
+          .where(
+            and(eq(mcpExposures.id, req.params.id), eq(mcpExposures.workspaceId, p.workspaceId)),
+          )
+          .returning();
+        if (!u) throw new NotFoundError("exposure not found");
+        const [d] = await tx
+          .select({ id: workflowDeployments.id })
+          .from(workflowDeployments)
+          .where(
+            and(
+              eq(workflowDeployments.workflowId, u.workflowId),
+              eq(workflowDeployments.environmentId, u.environmentId),
+              eq(workflowDeployments.active, true),
+            ),
+          );
+        return { e: u, deployed: Boolean(d) };
+      });
+      req.audit.details = { ...b };
+      return exposureDto(
+        row.e,
+        row.deployed,
+        `${ctx.config.baseUrl.replace(/\/$/, "")}/mcp/${p.workspaceSlug}`,
       );
     },
   );
@@ -934,7 +1121,7 @@ export function toolRoutes(app: FastifyInstance, ctx: ApiContext): void {
         if (dup) throw new ConflictError(`the tool name ${req.body.toolName} is taken`);
         const [created] = await tx
           .insert(mcpExposures)
-          .values({ id: uuidv7(), workspaceId: p.workspaceId, ...req.body })
+          .values({ id: uuidv7(), workspaceId: p.workspaceId, ...req.body, source: "manual" })
           .returning();
         return created as typeof mcpExposures.$inferSelect;
       });

@@ -235,7 +235,7 @@ export function triggerPageChecks(
     workflows?: readonly { latestVersion: number | null }[];
     webhooks?: readonly { enabled: boolean; signature: string; secretBound: boolean }[];
     schedules?: readonly { enabled: boolean; lastError: string | null }[];
-    exposures?: readonly { enabled: boolean }[];
+    exposures?: readonly { enabled: boolean; deployed?: boolean }[];
     can: (scope: string) => boolean;
   },
 ): PageCheck[] {
@@ -322,15 +322,29 @@ export function triggerPageChecks(
   } else {
     if (i.exposures?.length) {
       const off = i.exposures.filter((e) => !e.enabled).length;
+      // `deployed` is absent from older answers: treat it as deployed
+      const waiting = i.exposures.filter((e) => e.enabled && e.deployed === false).length;
       out.push(
         off
           ? {
               id: "live",
               state: "warning",
-              label: `${off} exposed tool${off === 1 ? " is" : "s are"} disabled`,
-              detail: "A later deployment switched it off; stop exposing it and expose it again.",
+              label: `${off} exposed tool${off === 1 ? " is" : "s are"} switched off`,
+              detail: "Clients do not see it. Switch it on in the list when they should.",
             }
-          : { id: "live", state: "ok", label: `${i.exposures.length} workflows exposed as tools` },
+          : waiting
+            ? {
+                id: "live",
+                state: "warning",
+                label: `${waiting} exposed tool${waiting === 1 ? " waits" : "s wait"} for a deployment`,
+                detail:
+                  "Clients see a tool only while a version of its workflow is deployed to its environment.",
+              }
+            : {
+                id: "live",
+                state: "ok",
+                label: `${i.exposures.length} workflows exposed as tools`,
+              },
       );
     }
     if (!i.can("api_keys:manage"))

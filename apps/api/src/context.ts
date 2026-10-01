@@ -57,6 +57,11 @@ export interface ApiConfig {
    * stores a command the worker would refuse to spawn.
    */
   mcpStdio: Omit<StdioPolicy, "parentEnv">;
+  /**
+   * How long a stdio MCP test or discovery waits for the worker that runs it (default 45 s; the
+   * worker gives a server 30 s). Tests shorten it.
+   */
+  mcpWorkerWaitMs?: number;
 }
 
 export interface Clock {

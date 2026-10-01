@@ -73,7 +73,14 @@ export interface McpExposure {
   environmentId: string;
   toolName: string;
   description: string;
+  /** the owner's switch; deploys leave a manual exposure's switch alone */
   enabled: boolean;
+  /** manual: made in Triggers → MCP tools; trigger: declared by a deployed version */
+  source?: "manual" | "trigger";
+  /** a version of the workflow is deployed to the exposure's environment */
+  deployed?: boolean;
+  /** clients see the tool now (enabled and deployed) */
+  active?: boolean;
   url: string;
 }
 export interface Tool {

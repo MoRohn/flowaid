@@ -6507,6 +6507,86 @@
         "responses": { "204": { "description": "No content" } }
       }
     },
+    "/v1/mcp/servers/test": {
+      "post": {
+        "summary": "Test a server configuration before saving it (HTTP from the API, stdio through the worker); nothing is stored",
+        "tags": ["mcp"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "default": "unsaved",
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "transport": { "type": "string", "enum": ["streamable_http", "sse", "stdio"] },
+                  "url": { "type": "string", "format": "uri" },
+                  "command": { "type": "string", "maxLength": 500 },
+                  "args": {
+                    "maxItems": 50,
+                    "type": "array",
+                    "items": { "type": "string", "maxLength": 500 }
+                  },
+                  "env": {
+                    "type": "object",
+                    "propertyNames": { "type": "string" },
+                    "additionalProperties": { "type": "string" }
+                  },
+                  "authKind": {
+                    "default": "none",
+                    "type": "string",
+                    "enum": ["none", "headers", "oauth2"]
+                  },
+                  "credentialId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      { "type": "null" }
+                    ]
+                  }
+                },
+                "required": ["transport"]
+              }
+            }
+          }
+        },
+        "x-cli": { "noun": "mcp-server", "verb": "try" },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["mcp:write"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": { "type": "boolean" },
+                    "message": { "type": "string" },
+                    "server": {},
+                    "toolCount": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": ["ok"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/mcp/servers/{id}/test": {
       "post": {
         "tags": ["mcp"],
@@ -6535,7 +6615,12 @@
                   "properties": {
                     "ok": { "type": "boolean" },
                     "message": { "type": "string" },
-                    "server": {}
+                    "server": {},
+                    "toolCount": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
                   },
                   "required": ["ok"],
                   "additionalProperties": false
@@ -6772,6 +6857,40 @@
       }
     },
     "/v1/mcp/exposures/{id}": {
+      "patch": {
+        "summary": "Switch an exposure on or off, or change its description; switching makes it manual, so deploys leave the switch alone",
+        "tags": ["mcp"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "enabled": { "type": "boolean" },
+                  "description": { "type": "string", "minLength": 1, "maxLength": 1000 }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "x-cli": { "noun": "mcp-exposure", "verb": "update", "positional": ["id"] },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["mcp:write"],
+        "responses": { "200": { "description": "Default Response" } }
+      },
       "delete": {
         "tags": ["mcp"],
         "parameters": [

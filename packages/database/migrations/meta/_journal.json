@@ -85,6 +85,13 @@
       "when": 1790806718268,
       "tag": "0011_agent_active",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1790859292593,
+      "tag": "0015_mcp_exposure_source",
+      "breakpoints": true
     }
   ]
 }

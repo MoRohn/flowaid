@@ -167,5 +167,19 @@ describe("triggers page checks", () => {
       can: () => false,
     });
     expect(mcp.map((c) => c.id)).toEqual(["workflows", "live", "tokens", "add"]);
+    expect(mcp.find((c) => c.id === "live")?.label).toBe("1 exposed tool is switched off");
+    const waiting = triggerPageChecks("mcp", {
+      ws: "acme",
+      workflows: [{ latestVersion: 1 }],
+      exposures: [
+        { enabled: true, deployed: false },
+        { enabled: true, deployed: true },
+      ],
+      can: () => true,
+    });
+    expect(waiting.find((c) => c.id === "live")).toMatchObject({
+      state: "warning",
+      label: "1 exposed tool waits for a deployment",
+    });
   });
 });

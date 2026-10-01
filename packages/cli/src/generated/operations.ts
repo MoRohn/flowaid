@@ -910,6 +910,24 @@ export const OPERATIONS: readonly CliOperation[] = [
     body: null,
   },
   {
+    noun: "mcp-exposure",
+    verb: "update",
+    method: "PATCH",
+    path: "/v1/mcp/exposures/{id}",
+    summary:
+      "Switch an exposure on or off, or change its description; switching makes it manual, so deploys leave the switch alone",
+    auth: "session_or_api_key",
+    positional: ["id"],
+    query: [],
+    body: {
+      required: true,
+      properties: [
+        { name: "enabled", type: "boolean", required: false },
+        { name: "description", type: "string", required: false },
+      ],
+    },
+  },
+  {
     noun: "mcp-server",
     verb: "call",
     method: "POST",
@@ -1045,6 +1063,35 @@ export const OPERATIONS: readonly CliOperation[] = [
     positional: ["id"],
     query: [],
     body: null,
+  },
+  {
+    noun: "mcp-server",
+    verb: "try",
+    method: "POST",
+    path: "/v1/mcp/servers/test",
+    summary:
+      "Test a server configuration before saving it (HTTP from the API, stdio through the worker); nothing is stored",
+    auth: "session_or_api_key",
+    positional: [],
+    query: [],
+    body: {
+      required: true,
+      properties: [
+        { name: "name", type: "string", required: false },
+        {
+          name: "transport",
+          type: "string",
+          required: true,
+          enum: ["streamable_http", "sse", "stdio"],
+        },
+        { name: "url", type: "string", required: false },
+        { name: "command", type: "string", required: false },
+        { name: "args", type: "array", required: false },
+        { name: "env", type: "object", required: false },
+        { name: "authKind", type: "string", required: false, enum: ["none", "headers", "oauth2"] },
+        { name: "credentialId", type: "any", required: false },
+      ],
+    },
   },
   {
     noun: "mcp-server",

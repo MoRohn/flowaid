@@ -71,6 +71,7 @@ import { stateAccessFor } from "./services/state.js";
 import { toolAccessFor } from "./services/tools.js";
 import { runEvaluationJob } from "./jobs/evaluation.js";
 import { runExportJob } from "./jobs/export.js";
+import { runMcpProbeJob, type McpConnect } from "./jobs/mcp.js";
 import {
   clearDelegatedResult,
   delegateNode,
@@ -223,6 +224,14 @@ export function createWorker(deps: WorkerDeps): Worker {
   const repo = new PgCredentialRepository(deps.db);
   const cache = new RunCredentialCache(deps.credentials);
   const providers = deps.registry ?? defaultProviderRegistry();
+  const connectMcp: McpConnect = (server, credential, o) =>
+    connectSession(server, credential, {
+      fetch: deps.http,
+      ...(deps.stdioPolicy ? { stdioPolicy: deps.stdioPolicy } : {}),
+      signal: o.signal,
+      stdio: { onSpawn: o.onSpawn },
+      timeoutMs: 30_000,
+    });
   const pool = new McpSessionPool({
     connect: (server, credential, signal) =>
       connectSession(server, credential, {
@@ -625,6 +634,7 @@ export function createWorker(deps: WorkerDeps): Worker {
       case "evaluation.run":
       case "trace_review.run":
       case "export.package":
+      case "mcp.probe":
       case "retention.sweep":
       case "partition.ensure":
       case "draft_versions.gc":
@@ -693,6 +703,11 @@ export function createWorker(deps: WorkerDeps): Worker {
                 storage,
                 vendorDir: deps.exports?.vendorDir ?? null,
               },
+              job,
+            );
+          if (job.type === "mcp.probe")
+            await runMcpProbeJob(
+              { db: deps.db, credentials: deps.credentials, connect: connectMcp },
               job,
             );
         },

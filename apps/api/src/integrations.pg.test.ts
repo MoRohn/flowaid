@@ -6,8 +6,10 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { z } from "zod";
+import { jobs } from "@flowaid/database";
 import { describeDb } from "@flowaid/database/testing";
 import { call, createTestApp, login, type Jar, type TestApp } from "./test/app.js";
+import { FakeMcpWorker } from "./test/fakeMcpWorker.js";
 
 const PETSTORE = readFileSync(
   fileURLToPath(
@@ -334,6 +336,39 @@ describeDb("credentials, tools and MCP (Postgres)", () => {
     ).toBe(403);
   });
 
+  it("tests an HTTP server's settings before they are saved, storing nothing", async () => {
+    const before = (await call(t.app, jar, "GET", "/v1/mcp/servers?limit=200")).json().items
+      .length as number;
+    const ok = await call(t.app, jar, "POST", "/v1/mcp/servers/test", {
+      name: "draft",
+      transport: "streamable_http",
+      url: `${upstream.url}/mcp`,
+    });
+    expect(ok.statusCode).toBe(200);
+    expect(ok.json()).toEqual({ ok: true, server: { name: "kb", version: "1.0.0" }, toolCount: 2 });
+    // the name is optional for a test
+    const unreachable = await call(t.app, jar, "POST", "/v1/mcp/servers/test", {
+      transport: "streamable_http",
+      url: "http://127.0.0.1:9/mcp",
+    });
+    expect(unreachable.json()).toMatchObject({ ok: false, message: expect.any(String) });
+    expect(
+      (await call(t.app, jar, "POST", "/v1/mcp/servers/test", { transport: "sse" })).statusCode,
+    ).toBe(400);
+    expect(
+      (
+        await call(t.app, jar, "POST", "/v1/mcp/servers/test", {
+          transport: "streamable_http",
+          url: `${upstream.url}/mcp`,
+          credentialId: "00000000-0000-7000-8000-000000000000",
+        })
+      ).statusCode,
+    ).toBe(400);
+    expect((await call(t.app, jar, "GET", "/v1/mcp/servers?limit=200")).json().items).toHaveLength(
+      before,
+    );
+  });
+
   it("mints MCP tokens (service accounts pinned to workflows) and manages exposures", async () => {
     const w = (await call(t.app, jar, "POST", "/v1/workflows", { name: "Exposed" })).json()
       .id as string;
@@ -380,9 +415,35 @@ describeDb("credentials, tools and MCP (Postgres)", () => {
     ).toBe(409);
     const exposures = (await call(t.app, jar, "GET", "/v1/mcp/exposures?limit=1")).json();
     expect(exposures).toEqual({
-      items: [expect.objectContaining({ toolName: "exposed_tool" })],
+      items: [
+        expect.objectContaining({
+          toolName: "exposed_tool",
+          source: "manual",
+          enabled: true,
+          // nothing is deployed to dev yet, so clients do not see it
+          deployed: false,
+          active: false,
+        }),
+      ],
       next_cursor: null,
     });
+    const id = exposure.json().exposure.id as string;
+    const off = await call(t.app, jar, "PATCH", `/v1/mcp/exposures/${id}`, { enabled: false });
+    expect(off.statusCode).toBe(200);
+    expect(off.json()).toMatchObject({ enabled: false, active: false, source: "manual" });
+    const on = await call(t.app, jar, "PATCH", `/v1/mcp/exposures/${id}`, {
+      enabled: true,
+      description: "Runs Exposed, now described",
+    });
+    expect(on.json()).toMatchObject({ enabled: true, description: "Runs Exposed, now described" });
+    expect((await call(t.app, jar, "PATCH", `/v1/mcp/exposures/${id}`, {})).statusCode).toBe(400);
+    expect(
+      (
+        await call(t.app, jar, "PATCH", "/v1/mcp/exposures/00000000-0000-7000-8000-000000000000", {
+          enabled: true,
+        })
+      ).statusCode,
+    ).toBe(404);
   });
 
   /** Every page of a list, `limit` at a time, and the first page on its own. */
@@ -474,6 +535,8 @@ describeDb("stdio MCP registration (Postgres)", () => {
         ],
         envAllowlist: ["LOG_LEVEL"],
       },
+      // no worker consumes the jobs queue here
+      mcpWorkerWaitMs: 300,
     });
     jar = await login(t.app);
   });
@@ -520,6 +583,25 @@ describeDb("stdio MCP registration (Postgres)", () => {
     ).toBe(200);
   });
 
+  it("says so when no worker answers a stdio test or discovery, and leaves no job behind", async () => {
+    const id = (await register({ name: "lonely", command: "/usr/bin/true" })).json().id as string;
+    const test = await call(t.app, jar, "POST", `/v1/mcp/servers/${id}/test`);
+    expect(test.json()).toEqual({
+      ok: false,
+      message: expect.stringContaining("no worker answered"),
+    });
+    const unsaved = await call(t.app, jar, "POST", "/v1/mcp/servers/test", {
+      transport: "stdio",
+      command: "/usr/bin/true",
+    });
+    expect(unsaved.json()).toMatchObject({ ok: false });
+    const discover = await call(t.app, jar, "POST", `/v1/mcp/servers/${id}/discover`);
+    expect(discover.statusCode).toBe(504);
+    expect(discover.body).toContain("no worker answered");
+    const left = await t.db.app.system((tx) => tx.select().from(jobs));
+    expect(left.filter((j) => j.kind.startsWith("mcp."))).toEqual([]);
+  });
+
   it("needs the admin scope, not just mcp:write", async () => {
     const key = (
       await call(t.app, jar, "POST", "/v1/api-keys", {
@@ -548,5 +630,126 @@ describeDb("stdio MCP registration (Postgres)", () => {
         )
       ).statusCode,
     ).toBe(201);
+    // nor test a stdio configuration, which would start a program
+    expect(
+      (
+        await call(
+          t.app,
+          null,
+          "POST",
+          "/v1/mcp/servers/test",
+          { transport: "stdio", command: "/usr/bin/true" },
+          auth,
+        )
+      ).statusCode,
+    ).toBe(403);
+  });
+});
+
+describeDb("stdio MCP test and discovery through the worker (Postgres)", () => {
+  const NODE = process.execPath;
+  const FIXTURE = fileURLToPath(
+    new URL("../../../packages/mcp/fixtures/tiny-stdio-server.mjs", import.meta.url),
+  );
+  const policy = {
+    enabled: true,
+    allowedCommands: [
+      { command: NODE, argsPattern: "\\S+[\\\\/]fixtures[\\\\/]tiny-stdio-server\\.mjs" },
+    ],
+    envAllowlist: ["TINY_GREETING"],
+  };
+  let t: TestApp;
+  let jar: Jar;
+  let worker: FakeMcpWorker;
+  beforeAll(async () => {
+    t = await createTestApp({ mcpStdio: policy, mcpWorkerWaitMs: 15_000 });
+    jar = await login(t.app);
+    worker = new FakeMcpWorker(t.db.app, { ...policy, parentEnv: {} });
+    await worker.start();
+  });
+  afterAll(async () => {
+    await worker.stop();
+    await t.close();
+  });
+
+  it("tests an unsaved stdio configuration on the worker without saving it", async () => {
+    const res = await call(t.app, jar, "POST", "/v1/mcp/servers/test", {
+      name: "files",
+      transport: "stdio",
+      command: NODE,
+      args: [FIXTURE],
+      env: { TINY_GREETING: "hi" },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      ok: true,
+      server: { name: "tiny-stdio", version: "1.0.0" },
+      toolCount: 2,
+    });
+    expect(worker.seen.at(-1)).toEqual({
+      kind: "mcp.test",
+      payload: {
+        config: {
+          name: "files",
+          transport: "stdio",
+          command: NODE,
+          args: [FIXTURE],
+          env: { TINY_GREETING: "hi" },
+          credentialId: null,
+        },
+      },
+    });
+    expect((await call(t.app, jar, "GET", "/v1/mcp/servers")).json().items).toEqual([]);
+    expect(await t.db.app.system((tx) => tx.select().from(jobs))).toEqual([]);
+    // the API's policy check still runs first: nothing reaches the worker
+    const refused = await call(t.app, jar, "POST", "/v1/mcp/servers/test", {
+      transport: "stdio",
+      command: NODE,
+      args: ["/tmp/other.mjs"],
+    });
+    expect(refused.statusCode).toBe(403);
+    expect(worker.seen).toHaveLength(1);
+  });
+
+  it("tests and discovers a saved stdio server; its tools reach the catalog", async () => {
+    const created = await call(t.app, jar, "POST", "/v1/mcp/servers", {
+      name: "local-docs",
+      transport: "stdio",
+      command: NODE,
+      args: [FIXTURE],
+    });
+    expect(created.statusCode).toBe(201);
+    const id = created.json().id as string;
+    expect((await call(t.app, jar, "POST", `/v1/mcp/servers/${id}/test`)).json()).toMatchObject({
+      ok: true,
+      server: { name: "tiny-stdio" },
+    });
+    const discovered = await call(t.app, jar, "POST", `/v1/mcp/servers/${id}/discover`);
+    expect(discovered.statusCode).toBe(200);
+    expect(
+      discovered
+        .json()
+        .tools.map((x: { name: string }) => x.name)
+        .sort(),
+    ).toEqual(["echo", "search_docs"]);
+    expect(worker.seen.at(-1)).toEqual({ kind: "mcp.discover", payload: { serverId: id } });
+    expect((await call(t.app, jar, "GET", `/v1/mcp/servers/${id}`)).json()).toMatchObject({
+      status: "connected",
+      toolCount: 2,
+    });
+    const tools = (await call(t.app, jar, "GET", `/v1/mcp/servers/${id}/tools`)).json();
+    expect(tools).toContainEqual(
+      expect.objectContaining({ name: "search_docs", "x-mcp-name": "search.docs" }),
+    );
+    const catalog = (await call(t.app, jar, "GET", "/v1/tools/catalog")).json() as {
+      name: string;
+      source: { kind: string; serverId?: string };
+    }[];
+    expect(
+      catalog
+        .filter((x) => x.source.serverId === id)
+        .map((x) => x.name)
+        .sort(),
+    ).toEqual(["echo", "search_docs"]);
   });
 });

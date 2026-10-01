@@ -3,8 +3,8 @@
  * MCP servers (connect, test, discover, tool policy, delete), workflows exposed as MCP tools and
  * MCP tokens (service-account keys with `mcp:serve`, shown once).
  */
-import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useId, useMemo, useState } from "react";
 import { CheckCircle2, Plus, Radar, Server, ShieldCheck, Trash2, Zap } from "lucide-react";
 import {
   Badge,
@@ -25,6 +25,7 @@ import {
   Input,
   Select,
   SelectItem,
+  Switch,
   Textarea,
   toast,
 } from "@flowaid/ui/primitives";
@@ -34,7 +35,8 @@ import {
   createDataTableColumns,
   type DataTableColumns,
 } from "@flowaid/ui/data";
-import { del, get, getAll, post } from "~/api/client";
+import { del, get, getAll, patch, post } from "~/api/client";
+import { errorMessage } from "~/shell/states";
 import type { Page, WorkflowDetail, WorkflowSummary } from "~/api/types";
 import { DraftStatus, GuidedFlow, type FlowStep } from "~/guide/GuidedFlow";
 import { CheckList, QualityNote, type Check } from "~/guide/Readiness";
@@ -253,26 +255,23 @@ function ServersSection() {
           cell: ({ row }) =>
             canWrite ? (
               <span className="flex justify-end gap-1">
-                {row.original.transport !== "stdio" ? (
-                  <>
-                    <IconButton
-                      size="sm"
-                      variant="ghost"
-                      label={`Test connection to ${row.original.name}`}
-                      onClick={() => test.mutate(row.original)}
-                    >
-                      <Zap strokeWidth={1.75} />
-                    </IconButton>
-                    <IconButton
-                      size="sm"
-                      variant="ghost"
-                      label={`Discover tools of ${row.original.name}`}
-                      onClick={() => discover.mutate(row.original)}
-                    >
-                      <Radar strokeWidth={1.75} />
-                    </IconButton>
-                  </>
-                ) : null}
+                {/* stdio servers are started by the worker for these */}
+                <IconButton
+                  size="sm"
+                  variant="ghost"
+                  label={`Test connection to ${row.original.name}`}
+                  onClick={() => test.mutate(row.original)}
+                >
+                  <Zap strokeWidth={1.75} />
+                </IconButton>
+                <IconButton
+                  size="sm"
+                  variant="ghost"
+                  label={`Discover tools of ${row.original.name}`}
+                  onClick={() => discover.mutate(row.original)}
+                >
+                  <Radar strokeWidth={1.75} />
+                </IconButton>
                 <IconButton
                   size="sm"
                   variant="ghost"
@@ -423,6 +422,7 @@ function ExposeDialog({
   const set = <K extends keyof ExposeDraft>(k: K, v: ExposeDraft[K]) =>
     setDraft((d) => ({ ...d, [k]: v }));
   const [created, setCreated] = useState<ExposeDraft | null>(null);
+  const [createdLive, setCreatedLive] = useState(false);
   const detail = useQuery({
     queryKey: ["workflow", s.ws, draft.workflowId],
     queryFn: () => get<WorkflowDetail>(`/v1/workflows/${draft.workflowId}`),
@@ -434,6 +434,7 @@ function ExposeDialog({
     errorTitle: "Could not expose the workflow",
     onSuccess: (_, body) => {
       kept.discard();
+      setCreatedLive(Boolean(deployed));
       setCreated(body);
     },
   });
@@ -460,7 +461,10 @@ function ExposeDialog({
               Clients holding a token for this workflow in{" "}
               {s.environments.find((e) => e.id === created.environmentId)?.name ??
                 "the environment"}{" "}
-              can list and call it now. Next, give your client a token.
+              {createdLive
+                ? "can list and call it now."
+                : "can list and call it once a version is deployed there."}{" "}
+              Later deployments keep it on. Next, give your client a token.
             </DialogDescription>
           </DialogHeader>
           <DialogBody>
@@ -512,7 +516,7 @@ function ExposeDialog({
                   label: `Nothing is deployed to ${env?.name ?? "this environment"} yet`,
                   state: "warning",
                   detail:
-                    "Deploy a version first, then expose it. Clients see no tool until something is deployed, and that first deployment switches an exposure made now off again (unless the version declares an MCP trigger).",
+                    "You can expose it now: the tool waits, and clients see it as soon as a version is deployed there.",
                   fix: (
                     <a
                       className="text-accent-text hover:underline"
@@ -548,12 +552,11 @@ function ExposeDialog({
       ? [{ id: "desc", label: "Describe what the tool does", state: "blocker" } satisfies Check]
       : []),
     ...deployChecks,
-    // said once: without a deployment the warning above already covers it
-    ...(deployed
+    ...(draft.workflowId
       ? [
           {
             id: "redeploy",
-            label: `A later deployment of this workflow to ${env?.name ?? "this environment"} switches the tool off, unless that version declares it as an MCP trigger. Expose it again then.`,
+            label: `The tool follows the workflow's deployment to ${env?.name ?? "this environment"}: later deployments and rollbacks keep it on with this name and description, and clients run whichever version is deployed. Switch it off in the list to hide it.`,
             state: "info",
           } satisfies Check,
         ]
@@ -913,6 +916,60 @@ function TokenDialog({
   );
 }
 
+/**
+ * An exposure's On/Off switch. Deployments leave it as set (switching makes the exposure the
+ * person's, even one a version declared), so this is how a switched-off tool comes back. The row
+ * changes at once and goes back if the server refuses.
+ */
+function ExposureSwitch({ exposure, disabled }: { exposure: McpExposure; disabled: boolean }) {
+  const s = useSession();
+  const qc = useQueryClient();
+  const id = useId();
+  const listKey = ["mcp-exposures", s.ws];
+  const change = useMutation({
+    mutationFn: (next: boolean) =>
+      patch<McpExposure>(`/v1/mcp/exposures/${exposure.id}`, { enabled: next }),
+    onMutate: async (next) => {
+      await qc.cancelQueries({ queryKey: listKey, exact: true });
+      const before = qc.getQueryData<McpExposure[]>(listKey);
+      qc.setQueryData<McpExposure[]>(listKey, (rows) =>
+        rows?.map((e) => (e.id === exposure.id ? { ...e, enabled: next } : e)),
+      );
+      return { before };
+    },
+    onError: (e, next, saved) => {
+      qc.setQueryData(listKey, saved?.before);
+      toast.error(`Could not switch ${exposure.toolName} ${next ? "on" : "off"}`, {
+        description: errorMessage(e),
+      });
+    },
+    onSuccess: (e) =>
+      toast.success(
+        e.enabled
+          ? e.deployed === false
+            ? `${e.toolName} is on: clients see it once a version is deployed`
+            : `${e.toolName} is on: clients can list and call it`
+          : `${e.toolName} is off: clients no longer see it`,
+      ),
+    onSettled: () => void qc.invalidateQueries({ queryKey: listKey }),
+  });
+  return (
+    <div className="flex shrink-0 items-center gap-2">
+      <Switch
+        id={id}
+        size="sm"
+        checked={exposure.enabled}
+        disabled={disabled || change.isPending}
+        onCheckedChange={(v) => change.mutate(v)}
+        aria-label={`Expose ${exposure.toolName}`}
+      />
+      <label htmlFor={id} className="cursor-pointer text-xs text-ink-2">
+        {exposure.enabled ? "On" : "Off"}
+      </label>
+    </div>
+  );
+}
+
 export function ExposuresSection() {
   const s = useSession();
   const canWrite = s.can("mcp:write");
@@ -1000,16 +1057,25 @@ export function ExposuresSection() {
                   <div className="min-w-0 flex-1">
                     <p className="flex items-center gap-2">
                       <span className="font-mono text-xs text-ink">{e.toolName}</span>
-                      {!e.enabled ? <Badge tone="warn">Disabled</Badge> : null}
+                      {e.enabled && e.deployed === false ? (
+                        <Badge tone="neutral">Waiting for a deployment</Badge>
+                      ) : null}
                     </p>
                     <p className="truncate text-2xs text-ink-3">{e.description}</p>
                     {!e.enabled ? (
                       <p className="text-2xs text-warn-text">
-                        A later deployment of the workflow switched it off; clients no longer see
-                        it. Stop exposing it and expose it again.
+                        Clients do not see it.{" "}
+                        {e.source === "trigger"
+                          ? "The deployed version no longer declares it; switch it on to keep it whatever later versions declare."
+                          : "Switch it on to expose it again; deployments leave the switch as you set it."}
+                      </p>
+                    ) : e.deployed === false ? (
+                      <p className="text-2xs text-ink-3">
+                        Clients see it once a version is deployed to {envName(e.environmentId)}.
                       </p>
                     ) : null}
                   </div>
+                  <ExposureSwitch exposure={e} disabled={!canWrite} />
                   <a
                     className="shrink-0 text-xs text-accent-text hover:underline"
                     href={`/${s.ws}/workflows/${e.workflowId}`}

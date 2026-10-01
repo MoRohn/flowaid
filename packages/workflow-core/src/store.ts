@@ -174,6 +174,12 @@ export type Job =
       includeRecordedRunId?: string;
       requestedBy: string;
     }
+  /**
+   * Test or discover an MCP server on the worker (stdio servers only run there). The `jobs` row
+   * (kind `mcp.test` / `mcp.discover`) holds the saved server's id or an unsaved configuration,
+   * and receives the answer in `result`; the API waits for it.
+   */
+  | { type: "mcp.probe"; jobId: string }
   | { type: "retention.sweep"; at: string }
   | { type: "partition.ensure"; monthsAhead: number }
   | { type: "draft_versions.gc" };

@@ -9,3 +9,4 @@ export * from "./pool.js";
 export * from "./discover.js";
 export * from "./caller.js";
 export * from "./expose.js";
+export * from "./probe.js";

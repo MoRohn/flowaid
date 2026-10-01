@@ -3454,7 +3454,34 @@ export interface paths {
     };
     options?: never;
     head?: never;
-    patch?: never;
+    /** Switch an exposure on or off, or change its description; switching makes it manual, so deploys leave the switch alone */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            description?: string;
+            enabled?: boolean;
+          };
+        };
+      };
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
     trace?: never;
   };
   "/v1/mcp/servers": {
@@ -3812,6 +3839,7 @@ export interface paths {
               message?: string;
               ok: boolean;
               server?: unknown;
+              toolCount?: number;
             };
           };
         };
@@ -3892,6 +3920,69 @@ export interface paths {
             [name: string]: unknown;
           };
           content?: never;
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/mcp/servers/test": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Test a server configuration before saving it (HTTP from the API, stdio through the worker); nothing is stored */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            args?: string[];
+            /**
+             * @default none
+             * @enum {string}
+             */
+            authKind?: "none" | "headers" | "oauth2";
+            command?: string;
+            credentialId?: string | null;
+            env?: {
+              [key: string]: string;
+            };
+            /** @default unsaved */
+            name?: string;
+            /** @enum {string} */
+            transport: "streamable_http" | "sse" | "stdio";
+            /** Format: uri */
+            url?: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              message?: string;
+              ok: boolean;
+              server?: unknown;
+              toolCount?: number;
+            };
+          };
         };
       };
     };
