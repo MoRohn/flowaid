@@ -67,6 +67,14 @@ manifest; `.optional()` input and output properties are optional ports.
 Third-party node ids start with the package name (`@acme/crm` owns `@acme/crm.*`); `flowaid.*`
 is reserved for `@flowaid/*` packages.
 
+An installed package runs in a plugin host process under the Node permission model: it can read
+its own directory and the packages the platform provides (`@flowaid/node-sdk`,
+`@flowaid/workflow-core`, `zod`), and nothing else; it cannot write files, spawn processes or
+start worker threads. Its code may import only common built-ins (`crypto`, `buffer`, `events`,
+`fs` for its own files, `path`, `stream`, `url`, `util`, `zlib`, timers...). `net`, `http`,
+`dns`, `child_process`, `module` and `vm` are refused, and the global `fetch` throws: reach the
+network through `ctx.http`.
+
 ## Testing
 
 ```ts

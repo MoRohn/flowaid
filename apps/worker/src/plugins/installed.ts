@@ -29,10 +29,10 @@ import type { AnyNodeDefinition, NodePackage } from "@flowaid/node-sdk";
 import { readTarball, verifyIntegrity, type RegistryClient } from "@flowaid/plugins";
 import type { JsonObject, NodeManifest, PortSpec } from "@flowaid/workflow-core";
 import type { WorkerLogger } from "../worker.js";
-import { PluginHost } from "./host.js";
+import { PROVIDED_PACKAGES, PluginHost } from "./host.js";
 
 /** Packages the platform provides to every plugin (linked, never installed). */
-export const PROVIDED_DEPENDENCIES = ["@flowaid/node-sdk", "@flowaid/workflow-core", "zod"];
+export const PROVIDED_DEPENDENCIES: readonly string[] = PROVIDED_PACKAGES;
 
 export class PluginLoadError extends Error {
   constructor(
