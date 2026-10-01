@@ -69,10 +69,10 @@ describe.runIf(Boolean(redisUrl))("RedisLimitStore (two api processes)", () => {
 
   it("expires a window by its TTL", async () => {
     const a = replica();
-    expect(await a.hit("short", 50)).toBe(1);
-    expect(await a.hit("short", 50)).toBe(2);
-    await new Promise((resolve) => setTimeout(resolve, 120));
-    expect(await a.hit("short", 50)).toBe(1);
+    expect(await a.hit("short", 500)).toBe(1);
+    expect(await a.hit("short", 500)).toBe(2);
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    expect(await a.hit("short", 500)).toBe(1);
     const ttl = await a.shared?.redis.pttl(`${prefix}short`);
     expect(ttl).toBeGreaterThan(0);
   });
