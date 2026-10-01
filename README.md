@@ -47,7 +47,7 @@ that one runtime.
 </picture>
 
 > [!NOTE]
-> FlowAId is in public beta; the current release is **0.7.0** (see the [Changelog](CHANGELOG.md)).
+> FlowAId is in public beta; the current release is **0.8.0** (see the [Changelog](CHANGELOG.md)).
 > Everything described here runs today, and every change is gated by the unit and PostgreSQL
 > suites, an accessibility gallery and a browser acceptance journey against the production builds.
 > Interfaces may still change before 1.0.
