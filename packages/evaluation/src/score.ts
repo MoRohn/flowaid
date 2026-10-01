@@ -1,20 +1,22 @@
 /** `scoreCase`: every expectation of a case checked against its run. */
 import {
   getPointer,
-  type DecisionCallContext,
   type DecisionProvider,
   type DecisionResult,
   type JsonValue,
 } from "@flowaid/workflow-core";
 import type { EvaluationCase } from "./expectation.js";
-import { judge } from "./scorers/judge.js";
+import { NO_JUDGE_MODEL, judge } from "./scorers/judge.js";
 import { jsonEquals, matchValue } from "./scorers/matchers.js";
 import type { CaseMetrics, CaseResult, CheckResult, NodeRecord, RunRecord } from "./types.js";
 
 export interface ScoreOptions {
   /** decision provider for `judge` matchers; without it they fail with a clear message */
   judge?: DecisionProvider;
-  judgeContext?: Omit<DecisionCallContext, "signal"> & { signal?: AbortSignal };
+  /** the message judge checks fail with when there is no `judge` (default NO_JUDGE_MODEL) */
+  judgeUnavailable?: string;
+  /** the judge calls' signal: aborting it (a cancelled evaluation) fails the pending checks */
+  judgeContext?: { signal?: AbortSignal };
 }
 
 /** The value a decision expectation compares against (score decisions also match their level/label). */
@@ -65,6 +67,8 @@ export async function scoreCase(
   const checks: CheckResult[] = [];
   const add = (check: CheckResult) => checks.push(check);
   const byNode = new Map<string, NodeRecord>(run.nodes.map((n) => [n.nodeId, n]));
+  let judgeCostUsd = 0;
+  let judged = false;
 
   // A run that did not reach a terminal success still gets every check, so failures are specific.
   for (const { path, matcher } of e.output) {
@@ -72,9 +76,15 @@ export async function scoreCase(
     const id = `output:${path || "/"}:${matcher.type}`;
     if (matcher.type === "judge") {
       if (!o.judge) {
-        add({ kind: "output", id, passed: false, message: "no judge provider is configured" });
+        add({ kind: "output", id, passed: false, message: o.judgeUnavailable ?? NO_JUDGE_MODEL });
         continue;
       }
+      const signal = o.judgeContext?.signal;
+      if (signal?.aborted) {
+        add({ kind: "output", id, passed: false, message: "judge skipped: evaluation cancelled" });
+        continue;
+      }
+      judged = true;
       try {
         const v = await judge(
           o.judge,
@@ -84,9 +94,10 @@ export async function scoreCase(
             runId: run.runId,
             nodeRunId: `eval:${c.id}`,
             idempotencyKey: null,
-            signal: o.judgeContext?.signal ?? new AbortController().signal,
+            signal: signal ?? new AbortController().signal,
           },
         );
+        judgeCostUsd += v.costUsd;
         add({
           kind: "output",
           id,
@@ -246,7 +257,7 @@ export async function scoreCase(
     passed: failures.length === 0,
     checks,
     failures,
-    metrics: metricsOf(run),
+    metrics: { ...metricsOf(run), ...(judged ? { judgeCostUsd } : {}) },
     status: run.status,
   };
 }

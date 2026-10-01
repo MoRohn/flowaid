@@ -14,3 +14,4 @@ export * from "./registry.js";
 export * from "./rerank.js";
 export * from "./streams.js";
 export * from "./safeFetch.js";
+export * from "./defaultModel.js";

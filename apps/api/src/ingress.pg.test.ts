@@ -168,9 +168,9 @@ describeDb("webhooks, schedules, events and audit (Postgres)", () => {
       { type: "webhook", path: "pager-c" },
       { type: "webhook", path: "pager-a" },
       { type: "webhook", path: "pager-b" },
-      { type: "schedule", cron: "0 6 * * *" },
-      { type: "schedule", cron: "0 3 * * *" },
-      { type: "schedule", cron: "0 9 * * *" },
+      { type: "schedule", cron: "0 6 * * *", input: { message: "6" } },
+      { type: "schedule", cron: "0 3 * * *", input: { message: "3" } },
+      { type: "schedule", cron: "0 9 * * *", input: { message: "9" } },
     ]);
     type Page = { items: { id: string; path?: string }[]; next_cursor: string | null };
     const list = async (url: string) => (await call(t.app, jar, "GET", url)).json() as Page;
@@ -224,6 +224,53 @@ describeDb("webhooks, schedules, events and audit (Postgres)", () => {
     expect(
       (await call(t.app, jar, "GET", `/v1/runs/${fired.json().run_id as string}`)).json(),
     ).toMatchObject({ origin: "schedule", input: { message: "morning" } });
+  });
+
+  it("refuses to deploy a schedule whose input does not match the version's inputs", async () => {
+    const w = (await call(t.app, jar, "POST", "/v1/workflows", { name: "Bad tick" })).json();
+    await call(
+      t.app,
+      jar,
+      "PUT",
+      `/v1/workflows/${w.id as string}/draft`,
+      {
+        definition: {
+          ...w.draft,
+          triggers: [
+            { type: "webhook", path: "bad-tick" },
+            { type: "schedule", cron: "0 6 * * *", input: { other: 1 } },
+          ],
+        },
+      },
+      { "if-match": String(w.draftRevision) },
+    );
+    const v = (
+      await call(t.app, jar, "POST", `/v1/workflows/${w.id as string}/publish`, {})
+    ).json();
+    const dep = await call(
+      t.app,
+      jar,
+      "PUT",
+      `/v1/workflows/${w.id as string}/deployments/${envs.dev as string}`,
+      { versionId: v.id },
+    );
+    expect(dep.statusCode).toBe(422);
+    expect(dep.json().error.details.diagnostics).toEqual([
+      expect.objectContaining({
+        code: "E_SCHEMA",
+        location: { path: "/triggers/1/input" },
+        message: expect.stringMatching(
+          /^schedule trigger 2 \(0 6 \* \* \*\): its input does not match the workflow's inputs: \/ must have required property 'message'/,
+        ),
+      }),
+    ]);
+    // nothing was materialised or deployed
+    const listed = await call(t.app, jar, "GET", `/v1/schedules?workflowId=${w.id as string}`);
+    expect(listed.json().items).toEqual([]);
+    const deployments = (
+      await call(t.app, jar, "GET", `/v1/workflows/${w.id as string}/deployments`)
+    ).json();
+    expect(JSON.stringify(deployments)).not.toContain(v.id as string);
   });
 
   it("publishes events: starts triggered workflows and signals waiting runs", async () => {

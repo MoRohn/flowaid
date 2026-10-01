@@ -11,6 +11,7 @@ import {
 import { reportToMarkdown } from "./report.js";
 import { runEvaluation } from "./runner.js";
 import { scoreCase } from "./score.js";
+import { NO_JUDGE_MODEL } from "./scorers/judge.js";
 import { jsonEquals, matchValue } from "./scorers/matchers.js";
 import { calibration, percentile, summarize } from "./summarize.js";
 import type { CaseResult, LaunchRequest, RunRecord } from "./types.js";
@@ -166,7 +167,64 @@ describe("scoreCase", () => {
       message: expect.stringContaining("judge answered no"),
     });
     expect(seen[0]).toEqual({ input: { message: "hi" }, actual: "Your refund is on its way." });
-    expect((await scoreCase(c, run())).failures[0]).toContain("no judge provider");
+    expect(r.metrics.judgeCostUsd).toBe(meta.costUsd);
+    expect((await scoreCase(c, run())).failures[0]).toContain(NO_JUDGE_MODEL);
+    expect(
+      (await scoreCase(c, run(), { judgeUnavailable: "no judge model available: bad key" }))
+        .checks[0]?.message,
+    ).toBe("no judge model available: bad key");
+    // no judge call, no judge cost
+    expect((await scoreCase(c, run())).metrics.judgeCostUsd).toBeUndefined();
+  });
+
+  it("does not call the judge once the evaluation is cancelled", async () => {
+    let calls = 0;
+    const provider = {
+      decideBoolean: () => (calls++, Promise.resolve(booleanDecision(0.9, meta))),
+    } as unknown as DecisionProvider;
+    const c = kase({
+      output: [{ path: "/reply", matcher: { type: "judge", instructions: "Polite?" } }],
+    });
+    const ac = new AbortController();
+    ac.abort();
+    const r = await scoreCase(c, run(), { judge: provider, judgeContext: { signal: ac.signal } });
+    expect(calls).toBe(0);
+    expect(r.checks[0]).toMatchObject({ passed: false, message: expect.stringMatching(/cancel/) });
+  });
+
+  it("counts judge costs in the summary total but not in cost per case", () => {
+    const base = {
+      latencyMs: 1,
+      tokens: 0,
+      branches: {},
+      decisions: {},
+      humanRequested: false,
+      toolCalls: { total: 0, ok: 0 },
+      schemaErrors: 0,
+    };
+    const s = summarize([
+      {
+        caseId: "a",
+        runId: "r1",
+        passed: true,
+        checks: [],
+        failures: [],
+        status: "completed",
+        metrics: { ...base, costUsd: 0.02, judgeCostUsd: 0.001 },
+      },
+      {
+        caseId: "b",
+        runId: "r2",
+        passed: true,
+        checks: [],
+        failures: [],
+        status: "completed",
+        metrics: { ...base, costUsd: 0.04 },
+      },
+    ]);
+    expect(s.costUsd.perCase).toBeCloseTo(0.03);
+    expect(s.costUsd.judge).toBeCloseTo(0.001);
+    expect(s.costUsd.total).toBeCloseTo(0.061);
   });
 });
 
@@ -390,7 +448,7 @@ describe("compare and report", () => {
     const good = summarize(baseline.map((b) => ({ ...b, passed: true })));
     const worse = {
       ...summarize(current),
-      costUsd: { total: 1, perCase: good.costUsd.perCase * 1.5 },
+      costUsd: { total: 1, perCase: good.costUsd.perCase * 1.5, judge: 0 },
     };
     expect(regressionWarnings(worse, good).map((w) => w.message)).toEqual([
       expect.stringContaining("pass rate dropped 33.3 pt"),

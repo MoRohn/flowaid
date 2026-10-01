@@ -87,7 +87,10 @@ export interface CheckResult {
 
 export interface CaseMetrics {
   latencyMs: number;
+  /** the workflow run's own cost (what `maxCostUsd` and the regression report compare) */
   costUsd: number;
+  /** what the case's judge checks cost; absent on results scored before judges were priced */
+  judgeCostUsd?: number;
   tokens: number;
   branches: Record<NodeId, string | null>;
   decisions: Record<NodeId, { value: JsonValue; confidence: number }>;
@@ -128,7 +131,11 @@ export interface EvaluationSummary {
   toolSuccess: number;
   humanReviewRate: number;
   latency: { p50: number; p95: number; p99: number };
-  costUsd: { total: number; perCase: number };
+  /**
+   * `total` is everything the evaluation spent (runs and judge checks); `perCase` is the
+   * workflow's run cost per case; `judge` is the judge checks' share of `total`.
+   */
+  costUsd: { total: number; perCase: number; judge: number };
 }
 
 export interface RegressionReport {

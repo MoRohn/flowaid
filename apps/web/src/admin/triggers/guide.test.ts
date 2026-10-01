@@ -89,6 +89,7 @@ describe("trigger guidance", () => {
     expect(notes.find((n) => n.id === "timezone")?.state).toBe("blocker");
     expect(notes.find((n) => n.id === "cadence")?.message).toContain("96 runs a day");
     expect(notes.find((n) => n.id === "input")?.state).toBe("warning");
+    expect(notes.find((n) => n.id === "input")?.message).toContain("Deploying a version");
   });
 
   it("says where the workflow is live and that the trigger waits for the next deployment", () => {

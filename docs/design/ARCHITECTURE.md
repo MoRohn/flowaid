@@ -934,7 +934,7 @@ export type QueueName =
 - **Timers** are rows in `run_timers` (authoritative). `BullMqQueueDriver.scheduleTimer` adds a delayed `timer.fire` job as an accelerator; `PgQueueDriver` polls due rows. Firing is idempotent: `markTimerFired` is a CAS on `fired_at IS NULL`, so an accelerator job and the reaper cannot both fire a timer.
 - **BullMqQueueDriver** (`REDIS_URL` set): one BullMQ queue per `QueueName`; deterministic `jobId`s (`run:<id>:start`, `timer:<id>`) for dedupe; `attempts: 1` (retries are the runtime's job, so semantics are identical with and without Redis); Redis pub/sub `EventBus`; Bull Board at `/admin/queues` is mounted only when `FLOWAID_QUEUE_UI=true`, behind the session auth hook with scope `admin` (its job views show raw `run.start` payloads, so it never ships enabled by default).
 - **PgQueueDriver** (no Redis): `queue_jobs` claimed with `FOR UPDATE SKIP LOCKED`, `run_at` for delays, `locked_by/locked_until`, `LISTEN/NOTIFY` to wake pollers; multiple API/worker replicas share work over Postgres alone. `PgEventBus` uses `NOTIFY run_events` with id-only payloads. Both drivers pass the same contract test suite. The default compose runs api + worker + web + postgres + minio without Redis; `docker compose --profile scale up` adds Redis and worker replicas.
-- **Worker process**: consumes the pools it is configured for (`WORKER_POOLS=general,retrieval`); a run's orchestration is pinned to `general`; nodes whose `pool` differs are dispatched as `node.exec` jobs (`NODE_DELEGATED`) executed by that pool's worker in its sandbox, reporting back through `run.signal{delegated_result}` with a 2 s DB fallback poll on `node_runs`. The `code` pool is a separate container (`worker-code`) hosting `isolated-vm`. Backpressure: `POST …/run` returns 429 when the workspace backlog exceeds `workspaces.settings.maxQueuedRuns` (default 1000). The `jobs` queue carries long-running API-initiated work (`export.package`); the `maintenance` queue carries `retention.sweep` (`RETENTION_SWEEP_CRON`, default `0 3 * * *`), `partition.ensure` and `draft_versions.gc`. The scheduler (`jobs/schedule.ts`, `croner`) polls `schedules` every 15 s with `FOR UPDATE SKIP LOCKED`, creates runs with `origin: 'schedule'` and `idempotency_key = 'schedule:<id>:<fireAtIso>'` so replicas cannot double-fire, honours `overlap`, `catch_up`, `max_catch_up` and `jitter_ms`, and records `last_error` (audit `schedule.fired`).
+- **Worker process**: consumes the pools it is configured for (`WORKER_POOLS=general,retrieval`); a run's orchestration is pinned to `general`; nodes whose `pool` differs are dispatched as `node.exec` jobs (`NODE_DELEGATED`) executed by that pool's worker in its sandbox, reporting back through `run.signal{delegated_result}` with a 2 s DB fallback poll on `node_runs`. The `code` pool is a separate container (`worker-code`) hosting `isolated-vm`. Backpressure: `POST …/run` returns 429 when the workspace backlog exceeds `workspaces.settings.maxQueuedRuns` (default 1000). The `jobs` queue carries long-running API-initiated work (`export.package`); the `maintenance` queue carries `retention.sweep` (`RETENTION_SWEEP_CRON`, default `0 3 * * *`), `partition.ensure` and `draft_versions.gc`. The scheduler (`jobs/schedule.ts`, `croner`) polls `schedules` every 15 s with `FOR UPDATE SKIP LOCKED`, creates runs with `origin: 'schedule'` and `idempotency_key = 'schedule:<id>:<fireAtIso>'` so replicas cannot double-fire, honours `overlap`, `catch_up` (after downtime: `skip` starts no missed run, `one` starts exactly one at the newest missed time, `all` one per missed time, the newest `max_catch_up` ≤ 100; the newest due fire is on time within a 60 s grace window, at least two polls) and `jitter_ms`, checks the schedule's input against the deployed version's inputs schema (deploy refuses a mismatch with `E_SCHEMA` at `/triggers/<i>/input`; at fire time a mismatch starts no run), and records `last_error` (audit `schedule.fired`).
 - **API process** never runs nodes; it enqueues `run.start` and serves reads, SSE and webhooks.
 
 ### 5.12 Streaming and SSE fan-out
@@ -1155,7 +1155,7 @@ export const ExpectationSchema = z.object({
             type: z.literal("judge"),
             instructions: z.string(),
             criteria: z.object({ true: z.string(), false: z.string() }).optional(),
-          }), // boolean decision over { input, expected?, actual }
+          }), // boolean decision over { input, expected?, actual }, by the workspace's AI builder model (settings.advisorModel, else the first default with a key); priced into costUsd.judge
         ]),
       }),
     )
@@ -1201,7 +1201,7 @@ export interface EvaluationSummary {
   toolSuccess: number;
   humanReviewRate: number;
   latency: { p50: number; p95: number; p99: number };
-  costUsd: { total: number; perCase: number };
+  costUsd: { total: number; perCase: number; judge: number }; // total = runs + judge checks; perCase = the workflow's run cost per case
 }
 export interface RegressionReport {
   versionId: string;

@@ -317,6 +317,7 @@ export function versionRoutes(app: FastifyInstance, ctx: ApiContext): void {
       workflowId: w.id,
       environmentId,
       triggers: v.definition.triggers,
+      inputs: v.plan.inputs,
       baseUrl: ctx.config.baseUrl,
       now: new Date(ctx.clock.now()),
     });

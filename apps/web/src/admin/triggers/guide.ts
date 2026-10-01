@@ -173,7 +173,7 @@ export function triggerNotes(trigger: NewTrigger, ctx: TriggerContext): TriggerN
       notes.push({
         id: "input",
         state: "warning",
-        message: `The workflow's input requires ${list(missing)}, which this input leaves out. Run now refuses such an input, and scheduled runs may fail.`,
+        message: `The workflow's input requires ${list(missing)}, which this input leaves out. Deploying a version with this schedule is refused until the input has them (Run now refuses it too).`,
       });
   }
   const live = ctx.deployments.map((d) => `${d.environment}${d.version ? ` (v${d.version})` : ""}`);

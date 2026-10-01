@@ -40,7 +40,7 @@ export const SCHEDULE_TERMS: readonly { term: string; text: string }[] = [
   },
   {
     term: "Red line",
-    text: "Why the last tick did not start a run: for example the previous run was still going, or the workflow is no longer deployed in this environment.",
+    text: "Why the last tick did not start a run: for example the previous run was still going, the workflow is no longer deployed in this environment, or the schedule's input does not match the deployed version's inputs. Skipped missed runs are noted here too.",
   },
   {
     term: "Overlap",
@@ -48,7 +48,7 @@ export const SCHEDULE_TERMS: readonly { term: string; text: string }[] = [
   },
   {
     term: "Missed runs",
-    text: "What happens after the scheduler was stopped past a run time: Run all starts one run per missed time, up to the limit; Skip and Run once start a single run.",
+    text: "What happens after the scheduler was stopped past one or more run times: Skip (default) starts none of them and waits for the next run time; Run once starts a single run for all of them; Run all starts one run per missed time, the most recent ones up to the limit (at most 100).",
   },
   {
     term: "Jitter",

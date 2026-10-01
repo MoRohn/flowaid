@@ -295,7 +295,8 @@ export interface EvaluationSummary {
   toolSuccess: number;
   humanReviewRate: number;
   latency: { p50: number; p95: number; p99: number };
-  costUsd: { total: number; perCase: number };
+  /** `judge` (judge checks' share of `total`) is absent on reports from older releases */
+  costUsd: { total: number; perCase: number; judge?: number };
 }
 export interface RegressionReport {
   versionId: string;

@@ -6,7 +6,6 @@
  * `RUN_CREATED` in one transaction, then enqueue `run.start`.
  */
 import { createHash } from "node:crypto";
-import Ajv2020Module from "ajv/dist/2020.js";
 import { and, count, eq, inArray } from "drizzle-orm";
 import {
   PgRunStore,
@@ -23,6 +22,7 @@ import {
   type WorkflowVersionRow,
 } from "@flowaid/database";
 import { stableStringify, uuidv7 } from "@flowaid/shared";
+import { inputIssues } from "@flowaid/workflow-compiler";
 import {
   BadRequestError,
   ConflictError,
@@ -42,9 +42,6 @@ import { assertEnvironmentAllowed, type Principal } from "../auth/principal.js";
 import type { ApiContext } from "../context.js";
 import { catalogSnapshot, compileIn } from "./compile.js";
 import { visibleWorkflow } from "./workflows.js";
-
-const Ajv2020 = Ajv2020Module.default;
-const ajv = new Ajv2020({ strict: false, allErrors: true, validateFormats: false });
 
 export interface StartRunRequest {
   input: JsonValue;
@@ -195,15 +192,10 @@ export async function startRun(
     }
     const environmentId = await resolveEnvironment(tx, p, r.environmentId);
     const version = await resolveVersion(tx, p, workflowId, environmentId, r);
-    const validate = ajv.compile(version.plan.inputs as object);
-    if (!validate(r.input))
+    const issues = inputIssues(version.plan.inputs, r.input);
+    if (issues.length > 0)
       throw new BadRequestError("the input does not match the workflow's inputs schema", {
-        issues: (validate.errors ?? []).map(
-          (e: { instancePath: string; message?: string; keyword: string }) => ({
-            path: e.instancePath || "/",
-            message: e.message ?? e.keyword,
-          }),
-        ),
+        issues,
       });
     const bound = new Set(
       (await listSecretBindings(tx, workflowId))

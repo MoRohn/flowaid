@@ -3,6 +3,10 @@
  * and environment, labels `{ evaluationRunId, caseId }`), human tasks answered from the case's
  * `expected.human` (default approve), results written as each case finishes, then the summary and
  * the regression report against the baseline evaluation run.
+ *
+ * `judge` checks use the workspace's generation model (services/judge.ts), resolved once per
+ * evaluation and only when a case has one; the judge's priced calls count in the summary's cost
+ * and stop when the evaluation is cancelled.
  */
 import { and, asc, eq, inArray } from "drizzle-orm";
 import {
@@ -25,13 +29,17 @@ import {
 } from "@flowaid/evaluation";
 import { uuidv7 } from "@flowaid/shared";
 import type { DecisionProvider, JsonObject, QueueDriver, Run } from "@flowaid/workflow-core";
+import { evaluationJudge, type JudgeDeps } from "../services/judge.js";
 
 const TERMINAL = new Set<Run["status"]>(["completed", "failed", "cancelled", "timed_out"]);
 
 export interface EvaluationJobDeps {
   db: Database;
   queue: QueueDriver;
+  /** replaces the workspace's judge model (tests) */
   judge?: DecisionProvider;
+  /** what the workspace's judge model resolves through; without it judge checks cannot run */
+  providers?: Omit<JudgeDeps, "db">;
   /** per-case wall-clock limit (default 10 min) */
   caseTimeoutMs?: number;
   pollMs?: number;
@@ -104,6 +112,20 @@ export async function runEvaluationJob(
       .where(eq(evaluationRuns.id, row.id)),
   );
   const controller = new AbortController();
+  const judging = cases.some((c) => c.expected.output.some((o) => o.matcher.type === "judge"));
+  let judge: { judge?: DecisionProvider; judgeUnavailable?: string } = {};
+  if (deps.judge) judge = { judge: deps.judge };
+  else if (judging && deps.providers) {
+    const r = await evaluationJudge(
+      { db, ...deps.providers },
+      row.workspaceId,
+      controller.signal,
+    ).catch((error: unknown) => ({
+      judge: null,
+      reason: `no judge model available: ${error instanceof Error ? error.message : String(error)}`,
+    }));
+    judge = r.judge ? { judge: r.judge } : { judgeUnavailable: r.reason };
+  }
 
   const launcher: RunLauncher = {
     async launch(req) {
@@ -199,6 +221,20 @@ export async function runEvaluationJob(
     },
   };
 
+  // A cancel request stops launching further cases and aborts in-flight runs and judge calls.
+  const cancelled = async () => {
+    const [state] = await db.system((tx) =>
+      tx
+        .select({ status: evaluationRuns.status })
+        .from(evaluationRuns)
+        .where(eq(evaluationRuns.id, row.id)),
+    );
+    if (state?.status === "cancelled") controller.abort();
+  };
+  const watch = setInterval(
+    () => void cancelled().catch(() => undefined),
+    Math.max(250, (deps.pollMs ?? 250) * 4),
+  );
   let completed = 0;
   try {
     const outcome = await runEvaluation({
@@ -207,7 +243,7 @@ export async function runEvaluationJob(
       launcher,
       concurrency: row.concurrency,
       signal: controller.signal,
-      ...(deps.judge ? { judge: deps.judge } : {}),
+      ...judge,
       onResult: async (result) => {
         completed++;
         await db.system(async (tx) => {
@@ -225,14 +261,7 @@ export async function runEvaluationJob(
             .onConflictDoNothing();
           await tx.update(evaluationRuns).set({ completed }).where(eq(evaluationRuns.id, row.id));
         });
-        // A cancel request stops launching further cases.
-        const [state] = await db.system((tx) =>
-          tx
-            .select({ status: evaluationRuns.status })
-            .from(evaluationRuns)
-            .where(eq(evaluationRuns.id, row.id)),
-        );
-        if (state?.status === "cancelled") controller.abort();
+        await cancelled();
       },
     });
     let report: JsonObject | null = null;
@@ -290,6 +319,8 @@ export async function runEvaluationJob(
         .where(eq(evaluationRuns.id, row.id)),
     );
     throw error;
+  } finally {
+    clearInterval(watch);
   }
 }
 

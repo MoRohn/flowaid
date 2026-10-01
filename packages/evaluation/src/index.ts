@@ -2,7 +2,7 @@
 export * from "./expectation.js";
 export * from "./types.js";
 export { jsonEquals, matchValue } from "./scorers/matchers.js";
-export { judge, type JudgeVerdict } from "./scorers/judge.js";
+export { judge, NO_JUDGE_MODEL, type JudgeVerdict } from "./scorers/judge.js";
 export { scoreCase, metricsOf, type ScoreOptions } from "./score.js";
 export { summarize, calibration, percentile } from "./summarize.js";
 export {

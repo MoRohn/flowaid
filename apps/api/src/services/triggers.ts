@@ -3,12 +3,15 @@
  * row per trigger — `webhooks` (path `<environment>/<path>`), `schedules` (next run from croner),
  * `mcp_exposures` — disables rows whose trigger disappeared (never deletes them), and refuses paths,
  * tool names or event names another workflow of the workspace already uses (`E_TRIGGER_CONFLICT`).
+ * A schedule's stored input must match the deployed version's inputs schema (`E_SCHEMA` at
+ * `/triggers/<i>/input`): the scheduler checks it again at every fire.
  */
 import { Cron } from "croner";
 import { and, eq, ne } from "drizzle-orm";
 import { environments, mcpExposures, schedules, webhooks, type Tx } from "@flowaid/database";
 import { uuidv7 } from "@flowaid/shared";
-import { WorkflowValidationError, type Trigger } from "@flowaid/workflow-core";
+import { describeInputIssues, inputIssues } from "@flowaid/workflow-compiler";
+import { WorkflowValidationError, type JsonSchema, type Trigger } from "@flowaid/workflow-core";
 
 export interface MaterialisedTriggers {
   webhooks: { id: string; path: string; url: string; signature: string; secretBound: boolean }[];
@@ -46,6 +49,8 @@ export async function materialiseTriggers(
     workflowId: string;
     environmentId: string;
     triggers: readonly Trigger[];
+    /** the deployed version's inputs schema: schedule inputs are checked against it */
+    inputs: JsonSchema;
     baseUrl: string;
     now: Date;
   },
@@ -129,6 +134,13 @@ export async function materialiseTriggers(
   const keepSchedules = new Set<string>();
   for (const [idx, t] of i.triggers.entries()) {
     if (t.type !== "schedule") continue;
+    const issues = inputIssues(i.inputs, t.input);
+    if (issues.length > 0)
+      throw diagnosticError(
+        "E_SCHEMA",
+        `schedule trigger ${idx + 1} (${t.cron}): its input does not match the workflow's inputs: ${describeInputIssues(issues)}`,
+        `/triggers/${idx}/input`,
+      );
     const next = nextRun(t.cron, t.timezone, i.now);
     if (!next)
       throw diagnosticError(

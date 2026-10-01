@@ -122,7 +122,7 @@ export interface WorkerDeps {
   /** FLOWAID_ALLOW_PRIVATE_NETWORK (with an `http` built to match: see network.ts) */
   allowPrivateNetwork?: boolean;
   log?: WorkerLogger;
-  /** judge provider and timing for evaluation runs */
+  /** timing for evaluation runs; `judge` replaces the workspace's judge model (tests) */
   evaluation?: { judge?: DecisionProvider; caseTimeoutMs?: number; pollMs?: number };
   maintenance?: { timerPollMs?: number; heartbeatMs?: number; reapMs?: number };
   /** delay before a run job is redelivered when another worker holds the run (default 1 s) */
@@ -677,7 +677,17 @@ export function createWorker(deps: WorkerDeps): Worker {
         async (job) => {
           if (job.type === "evaluation.run")
             await runEvaluationJob(
-              { db: deps.db, queue: deps.queue, ...(deps.evaluation ?? {}) },
+              {
+                db: deps.db,
+                queue: deps.queue,
+                providers: {
+                  registry: providers,
+                  credentials: deps.credentials,
+                  http: deps.http,
+                  serverKeys,
+                },
+                ...(deps.evaluation ?? {}),
+              },
               job.evaluationRunId,
             );
         },

@@ -116,8 +116,13 @@ export function usesJudge(expected: Record<string, unknown>): boolean {
 
 const ESCALATION_TAG = /escalat|human|review|handoff|hand-off/i;
 
-/** The judge message the scorer writes when the worker has no judge model. */
-export const NO_JUDGE = "no judge provider is configured";
+/** The judge message the scorer writes when the workspace has no model to judge with. */
+export const NO_JUDGE = "no judge model available: add an OpenAI, Anthropic or Ollama key";
+
+/** A judge check that could not run (also the wording of results scored by older releases). */
+export const judgeCouldNotRun = (message: string | undefined): boolean =>
+  message?.startsWith("no judge model available") === true ||
+  message === "no judge provider is configured";
 
 /** How well a set's cases cover the workflow, for the set's page. */
 export function caseCoverage(cases: readonly EvaluationCase[]): Note[] {
@@ -178,8 +183,8 @@ export function caseCoverage(cases: readonly EvaluationCase[]): Note[] {
   if (judged)
     notes.push({
       id: "judge",
-      state: "warning",
-      message: `${judged} case${judged === 1 ? " uses" : "s use"} a judge check. The evaluation worker in this release has no judge model configured, so judge checks fail with “${NO_JUDGE}”.`,
+      state: "info",
+      message: `${judged} case${judged === 1 ? " uses" : "s use"} a judge check: the AI builder's model (Settings, else the first OpenAI, Anthropic or Ollama key) grades the answer, and its calls are added to the evaluation's cost. Without such a key, judge checks fail.`,
     });
   return notes;
 }
@@ -220,12 +225,19 @@ export function reportReading(
       state: "warning",
       message: `${weakPasses} of the passing cases only check that the run finishes: their pass says nothing about the answer.`,
     });
-  const judgeless = results.filter((r) => r.checks.some((c) => c.message === NO_JUDGE)).length;
+  const judgeless = results.filter((r) => r.checks.some((c) => judgeCouldNotRun(c.message))).length;
   if (judgeless)
     notes.push({
       id: "judge",
       state: "warning",
-      message: `${judgeless} case${judgeless === 1 ? " has" : "s have"} judge checks that could not run (no judge model is configured for evaluations), so ${judgeless === 1 ? "it fails" : "they fail"} whatever the answer.`,
+      message: `${judgeless} case${judgeless === 1 ? " has" : "s have"} judge checks that could not run (no judge model: add an OpenAI, Anthropic or Ollama key in Credentials), so ${judgeless === 1 ? "it fails" : "they fail"} whatever the answer.`,
+    });
+  const judgeCost = summary.costUsd.judge ?? 0;
+  if (judgeCost > 0)
+    notes.push({
+      id: "judge-cost",
+      state: "info",
+      message: `Judge checks cost $${judgeCost.toFixed(4)}: counted in the evaluation's total, not in cost per case, which is the workflow's own.`,
     });
   const escalated = results.filter((r) => r.metrics?.humanRequested).length;
   if (escalated)

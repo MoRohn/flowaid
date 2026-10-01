@@ -735,6 +735,7 @@ export function workflowRoutes(app: FastifyInstance, ctx: ApiContext): void {
             workflowId: w.id,
             environmentId: envId,
             triggers: w.draft.triggers,
+            inputs: v.plan.inputs,
             baseUrl: ctx.config.baseUrl,
             now: new Date(ctx.clock.now()),
           });
