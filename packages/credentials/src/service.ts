@@ -126,6 +126,31 @@ export class CredentialService {
     }
   }
 
+  /**
+   * Proves a stored credential opens under its KEK version (data key and record), without
+   * returning, learning or recording anything. Null for an external or missing credential.
+   */
+  async verify(credentialId: string): Promise<boolean | null> {
+    const row = await this.options.repository.getCiphertext(credentialId);
+    if (!row || row.provider === "external") return null;
+    return this.verifySealed(credentialId, row.type, row);
+  }
+
+  /** `verify()` for a sealed value before it is stored (master-key rotation checks each one). */
+  async verifySealed(
+    id: string,
+    type: string,
+    sealed: { ciphertext: string; wrappedDataKey: string; keyVersion: number },
+  ): Promise<boolean> {
+    try {
+      const value = await this.unsealDb(id, type, sealed);
+      for (const key of Object.keys(value)) value[key] = "";
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   /** Decrypts (or resolves) a credential, teaches the redactor its values and records the use. */
   async decrypt(credentialId: string): Promise<Record<string, string>> {
     const row = await this.options.repository.getCiphertext(credentialId);

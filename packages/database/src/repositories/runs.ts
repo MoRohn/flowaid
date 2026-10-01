@@ -101,10 +101,15 @@ export async function listHumanTasks(
 
 export type AuditActorType = (typeof auditEvents.$inferSelect)["actorType"];
 
-/** Appends an audit event; `details` must already be redacted by the caller. */
+/**
+ * Appends an audit event; `details` must already be redacted by the caller. With an `id` the
+ * insert is idempotent (an existing row with that id is kept): the api writes a request's row
+ * inside each transaction the request commits, under one id.
+ */
 export async function recordAudit(
   tx: Tx,
   input: {
+    id?: string;
     workspaceId: string | null;
     actorType: AuditActorType;
     actorId: string;
@@ -117,7 +122,28 @@ export async function recordAudit(
     requestId?: string | null;
   },
 ): Promise<void> {
-  await tx.insert(auditEvents).values({ id: uuidv7(), ...input, details: input.details ?? {} });
+  const { id, ...row } = input;
+  const insert = tx
+    .insert(auditEvents)
+    .values({ ...row, id: id ?? uuidv7(), details: row.details ?? {} });
+  await (id ? insert.onConflictDoNothing({ target: auditEvents.id }) : insert);
+}
+
+/** Completes a request's audit row once the response is known (the resource id, details). */
+export async function completeAudit(
+  tx: Tx,
+  id: string,
+  patch: Pick<
+    typeof auditEvents.$inferInsert,
+    "workspaceId" | "actorType" | "actorId" | "resourceId" | "details"
+  >,
+): Promise<boolean> {
+  const rows = await tx
+    .update(auditEvents)
+    .set(patch)
+    .where(eq(auditEvents.id, id))
+    .returning({ id: auditEvents.id });
+  return rows.length > 0;
 }
 
 export async function listAudit(tx: Tx, workspaceId: string, limit = 100) {

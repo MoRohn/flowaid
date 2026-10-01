@@ -30,32 +30,45 @@ CI, E2E and the desktop checks run on every push to `main`.
 
 ## Packages
 
-| package                                                              | state                                                                                              | tests |
-| -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | ----- |
-| `workflow-core`                                                      | contracts, FlowExpr, templates, schema checker (0.3.8, RFC-0021)                                   | 2,665 |
-| `workflow-compiler`                                                  | 8 passes, 94 diagnostics, diff, migrate                                                            | 177   |
-| `workflow-runtime`                                                   | scheduler, orchestrator, replay, run actions, drivers                                              | 89    |
-| `database`                                                           | 50 tables, migrations 0000–0010 with RLS, run store, queue, event bus                              | 56    |
-| `nodes-core`                                                         | 60 nodes and the templates                                                                         | 153   |
-| `providers`, `provider-typesafe`, `-openai`, `-anthropic`, `-ollama` | registry, pricing, failover, routing, rerank, record/replay; TypeSafe Jev and generation providers | 163   |
-| `advisor`                                                            | cost optimiser, AI builder, AI critic, Ask FlowAId loop and its evaluation set                     | 40    |
-| `insights`                                                           | change detection: Fisher, Mann–Whitney, Benjamini–Hochberg, version attribution                    | 20    |
-| `knowledge`                                                          | ingestion, chunking, pgvector hybrid search                                                        | 33    |
-| `mcp`, `openapi-tools`                                               | MCP client pool and exposure; OpenAPI tools                                                        | 75    |
-| `plugins`, `create-flowaid-node`                                     | registry discovery, install, plugin host; scaffold                                                 | 25    |
-| `importer`                                                           | the FlowAId importer and migration report                                                          | 20    |
-| `sandbox`, `credentials`, `storage`                                  | isolated-vm and container executors; envelope encryption; local and S3 artifacts                   | 87    |
-| `observability`                                                      | logs, tracing, metrics, Prometheus, OTel, trace reviews, alerts                                    | 71    |
-| `evaluation`, `jev`                                                  | evaluation runner and reports; Jev decision-contract library                                       | 209   |
-| `workflow-sdk`, `cli`                                                | typed client with resumable SSE and builders; the `flowaid` CLI                                    | 43    |
-| `codegen`                                                            | code export packages, npm and vendored                                                             | 29    |
-| `langchain`, `nodes-langchain`                                       | adapters, callback handler, bundled nodes and the RAG template                                     | 53    |
-| `node-sdk`, `shared`, `env`                                          | node authoring kit; primitives; environment schema                                                 | 165   |
-| `ui`                                                                 | component library, playground and accessibility gallery                                            | 899   |
+| package                                                              | state                                                                                                        | tests |
+| -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ----- |
+| `workflow-core`                                                      | contracts, FlowExpr, templates, schema checker (0.3.8, RFC-0021)                                             | 2,665 |
+| `workflow-compiler`                                                  | 8 passes, 94 diagnostics, diff, migrate                                                                      | 177   |
+| `workflow-runtime`                                                   | scheduler, orchestrator, replay, run actions, drivers                                                        | 89    |
+| `database`                                                           | 50 tables, migrations 0000–0012 with RLS (bypass gated on `flowaid_rls_bypass`), run store, queue, event bus | 56    |
+| `nodes-core`                                                         | 60 nodes and the templates                                                                                   | 153   |
+| `providers`, `provider-typesafe`, `-openai`, `-anthropic`, `-ollama` | registry, pricing, failover, routing, rerank, record/replay; TypeSafe Jev and generation providers           | 163   |
+| `advisor`                                                            | cost optimiser, AI builder, AI critic, Ask FlowAId loop and its evaluation set                               | 40    |
+| `insights`                                                           | change detection: Fisher, Mann–Whitney, Benjamini–Hochberg, version attribution                              | 20    |
+| `knowledge`                                                          | ingestion, chunking, pgvector hybrid search                                                                  | 33    |
+| `mcp`, `openapi-tools`                                               | MCP client pool and exposure; OpenAPI tools                                                                  | 75    |
+| `plugins`, `create-flowaid-node`                                     | registry discovery, install, plugin host; scaffold                                                           | 25    |
+| `importer`                                                           | the FlowAId importer and migration report                                                                    | 20    |
+| `sandbox`, `credentials`, `storage`                                  | isolated-vm and container executors; envelope encryption; local and S3 artifacts                             | 87    |
+| `observability`                                                      | logs, tracing, metrics, Prometheus, OTel, trace reviews, alerts                                              | 71    |
+| `evaluation`, `jev`                                                  | evaluation runner and reports; Jev decision-contract library                                                 | 209   |
+| `workflow-sdk`, `cli`                                                | typed client with resumable SSE and builders; the `flowaid` CLI                                              | 43    |
+| `codegen`                                                            | code export packages, npm and vendored                                                                       | 29    |
+| `langchain`, `nodes-langchain`                                       | adapters, callback handler, bundled nodes and the RAG template                                               | 53    |
+| `node-sdk`, `shared`, `env`                                          | node authoring kit; primitives; environment schema                                                           | 165   |
+| `ui`                                                                 | component library, playground and accessibility gallery                                                      | 899   |
 
 Workspace packages export `types` and `development` conditions to their sources and `default`
 to `dist`: tests, `tsx --conditions=development` and the web build read sources, while the
 compiled API, worker and Docker images run plain `node` on `dist`.
+
+## Hardening after V2 (2026-10-01)
+
+- **P3-3:** with `REDIS_URL`, request rate limits, sign-in throttles and the webhook replay cache
+  live in Redis and hold across api replicas; without it they stay in process memory.
+- **P3-4:** `app.bypass_rls` lifts row-level security only for members of `flowaid_rls_bypass`
+  (`flowaid_app` and the owner; never the sandbox host's `flowaid_code`), migration 0012.
+- **P3-6:** a mutation's audit row is written inside the transaction that makes the change.
+- **P3-7:** `flowaid keys rotate-master` (`pnpm keys`, or `node dist/keys.js` in the api image)
+  rotates the master key; procedure in [operations/RUNBOOK.md](operations/RUNBOOK.md#key-rotation).
+- `PgRunStore.dueTimers` decides what is due by the database clock.
+
+What stays open is in [security/THREAT_MODEL.md](security/THREAT_MODEL.md#accepted-risks-and-open-items).
 
 ## Upgrade plan (`docs/project/UPGRADE_PLAN.md`)
 

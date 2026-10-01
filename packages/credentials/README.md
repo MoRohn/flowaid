@@ -16,6 +16,9 @@ master key (env | file | AWS KMS | Vault Transit | Azure Key Vault | GCP Cloud K
 - A ciphertext copied onto another credential, type or key version fails authentication.
 - `rotate()` moves a credential to the active KEK version; `KeyRing.createVersion()` starts one.
 - `KeyRing.rotateMaster(next)` re-wraps every KEK in one store call. Credentials are untouched.
+  The operator command `flowaid keys rotate-master` (`apps/api/src/keys.ts`) does the same in one
+  database transaction and then re-seals every data key under a new KEK version.
+- `verify()` / `verifySealed()` prove a stored or re-sealed credential opens, without using it.
 - `KeyRing.verifyMaster()` runs at boot: a different master fails with `E_MASTER_KEY_MISMATCH`
   (KCV = first 8 bytes of `HMAC-SHA256(master, 'flowaid/master-kcv/v1')`; KMS and Vault
   fingerprint the key identity, since the key never leaves them).

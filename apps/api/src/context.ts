@@ -13,6 +13,7 @@ import type { AlertDispatcher, SmtpSettings } from "@flowaid/observability";
 import type { JwtKeys } from "./auth/jwt.js";
 import type { S3Options } from "@flowaid/storage";
 import type { StdioPolicy } from "@flowaid/mcp";
+import { MemoryLimitStore, type LimitStore } from "./services/limits.js";
 
 export interface ApiConfig {
   production: boolean;
@@ -89,8 +90,19 @@ export interface ApiContext {
   alerts?: AlertDispatcher;
   /** SMTP for `email` channels (SMTP_URL, SMTP_FROM); test sends explain its absence */
   smtp?: SmtpSettings;
+  /**
+   * Login throttles and the webhook replay cache: Redis with REDIS_URL (shared by every replica),
+   * else this process's memory (`limitStore()` creates that on first use).
+   */
+  limits?: LimitStore;
   /** readiness probe of Redis (REDIS_URL): resolves once it answers; absent without Redis */
   pingRedis?: () => Promise<void>;
+}
+
+/** The context's limit store, creating the in-memory one on first use (local mode, tests). */
+export function limitStore(ctx: ApiContext): LimitStore {
+  ctx.limits ??= new MemoryLimitStore(() => ctx.clock.now());
+  return ctx.limits;
 }
 
 export function configFromEnv(env: Env): ApiConfig {

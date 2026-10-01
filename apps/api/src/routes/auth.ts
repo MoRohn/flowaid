@@ -31,14 +31,14 @@ import { hashSecret, randomToken } from "../auth/apiKey.js";
 import { ACCESS_TTL_S } from "../auth/jwt.js";
 import { hashPassword, passwordProblem, verifyPassword } from "../auth/passwords.js";
 import { sessionUserId } from "../auth/principal.js";
-import type { ApiContext } from "../context.js";
+import { limitStore, type ApiContext } from "../context.js";
 import { NoContent } from "../dto/common.js";
 import { LoginRequestSchema, MeResponseSchema, SessionResponseSchema } from "../dto/identity.js";
 import { REFRESH_COOKIE, sessionCookieName } from "../plugins/auth.js";
 import { featuresFor } from "../services/features.js";
 import { loadEnabledPlugins } from "../services/plugins.js";
 import { advisorModel } from "../services/advisor.js";
-import { Throttle } from "../services/throttle.js";
+import { Throttle } from "../services/limits.js";
 
 const REFRESH_TTL_MS = 30 * 24 * 3600 * 1000;
 
@@ -174,8 +174,9 @@ const ua = (req: FastifyRequest) =>
 
 export function authRoutes(app: FastifyInstance, ctx: ApiContext): void {
   const r = app.withTypeProvider<ZodTypeProvider>();
-  const byIp = new Throttle(20, 60_000, () => ctx.clock.now());
-  const byEmail = new Throttle(10, 15 * 60_000, () => ctx.clock.now());
+  // In Redis with REDIS_URL, so every api replica counts the same attempts (P3-3).
+  const byIp = new Throttle(limitStore(ctx), "login-ip", 20, 60_000);
+  const byEmail = new Throttle(limitStore(ctx), "login-email", 10, 15 * 60_000);
 
   r.post(
     "/v1/auth/login",
@@ -195,7 +196,7 @@ export function authRoutes(app: FastifyInstance, ctx: ApiContext): void {
     async (req, reply) => {
       const email = req.body.email.trim().toLowerCase();
       const emailHash = hashSecret(email).slice(0, 16);
-      if (!byIp.hit(req.ip) || !byEmail.hit(email))
+      if (!(await byIp.hit(req.ip)) || !(await byEmail.hit(email)))
         throw new RateLimitError("too many sign-in attempts; try again later", 60_000);
       const user = await ctx.db.system((tx) => findUserByEmail(tx, email));
       const ok = await verifyPassword(user?.passwordHash ?? null, req.body.password);
@@ -216,7 +217,7 @@ export function authRoutes(app: FastifyInstance, ctx: ApiContext): void {
         );
         throw new UnauthorizedError("wrong email or password");
       }
-      byEmail.reset(email);
+      await byEmail.reset(email);
       // A presented refresh token belongs to an earlier login: revoke its family.
       const presented = req.cookies[REFRESH_COOKIE];
       const refresh = randomToken();

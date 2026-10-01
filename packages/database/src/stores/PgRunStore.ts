@@ -356,13 +356,22 @@ export class PgRunStore implements RunStore {
     }));
   }
 
-  async dueTimers(now: Date, limit: number): Promise<RunTimer[]> {
+  /**
+   * Timers whose `fire_at` has passed by the database clock, like `expiredLeases`: a worker whose
+   * clock runs ahead must not fire timers early, nor one running behind fire them late. `_now`
+   * is the caller's clock and is not used (the in-memory store uses it).
+   */
+  async dueTimers(_now: Date, limit: number): Promise<RunTimer[]> {
     const rows = await this.tx((tx) =>
       tx
         .select()
         .from(runTimers)
         .where(
-          and(isNull(runTimers.firedAt), isNull(runTimers.cancelledAt), lte(runTimers.fireAt, now)),
+          and(
+            isNull(runTimers.firedAt),
+            isNull(runTimers.cancelledAt),
+            lte(runTimers.fireAt, sql`now()`),
+          ),
         )
         .orderBy(asc(runTimers.fireAt))
         .limit(limit),

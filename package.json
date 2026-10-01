@@ -40,6 +40,7 @@
     "smoke:desktop": "node --disable-warning=ExperimentalWarning scripts/desktop-smoke.ts",
     "pageindex:test": "node --disable-warning=ExperimentalWarning scripts/python-test.ts apps/pageindex",
     "flowaid": "tsx --conditions=development packages/cli/src/main.ts",
+    "keys": "tsx --conditions=development apps/api/src/keys.ts",
     "prepare": "node --disable-warning=ExperimentalWarning scripts/install-hooks.ts",
     "changeset": "changeset",
     "version-packages": "changeset version && node --disable-warning=ExperimentalWarning scripts/release-version.ts && pnpm --filter @flowaid/nodes-core --filter @flowaid/nodes-langchain manifest && prettier --write CHANGELOG.md \"{apps,packages}/*/CHANGELOG.md\" \"{apps,packages}/*/package.json\" \"packages/*/src/**/*.ts\""

@@ -81,9 +81,27 @@ named in the commits.
     declared), and side channels within the host process (the other nodes of the same package
     run there). Bundled packages (`@flowaid/nodes-langchain`) ship with the worker and are not
     held to the built-in allow-list.
-- **The row-level-security bypass is a custom setting.** Any database role could set it,
-  including the sandbox host's role. Gating it on role membership is open (P3-4).
-- **Rate limits and login throttles are in memory.** They are per process, which is fine locally.
-  Redis-backed stores for the scale profile are open (P3-3).
-- **Audit rows are written after commit, best effort.** An outbox is open (P3-6).
-- **No `flowaid keys rotate-master` command yet.** The library supports rotation (P3-7).
+- **The api and the worker share one database role.** Both connect as `flowaid_app`, which is a
+  member of `flowaid_rls_bypass` because their system scope needs it, so SQL injected into the
+  api could still lift row-level security. The sandbox host's `flowaid_code` cannot (P3-4).
+- **Mutations that commit nothing through the database are audited after the fact.** A route
+  that only enqueues work gets its audit row when the response is sent, best effort; and a
+  crash after commit can lose the resource id a handler learns after its transaction (the row
+  then names the route's resource id or `-`) (P3-6).
+- **The global request rate limit fails open on a Redis error.** With `REDIS_URL`, a Redis
+  outage lets requests past the per-principal limit (the login throttles and the webhook replay
+  cache fail closed) (P3-3).
+- **Master-key rotation needs a stop.** `flowaid keys rotate-master` refuses to run while the api
+  or the worker is connected, and moves only to a local key (file or variable) (P3-7).
+
+## Fixed after V2
+
+- **P3-4:** the row-level-security bypass was a custom setting any role could set, including the
+  sandbox host's. `flowaid_bypass_rls()` now also requires membership in `flowaid_rls_bypass`
+  (migration 0012), granted to `flowaid_app` and the owner only.
+- **P3-3:** rate limits, login throttles and the webhook replay cache were per process. With
+  `REDIS_URL` they live in Redis and hold across api replicas.
+- **P3-6:** audit rows were written after commit, best effort. A request's row is now written
+  in each transaction that changes something, before it commits.
+- **P3-7:** there was no master-key rotation command. `flowaid keys rotate-master` re-wraps every
+  KEK and re-seals every data key, verified and resumable.

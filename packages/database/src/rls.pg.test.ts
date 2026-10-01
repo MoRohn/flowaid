@@ -1,5 +1,6 @@
 import postgres from "postgres";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { sql } from "drizzle-orm";
 import { uuidv7 } from "@flowaid/shared";
 import { PgRunStore } from "./stores/PgRunStore.js";
 import { createTestDatabase, describeDb, type TestDatabase } from "./test/pg.js";
@@ -195,6 +196,93 @@ describeDb("row-level security", () => {
       } finally {
         await code.end();
       }
+    });
+  });
+
+  describe("the bypass setting (0012_rls_bypass_role.sql)", () => {
+    it("does not lift the policies for flowaid_code, which is not in flowaid_rls_bypass", async () => {
+      const code = postgres(t.codeUrl, { max: 1, onnotice: () => undefined });
+      try {
+        const [run] = await t.admin<{ id: string }[]>`
+          select id from runs where workspace_id = ${a.workspaceId} limit 1`;
+        const runId = run?.id ?? "";
+        // with another tenant's workspace, and with none at all
+        for (const workspace of [b.workspaceId, ""]) {
+          await expect(
+            code.begin(async (tx) => {
+              await tx`select set_config('app.bypass_rls', 'on', true)`;
+              await tx`select set_config('app.workspace_id', ${workspace}, true)`;
+              await tx`insert into run_events (run_id, seq, type, payload, at) values (${runId}, 9997, 'LOG', '{}', now())`;
+            }),
+          ).rejects.toThrow(/row-level security/);
+        }
+        // the whole connection, as DB_RLS=false would set it
+        const sticky = postgres(t.codeUrl, {
+          max: 1,
+          onnotice: () => undefined,
+          connection: { "app.bypass_rls": "on" },
+        });
+        try {
+          const [row] = await sticky<{ bypass: boolean }[]>`select flowaid_bypass_rls() as bypass`;
+          expect(row?.bypass).toBe(false);
+        } finally {
+          await sticky.end();
+        }
+      } finally {
+        await code.end();
+      }
+    });
+
+    it("hides every row from a role with table privileges but no membership", async () => {
+      const role = `flowaid_t_nobypass_${t.name.slice(-12)}`;
+      await t.admin.unsafe(`CREATE ROLE ${role} LOGIN PASSWORD 'nobypass-pw' NOINHERIT`);
+      await t.admin.unsafe(`GRANT CONNECT ON DATABASE ${t.name} TO ${role}`);
+      await t.admin.unsafe(`GRANT USAGE ON SCHEMA public TO ${role}`);
+      await t.admin.unsafe(`GRANT SELECT, INSERT ON runs, credentials, audit_events TO ${role}`);
+      await t.admin.unsafe(
+        `GRANT EXECUTE ON FUNCTION flowaid_bypass_rls(), flowaid_workspace_id() TO ${role}`,
+      );
+      const url = new URL(t.appUrl);
+      url.username = role;
+      url.password = "nobypass-pw";
+      const other = postgres(url.toString(), { max: 1, onnotice: () => undefined });
+      try {
+        const counts = await other.begin(async (tx) => {
+          await tx`select set_config('app.bypass_rls', 'on', true)`;
+          const [r] = await tx<{ runs: number; audit: number; bypass: boolean }[]>`
+            select (select count(*)::int from runs) as runs,
+                   (select count(*)::int from audit_events) as audit,
+                   flowaid_bypass_rls() as bypass`;
+          return r;
+        });
+        expect(counts).toEqual({ runs: 0, audit: 0, bypass: false });
+        await expect(
+          other.begin(async (tx) => {
+            await tx`select set_config('app.bypass_rls', 'on', true)`;
+            await tx`insert into audit_events (id, workspace_id, actor_type, actor_id, action, resource_type, resource_id)
+              values (${uuidv7()}, ${b.workspaceId}, 'system', 'forged', 'x', 'r', '1')`;
+          }),
+        ).rejects.toThrow(/row-level security/);
+        // Granting the role is what turns the setting on.
+        await t.admin.unsafe(`GRANT flowaid_rls_bypass TO ${role}`);
+        const after = await other.begin(async (tx) => {
+          await tx`select set_config('app.bypass_rls', 'on', true)`;
+          const [r] = await tx<{ runs: number }[]>`select count(*)::int as runs from runs`;
+          return r?.runs;
+        });
+        expect(after).toBe(2);
+      } finally {
+        await other.end();
+        await t.admin.unsafe(`DROP OWNED BY ${role}`);
+        await t.admin.unsafe(`DROP ROLE ${role}`);
+      }
+    });
+
+    it("still lifts the policies for flowaid_app's system scope", async () => {
+      const rows = await t.app.system((tx) =>
+        tx.execute<{ n: number }>(sql`select count(distinct workspace_id)::int as n from runs`),
+      );
+      expect(rows[0]?.n).toBe(2);
     });
   });
 

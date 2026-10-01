@@ -1,11 +1,21 @@
-/** Per-principal rate limits (API.md §1): session 600/min, API key 1 200/min (or its own), public by IP. */
+/**
+ * Per-principal rate limits (API.md §1): session 600/min, API key 1 200/min (or its own), public by
+ * IP. With `REDIS_URL` the counters live in Redis (P3-3), so the limits hold across api replicas;
+ * a Redis error lets the request through rather than failing every request (ioredis reports the
+ * connection error, and /v1/ready turns unavailable), while the login throttles and the webhook
+ * replay cache fail closed.
+ */
 import type { FastifyInstance } from "fastify";
 import rateLimit from "@fastify/rate-limit";
-import type { ApiContext } from "../context.js";
+import { limitStore, type ApiContext } from "../context.js";
 
 export async function registerRateLimit(app: FastifyInstance, ctx: ApiContext): Promise<void> {
+  const shared = limitStore(ctx).shared;
   await app.register(rateLimit, {
     global: true,
+    ...(shared
+      ? { redis: shared.redis, nameSpace: `${shared.prefix}rate:`, skipOnError: true }
+      : {}),
     hook: "preHandler",
     timeWindow: 60_000,
     max: (req) => {

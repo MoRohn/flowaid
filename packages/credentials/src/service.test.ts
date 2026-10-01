@@ -173,6 +173,17 @@ describe("KeyRing", () => {
     await new KeyRing(envMasterKey(MASTER_B), store).verifyMaster();
   });
 
+  it("verifies a credential without decrypting it for use", async () => {
+    const { service, save, rows, touched } = setup();
+    await save("cred-v", "http.bearer", { token: "verify-me-1" });
+    expect(await service.verify("cred-v")).toBe(true);
+    expect(await service.verify("missing")).toBeNull();
+    expect(touched).toEqual([]);
+    const row = rows.get("cred-v");
+    if (row) row.ciphertext = `${row.ciphertext.slice(0, -6)}AAAAAA`;
+    expect(await service.verify("cred-v")).toBe(false);
+  });
+
   it("refuses an unknown KEK version", async () => {
     const { keyring } = setup();
     await expect(keyring.kek(9)).rejects.toThrow(/version 9 does not exist/);
