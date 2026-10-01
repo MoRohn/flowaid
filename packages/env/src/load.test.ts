@@ -329,6 +329,8 @@ describe("secret-safe serialisation", () => {
         "SMTP_URL",
         "VAULT_TOKEN",
         "AZURE_CLIENT_SECRET",
+        "AWS_SECRET_ACCESS_KEY",
+        "AWS_SESSION_TOKEN",
         "FLOWAID_PAGEINDEX_TOKEN",
         "FLOWAID_LAUNCHER_TOKEN",
       ].sort(),

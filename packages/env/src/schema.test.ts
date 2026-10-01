@@ -171,6 +171,10 @@ describe("EnvSchema", () => {
           input.AZURE_TENANT_ID = ENV_VAR_DOCS.AZURE_TENANT_ID.example;
           input.AZURE_CLIENT_ID = ENV_VAR_DOCS.AZURE_CLIENT_ID.example;
         }
+        if (["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN"].includes(name)) {
+          input.AWS_ACCESS_KEY_ID = ENV_VAR_DOCS.AWS_ACCESS_KEY_ID.example;
+          input.AWS_SECRET_ACCESS_KEY = ENV_VAR_DOCS.AWS_SECRET_ACCESS_KEY.example;
+        }
         const result = EnvSchema.safeParse(input);
         expect(
           result.success,

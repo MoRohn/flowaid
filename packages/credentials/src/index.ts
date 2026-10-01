@@ -3,6 +3,8 @@ export * from "./masterKey/types.js";
 export * from "./masterKey/local.js";
 export * from "./masterKey/remote.js";
 export * from "./masterKey/cloud.js";
+export * from "./aws/sigv4.js";
+export * from "./aws/client.js";
 export * from "./fromEnv.js";
 export * from "./keyring.js";
 export * from "./externalRef.js";

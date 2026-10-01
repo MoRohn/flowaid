@@ -177,6 +177,34 @@ Per replica, `WORKER_CONCURRENCY` (default 10) caps concurrent executions; `work
 own `WORKER_CODE_CONCURRENCY` (default 4). Scale when `flowaid_queue_latency_ms` or the backlog
 grows while the workers are healthy.
 
+## Key services
+
+The master key stays local unless `FLOWAID_MASTER_KEY_PROVIDER` names a key service
+(`aws-kms`, `vault-transit`, `azure-keyvault`, `gcp-kms`); `FLOWAID_MASTER_KEY_ID` names the key.
+External credential references (`env:`, `vault:`, `aws-sm:`, `azure-kv:`, `gcp-sm:`) are read
+when a run uses them and cached for five minutes. The api and the worker build both from the same
+variables, so set them on both. Every variable is described in
+[packages/env/README.md](../../packages/env/README.md).
+
+**AWS.** FlowAId signs KMS and Secrets Manager requests itself (Signature Version 4); no AWS SDK
+or CLI is needed in the image.
+
+- Credentials: `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` (plus `AWS_SESSION_TOKEN` for
+  temporary credentials); without them, the ECS task role, then the EC2 instance profile
+  (IMDSv2). Other sources (`~/.aws` profiles, SSO, web identity, EKS Pod Identity) are not read;
+  export their keys into the environment instead.
+- The region is the one in the key's or secret's ARN, so `FLOWAID_MASTER_KEY_ID` must be a key
+  or alias ARN (`arn:aws:kms:<region>:<account>:key/<id>`) and an `aws-sm:` reference a full
+  secret ARN (`aws-sm:arn:aws:secretsmanager:<region>:<account>:secret:<name>[#<json key>]`).
+- IAM: `kms:Encrypt` and `kms:Decrypt` on the master key; `secretsmanager:GetSecretValue` on the
+  secrets references name (plus `kms:Decrypt` on their key when it is a customer managed key).
+- Testing against LocalStack: `AWS_ENDPOINT_URL=http://localhost:4566` with any access key pair.
+  Errors name the operation, the HTTP status and the AWS error type
+  (`AWS kms Decrypt failed (400 IncorrectKeyException)`), never the response body.
+
+Switching providers is a master rotation, which is not available yet (below): KEKs wrapped by one
+provider do not unwrap with another, and the api refuses to start with `E_MASTER_KEY_MISMATCH`.
+
 ## Key rotation
 
 - **A credential's secret values** can be replaced: `POST /v1/credentials/:id/rotate` (CLI

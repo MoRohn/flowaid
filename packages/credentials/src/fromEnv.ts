@@ -5,6 +5,7 @@
  */
 import type { Env } from "@flowaid/env";
 import { CredentialError } from "@flowaid/workflow-core";
+import { awsCredentialChain, awsKmsClient, awsSecretsManagerClient } from "./aws/client.js";
 import type { ExternalResolverOptions } from "./externalRef.js";
 import {
   AZURE_VAULT_RESOURCE,
@@ -18,7 +19,7 @@ import {
   type HttpFetch,
   type TokenSource,
 } from "./masterKey/cloud.js";
-import { vaultTransitMasterKey } from "./masterKey/remote.js";
+import { awsKmsMasterKey, vaultTransitMasterKey } from "./masterKey/remote.js";
 import type { MasterKeyProvider } from "./masterKey/types.js";
 
 export interface KeyServiceDeps {
@@ -40,6 +41,11 @@ type KeyEnv = Pick<
   | "AZURE_CLIENT_ID"
   | "AZURE_CLIENT_SECRET"
   | "GOOGLE_APPLICATION_CREDENTIALS"
+  | "AWS_ACCESS_KEY_ID"
+  | "AWS_SECRET_ACCESS_KEY"
+  | "AWS_SESSION_TOKEN"
+  | "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI"
+  | "AWS_ENDPOINT_URL"
 > & { secretRefs?: Env["secretRefs"] };
 
 /** Azure: the service principal when configured, else the host's managed identity. */
@@ -73,6 +79,16 @@ export function gcpToken(env: KeyEnv, deps: KeyServiceDeps): TokenSource {
   return gcpServiceAccountToken({ http: deps.http, key });
 }
 
+/** AWS: static keys, else the ECS task role, else the EC2 instance profile; `AWS_ENDPOINT_URL`
+ * points both services at another endpoint (LocalStack). */
+function awsServiceOptions(env: KeyEnv, deps: KeyServiceDeps) {
+  return {
+    http: deps.http,
+    credentials: awsCredentialChain(env, deps.http),
+    ...(env.AWS_ENDPOINT_URL ? { endpoint: env.AWS_ENDPOINT_URL } : {}),
+  };
+}
+
 /**
  * The master key provider `FLOWAID_MASTER_KEY_PROVIDER` names; `local` is the caller's (env or
  * key file, whose creation rules differ between the api and the worker).
@@ -97,6 +113,8 @@ export async function masterKeyProviderFromEnv(
         ...(env.VAULT_NAMESPACE ? { namespace: env.VAULT_NAMESPACE } : {}),
         http: deps.http as never,
       });
+    case "aws-kms":
+      return awsKmsMasterKey({ keyArn: keyId, client: awsKmsClient(awsServiceOptions(env, deps)) });
     case "azure-keyvault":
       return azureKeyVaultMasterKey({ keyId, token: azureToken(env, deps), http: deps.http });
     case "gcp-kms":
@@ -106,8 +124,8 @@ export async function masterKeyProviderFromEnv(
 
 /**
  * What external references can read: `FLOWAID_SECRET_*` values, Vault when `VAULT_ADDR` is set,
- * and Azure Key Vault and Secret Manager through the platform identity (resolved lazily: a
- * reference that is never used never asks for a token).
+ * and AWS Secrets Manager, Azure Key Vault and Secret Manager through the platform identity
+ * (resolved lazily: a reference that is never used never asks for credentials or a token).
  */
 export function externalResolverOptionsFromEnv(
   env: KeyEnv,
@@ -115,6 +133,7 @@ export function externalResolverOptionsFromEnv(
 ): ExternalResolverOptions {
   let azure: TokenSource | undefined;
   let gcp: TokenSource | undefined;
+  let aws: ReturnType<typeof awsSecretsManagerClient> | undefined;
   return {
     secretEnv: env.secretRefs ?? {},
     ...(env.VAULT_ADDR && env.VAULT_TOKEN
@@ -127,6 +146,10 @@ export function externalResolverOptionsFromEnv(
           },
         }
       : {}),
+    awsSecretsManager: {
+      getSecretString: (arn) =>
+        (aws ??= awsSecretsManagerClient(awsServiceOptions(env, deps))).getSecretString(arn),
+    },
     azureKeyVault: {
       http: deps.http,
       token: () => (azure ??= azureToken(env, deps))(),

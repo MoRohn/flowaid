@@ -18,8 +18,8 @@ import type { MasterKeyProvider } from "./types.js";
  * configuration (and metadata endpoints are link-local by design). */
 export type HttpFetch = (
   url: string,
-  init?: { method?: string; headers?: Record<string, string>; body?: string },
-) => Promise<{ ok: boolean; status: number; json(): Promise<unknown> }>;
+  init?: { method?: string; headers?: Record<string, string>; body?: string; signal?: AbortSignal },
+) => Promise<{ ok: boolean; status: number; json(): Promise<unknown>; text?(): Promise<string> }>;
 
 /** Returns a bearer token for the service, refreshed as it nears expiry. */
 export type TokenSource = () => Promise<string>;
