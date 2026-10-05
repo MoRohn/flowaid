@@ -21,10 +21,30 @@ export interface TemplateNeed {
 export interface WorkspaceResources {
   keys: KeySources;
   mcpServers: number;
-  knowledgeSources: number;
+  /** the workspace's knowledge sources, by kind */
+  knowledge: readonly { kind: string }[];
+  /** the PageIndex service is configured (`features.pageindex`) */
+  pageindex: boolean;
 }
 
 const docs = (key: string) => (key === "documents" ? "Documents" : `Documents (${key})`);
+
+/**
+ * The kind of knowledge source a template's slot takes: PDFs indexed with PageIndex (the slot
+ * says so: its steps navigate section trees), or a source of chunks any other kind fills.
+ */
+export function slotSourceKind(slot: { description?: string }): "pageindex" | "chunks" {
+  return /pageindex/i.test(slot.description ?? "") ? "pageindex" : "chunks";
+}
+
+/** The sources that can fill a knowledge slot. */
+export function sourcesForSlot<T extends { kind: string }>(
+  slot: { description?: string },
+  sources: readonly T[],
+): T[] {
+  const wanted = slotSourceKind(slot);
+  return sources.filter((s) => (s.kind === "pageindex") === (wanted === "pageindex"));
+}
 
 export function templateNeeds(t: TemplateRow, have: WorkspaceResources): TemplateNeed[] {
   const needs: TemplateNeed[] = [];
@@ -77,17 +97,34 @@ export function templateNeeds(t: TemplateRow, have: WorkspaceResources): Templat
             where: "integrations",
           },
     );
-  for (const k of t.requiredResources?.knowledgeSources ?? [])
+  for (const k of t.requiredResources?.knowledgeSources ?? []) {
+    const pageindex = slotSourceKind(k) === "pageindex";
+    const fits = sourcesForSlot(k, have.knowledge).length;
     needs.push(
-      have.knowledgeSources > 0
-        ? { label: docs(k.key), ready: true, detail: "choose the source in the builder" }
-        : {
+      pageindex && !have.pageindex
+        ? {
             label: docs(k.key),
             ready: false,
-            detail: "add a source under Knowledge",
-            where: "knowledge",
-          },
+            state: "PageIndex is off",
+            detail:
+              "needs PDFs indexed with PageIndex, which is turned off on this server: start FlowAId with --pageindex",
+          }
+        : fits > 0
+          ? {
+              label: docs(k.key),
+              ready: true,
+              detail: "choose which source when you create it",
+            }
+          : {
+              label: docs(k.key),
+              ready: false,
+              detail: pageindex
+                ? "add a PageIndex source with indexed PDFs under Knowledge"
+                : "add a source of documents (not PageIndex) under Knowledge",
+              where: "knowledge",
+            },
     );
+  }
   return needs;
 }
 
@@ -101,20 +138,30 @@ export interface TemplateCheck {
 }
 
 /**
+ * The key a slot's choice is sent under in `POST /v1/workflows {resources}`: an MCP server by its
+ * key, a knowledge source as `knowledge.<key>` (the API resolves `$template.<kind>.<key>` either way).
+ */
+export const pickKey = (slot: { key: string; kind: "mcpServers" | "knowledgeSources" }): string =>
+  slot.kind === "knowledgeSources" ? `knowledge.${slot.key}` : slot.key;
+
+/**
  * The Use template dialog's readiness list: the template's needs against the workspace, and the
- * MCP servers chosen for its slots so far. `ready` is true when a run of the new copy has what
- * FlowAId can check for; it says nothing about whether its answers suit your cases.
+ * MCP servers and knowledge sources chosen for its slots so far. `ready` is true when a run of the
+ * new copy has what FlowAId can check for; it says nothing about whether its answers suit your
+ * cases.
  */
 export function templateChecks(
   needs: readonly TemplateNeed[],
   slots: readonly { key: string; kind: "mcpServers" | "knowledgeSources" }[],
   picked: Readonly<Record<string, string>>,
-  serverName: (id: string) => string | undefined,
+  nameOf: (id: string) => string | undefined,
 ): { checks: TemplateCheck[]; ready: boolean } {
-  // once servers exist, an MCP need becomes the question of which one this copy uses
+  // once servers or sources exist, the need becomes the question of which one this copy uses
   const slotOf = (n: TemplateNeed) =>
     n.ready
-      ? slots.find((x) => x.kind === "mcpServers" && n.label === `MCP server (${x.key})`)
+      ? slots.find((x) =>
+          x.kind === "mcpServers" ? n.label === `MCP server (${x.key})` : n.label === docs(x.key),
+        )
       : undefined;
   const checks: TemplateCheck[] = needs.map((n) => {
     const slot = slotOf(n);
@@ -126,18 +173,22 @@ export function templateChecks(
         detail: n.detail,
         ...(n.where ? { where: n.where } : {}),
       };
-    const id = picked[slot.key];
+    const id = picked[pickKey(slot)];
+    const what = slot.kind === "mcpServers" ? "MCP server" : "knowledge source";
     return id
       ? {
           id: `slot:${slot.key}`,
           state: "ok",
-          label: `MCP server for ${slot.key}: ${serverName(id) ?? "chosen"}`,
-          detail: "its tools are wired into the copy",
+          label: `${slot.kind === "mcpServers" ? "MCP server" : "Knowledge source"} for ${slot.key}: ${nameOf(id) ?? "chosen"}`,
+          detail:
+            slot.kind === "mcpServers"
+              ? "its tools are wired into the copy"
+              : "the steps that read documents search it",
         }
       : {
           id: `slot:${slot.key}`,
           state: "warning",
-          label: `No MCP server chosen for ${slot.key}`,
+          label: `No ${what} chosen for ${slot.key}`,
           detail:
             "choose one in the next step, or later in the builder; steps that use it fail until then",
         };

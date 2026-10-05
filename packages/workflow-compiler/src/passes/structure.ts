@@ -422,13 +422,16 @@ function checkDecisionConfig(ctx: CompileContext, info: NodeInfo, node: TaskNode
 
 /**
  * Agent nodes loop over model calls and tool calls, so they need a step limit (`maxSteps`) and a
- * spend limit (a cost or token bound on the node, its manifest defaults or the workflow).
+ * spend limit (a cost or token bound on the node, its manifest defaults or the workflow). A step
+ * that uses an agent preset (`agentId`) may leave `maxSteps` to the preset, which always has one
+ * (its own, 1–50, else the node's default).
  */
 function checkAgentBounds(ctx: CompileContext, info: NodeInfo, node: TaskNode): void {
   if (info.manifest?.metadata.category !== "agent") return;
   const where = { nodeId: node.id, path: nodePath(info.index) };
   const steps = node.config.maxSteps;
-  if (typeof steps !== "number" || !Number.isInteger(steps) || steps < 1) {
+  const fromPreset = steps === undefined && typeof node.config.agentId === "string";
+  if (!fromPreset && (typeof steps !== "number" || !Number.isInteger(steps) || steps < 1)) {
     ctx.diagnostics.add(
       "E_AGENT_UNBOUNDED",
       `Agent '${node.id}' needs config.maxSteps (a positive integer)`,

@@ -53,7 +53,7 @@ const CASES: EvaluationCaseResultView[] = [
 ];
 
 function renderReport(
-  gate: "pass" | "warn" | "fail",
+  gate: "pass" | "warn" | "fail" | "none",
   extra: Partial<React.ComponentProps<typeof EvaluationReport>> = {},
 ) {
   return render(
@@ -71,7 +71,7 @@ function renderReport(
 
 describe("EvaluationReport", () => {
   it("offers a plain Publish when the gate passes", () => {
-    renderReport("pass");
+    renderReport("pass", { onPublish: vi.fn() });
     expect(screen.getByRole("button", { name: "Publish" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Publish anyway" })).not.toBeInTheDocument();
     expect(screen.getByText("Gate passed")).toBeInTheDocument();
@@ -89,17 +89,55 @@ describe("EvaluationReport", () => {
   });
 
   it("publishes normally when the gate passed with warnings but no regression", () => {
-    renderReport("warn", { cases: [] });
+    renderReport("warn", { cases: [], onPublish: vi.fn() });
     expect(screen.getByText("Gate passed with warnings")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Publish" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Publish anyway" })).not.toBeInTheDocument();
   });
 
   it("makes Block publish the primary action when the gate fails", () => {
-    const { container } = renderReport("fail");
+    const { container } = renderReport("fail", { onPublish: vi.fn(), onBlock: vi.fn() });
     expect(screen.getByText("Gate failed")).toBeInTheDocument();
     expect(container.firstElementChild).toHaveAttribute("data-gate", "fail");
     expect(screen.getByRole("button", { name: "Block publish" }).className).toContain("bg-accent");
+  });
+
+  it("says when no gate was set, and offers Publish as a secondary action only", () => {
+    const { container } = renderReport("none", { onPublish: vi.fn(), onBlock: vi.fn() });
+    expect(screen.getByText("No gate set")).toBeInTheDocument();
+    expect(screen.queryByText(/Gate passed/)).not.toBeInTheDocument();
+    expect(container.firstElementChild).toHaveAttribute("data-gate", "none");
+    expect(screen.getByRole("button", { name: "Publish" }).className).not.toContain("bg-accent");
+    expect(screen.queryByRole("button", { name: "Block publish" })).not.toBeInTheDocument();
+  });
+
+  it("offers no action it has no handler for", () => {
+    renderReport("fail");
+    expect(screen.queryByRole("button", { name: /Publish/ })).not.toBeInTheDocument();
+  });
+
+  it("says why each failed case failed, and how many cases never ran", () => {
+    renderReport("none", {
+      notRun: 2,
+      cases: [
+        CASES[0] as (typeof CASES)[number],
+        {
+          id: "c4",
+          name: "Feedback note",
+          passed: false,
+          failedChecks: [
+            { label: "Decision triage.topic", message: 'value "billing" ≠ "feedback"' },
+            { label: "Run status", message: "run failed" },
+            { label: "Branch route", message: "route fired person, expected automation" },
+            { label: "Output /reply", message: "no value" },
+          ],
+        },
+      ],
+    });
+    const why = screen.getByRole("list", { name: "Why Feedback note failed" });
+    expect(why.textContent).toContain('Decision triage.topic: value "billing" ≠ "feedback"');
+    expect(why.textContent).toContain("1 more failed check");
+    expect(screen.getByText("1/2 passed · 0 regressions · 2 not run")).toBeInTheDocument();
   });
 
   it("lists regressions with expected vs actual and the branch change", () => {

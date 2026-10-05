@@ -5,9 +5,11 @@ import {
   NO_JUDGE,
   caseCoverage,
   checksOnlyCompletion,
+  deleteSetText,
   emptySetDraft,
   reportReading,
   setBody,
+  sentence,
   setReviewNotes,
   usesJudge,
 } from "./logic";
@@ -115,6 +117,24 @@ const result = (over: Partial<CaseResultRow>): CaseResultRow => ({
   ...over,
 });
 
+describe("a set's description in its header", () => {
+  it("ends as a sentence before the next one starts", () => {
+    expect(sentence("Protects routing")).toBe("Protects routing.");
+    expect(sentence("Protects routing. ")).toBe("Protects routing.");
+    expect(sentence("Does it route?")).toBe("Does it route?");
+    expect(sentence("  ")).toBe("");
+  });
+});
+
+describe("deleting a set", () => {
+  it("names the workflows it gates", () => {
+    expect(deleteSetText([])).not.toMatch(/publish gate/);
+    expect(deleteSetText([{ name: "Audit eval triage" }])).toMatch(
+      /It is the publish gate of Audit eval triage: that workflow publishes without an evaluation check/,
+    );
+  });
+});
+
 describe("reportReading", () => {
   it("separates runs that finished from cases that passed", () => {
     const notes = reportReading(summary({ completionRate: 0.5 }), [], new Set());
@@ -173,5 +193,29 @@ describe("reportReading", () => {
     expect(ids(notes)).toEqual(["finished:ok", "passed:info", "judge:warning", "judge-cost:info"]);
     expect(notes[2]?.message).toMatch(/^2 cases have judge checks that could not run/);
     expect(notes[3]?.message).toContain("$0.0100");
+  });
+
+  it("says a cancelled run covers only the cases that ran, and when a baseline ran others", () => {
+    // cancelled at 2 of 4: it used to read "All 2 runs finished"
+    const notes = reportReading(summary({ cases: 2, passed: 1, passRate: 0.5 }), [], new Set(), {
+      run: { status: "cancelled", total: 4 },
+      baseline: { sameCases: false, cases: 3 },
+    });
+    expect(ids(notes)).toEqual([
+      "partial:warning",
+      "finished:ok",
+      "baseline-cases:warning",
+      "passed:info",
+    ]);
+    expect(notes[0]?.message).toMatch(/^Only 2 of 4 cases ran: the evaluation was cancelled/);
+    expect(notes[1]?.message).toBe("The 2 runs that started all finished.");
+    expect(notes[2]?.message).toMatch(/\(3 there, 2 here\)/);
+  });
+
+  it("reads a run cancelled before any case finished", () => {
+    const notes = reportReading(summary({ cases: 0, passed: 0, passRate: 0 }), [], new Set(), {
+      run: { status: "cancelled", total: 3 },
+    });
+    expect(ids(notes)).toEqual(["partial:warning"]);
   });
 });

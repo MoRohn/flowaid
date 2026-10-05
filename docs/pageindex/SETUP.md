@@ -67,7 +67,9 @@ rebuilt from the uploaded files, which FlowAId keeps in artifact storage.
 | `FLOWAID_PAGEINDEX_MAX_BYTES`, `…_MAX_PAGES`, `…_CONCURRENCY`, `…_JOB_TIMEOUT_S` | service     | 50 MiB, 500 pages, 2 jobs at once, 1,800 s per job                |
 
 When PageIndex is not configured, `features.pageindex` is off. The Knowledge page shows the kind
-as unavailable with a link here, and the rest of FlowAId is unaffected.
+as unavailable with a link here, and the rest of FlowAId is unaffected. A PageIndex source made
+earlier says it is turned off and how to turn it on, and lists its documents; nothing can be
+uploaded, indexed or asked until the service is configured again.
 
 ## 3. First document, first answer
 

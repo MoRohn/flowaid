@@ -49,13 +49,16 @@ import {
 } from "~/admin/logic";
 import type { EvaluationCase, EvaluationRun, EvaluationSet } from "~/admin/types";
 import { JsonField, Notice, QueryView, Section, useConfirm, useMutate } from "~/admin/ui";
-import { caseCoverage } from "~/evaluations/logic";
+import { caseCoverage, deleteSetText, sentence } from "~/evaluations/logic";
 import { CaseGuide, EXAMPLE_EXPECTATION, ExpectationHelp } from "~/evaluations/SetGuide";
 import { useSession } from "~/session";
 import { AppFrame, PageBody } from "~/shell/AppFrame";
 import { errorMessage } from "~/shell/states";
 
 const DRAFT = "__draft";
+
+/** The set, with the workflows that use it as their publish gate. */
+type GatedSet = EvaluationSet & { gateOf?: { id: string; name: string }[] };
 const NONE = "__none";
 
 /** Required top-level input fields the value leaves out (or leaves as empty text). */
@@ -103,6 +106,8 @@ function CaseDialog({
   const expectedOk = parseJsonObject(expected);
   // a case without the workflow's required inputs only tests the input check
   const missing = inputOk.ok ? missingRequired(schema, inputOk.value) : [];
+  // a new case's empty form is not an error until something is typed in it
+  const [touched, setTouched] = useState(existing !== null);
   const save = useMutate(
     () => {
       const body = {
@@ -156,8 +161,12 @@ function CaseDialog({
               {mode === "form" && hasForm ? (
                 <FieldRow
                   label="Input"
-                  hint="What the run starts with, from the workflow's inputs"
-                  {...(missing.length
+                  hint={
+                    missing.length && !touched
+                      ? `What the run starts with, from the workflow's inputs. Required: ${missing.join(", ")}`
+                      : "What the run starts with, from the workflow's inputs"
+                  }
+                  {...(missing.length && touched
                     ? {
                         error: `Fill in the required ${missing.length === 1 ? "field" : "fields"}: ${missing.join(", ")}`,
                       }
@@ -167,7 +176,10 @@ function CaseDialog({
                     key={seed}
                     schema={schema as never}
                     defaultValues={(inputOk.ok ? inputOk.value : {}) as Record<string, unknown>}
-                    onChange={(v) => setInput(pretty(v))}
+                    onChange={(v) => {
+                      setTouched(true);
+                      setInput(pretty(v));
+                    }}
                     aria-label="Case input"
                   />
                 </FieldRow>
@@ -410,14 +422,16 @@ function RunDialog({
                 Gate on pass rate
               </label>
               {gated ? (
+                // entered in percent, as the text below speaks of it; sent as a share (0–1)
                 <NumberInput
                   aria-label="Minimum pass rate"
-                  value={minPass}
+                  value={minPass === null ? null : Math.round(minPass * 100)}
                   min={0}
-                  max={1}
-                  step={0.05}
-                  precision={2}
-                  onValueChange={setMinPass}
+                  max={100}
+                  step={5}
+                  precision={0}
+                  unit="%"
+                  onValueChange={(v) => setMinPass(v === null ? null : v / 100)}
                   className="w-28"
                 />
               ) : null}
@@ -460,7 +474,7 @@ export default function SetPage({ params }: { params: Promise<{ setId: string }>
   const [deleting, setDeleting] = useState(false);
   const set = useQuery({
     queryKey: ["evaluation-set", s.ws, setId],
-    queryFn: () => get<EvaluationSet>(`/v1/evaluations/sets/${setId}`),
+    queryFn: () => get<GatedSet>(`/v1/evaluations/sets/${setId}`),
   });
   const cases = useQuery({
     queryKey: ["evaluation-cases", s.ws, setId],
@@ -599,7 +613,7 @@ export default function SetPage({ params }: { params: Promise<{ setId: string }>
                     x.workflowId
                       ? `Tests ${tested.data?.name ?? "its workflow"}.`
                       : "Not tied to a workflow: choose one when you run it.",
-                    x.description,
+                    sentence(x.description),
                     canWrite && cases.data && caseCount === 0
                       ? "Add a case before running an evaluation."
                       : "",
@@ -758,7 +772,7 @@ export default function SetPage({ params }: { params: Promise<{ setId: string }>
         open={deleting}
         onOpenChange={setDeleting}
         title={`Delete ${set.data?.name ?? "this set"}?`}
-        description="Its cases and evaluation reports are deleted. Workflow runs made by evaluations are kept."
+        description={deleteSetText(set.data?.gateOf ?? [])}
         variant="danger"
         confirmLabel="Delete set"
         loading={removeSet.isPending}

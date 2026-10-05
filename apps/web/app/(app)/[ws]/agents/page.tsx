@@ -4,29 +4,13 @@ import { useQuery } from "@tanstack/react-query";
 import type { ToolDefinition } from "@flowaid/workflow-core";
 import { useState } from "react";
 import { Bot, Plus } from "lucide-react";
-import {
-  Badge,
-  Button,
-  Card,
-  CardBody,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  ConfirmDialog,
-  EmptyState,
-} from "@flowaid/ui/primitives";
+import { Button, ConfirmDialog, EmptyState } from "@flowaid/ui/primitives";
 import { PageHeader } from "@flowaid/ui/shell";
 import { del, get, getAll } from "~/api/client";
 import { QueryView, useConfirm, useMutate } from "~/admin/ui";
-import { AgentActiveSwitch } from "~/agents/AgentActiveSwitch";
+import { AgentCard } from "~/agents/AgentCard";
 import { AgentDialog } from "~/agents/AgentDialog";
-import {
-  APPROVAL_LABEL,
-  boundsOf,
-  modelLabel,
-  type AgentPreset,
-  type ApprovalMode,
-} from "~/agents/logic";
+import type { AgentPreset } from "~/agents/logic";
 import { AGENTS } from "~/guide/capabilities/agents";
 import { PageIntro } from "~/guide/PageIntro";
 import type { Check } from "~/guide/Readiness";
@@ -107,68 +91,17 @@ export default function AgentsPage() {
                 />
               ) : (
                 <ul className="grid gap-3 md:grid-cols-2" role="list">
-                  {agents.map((a) => {
-                    const tools = (a.config.tools ?? []) as {
-                      name: string;
-                      approval: ApprovalMode;
-                    }[];
-                    return (
-                      <li key={a.id}>
-                        <Card className={a.active === false ? "opacity-80" : undefined}>
-                          <CardHeader>
-                            <div className="flex items-start justify-between gap-3">
-                              <CardTitle>{a.name}</CardTitle>
-                              <AgentActiveSwitch agent={a} disabled={!canWrite} />
-                            </div>
-                            {a.description ? (
-                              <CardDescription>{a.description}</CardDescription>
-                            ) : null}
-                          </CardHeader>
-                          <CardBody className="flex flex-col gap-3">
-                            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-                              <dt className="text-ink-3">Model</dt>
-                              <dd className="font-mono text-ink">{modelLabel(a.config.model)}</dd>
-                              <dt className="text-ink-3">Bounds</dt>
-                              <dd className="font-mono text-ink">
-                                {`${boundsOf(a.config).maxSteps} steps · ${boundsOf(a.config).maxToolCalls} tool calls · $${boundsOf(a.config).maxCostUsd}`}
-                              </dd>
-                            </dl>
-                            <div className="flex flex-wrap gap-1.5">
-                              {tools.length === 0 ? (
-                                <span className="text-xs text-ink-3">No tools</span>
-                              ) : (
-                                tools.map((t) => (
-                                  <Badge
-                                    key={t.name}
-                                    tone={t.approval === "never" ? "neutral" : "warn"}
-                                  >
-                                    <span className="font-mono">{t.name}</span>
-                                    <span className="sr-only"> ({APPROVAL_LABEL[t.approval]})</span>
-                                    {t.approval !== "never" ? (
-                                      <span aria-hidden className="text-ink-3">
-                                        {" "}
-                                        · approval
-                                      </span>
-                                    ) : null}
-                                  </Badge>
-                                ))
-                              )}
-                            </div>
-                            {canWrite ? (
-                              <div className="flex gap-2">
-                                <Button size="sm" variant="secondary" onClick={() => setEditing(a)}>
-                                  Edit
-                                </Button>
-                                <Button size="sm" variant="ghost" onClick={() => confirm.ask(a)}>
-                                  Delete
-                                </Button>
-                              </div>
-                            ) : null}
-                          </CardBody>
-                        </Card>
-                      </li>
-                    );
-                  })}
+                  {agents.map((a) => (
+                    <li key={a.id}>
+                      <AgentCard
+                        agent={a}
+                        catalog={tools.data}
+                        canWrite={canWrite}
+                        onEdit={() => setEditing(a)}
+                        onDelete={() => confirm.ask(a)}
+                      />
+                    </li>
+                  ))}
                 </ul>
               )
             }

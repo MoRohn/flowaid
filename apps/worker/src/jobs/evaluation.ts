@@ -20,6 +20,7 @@ import {
   type Database,
 } from "@flowaid/database";
 import {
+  answersByNodeRun,
   compare,
   parseCase,
   runEvaluation,
@@ -52,10 +53,21 @@ export interface EvaluationJobDeps {
   pollMs?: number;
 }
 
-/** Reads a finished run into the evaluation's RunRecord. */
-async function recordOf(store: PgRunStore, run: Run, humanRequested: boolean): Promise<RunRecord> {
+/**
+ * Reads a finished run into the evaluation's RunRecord. A batch decision step's answers come from
+ * its per-question DECISION_COMPLETED events (its `decision` column holds only one of them).
+ */
+export async function recordOf(
+  store: PgRunStore,
+  run: Run,
+  humanRequested: boolean,
+): Promise<RunRecord> {
   const nodes = await store.listNodeRuns(run.id);
-  const events = await store.listEvents(run.id, 0, 10_000, ["TOOL_RETURNED"]);
+  const all = await store.listEvents(run.id, 0, 10_000, ["TOOL_RETURNED", "DECISION_COMPLETED"]);
+  const events = all.filter((e) => e.type === "TOOL_RETURNED");
+  const answers = answersByNodeRun(
+    all.flatMap((e) => (e.type === "DECISION_COMPLETED" ? [e] : [])),
+  );
   const last = new Map<string, (typeof nodes)[number]>();
   for (const n of nodes) {
     const prev = last.get(n.nodeId);
@@ -75,6 +87,7 @@ async function recordOf(store: PgRunStore, run: Run, humanRequested: boolean): P
       status: n.status,
       firedPort: n.firedPorts.find((p) => p !== "done") ?? n.firedPorts[0] ?? null,
       decision: n.decision,
+      answers: answers.get(n.id) ?? null,
       schemaError: n.error?.code === "OUTPUT_SCHEMA_MISMATCH",
     })),
     tools: events.map((e) => {

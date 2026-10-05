@@ -140,7 +140,10 @@ export function ExpectationHelp() {
         <Term name="decisions">
           Per Decision step id: the <code className="font-mono">value</code> (or{" "}
           <code className="font-mono">valueIn</code>, <code className="font-mono">range</code>) and
-          a <code className="font-mono">minConfidence</code>.
+          a <code className="font-mono">minConfidence</code>. A step that asks several questions
+          (Decision batch) is checked per question:{" "}
+          <code className="font-mono">"triage.topic"</code>,{" "}
+          <code className="font-mono">"triage.urgency"</code>.
         </Term>
         <Term name="branches">Per branch, gate or router step id: the port it must take.</Term>
         <Term name="requiredNodes / forbiddenNodes">Steps that must, or must not, run.</Term>

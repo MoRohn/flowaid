@@ -42,6 +42,19 @@ describe("chunking", () => {
 });
 
 describe("sourceReviewNotes", () => {
+  it("says what saving a saved source's settings does to its documents", () => {
+    const next = (editing: { reindex: boolean; refetch: boolean; changed: boolean }) =>
+      sourceReviewNotes(form(), {
+        embedding: ready,
+        indexReady: true,
+        editing: { documents: 3, ...editing },
+      }).find((n) => n.id === "next")?.message;
+    expect(next({ reindex: true, refetch: false, changed: true })).toBe(
+      "Saving indexes its 3 documents again with the new settings, in the background.",
+    );
+    expect(next({ reindex: false, refetch: false, changed: false })).toBe("Nothing changed yet.");
+  });
+
   it("says what a keyword-only source cannot do", () => {
     const notes = sourceReviewNotes(form(), { embedding: null, indexReady: true });
     expect(ids(notes)).toEqual(["keyword-only:info", "next:info"]);
@@ -115,6 +128,20 @@ describe("sourceStatusHelp", () => {
       }),
     ).toMatch(/1 document failed/);
     expect(sourceStatusHelp({ ...src, status: "error", lastError: "401" })).toMatch(/retry/);
+  });
+
+  it("does not point at the table's badges once the failed documents are gone", () => {
+    const failed = { lastRun: { indexed: 0, unchanged: 0, deleted: 0, failed: 1 } };
+    const help = sourceStatusHelp({
+      ...src,
+      kind: "text",
+      status: "error",
+      documents: 0,
+      stats: failed,
+      lastError: "no key",
+    });
+    expect(help).not.toMatch(/Error badge in the table/);
+    expect(help).toMatch(/no document is left/);
   });
 });
 

@@ -4,7 +4,8 @@
  * so every model turn is a GENERATION_COMPLETED event with cost and every tool call a
  * TOOL_CALLED/TOOL_RETURNED pair with capability checks.
  *
- * Bounds: `maxSteps` (model turns; set on the node, where the compiler checks it), `maxToolCalls`,
+ * Bounds: `maxSteps` (model turns; set on the node, where the compiler checks it, or left to the
+ * agent preset a step uses), `maxToolCalls`,
  * `maxTokens`, `maxCostUsd` (default 1 USD, also the manifest's default policy so the compiler
  * sees a spend bound) and the node timeout (`ctx.signal`); the run's remaining budget caps them
  * too. Exceeding one fails the node with BOUNDS_EXCEEDED (route it with the policy's `onError`).
@@ -327,8 +328,21 @@ export const agentNode = defineNode({
   },
   configSchema: agentSettingsSchema
     .extend({
-      // the compiler requires the step bound on the node itself (E_AGENT_UNBOUNDED)
-      maxSteps: z.int().min(1).max(50).default(AGENT_DEFAULTS.maxSteps),
+      // The compiler requires the step bound on the node itself (E_AGENT_UNBOUNDED) unless the
+      // step uses an agent preset, whose own Max steps (1–50, else 8) then applies: no default
+      // is filled in at run time, so a later change to the preset reaches the step. New steps
+      // start at 8 (the schema's default, which the builder fills in).
+      maxSteps: z
+        .int()
+        .min(1)
+        .max(50)
+        .optional()
+        .meta({
+          default: AGENT_DEFAULTS.maxSteps,
+          "x-ui": {
+            help: "Model turns before the agent must answer. Leave it empty on a step that uses an agent preset to use the preset's.",
+          },
+        }),
       agentId: z
         .uuid()
         .optional()

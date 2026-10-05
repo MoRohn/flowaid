@@ -26,11 +26,22 @@ export const MatcherSchema = z.discriminatedUnion("type", [
 ]);
 export type Matcher = z.infer<typeof MatcherSchema>;
 
+/**
+ * A decision expectation's key: a decision step's id, or `<step>.<question>` for one question of a
+ * batch step (a step id alone on a batch step means its one question that can give the value).
+ */
+export const DecisionKeySchema = z
+  .string()
+  .regex(
+    /^[a-z][a-z0-9_]{0,63}(\.[a-z][a-z0-9_]{0,63})?$/,
+    "a decision step id, or <step>.<question> for a batch step's question",
+  );
+
 export const ExpectationSchema = z.object({
   output: z.array(z.object({ path: JsonPointerSchema, matcher: MatcherSchema })).default([]),
   decisions: z
     .record(
-      NodeIdSchema,
+      DecisionKeySchema,
       z.object({
         value: JsonValueSchema.optional(),
         valueIn: z.array(JsonValueSchema).optional(),

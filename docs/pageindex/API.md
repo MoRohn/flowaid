@@ -6,7 +6,8 @@ The API routes behind PageIndex document sources. Types are RFC-0022's (`IndexRe
 
 - is workspace-scoped: it runs in `db.tenant`, and ids from another workspace answer 404;
 - requires `features.pageindex`, answering 409 `PAGEINDEX_DISABLED` when the service is not
-  configured;
+  configured (except `GET /v1/pageindex/status`, and `GET /v1/pageindex/sources/:id/documents`,
+  which lists the stored documents from the database so a source's page can show what it holds);
 - uses the knowledge scopes: `knowledge:read` to read, `knowledge:write` to change anything.
 
 ## Sources

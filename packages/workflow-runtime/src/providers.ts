@@ -66,6 +66,13 @@ function servedBy(failedOverTo: string | undefined, first: ModelRef): ModelRef {
     : first;
 }
 
+/**
+ * The `batchId` of a batch step's answers: one DECISION_COMPLETED per question, `question` being
+ * its id. Evaluations read a batch step's answers by it (`@flowaid/evaluation` `batchIdOf`), since
+ * `node_runs.decision` keeps only the last one.
+ */
+export const batchDecisionId = (nodeRunId: string): string => `${nodeRunId}:batch`;
+
 export interface RegistryAccessOptions {
   /** Resolves the credential bound to a provider (workflow secrets → credentials). */
   credential: ResolveContext["credential"];
@@ -148,7 +155,7 @@ export function registryProviderAccess(
         track<ScoreDecision>(state, { q: question }, (p) => p.decideScore(state, question, ctx)),
       batch: async (state, questions, ctx) => {
         const provider = await get();
-        const batchId = `${call.nodeRunId}:batch`;
+        const batchId = batchDecisionId(call.nodeRunId);
         emit({
           type: "DECISION_REQUESTED",
           batchId,

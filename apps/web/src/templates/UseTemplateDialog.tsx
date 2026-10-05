@@ -31,8 +31,16 @@ import { DraftStatus, GuidedFlow, type FlowStep } from "~/guide/GuidedFlow";
 import { CheckList, QualityNote, type Check } from "~/guide/Readiness";
 import { useKeptDraft } from "~/guide/useKeptDraft";
 import { useSession } from "~/session";
+import type { KnowledgeSource } from "~/knowledge/model";
+import { KIND_LABEL } from "~/knowledge/model";
 import { businessArea } from "./business";
-import { templateChecks, type TemplateNeed } from "./readiness";
+import {
+  pickKey,
+  slotSourceKind,
+  sourcesForSlot,
+  templateChecks,
+  type TemplateNeed,
+} from "./readiness";
 
 interface TemplateDraft {
   name: string;
@@ -64,17 +72,24 @@ export function UseTemplateDialog({
   const { draft, setDraft } = kept;
   const slots = templateResourceSlots(template);
   const needsMcp = slots.some((x) => x.kind === "mcpServers");
+  const needsSources = slots.some((x) => x.kind === "knowledgeSources");
   const servers = useQuery({
     queryKey: ["mcp-servers", s.ws],
     queryFn: () => getAll<McpServer>("/v1/mcp/servers"),
     enabled: needsMcp && s.can("mcp:read"),
+  });
+  const sources = useQuery({
+    queryKey: ["knowledge-sources", s.ws],
+    queryFn: () => getAll<KnowledgeSource>("/v1/knowledge/sources"),
+    enabled: needsSources && s.features.knowledge === true,
   });
   const name = (draft.name || template.name).trim();
   const readiness = templateChecks(
     needs,
     slots,
     draft.picked,
-    (id) => servers.data?.find((m) => m.id === id)?.name,
+    (id) =>
+      servers.data?.find((m) => m.id === id)?.name ?? sources.data?.find((k) => k.id === id)?.name,
   );
   const create = useMutate(
     () =>
@@ -109,8 +124,12 @@ export function UseTemplateDialog({
         }
       : {}),
   }));
-  const mcpSlots = slots.filter((x) => x.kind === "mcpServers");
   const area = businessArea(template);
+  const slotsTitle = !needsSources
+    ? "Choose its servers"
+    : !needsMcp
+      ? "Choose its documents"
+      : "Choose its servers and documents";
 
   const steps: FlowStep[] = [
     {
@@ -161,9 +180,19 @@ export function UseTemplateDialog({
       ? [
           {
             id: "servers",
-            title: "Choose its servers",
-            why: "Some steps call tools on an MCP server. Pick which of your connected servers they use; the list shows the tools each slot expects. You can create the copy first and choose in the builder later, but those steps fail until a server is chosen.",
-            done: mcpSlots.every((x) => draft.picked[x.key]),
+            title: slotsTitle,
+            why: [
+              needsMcp
+                ? "Some steps call tools on an MCP server: pick which of your connected servers they use; the list shows the tools each slot expects."
+                : "",
+              needsSources
+                ? "Some steps read documents: pick the knowledge source they search."
+                : "",
+              "You can create the copy first and choose in the builder later, but those steps fail until one is chosen.",
+            ]
+              .filter(Boolean)
+              .join(" "),
+            done: slots.every((x) => draft.picked[pickKey(x)]),
             optional: true,
             optionalLabel: "Can wait",
             children: (
@@ -209,10 +238,16 @@ export function UseTemplateDialog({
                       </Select>
                     </FieldRow>
                   ) : (
-                    <Notice key={slot.key} tone="info">
-                      Knowledge source “{slot.key}” is chosen in the builder once knowledge sources
-                      are enabled.
-                    </Notice>
+                    <SourceSlot
+                      key={slot.key}
+                      slot={slot}
+                      sources={sources.data ?? []}
+                      loading={sources.isPending && s.features.knowledge === true}
+                      value={draft.picked[pickKey(slot)] ?? ""}
+                      onChange={(v) =>
+                        setDraft((d) => ({ ...d, picked: { ...d.picked, [pickKey(slot)]: v } }))
+                      }
+                    />
                   ),
                 )}
                 {needsMcp && servers.data && servers.data.length === 0 ? (
@@ -280,12 +315,8 @@ export function UseTemplateDialog({
       }}
     >
       <DialogContent size="lg">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (name) create.mutate(undefined);
-          }}
-        >
+        {/* created only from the labelled button: Enter in the name field must not skip Review */}
+        <form onSubmit={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>Use “{template.name}”</DialogTitle>
             <DialogDescription>{template.description}</DialogDescription>
@@ -307,12 +338,89 @@ export function UseTemplateDialog({
             <Button type="button" variant="ghost" onClick={onClose}>
               Close
             </Button>
-            <Button type="submit" variant="primary" loading={create.isPending} disabled={!name}>
+            <Button
+              type="button"
+              variant="primary"
+              loading={create.isPending}
+              disabled={!name}
+              onClick={() => create.mutate(undefined)}
+            >
               Create workflow
             </Button>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * A knowledge source for one of the template's slots, from the sources of the kind it reads
+ * (PageIndex PDFs, or chunked documents); sent with the create request, so the copy opens with
+ * its steps pointed at it.
+ */
+function SourceSlot({
+  slot,
+  sources,
+  loading,
+  value,
+  onChange,
+}: {
+  slot: { key: string; description: string };
+  sources: readonly KnowledgeSource[];
+  loading: boolean;
+  value: string;
+  onChange: (id: string) => void;
+}) {
+  const s = useSession();
+  const pageindex = slotSourceKind(slot) === "pageindex";
+  const fits = sourcesForSlot(slot, sources);
+  return (
+    <FieldRow
+      label={`Knowledge source: ${slot.key}`}
+      htmlFor={`tpl-src-${slot.key}`}
+      hint={
+        <>
+          {slot.description}
+          {!loading && fits.length === 0 ? (
+            <>
+              {" "}
+              No {pageindex ? "PageIndex source" : "source of this kind"} yet:{" "}
+              <a className="text-accent-text hover:underline" href={`/${s.ws}/knowledge`}>
+                add one under Knowledge
+              </a>
+              ; your choices here are kept.
+            </>
+          ) : null}
+        </>
+      }
+    >
+      <Select
+        id={`tpl-src-${slot.key}`}
+        value={value}
+        disabled={fits.length === 0}
+        placeholder={
+          loading
+            ? "Loading…"
+            : fits.length
+              ? "Choose a source"
+              : pageindex
+                ? "No PageIndex sources"
+                : "No sources"
+        }
+        onValueChange={onChange}
+      >
+        {fits.map((k) => (
+          <SelectItem
+            key={k.id}
+            value={k.id}
+            meta={`${k.documents} doc${k.documents === 1 ? "" : "s"}`}
+            description={KIND_LABEL[k.kind]}
+          >
+            {k.name}
+          </SelectItem>
+        ))}
+      </Select>
+    </FieldRow>
   );
 }

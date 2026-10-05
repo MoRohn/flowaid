@@ -193,6 +193,34 @@ describeDb("knowledge routes (Postgres + pgvector)", () => {
     expect(left[0]?.n).toBe(0);
   });
 
+  it("leaves the error state once the last failed upload is removed", async () => {
+    const id = (
+      await call(t.app, jar, "POST", "/v1/knowledge/sources", {
+        name: "Failing uploads",
+        kind: "text",
+        pipeline: { embedding: { provider: "fake", model: "hashed-bow" } },
+      })
+    ).json().id as string;
+    const doc = (
+      await call(t.app, jar, "POST", `/v1/knowledge/sources/${id}/documents`, {
+        documents: [{ externalId: "a.md", title: "A", text: "Alpha" }],
+      })
+    ).json().documents[0].id as string;
+    // what a failed indexing run leaves behind
+    await t.db.admin`update documents set status = 'error', error = 'no key' where id = ${doc}`;
+    await t.db
+      .admin`update knowledge_sources set status = 'error', last_error = 'no key' where id = ${id}`;
+    expect((await call(t.app, jar, "DELETE", `/v1/knowledge/documents/${doc}`)).statusCode).toBe(
+      204,
+    );
+    // before, it stayed in Error over an empty table
+    expect((await call(t.app, jar, "GET", `/v1/knowledge/sources/${id}`)).json()).toMatchObject({
+      status: "new",
+      lastError: null,
+      documents: 0,
+    });
+  });
+
   it("pages the sources by name with a cursor", async () => {
     for (const name of ["Pager C", "Pager A", "Pager B"])
       expect(

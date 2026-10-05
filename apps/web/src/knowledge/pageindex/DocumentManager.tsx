@@ -50,23 +50,45 @@ export function usePageIndexDocuments(sourceId: string) {
   });
 }
 
-/** Whether the service is configured and answering (`GET /v1/pageindex/status`). */
-export function ServiceBanner() {
+/** The PageIndex service as the source page needs it: turned off, or on but not answering. */
+export type ServiceState = "off" | "down" | "up" | "unknown";
+
+/**
+ * Whether the service is configured and answering (`GET /v1/pageindex/status`). "Off" (not
+ * configured, or switched off) is one state for the whole page: nothing can be uploaded, indexed
+ * or asked until it is turned on.
+ */
+export function usePageIndexService(): ServiceState {
   const status = useQuery({
     queryKey: ["pageindex-status", currentWorkspace()],
     queryFn: () => get<PageIndexStatus>("/v1/pageindex/status"),
     staleTime: 30_000,
     refetchInterval: (q) => (q.state.data && !q.state.data.reachable ? 15_000 : false),
   });
+  if (
+    status.data?.enabled === false ||
+    (status.error instanceof ApiError && status.error.code === "PAGEINDEX_DISABLED")
+  )
+    return "off";
+  if (status.data) return status.data.reachable ? "up" : "down";
+  return "unknown";
+}
+
+/** The page's one word on the service when it is off or not answering. */
+export function ServiceBanner({ state }: { state: ServiceState }) {
   const guide = <LearnMore href={HELP.pageindexSetup} label="Setup guide" />;
-  if (status.error instanceof ApiError && status.error.code === "PAGEINDEX_DISABLED")
+  if (state === "off")
     return (
       <Notice tone="warn">
-        PageIndex is not configured on this server, so documents cannot be uploaded or indexed.{" "}
-        {guide}
+        PageIndex is turned off on this server, so this source&apos;s PDFs can&apos;t be uploaded,
+        indexed, opened or asked about until it is on. They are kept: the list below is what the
+        source holds. To turn it on, start FlowAId with{" "}
+        <code className="font-mono">--pageindex</code>, or set{" "}
+        <code className="font-mono">FLOWAID_PAGEINDEX_URL</code> and{" "}
+        <code className="font-mono">FLOWAID_PAGEINDEX_TOKEN</code> and restart. {guide}
       </Notice>
     );
-  if (status.data && !status.data.reachable)
+  if (state === "down")
     return (
       <Notice tone="danger">
         The PageIndex service is not answering. New uploads wait and indexes cannot be built until
@@ -96,13 +118,17 @@ function IndexCell({ d }: { d: DocumentSummary }) {
 
 export function DocumentManager({
   sourceId,
-  canWrite,
+  canWrite: mayWrite,
+  off = false,
   onOpen,
 }: {
   sourceId: string;
   canWrite: boolean;
+  /** the service is turned off: the documents are listed, nothing can be done with them */
+  off?: boolean;
   onOpen: (t: ViewerTarget) => void;
 }) {
+  const canWrite = mayWrite && !off;
   const documents = usePageIndexDocuments(sourceId);
   const uploads = useUploads(sourceId);
   const versionInput = useRef<HTMLInputElement>(null);
@@ -171,7 +197,7 @@ export function DocumentManager({
           size: 240,
           meta: { grow: true },
           cell: ({ row }) =>
-            readableIndex(row.original) ? (
+            readableIndex(row.original) && !off ? (
               <button
                 type="button"
                 className="block max-w-full truncate text-left text-ink hover:underline"
@@ -234,6 +260,8 @@ export function DocumentManager({
             const d = row.original;
             const ix = rowIndex(d);
             const failed = ix?.state === "failed" || ix?.state === "canceled";
+            // every action needs the service
+            if (off) return null;
             return (
               <span className="flex justify-end gap-0.5">
                 {readableIndex(d) ? (
@@ -305,7 +333,7 @@ export function DocumentManager({
       ]),
     // the mutations are stable; the table re-renders cells from the rows
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [canWrite],
+    [canWrite, off],
   );
 
   const items = documents.data?.items ?? [];

@@ -16,8 +16,6 @@ import type { Page, VersionSummary } from "~/api/types";
 import {
   calibrationNote,
   caseResultViews,
-  confusionPairs,
-  gateOf,
   runTone,
   summaryMetrics,
   toCalibrationBins,
@@ -32,6 +30,7 @@ import type {
 } from "~/admin/types";
 import { Notice, QueryView, Section, useMutate } from "~/admin/ui";
 import { checksOnlyCompletion, reportReading } from "~/evaluations/logic";
+import { confusionByDecision, failedChecks, reportGate, sameCases } from "~/evaluations/report";
 import { GuidePanel, Tips, toChecks } from "~/evaluations/SetGuide";
 import { CheckList } from "~/guide/Readiness";
 import { useSession } from "~/session";
@@ -113,13 +112,20 @@ export default function EvaluationRunPage({ params }: { params: Promise<{ evalRu
   const report: RegressionReport | null = compared.data ?? r?.report ?? null;
   const summary = report?.summary ?? r?.summary ?? null;
   const baseSummary = report?.baseline ?? null;
+  // rates over different cases (a cancelled run, an edited set) are not differences
+  const comparable =
+    !baseSummary ||
+    (results.data && baselineResults.data
+      ? sameCases(results.data, baselineResults.data)
+      : baseSummary.cases === summary?.cases);
+  const deltaBase = comparable ? baseSummary : null;
   const caseRows = useMemo(() => cases.data?.items ?? [], [cases.data]);
   const versionOf = (vid: string | null): WorkflowVersionView | undefined => {
     const v = versions.data?.find((x) => x.id === vid);
     return v ? versionView(v, [], 0) : undefined;
   };
   const confusion = useMemo(
-    () => confusionPairs(results.data ?? [], caseRows),
+    () => confusionByDecision(results.data ?? [], caseRows),
     [results.data, caseRows],
   );
   const baselineRun = siblings.data?.items.find((x) => x.id === chosenBaseline);
@@ -132,7 +138,12 @@ export default function EvaluationRunPage({ params }: { params: Promise<{ evalRu
     () => new Set(caseRows.filter((c) => checksOnlyCompletion(c.expected)).map((c) => c.id)),
     [caseRows],
   );
-  const reading = summary ? reportReading(summary, results.data ?? [], weakCases) : [];
+  const reading = summary
+    ? reportReading(summary, results.data ?? [], weakCases, {
+        ...(r ? { run: { status: r.status, total: r.total } } : {}),
+        baseline: baseSummary ? { sameCases: comparable, cases: baseSummary.cases } : null,
+      })
+    : [];
   const caseLabel = (id: string) => {
     const c = caseRows.find((x) => x.id === id);
     return c ? `Case ${c.ordinal + 1}` : id.slice(0, 8);
@@ -212,28 +223,28 @@ export default function EvaluationRunPage({ params }: { params: Promise<{ evalRu
                       label="Pass rate"
                       value={summary.passRate}
                       unit="percent"
-                      {...vsBase(baseSummary?.passRate)}
+                      {...vsBase(deltaBase?.passRate)}
                     />
                     <MetricTile
                       label="Latency p95"
                       value={summary.latency.p95}
                       unit="ms"
                       lowerIsBetter
-                      {...vsBase(baseSummary?.latency.p95)}
+                      {...vsBase(deltaBase?.latency.p95)}
                     />
                     <MetricTile
                       label="Cost per case"
                       value={summary.costUsd.perCase}
                       unit="usd"
                       lowerIsBetter
-                      {...vsBase(baseSummary?.costUsd.perCase)}
+                      {...vsBase(deltaBase?.costUsd.perCase)}
                     />
                     <MetricTile
                       label="Human review rate"
                       value={summary.humanReviewRate}
                       unit="percent"
                       lowerIsBetter
-                      {...vsBase(baseSummary?.humanReviewRate)}
+                      {...vsBase(deltaBase?.humanReviewRate)}
                     />
                   </MetricsGrid>
                 ) : null}
@@ -253,7 +264,7 @@ export default function EvaluationRunPage({ params }: { params: Promise<{ evalRu
                         <Tips
                           items={[
                             "A pass means every expectation of the case held; it is only as strict as the case. It does not show the answer is good in ways the case does not check.",
-                            "Select a failed case to open its run: the trace shows the step and value behind the failed check.",
+                            "Each failed case lists the checks it failed and why. Select a case to open its run: the trace shows the steps behind them.",
                             "Latency and cost are this run's own. Human steps were answered by the evaluation, so waiting time for people is not in them.",
                             report?.gate
                               ? `Gate: this run was held to ${Math.round(report.gate.minPassRate * 100)}% of cases passing. Publishing checks its own gate when you publish.`
@@ -293,15 +304,19 @@ export default function EvaluationRunPage({ params }: { params: Promise<{ evalRu
                       datasetName={set.data?.name ?? "Evaluation set"}
                       candidate={candidate}
                       {...(base ? { base } : {})}
-                      metrics={summaryMetrics(summary, baseSummary)}
+                      metrics={summaryMetrics(summary, deltaBase)}
                       cases={caseResultViews(
                         results.data ?? [],
                         caseRows,
                         chosenBaseline ? (baselineResults.data ?? null) : null,
-                      )}
-                      gate={gateOf(report)}
-                      {...(calibrationNote(summary, baseSummary)
-                        ? { calibrationNote: calibrationNote(summary, baseSummary) }
+                      ).map((c) => {
+                        const res = results.data?.find((x) => x.caseId === c.id);
+                        return res ? { ...c, failedChecks: failedChecks(res) } : c;
+                      })}
+                      gate={reportGate(report)}
+                      notRun={Math.max(0, x.total - (results.data?.length ?? 0))}
+                      {...(calibrationNote(summary, deltaBase)
+                        ? { calibrationNote: calibrationNote(summary, deltaBase) }
                         : {})}
                       {...(s.can("workflows:publish")
                         ? {
@@ -329,7 +344,7 @@ export default function EvaluationRunPage({ params }: { params: Promise<{ evalRu
                     {Object.keys(summary.calibration).length > 0 ? (
                       <Section
                         title="Calibration"
-                        description="Predicted confidence against observed accuracy, per decision node. Points on the diagonal are well calibrated; ECE is the average gap (lower is better), and bins with few decisions move a lot between runs."
+                        description="Predicted confidence against observed accuracy, per Decision step, and per question for a step that asks several (triage.topic). Points on the diagonal are well calibrated; ECE is the average gap (lower is better), and bins with few decisions move a lot between runs."
                       >
                         <div className="grid gap-4 lg:grid-cols-2">
                           {Object.entries(summary.calibration).map(([node, c]) => (
@@ -346,7 +361,7 @@ export default function EvaluationRunPage({ params }: { params: Promise<{ evalRu
                     {Object.keys(confusion).length > 0 ? (
                       <Section
                         title="Confusion"
-                        description="Expected against actual decision values."
+                        description="Expected against actual decision values, per Decision step and per question of a step that asks several."
                       >
                         <div className="grid gap-4 lg:grid-cols-2">
                           {Object.entries(confusion).map(([node, pairs]) => (
