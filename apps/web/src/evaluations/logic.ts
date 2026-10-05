@@ -55,7 +55,7 @@ export function setReviewNotes(
       id: "any-workflow",
       state: "info",
       message:
-        "Not tied to a workflow: Add to evaluation on a run offers only sets tied to that run's workflow, cases are written as JSON rather than the workflow's input form, and every run of the set asks which workflow to test.",
+        "Not tied to a workflow: Add to evaluation offers it on the runs of every workflow, cases are written as JSON rather than a workflow's input form, and every run of the set asks which workflow to test.",
     });
   else
     notes.push({
@@ -71,6 +71,12 @@ export function setReviewNotes(
         "No description: a line on what the set protects helps when it fails months from now.",
     });
   return notes;
+}
+
+/** A description as a sentence of a longer line: trimmed, ending in a full stop ("" stays ""). */
+export function sentence(text: string): string {
+  const t = text.trim();
+  return !t || /[.!?…:]$/.test(t) ? t : `${t}.`;
 }
 
 /** What deleting a set does, naming the workflows that use it as their publish gate. */

@@ -26,3 +26,8 @@ baseline that scored other cases is no longer shown as differences.
 Deleting an evaluation set clears the publish-gate link of the workflows that used it (they kept
 the id of a set that no longer existed), and the confirmation names those workflows.
 `GET /v1/evaluations/sets/:id` lists them as `gateOf`.
+
+Smaller evaluation fixes: Add to evaluation also offers sets tied to no workflow and will not add
+a run the set already holds; the gate's minimum pass rate is entered in percent, as its text
+speaks of it; a new case's form no longer shows "Fill in the required field" before anything is
+typed; and a set's description ends its sentence in the header.

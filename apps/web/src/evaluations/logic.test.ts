@@ -9,6 +9,7 @@ import {
   emptySetDraft,
   reportReading,
   setBody,
+  sentence,
   setReviewNotes,
   usesJudge,
 } from "./logic";
@@ -114,6 +115,15 @@ const result = (over: Partial<CaseResultRow>): CaseResultRow => ({
   metrics: null,
   status: "completed",
   ...over,
+});
+
+describe("a set's description in its header", () => {
+  it("ends as a sentence before the next one starts", () => {
+    expect(sentence("Protects routing")).toBe("Protects routing.");
+    expect(sentence("Protects routing. ")).toBe("Protects routing.");
+    expect(sentence("Does it route?")).toBe("Does it route?");
+    expect(sentence("  ")).toBe("");
+  });
 });
 
 describe("deleting a set", () => {

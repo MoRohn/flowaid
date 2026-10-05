@@ -1,6 +1,6 @@
 "use client";
 /** Adds a run's input (and, optionally, its output as the expectation) to an evaluation set. */
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import {
   Button,
@@ -19,7 +19,7 @@ import {
   SelectItem,
   toast,
 } from "@flowaid/ui/primitives";
-import { getAll, post } from "~/api/client";
+import { get, getAll, post } from "~/api/client";
 import { errorMessage } from "~/shell/states";
 import type { EvaluationSetSummary } from "./types";
 
@@ -41,16 +41,32 @@ export function AddToEvaluationDialog({
   workflowId,
   output,
 }: AddToEvaluationDialogProps) {
+  const qc = useQueryClient();
   const [setId, setSetId] = useState<string>("");
   const [expectOutput, setExpectOutput] = useState(output !== undefined && output !== null);
   const sets = useQuery({
-    queryKey: ["evaluation-sets", ws, workflowId],
-    queryFn: () => getAll<EvaluationSetSummary>("/v1/evaluations/sets", { workflowId }),
+    queryKey: ["evaluation-sets", ws, "for", workflowId],
+    queryFn: () => getAll<EvaluationSetSummary>("/v1/evaluations/sets"),
+    // the sets tied to this workflow, and those tied to none (any workflow can be tested on them)
+    select: (rows) =>
+      rows
+        .filter((s) => s.workflowId === workflowId || s.workflowId === null)
+        .sort((a, b) => Number(b.workflowId !== null) - Number(a.workflowId !== null)),
     enabled: open,
   });
   // the only set that fits this workflow is the one meant
   const only = sets.data?.length === 1 ? sets.data[0]?.id : undefined;
   const chosen = setId || only || "";
+  // a run already in the set would only be a second copy of the same case
+  const cases = useQuery({
+    queryKey: ["evaluation-cases", ws, chosen],
+    queryFn: () =>
+      get<{ items: { ordinal: number; sourceRunId: string | null }[] }>(
+        `/v1/evaluations/sets/${chosen}/cases?limit=200`,
+      ),
+    enabled: open && chosen !== "",
+  });
+  const already = cases.data?.items.find((c) => c.sourceRunId === runId);
   const add = useMutation({
     mutationFn: () =>
       post(`/v1/runs/${runId}/add-to-evaluation`, {
@@ -61,6 +77,7 @@ export function AddToEvaluationDialog({
       }),
     onSuccess: () => {
       toast.success("Added to the evaluation set");
+      void qc.invalidateQueries({ queryKey: ["evaluation-cases", ws, chosen] });
       onOpenChange(false);
     },
     onError: (e) => toast.error(errorMessage(e)),
@@ -94,11 +111,22 @@ export function AddToEvaluationDialog({
               disabled={!sets.data?.length}
             >
               {(sets.data ?? []).map((s) => (
-                <SelectItem key={s.id} value={s.id}>
+                <SelectItem
+                  key={s.id}
+                  value={s.id}
+                  {...(s.workflowId === null ? { description: "Any workflow" } : {})}
+                >
                   {s.name}
                 </SelectItem>
               ))}
             </Select>
+            {already ? (
+              <FieldHint>
+                <span className="text-warn-text">
+                  This run is already case {already.ordinal + 1} of the set.
+                </span>
+              </FieldHint>
+            ) : null}
             {sets.data?.length === 0 ? (
               <FieldHint>
                 <a className="text-accent-text hover:underline" href={`/${ws}/evaluations`}>
@@ -124,7 +152,7 @@ export function AddToEvaluationDialog({
           </Button>
           <Button
             variant="primary"
-            disabled={!chosen}
+            disabled={!chosen || Boolean(already)}
             loading={add.isPending}
             onClick={() => add.mutate()}
           >
