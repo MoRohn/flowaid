@@ -117,7 +117,10 @@ export function pageIndexRoutes(app: FastifyInstance, ctx: ApiContext): void {
       },
     },
     async (req) => {
-      const p = need(req.principal);
+      // the list is read from the database, so it answers while the service is off: the source
+      // page shows what the source holds and that it waits for the service
+      const p = req.principal;
+      if (!p) throw new ForbiddenError("no principal");
       return {
         items: await ctx.db.tenant(p.workspaceId, (tx) =>
           listDocuments(tx, p.workspaceId, req.params.sourceId),
