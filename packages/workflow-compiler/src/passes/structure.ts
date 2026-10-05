@@ -504,6 +504,18 @@ function checkHuman(ctx: CompileContext, info: NodeInfo): void {
       where("escalation"),
     );
   }
+  // The run's time limit counts the time spent waiting for a person: a task that may stay open
+  // longer is cancelled with the run while its card still promises the full expiry (RFC-0023).
+  const runLimit = ctx.definition.execution.timeoutMs;
+  if (node.expiresInMs === undefined || node.expiresInMs > runLimit) {
+    ctx.diagnostics.add(
+      "W_HUMAN_EXPIRY_EXCEEDS_RUN_TIMEOUT",
+      node.expiresInMs === undefined
+        ? `'${node.id}' waits for a person with no expiry, but the run stops after ${formatMs(runLimit)} (execution.timeoutMs) and cancels the task; set expiresInMs within the run's time limit or raise execution.timeoutMs`
+        : `'${node.id}' waits up to ${formatMs(node.expiresInMs)} for a person, but the run stops after ${formatMs(runLimit)} (execution.timeoutMs) and cancels the task; raise execution.timeoutMs above the expiry or shorten expiresInMs`,
+      where(node.expiresInMs === undefined ? undefined : "expiresInMs"),
+    );
+  }
   if (
     (node.mode.type === "form" || node.mode.type === "review") &&
     !isSchemaObject(node.mode.schema)
@@ -514,6 +526,22 @@ function checkHuman(ctx: CompileContext, info: NodeInfo): void {
       where("mode"),
     );
   }
+}
+
+/** A duration in the largest whole unit that reads naturally: "45 s", "3 min", "2 h", "3 days". */
+export function formatMs(ms: number): string {
+  const units: [number, string][] = [
+    [86_400_000, "day"],
+    [3_600_000, "h"],
+    [60_000, "min"],
+    [1000, "s"],
+  ];
+  for (const [size, unit] of units) {
+    if (ms < size) continue;
+    const n = Math.round((ms / size) * 10) / 10;
+    return unit === "day" ? `${n} ${n === 1 ? "day" : "days"}` : `${n} ${unit}`;
+  }
+  return `${ms} ms`;
 }
 
 function isSchemaObject(schema: JsonSchema): boolean {

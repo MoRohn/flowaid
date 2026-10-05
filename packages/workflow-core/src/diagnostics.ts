@@ -103,6 +103,7 @@ export const DiagnosticCodeSchema = z.enum([
   // decisions, human, agent, policy
   "E_DECISION_CONFIG",
   "E_HUMAN_CONFIG",
+  "W_HUMAN_EXPIRY_EXCEEDS_RUN_TIMEOUT",
   "E_AGENT_UNBOUNDED",
   "E_RETRY_ON_IRREVERSIBLE",
   "W_RETRY_SIDE_EFFECT",

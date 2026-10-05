@@ -566,6 +566,10 @@ const CASES: Case[] = [
   },
   { code: "E_HUMAN_CONFIG", edit: (d) => void (node(d, "approve").onExpire = "escalate") },
   {
+    code: "W_HUMAN_EXPIRY_EXCEEDS_RUN_TIMEOUT",
+    edit: (d) => void (d.execution.timeoutMs = 60_000),
+  },
+  {
     code: "E_AGENT_UNBOUNDED",
     edit: (d) => {
       delete d.execution.maxCostUsd;
@@ -651,7 +655,7 @@ describe("diagnostic codes", () => {
   it("covers every compiler-owned code exactly once", () => {
     const owned = DiagnosticCodeSchema.options.filter((c) => !NOT_COMPILER.includes(c));
     expect(CASES.map((c) => c.code).sort()).toEqual([...owned].sort());
-    expect(owned).toHaveLength(95);
+    expect(owned).toHaveLength(96);
   });
 
   const snapshot: Record<string, Diagnostic[]> = {};
