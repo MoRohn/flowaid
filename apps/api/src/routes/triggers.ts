@@ -1,7 +1,8 @@
 /**
  * Webhooks and schedules (API.md §3.9): rows are materialised from deployed triggers; these routes
  * edit only environment-specific fields (definition fields answer 409), rotate webhook secrets,
- * list deliveries, and fire a schedule by hand. Also: the audit log and artifact downloads.
+ * list deliveries, and fire a schedule by hand. Also: the audit log (list, the resource types it
+ * holds, CSV/JSON export of a filtered range) and artifact downloads.
  */
 import { randomBytes } from "node:crypto";
 import { Readable } from "node:stream";
@@ -19,6 +20,7 @@ import {
   isNull,
   lt,
   lte,
+  ne,
   or,
   sql,
   type AnyColumn,
@@ -56,10 +58,85 @@ import { startRun } from "../services/runs.js";
 
 type WebhookRow = typeof webhooks.$inferSelect;
 
+/** Deletes the secrets generated for a webhook other than the one it uses now (`keep`). */
+async function dropReplacedSecrets(tx: Tx, webhookId: string, keep: string | null) {
+  await tx
+    .delete(credentials)
+    .where(
+      and(eq(credentials.ownerWebhookId, webhookId), keep ? ne(credentials.id, keep) : undefined),
+    );
+}
+
 /** Only the workflows `p` may see, in SQL so a page is not thinned after the fact. */
 const visibleWorkflows = (p: Principal, col: AnyColumn) =>
   p.workflowIds ? (p.workflowIds.size ? inArray(col, [...p.workflowIds]) : sql`false`) : undefined;
 type ScheduleRow = typeof schedules.$inferSelect;
+type AuditRow = typeof auditEvents.$inferSelect;
+
+/** The audit log's filters, shared by the list and the export. */
+const AuditFilters = z.object({
+  actor: z.string().optional(),
+  action: z.string().optional(),
+  resourceType: z.string().optional(),
+  resourceId: z.string().optional(),
+  from: z.iso.datetime().optional(),
+  to: z.iso.datetime().optional(),
+});
+const auditWhere = (workspaceId: string, q: z.infer<typeof AuditFilters>) =>
+  and(
+    eq(auditEvents.workspaceId, workspaceId),
+    q.actor ? eq(auditEvents.actorId, q.actor) : undefined,
+    q.action ? eq(auditEvents.action, q.action) : undefined,
+    q.resourceType ? eq(auditEvents.resourceType, q.resourceType) : undefined,
+    q.resourceId ? eq(auditEvents.resourceId, q.resourceId) : undefined,
+    q.from ? gte(auditEvents.at, new Date(q.from)) : undefined,
+    q.to ? lte(auditEvents.at, new Date(q.to)) : undefined,
+  );
+
+/** The most events one export holds; a longer range is cut (newest kept) and says so. */
+export const AUDIT_EXPORT_LIMIT = 50_000;
+const CSV_COLUMNS = [
+  "at",
+  "action",
+  "actor_type",
+  "actor_id",
+  "resource_type",
+  "resource_id",
+  "ip",
+  "user_agent",
+  "request_id",
+  "details",
+] as const;
+
+/**
+ * One CSV field: quoted when it holds a comma, quote or line break, and a leading `= + - @` is
+ * prefixed with `'` so a spreadsheet never runs it as a formula.
+ */
+export function csvField(value: string): string {
+  const safe = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+  return /[",\r\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
+}
+
+/** Audit events as CSV (RFC 4180, CRLF), with a header row. */
+export function auditCsv(rows: readonly AuditRow[]): string {
+  const lines = rows.map((a) =>
+    [
+      a.at.toISOString(),
+      a.action,
+      a.actorType,
+      a.actorId,
+      a.resourceType,
+      a.resourceId,
+      a.ip ?? "",
+      a.userAgent ?? "",
+      a.requestId ?? "",
+      JSON.stringify(a.details),
+    ]
+      .map(csvField)
+      .join(","),
+  );
+  return [CSV_COLUMNS.join(","), ...lines].join("\r\n") + "\r\n";
+}
 
 const webhookDto = (w: WebhookRow, ctx: ApiContext, slug: string) => ({
   id: w.id,
@@ -208,6 +285,13 @@ export function triggerRoutes(app: FastifyInstance, ctx: ApiContext): void {
               ),
             );
           if (!c) throw new BadRequestError("secret credential not found");
+          if (
+            c.ownerNotificationId ||
+            (c.ownerWebhookId !== null && c.ownerWebhookId !== req.params.id)
+          )
+            throw new ConflictError(
+              "that credential is the signing secret of another webhook or notification channel",
+            );
         }
         const { path: _path, ...fields } = req.body;
         const [u] = await tx
@@ -215,6 +299,9 @@ export function triggerRoutes(app: FastifyInstance, ctx: ApiContext): void {
           .set(fields)
           .where(eq(webhooks.id, req.params.id))
           .returning();
+        // a secret generated for this webhook and no longer used by it is deleted
+        if (req.body.secretCredentialId !== undefined)
+          await dropReplacedSecrets(tx, req.params.id, req.body.secretCredentialId);
         return u as WebhookRow;
       });
       return webhookDto(w, ctx, p.workspaceSlug);
@@ -247,6 +334,10 @@ export function triggerRoutes(app: FastifyInstance, ctx: ApiContext): void {
       });
       await ctx.db.tenant(p.workspaceId, async (tx) => {
         const w = await loadHook(tx, p, req.params.id);
+        // the previous secret stops working now, so it is deleted rather than left behind (first:
+        // it may hold the name)
+        await dropReplacedSecrets(tx, w.id, null);
+        // the webhook owns it: not listed under Credentials, deleted with the webhook
         await tx.insert(credentials).values({
           id: credentialId,
           workspaceId: p.workspaceId,
@@ -258,6 +349,7 @@ export function triggerRoutes(app: FastifyInstance, ctx: ApiContext): void {
           keyVersion: sealed.keyVersion,
           publicFields: sealed.publicFields,
           environmentId: w.environmentId,
+          ownerWebhookId: w.id,
           createdBy: p.userId,
         });
         await tx
@@ -442,6 +534,13 @@ export function triggerRoutes(app: FastifyInstance, ctx: ApiContext): void {
         },
         { origin: "schedule" },
       );
+      // the row's "last run" shows it, like a scheduled fire (overlap: skip waits for it too)
+      await ctx.db.tenant(p.workspaceId, (tx) =>
+        tx
+          .update(schedules)
+          .set({ lastRunAt: new Date(ctx.clock.now()), lastRunId: started.run.id })
+          .where(eq(schedules.id, s.id)),
+      );
       req.audit.details = { runId: started.run.id };
       return reply.code(202).send({ run_id: started.run.id });
     },
@@ -457,14 +556,7 @@ export function triggerRoutes(app: FastifyInstance, ctx: ApiContext): void {
       },
       schema: {
         tags: ["audit"],
-        querystring: ListQuery.extend({
-          actor: z.string().optional(),
-          action: z.string().optional(),
-          resourceType: z.string().optional(),
-          resourceId: z.string().optional(),
-          from: z.iso.datetime().optional(),
-          to: z.iso.datetime().optional(),
-        }),
+        querystring: ListQuery.extend(AuditFilters.shape),
       },
     },
     async (req) => {
@@ -477,13 +569,7 @@ export function triggerRoutes(app: FastifyInstance, ctx: ApiContext): void {
           .from(auditEvents)
           .where(
             and(
-              eq(auditEvents.workspaceId, p.workspaceId),
-              q.actor ? eq(auditEvents.actorId, q.actor) : undefined,
-              q.action ? eq(auditEvents.action, q.action) : undefined,
-              q.resourceType ? eq(auditEvents.resourceType, q.resourceType) : undefined,
-              q.resourceId ? eq(auditEvents.resourceId, q.resourceId) : undefined,
-              q.from ? gte(auditEvents.at, new Date(q.from)) : undefined,
-              q.to ? lte(auditEvents.at, new Date(q.to)) : undefined,
+              auditWhere(p.workspaceId, q),
               cursor
                 ? or(
                     lt(auditEvents.at, new Date(String(cursor[0]))),
@@ -505,6 +591,77 @@ export function triggerRoutes(app: FastifyInstance, ctx: ApiContext): void {
         next_cursor:
           rows.length > q.limit && last ? encodeCursor(last.at.toISOString(), last.id) : null,
       };
+    },
+  );
+
+  r.get(
+    "/v1/audit/resource-types",
+    {
+      config: {
+        auth: "session_or_api_key",
+        scope: "audit:read",
+        cli: { noun: "audit", verb: "resource-types" },
+      },
+      schema: {
+        tags: ["audit"],
+        summary: "The resource types the workspace's audit log holds (for its filter)",
+        response: { 200: z.array(z.string()) },
+      },
+    },
+    async (req) => {
+      const p = need(req.principal);
+      const rows = await ctx.db.tenant(p.workspaceId, (tx) =>
+        tx
+          .selectDistinct({ type: auditEvents.resourceType })
+          .from(auditEvents)
+          .where(eq(auditEvents.workspaceId, p.workspaceId))
+          .orderBy(asc(auditEvents.resourceType)),
+      );
+      return rows.map((r) => r.type);
+    },
+  );
+
+  r.get(
+    "/v1/audit/export",
+    {
+      config: {
+        auth: "session_or_api_key",
+        scope: "audit:read",
+        cli: { noun: "audit", verb: "export" },
+      },
+      schema: {
+        tags: ["audit"],
+        summary: `The filtered audit log as a CSV or JSON file, newest first (at most ${AUDIT_EXPORT_LIMIT} events; x-flowaid-truncated says when more matched)`,
+        querystring: AuditFilters.extend({ format: z.enum(["csv", "json"]).default("csv") }),
+      },
+    },
+    async (req, reply) => {
+      const p = need(req.principal);
+      const { format, ...filters } = req.query;
+      const rows = await ctx.db.tenant(p.workspaceId, (tx) =>
+        tx
+          .select()
+          .from(auditEvents)
+          .where(auditWhere(p.workspaceId, filters))
+          .orderBy(desc(auditEvents.at), desc(auditEvents.id))
+          .limit(AUDIT_EXPORT_LIMIT + 1),
+      );
+      const truncated = rows.length > AUDIT_EXPORT_LIMIT;
+      const events = rows.slice(0, AUDIT_EXPORT_LIMIT);
+      const day = new Date(ctx.clock.now()).toISOString().slice(0, 10);
+      void reply
+        .header("cache-control", "private, no-store")
+        .header("x-content-type-options", "nosniff")
+        .header("x-flowaid-truncated", truncated ? "true" : "false")
+        .header(
+          "content-disposition",
+          `attachment; filename="audit-${p.workspaceSlug.replace(/[^A-Za-z0-9_-]+/g, "_")}-${day}.${format}"`,
+        );
+      if (format === "json")
+        return reply
+          .header("content-type", "application/json; charset=utf-8")
+          .send(JSON.stringify(events.map((a) => ({ ...a, at: a.at.toISOString() }))));
+      return reply.header("content-type", "text/csv; charset=utf-8").send(auditCsv(events));
     },
   );
 

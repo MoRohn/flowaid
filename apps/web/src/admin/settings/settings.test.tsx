@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { installDomStubs } from "@/primitives/testStubs";
 import { Toaster } from "@flowaid/ui/primitives";
 import type { NotificationChannel } from "../types";
@@ -35,6 +35,10 @@ vi.mock("next/navigation", () => ({
 
 const { ApiKeysTab } = await import("./ApiKeysTab");
 const { NotificationsTab } = await import("./NotificationsTab");
+const { AuditTab, auditFilters } = await import("./AuditTab");
+const { WorkspaceTab, retentionCuts } = await import("./WorkspaceTab");
+const { EnvironmentsTab, deleteConsequences, renameConsequences } =
+  await import("./EnvironmentsTab");
 
 function memoryStorage(): Storage {
   const data = new Map<string, string>();
@@ -177,6 +181,187 @@ describe("New API key", () => {
     await waitFor(() =>
       expect(window.sessionStorage.getItem("flowaid:draft:acme:api-key")).toContain("smoke"),
     );
+  });
+});
+
+describe("Audit log", () => {
+  it("offers the resource types the log holds and exports the filtered range", async () => {
+    // the download goes through a blob URL; restored after the test
+    const createObjectURL = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:audit");
+    const revokeObjectURL = vi.spyOn(URL, "revokeObjectURL").mockReturnValue(undefined);
+    onTestFinished(() => {
+      createObjectURL.mockRestore();
+      revokeObjectURL.mockRestore();
+    });
+    const fetchMock = stubApi({
+      "GET /v1/audit": () => ({ items: [], next_cursor: null }),
+      "GET /v1/audit/resource-types": () => ["credential", "notification", "plugin"],
+      "GET /v1/audit/export": () =>
+        new Response("at,action\r\n", { headers: { "content-type": "text/csv" } }),
+    });
+    render(withClient(<AuditTab />));
+    click(await screen.findByRole("combobox", { name: "Resource type" }));
+    expect(await screen.findByRole("option", { name: "plugin" })).toBeTruthy();
+    click(screen.getByRole("option", { name: "notification" }));
+    click(screen.getByRole("combobox", { name: "Period" }));
+    click(screen.getByRole("option", { name: "All time" }));
+    click(screen.getByRole("button", { name: "Export CSV" }));
+    await waitFor(() => expect(createObjectURL).toHaveBeenCalled());
+    const url = fetchMock.mock.calls
+      .map(([u]) => u)
+      .find((u) => u.startsWith("/v1/audit/export")) as string;
+    const params = new URL(url, "http://x").searchParams;
+    expect(params.get("format")).toBe("csv");
+    expect(params.get("resourceType")).toBe("notification");
+    expect(params.has("from")).toBe(false);
+  });
+
+  it("filters by days back, or not at all for all time", () => {
+    const now = Date.parse("2026-10-05T00:00:00.000Z");
+    expect(auditFilters({ action: "", resource: "__any", range: "7d", now })).toEqual({
+      action: undefined,
+      resourceType: undefined,
+      from: "2026-09-28T00:00:00.000Z",
+    });
+    expect(auditFilters({ action: "x", resource: "tool", range: "all", now })).toEqual({
+      action: "x",
+      resourceType: "tool",
+      from: undefined,
+    });
+  });
+});
+
+describe("Workspace settings", () => {
+  const workspace = {
+    id: "",
+    slug: "acme",
+    name: "Acme",
+    settings: { retention: { runsDays: 90 } },
+    createdAt: "2026-09-01T00:00:00.000Z",
+  };
+  const type = (label: RegExp, value: string) =>
+    act(() => {
+      const input = screen.getByRole("spinbutton", { name: label });
+      fireEvent.change(input, { target: { value } });
+      fireEvent.blur(input);
+    });
+
+  it("asks before keeping runs for a shorter time, and says $0 is no budget", async () => {
+    const fetchMock = stubApi({
+      "GET /v1/workspaces/": () => workspace,
+      "GET /v1/workspaces//budget": () => ({
+        month: "2026-10",
+        spentUsd: 0,
+        monthlyCostUsd: null,
+        reached: false,
+      }),
+      "PATCH /v1/workspaces/": () => workspace,
+    });
+    const patches = () => fetchMock.mock.calls.filter(([, init]) => init?.method === "PATCH");
+    render(withClient(<WorkspaceTab />));
+    await screen.findByRole("spinbutton", { name: /^Runs/ });
+    type(/^Monthly budget/, "0");
+    expect(screen.getByText(/\$0 means no budget/)).toBeTruthy();
+    type(/^Runs/, "30");
+    click(screen.getByRole("button", { name: "Save changes" }));
+    expect(screen.getByText("Keep data for a shorter time?")).toBeTruthy();
+    expect(screen.getByText(/Runs: 90 → 30 days/)).toBeTruthy();
+    expect(patches()).toHaveLength(0);
+    click(screen.getByRole("button", { name: "Save and shorten" }));
+    await waitFor(() => expect(patches()).toHaveLength(1));
+    expect(JSON.parse(patches()[0]?.[1]?.body as string)).toMatchObject({
+      settings: { retention: { runsDays: 30 }, budgets: { monthlyCostUsd: 0 } },
+    });
+  });
+
+  it("names each shortened period, counting empty fields as the defaults", () => {
+    const d = {
+      name: "Acme",
+      runsDays: null,
+      auditDays: null,
+      artifactsDays: null,
+      maxQueuedRuns: null,
+      monthlyCostUsd: null,
+    };
+    expect(retentionCuts(d, { ...d, runsDays: 120 })).toEqual([]);
+    expect(retentionCuts(d, { ...d, auditDays: 200, artifactsDays: 30 })).toEqual([
+      "Artifacts: 90 → 30 days. Files runs wrote more than 30 days ago are deleted.",
+      "Audit log: 400 → 200 days. Entries older than 200 days are deleted.",
+    ]);
+    expect(retentionCuts({ ...d, runsDays: 30 }, d)).toEqual([]);
+  });
+});
+
+describe("Environments", () => {
+  const none = {
+    runs: 0,
+    evaluationRuns: 0,
+    deployments: 0,
+    webhooks: 0,
+    schedules: 0,
+    mcpExposures: 0,
+    secretBindings: 0,
+    credentials: 0,
+    apiKeys: 0,
+  };
+
+  it("names what a delete removes, and refuses one with runs on record", async () => {
+    const fetchMock = stubApi({
+      "GET /v1/environments/env-dev/usage": () => ({ ...none, runs: 3 }),
+      "GET /v1/environments/env-prod/usage": () => ({
+        ...none,
+        deployments: 2,
+        webhooks: 1,
+        schedules: 2,
+        credentials: 1,
+        apiKeys: 1,
+      }),
+      "DELETE /v1/environments/env-prod": () => new Response(null, { status: 204 }),
+    });
+    render(withClient(<EnvironmentsTab />));
+    click(screen.getByRole("button", { name: "Delete dev" }));
+    expect(await screen.findByText(/3 runs on record keep their environment/)).toBeTruthy();
+    expect(screen.getByRole<HTMLButtonElement>("button", { name: "Delete" }).disabled).toBe(true);
+    click(screen.getByRole("button", { name: "Cancel" }));
+
+    click(screen.getByRole("button", { name: "Delete prod" }));
+    expect(await screen.findByText(/2 deployments end/)).toBeTruthy();
+    expect(
+      screen.getByText(/1 webhook and 2 schedules are removed; webhook URLs stop working/),
+    ).toBeTruthy();
+    expect(screen.getByText(/1 credential limited to prod is deleted for good/)).toBeTruthy();
+    expect(screen.getByText(/1 API key or MCP token pinned to prod is revoked/)).toBeTruthy();
+    click(screen.getByRole("button", { name: "Delete" }));
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.some(
+          ([url, init]) => init?.method === "DELETE" && url === "/v1/environments/env-prod",
+        ),
+      ).toBe(true),
+    );
+  });
+
+  it("warns that a rename moves webhook URLs and, for dev, stops Run draft", async () => {
+    stubApi({ "GET /v1/environments/env-dev/usage": () => ({ ...none, webhooks: 2 }) });
+    render(withClient(<EnvironmentsTab />));
+    click(screen.getByRole("button", { name: "Edit dev" }));
+    act(() => {
+      fireEvent.change(screen.getByLabelText(/^Name/), { target: { value: "development" } });
+    });
+    expect(await screen.findByText(/2 webhooks here keep the …\/dev\/… URL/)).toBeTruthy();
+    expect(
+      screen.getByText(/draft runs fail until an environment is called dev again/),
+    ).toBeTruthy();
+  });
+
+  it("says so when nothing depends on it", () => {
+    expect(deleteConsequences("scratch", none)).toEqual([]);
+    expect(deleteConsequences("qa", { ...none, deployments: 1 })).toEqual([
+      "1 deployment ends: its workflow stops running in qa.",
+    ]);
+    expect(renameConsequences("qa", "test", 0)).toEqual([
+      "Webhook URLs carry the environment's name: webhooks deployed here later use …/test/….",
+    ]);
   });
 });
 

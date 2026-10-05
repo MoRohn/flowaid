@@ -1,8 +1,11 @@
 "use client";
-/** The audit log: filter by action, resource and time; page with the keyset cursor; inspect details. */
-import { useInfiniteQuery } from "@tanstack/react-query";
+/**
+ * The audit log: filter by action, resource and time; page with the keyset cursor; inspect details;
+ * export the filtered range as CSV or JSON. The resource types offered are the ones the log holds.
+ */
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useDeferredValue, useMemo, useState } from "react";
-import { ScrollText } from "lucide-react";
+import { Download, ScrollText } from "lucide-react";
 import {
   Badge,
   Button,
@@ -16,6 +19,7 @@ import {
   SheetDescription,
   SheetHeader,
   SheetTitle,
+  toast,
 } from "@flowaid/ui/primitives";
 import {
   DataTable,
@@ -29,29 +33,44 @@ import { get, qs } from "~/api/client";
 import type { Page } from "~/api/types";
 import { useSession } from "~/session";
 import type { AuditEvent } from "../types";
-import { Section, useMembers } from "../ui";
+import { Section, downloadFrom, useMembers } from "../ui";
 import { errorMessage } from "~/shell/states";
 
 const ANY = "__any";
-const RESOURCES = [
-  "workflow",
-  "workflow_version",
-  "run",
-  "human_task",
-  "credential",
-  "api_key",
-  "membership",
-  "environment",
-  "workspace",
-  "mcp_server",
-  "mcp_exposure",
-  "tool",
-  "webhook",
-  "schedule",
-  "evaluation_set",
-  "evaluation_run",
-] as const;
-const RANGES = { "24h": 1, "7d": 7, "30d": 30, "90d": 90 } as const;
+/** Days back; null: everything the log still holds (retention keeps 400 days by default). */
+const RANGES = {
+  "24h": 1,
+  "7d": 7,
+  "30d": 30,
+  "90d": 90,
+  "1y": 365,
+  all: null,
+} as const satisfies Record<string, number | null>;
+const RANGE_LABEL: Record<keyof typeof RANGES, string> = {
+  "24h": "Last 24h",
+  "7d": "Last 7d",
+  "30d": "Last 30d",
+  "90d": "Last 90d",
+  "1y": "Last year",
+  all: "All time",
+};
+
+/** The list's and the export's filters, as query parameters. */
+export function auditFilters(o: {
+  action: string;
+  resource: string;
+  range: keyof typeof RANGES;
+  /** for tests; the current time otherwise */
+  now?: number;
+}): Record<string, string | undefined> {
+  const days = RANGES[o.range];
+  const now = o.now ?? Date.now();
+  return {
+    action: o.action || undefined,
+    resourceType: o.resource === ANY ? undefined : o.resource,
+    from: days === null ? undefined : new Date(now - days * 86_400_000).toISOString(),
+  };
+}
 
 const actionTone = (a: string): "danger" | "warn" | "accent" | "neutral" =>
   /delete|revoke|remove|purge/.test(a)
@@ -77,13 +96,39 @@ export function AuditTab() {
         `/v1/audit${qs({
           limit: 100,
           cursor: pageParam,
-          action: actionQ || undefined,
-          resourceType: resource === ANY ? undefined : resource,
-          from: new Date(Date.now() - RANGES[range] * 86_400_000).toISOString(),
+          ...auditFilters({ action: actionQ, resource, range }),
         })}`,
       ),
     getNextPageParam: (p) => p.next_cursor ?? undefined,
   });
+  // the types the log holds, not a fixed list that misses new kinds of resource
+  const types = useQuery({
+    queryKey: ["audit-types", s.ws],
+    queryFn: () => get<string[]>("/v1/audit/resource-types"),
+    staleTime: 60_000,
+  });
+  const resourceTypes = useMemo(
+    () => [...new Set([...(types.data ?? []), ...(resource === ANY ? [] : [resource])])].sort(),
+    [types.data, resource],
+  );
+  const [exporting, setExporting] = useState<"csv" | "json" | null>(null);
+  const exportLog = async (format: "csv" | "json") => {
+    setExporting(format);
+    try {
+      const day = new Date().toISOString().slice(0, 10);
+      await downloadFrom(
+        `/v1/audit/export${qs({
+          format,
+          ...auditFilters({ action: actionQ, resource, range }),
+        })}`,
+        `audit-${s.ws}-${day}.${format}`,
+      );
+    } catch (e) {
+      toast.error("Could not export the audit log", { description: errorMessage(e) });
+    } finally {
+      setExporting(null);
+    }
+  };
   const rows = useMemo(() => log.data?.pages.flatMap((p) => p.items) ?? [], [log.data]);
   const names = useMembers();
 
@@ -191,7 +236,7 @@ export function AuditTab() {
               className="w-44"
             >
               <SelectItem value={ANY}>All resources</SelectItem>
-              {RESOURCES.map((r) => (
+              {resourceTypes.map((r) => (
                 <SelectItem key={r} value={r}>
                   {r.replace(/_/g, " ")}
                 </SelectItem>
@@ -203,12 +248,28 @@ export function AuditTab() {
               onValueChange={(v) => setRange(v as keyof typeof RANGES)}
               className="w-32"
             >
-              {Object.keys(RANGES).map((r) => (
+              {(Object.keys(RANGES) as (keyof typeof RANGES)[]).map((r) => (
                 <SelectItem key={r} value={r}>
-                  Last {r}
+                  {RANGE_LABEL[r]}
                 </SelectItem>
               ))}
             </Select>
+            <span className="ml-auto flex items-center gap-1">
+              {(["csv", "json"] as const).map((f) => (
+                <Button
+                  key={f}
+                  size="sm"
+                  variant="ghost"
+                  leadingIcon={<Download strokeWidth={1.75} />}
+                  loading={exporting === f}
+                  disabled={exporting !== null}
+                  title="Downloads every event that matches these filters, newest first"
+                  onClick={() => void exportLog(f)}
+                >
+                  Export {f.toUpperCase()}
+                </Button>
+              ))}
+            </span>
           </div>
         }
         footer={

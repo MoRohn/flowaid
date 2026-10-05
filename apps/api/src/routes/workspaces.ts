@@ -6,9 +6,15 @@ import {
   apiKeys,
   createUser,
   createWorkspace,
+  credentials,
   environments,
   evaluationRuns,
   findUserByEmail,
+  mcpExposures,
+  schedules,
+  secretReferences,
+  webhooks,
+  workflowDeployments,
   getWorkspaceBySlug,
   listUserWorkspaces,
   memberships,
@@ -510,6 +516,121 @@ export function workspaceRoutes(app: FastifyInstance, ctx: ApiContext): void {
       if (!row) throw new NotFoundError("environment not found");
       req.audit.details = { fields: Object.keys(req.body) };
       return envDto(row);
+    },
+  );
+
+  r.get(
+    "/v1/environments/:id/usage",
+    {
+      config: {
+        auth: "session_or_api_key",
+        scope: "admin",
+        cli: { noun: "environment", verb: "usage", positional: ["id"] },
+      },
+      schema: {
+        tags: ["environments"],
+        summary:
+          "What depends on an environment, for the delete and rename confirmations: runs on record (which block a delete), active deployments, triggers, secret bindings, credentials limited to it and keys pinned to it",
+        params: IdParams,
+        response: {
+          200: z.object({
+            runs: z.number().int(),
+            evaluationRuns: z.number().int(),
+            deployments: z.number().int(),
+            webhooks: z.number().int(),
+            schedules: z.number().int(),
+            mcpExposures: z.number().int(),
+            secretBindings: z.number().int(),
+            credentials: z.number().int(),
+            apiKeys: z.number().int(),
+          }),
+        },
+      },
+    },
+    async (req) => {
+      const ws = req.principal?.workspaceId ?? "";
+      return ctx.db.tenant(ws, async (tx) => {
+        const [env] = await tx
+          .select({ id: environments.id })
+          .from(environments)
+          .where(and(eq(environments.id, req.params.id), eq(environments.workspaceId, ws)));
+        if (!env) throw new NotFoundError("environment not found");
+        const n = async (q: Promise<{ n: number }[]>) => (await q)[0]?.n ?? 0;
+        const [
+          runCount,
+          evaluationRunCount,
+          deployments,
+          hooks,
+          scheduleCount,
+          exposures,
+          bindings,
+          creds,
+          keys,
+        ] = await Promise.all([
+          n(tx.select({ n: count() }).from(runs).where(eq(runs.environmentId, env.id))),
+          n(
+            tx
+              .select({ n: count() })
+              .from(evaluationRuns)
+              .where(eq(evaluationRuns.environmentId, env.id)),
+          ),
+          n(
+            tx
+              .select({ n: count() })
+              .from(workflowDeployments)
+              .where(
+                and(
+                  eq(workflowDeployments.environmentId, env.id),
+                  eq(workflowDeployments.active, true),
+                ),
+              ),
+          ),
+          n(tx.select({ n: count() }).from(webhooks).where(eq(webhooks.environmentId, env.id))),
+          n(tx.select({ n: count() }).from(schedules).where(eq(schedules.environmentId, env.id))),
+          n(
+            tx
+              .select({ n: count() })
+              .from(mcpExposures)
+              .where(eq(mcpExposures.environmentId, env.id)),
+          ),
+          n(
+            tx
+              .select({ n: count() })
+              .from(secretReferences)
+              .where(eq(secretReferences.environmentId, env.id)),
+          ),
+          n(
+            tx
+              .select({ n: count() })
+              .from(credentials)
+              // a webhook's own signing secret goes with the webhook, counted there
+              .where(
+                and(
+                  eq(credentials.environmentId, env.id),
+                  isNull(credentials.ownerWebhookId),
+                  isNull(credentials.ownerNotificationId),
+                ),
+              ),
+          ),
+          n(
+            tx
+              .select({ n: count() })
+              .from(apiKeys)
+              .where(and(eq(apiKeys.environmentId, env.id), isNull(apiKeys.revokedAt))),
+          ),
+        ]);
+        return {
+          runs: runCount,
+          evaluationRuns: evaluationRunCount,
+          deployments,
+          webhooks: hooks,
+          schedules: scheduleCount,
+          mcpExposures: exposures,
+          secretBindings: bindings,
+          credentials: creds,
+          apiKeys: keys,
+        };
+      });
     },
   );
 

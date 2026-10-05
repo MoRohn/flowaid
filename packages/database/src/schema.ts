@@ -20,6 +20,7 @@ import {
   primaryKey,
   check,
   customType,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import type {
   JsonValue,
@@ -435,6 +436,15 @@ export const credentials = pgTable(
       onDelete: "cascade",
     }), // null = any environment
     allowedWorkflowIds: jsonb("allowed_workflow_ids").$type<string[] | null>(),
+    // v1.2: a signing secret FlowAId generated for a webhook or notification channel belongs to it:
+    // left out of the credentials list, rotated and deleted only through its owner, deleted with it
+    ownerWebhookId: uuid("owner_webhook_id").references((): AnyPgColumn => webhooks.id, {
+      onDelete: "cascade",
+    }),
+    ownerNotificationId: uuid("owner_notification_id").references(
+      (): AnyPgColumn => notifications.id,
+      { onDelete: "cascade" },
+    ),
     lastTestedAt: ts("last_tested_at"),
     lastTestOk: boolean("last_test_ok"),
     lastUsedAt: ts("last_used_at"),

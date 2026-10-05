@@ -69,7 +69,11 @@ describe("adding a webhook, step by step", () => {
       "GET /v1/workflows": () => ({ items: [{ id: "wf-1", name: "Refund desk" }] }),
       "GET /v1/workflows/wf-1": () => detail,
       "GET /v1/webhooks": () => ({
-        items: [{ workflowId: "wf-2", path: "dev/refund-desk" }],
+        items: [
+          { workflowId: "wf-2", path: "dev/refund-desk", enabled: true },
+          // switched off: its path passes to the next workflow deployed with it, so no warning
+          { workflowId: "wf-3", path: "prod/refund-desk", enabled: false },
+        ],
         next_cursor: null,
       }),
       "PUT /v1/workflows/wf-1/draft": () => ({ ok: true }),
@@ -90,7 +94,9 @@ describe("adding a webhook, step by step", () => {
     const rail = screen.getByRole("navigation", { name: "Steps" });
     fireEvent.click(within(rail).getByRole("button", { name: /Review and add/ }));
     await waitFor(() =>
-      expect(screen.getByText(/Another workflow already uses \/refund-desk in dev/)).toBeTruthy(),
+      expect(
+        screen.getByText(/Another workflow already uses \/refund-desk in dev: deploying/),
+      ).toBeTruthy(),
     );
     expect(screen.getByText(/Callers must send a JSON body with email/)).toBeTruthy();
     expect(screen.getByText(/Live now in dev \(v2\)/)).toBeTruthy();
@@ -119,6 +125,28 @@ describe("adding a webhook, step by step", () => {
       fetchMock.mock.calls.filter(([, i]) => (i?.method ?? "GET") !== "GET").map(([u]) => u),
     ).toEqual(["/v1/workflows/wf-1/draft"]);
     expect(window.sessionStorage.getItem("flowaid:draft:acme:trigger:webhook")).toBeNull();
+  });
+});
+
+describe("adding an unsigned webhook", () => {
+  it("ends with next steps for an unsigned webhook, not a secret to generate", async () => {
+    window.localStorage.setItem("flowaid:guided-mode", "all");
+    stubApi({
+      "GET /v1/workflows/wf-1": () => detail,
+      "GET /v1/webhooks": () => ({ items: [], next_cursor: null }),
+      "PUT /v1/workflows/wf-1/draft": () => ({ ok: true }),
+    });
+    render(
+      withClient(
+        <AddTriggerDialog kind="webhook" workflowId="wf-1" open onOpenChange={() => undefined} />,
+      ),
+    );
+    fireEvent.click(await screen.findByRole("radio", { name: /Nothing \(unsigned\)/ }));
+    await waitFor(() => expect(button("Add to the draft").disabled).toBe(false));
+    fireEvent.click(button("Add to the draft"));
+    expect(await screen.findByText(/Added to Refund desk's draft/)).toBeTruthy();
+    expect(screen.queryByText(/Generate secret/)).toBeNull();
+    expect(screen.getByText(/Give the URL to the sender/)).toBeTruthy();
   });
 });
 

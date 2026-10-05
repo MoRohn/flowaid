@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { installDomStubs } from "@/primitives/testStubs";
@@ -7,6 +7,8 @@ import { Toaster } from "@flowaid/ui/primitives";
 import type { NotificationChannel, Schedule, Webhook } from "../types";
 
 const scopes = new Set(["admin", "webhooks:write", "schedules:write", "runs:create"]);
+const { push } = vi.hoisted(() => ({ push: vi.fn() }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
 vi.mock("~/session", () => ({
   useSession: () => ({
     ws: "acme",
@@ -167,6 +169,77 @@ describe("webhook list", () => {
     expect(screen.getByText("Rejected")).toBeTruthy();
     expect(screen.getByText("bad signature")).toBeTruthy();
   });
+
+  it("asks before rotating a secret in use, but not before generating the first", async () => {
+    const fetchMock = stubApi({
+      "GET /v1/webhooks": () => ({
+        items: [hook, { ...hook, id: "wh-2", path: "dev/new", secretBound: false }],
+        next_cursor: null,
+      }),
+      "POST /v1/webhooks/wh-1/rotate-secret": () => ({ secret: "whsec_new", credentialId: "c" }),
+      "POST /v1/webhooks/wh-2/rotate-secret": () => ({ secret: "whsec_first", credentialId: "c" }),
+    });
+    const rotations = () =>
+      fetchMock.mock.calls.filter(([url]) => url.endsWith("/rotate-secret")).map(([url]) => url);
+    render(withClient(<WebhookList />));
+    const rotateButton = await screen.findByRole("button", { name: "Rotate secret" });
+    act(() => {
+      fireEvent.click(rotateButton);
+    });
+    expect(screen.getByText("Rotate the signing secret of /dev/orders?")).toBeTruthy();
+    expect(screen.getByText(/current secret stops working/)).toBeTruthy();
+    expect(rotations()).toEqual([]);
+    act(() => {
+      fireEvent.click(screen.getAllByRole("button", { name: "Rotate secret" }).at(-1) as Element);
+    });
+    expect((await screen.findByTestId("one-time-secret")).textContent).toBe("whsec_new");
+    expect(rotations()).toEqual(["/v1/webhooks/wh-1/rotate-secret"]);
+    act(() => {
+      fireEvent.click(screen.getByRole("button", { name: "I have copied it" }));
+    });
+    // nothing to lose yet: generating the first secret doesn't ask
+    act(() => {
+      fireEvent.click(screen.getByRole("button", { name: "Generate secret" }));
+    });
+    expect((await screen.findByTestId("one-time-secret")).textContent).toBe("whsec_first");
+  });
+
+  it("offers the signed-timestamp switch only to HMAC webhooks", async () => {
+    stubApi({
+      "GET /v1/webhooks": () => ({
+        items: [{ ...hook, id: "wh-3", signature: "none", secretBound: false }],
+        next_cursor: null,
+      }),
+    });
+    render(withClient(<WebhookList />));
+    expect(await screen.findByText("Unsigned")).toBeTruthy();
+    expect(screen.queryByRole("switch", { name: /signed timestamp/ })).toBeNull();
+    expect(screen.getAllByRole("switch")).toHaveLength(1);
+  });
+
+  it("keeps a switch busy until its change is saved", async () => {
+    let finish: (r: Response) => void = () => undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: string, init?: RequestInit) =>
+        init?.method === "PATCH"
+          ? new Promise<Response>((resolve) => (finish = resolve))
+          : Promise.resolve(Response.json({ items: [hook], next_cursor: null })),
+      ),
+    );
+    render(withClient(<WebhookList />));
+    const [enabled] = await screen.findAllByRole("switch");
+    act(() => {
+      fireEvent.click(enabled as Element);
+    });
+    await waitFor(() => expect((enabled as HTMLButtonElement).disabled).toBe(true));
+    expect(enabled?.getAttribute("aria-busy")).toBe("true");
+    await act(async () => {
+      finish(Response.json({ ...hook, enabled: false }));
+      await Promise.resolve();
+    });
+    await waitFor(() => expect((enabled as HTMLButtonElement).disabled).toBe(false));
+  });
 });
 
 describe("schedule list", () => {
@@ -195,6 +268,31 @@ describe("schedule list", () => {
         ),
       ).toBe(true),
     );
+  });
+
+  it("asks before Run now, naming the environment, then links to the run", async () => {
+    push.mockClear();
+    const fetchMock = stubApi({
+      "GET /v1/schedules": () => ({ items: [schedule], next_cursor: null }),
+      "POST /v1/schedules/sc-1/trigger": () => Response.json({ run_id: "run-9" }, { status: 202 }),
+    });
+    render(withClient(<ScheduleList workflowName={() => "Daily digest"} />));
+    const runNow = await screen.findByRole("button", { name: "Run now" });
+    act(() => {
+      fireEvent.click(runNow);
+    });
+    expect(screen.getByText("Run Daily digest now in dev?")).toBeTruthy();
+    expect(screen.getByText(/paid model steps are charged/)).toBeTruthy();
+    expect(screen.getByText(/Overlap is Skip/)).toBeTruthy();
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
+    act(() => {
+      fireEvent.click(screen.getByRole("button", { name: "Run now in dev" }));
+    });
+    const open = await screen.findByRole("button", { name: "Open run" });
+    act(() => {
+      fireEvent.click(open);
+    });
+    expect(push).toHaveBeenCalledWith("/acme/runs/run-9");
   });
 });
 
@@ -263,5 +361,63 @@ describe("notification channels", () => {
       fireEvent.click(send);
     });
     expect(await screen.findByText("Ops hook did not receive the test")).toBeTruthy();
+  });
+
+  it("lists what was sent to a channel, with why a send failed", async () => {
+    stubApi({
+      "GET /v1/notifications": () => ({ items: [channel], next_cursor: null }),
+      "GET /v1/notifications/nc-1/deliveries": () => ({
+        items: [
+          {
+            id: "d-2",
+            event: "test",
+            status: "failed",
+            error: "the endpoint answered HTTP 500",
+            createdAt: "2026-10-05T12:00:00.000Z",
+            sentAt: null,
+          },
+          {
+            id: "d-1",
+            event: "run.failed",
+            status: "sent",
+            error: null,
+            createdAt: "2026-10-05T11:00:00.000Z",
+            sentAt: "2026-10-05T11:00:01.000Z",
+          },
+        ],
+      }),
+    });
+    render(withClient(<NotificationsTab />));
+    const open = await screen.findByRole("button", { name: "What was sent to Ops hook" });
+    act(() => {
+      fireEvent.click(open);
+    });
+    expect(await screen.findByText("Sent to Ops hook")).toBeTruthy();
+    const list = await screen.findByRole("list", { name: "Deliveries" });
+    expect(within(list).getByText("Test message")).toBeTruthy();
+    expect(within(list).getByText("Failed")).toBeTruthy();
+    expect(within(list).getByText("the endpoint answered HTTP 500")).toBeTruthy();
+    expect(within(list).getByText("A run failed")).toBeTruthy();
+    expect(within(list).getByText("Sent")).toBeTruthy();
+  });
+
+  it("asks before rotating a channel's signing secret", async () => {
+    const fetchMock = stubApi({
+      "GET /v1/notifications": () => ({ items: [channel], next_cursor: null }),
+      "POST /v1/notifications/nc-1/rotate-secret": () => ({ signingSecret: "nfsec_new" }),
+    });
+    render(withClient(<NotificationsTab />));
+    const rotateIcon = await screen.findByRole("button", {
+      name: "Rotate the signing secret of Ops hook",
+    });
+    act(() => {
+      fireEvent.click(rotateIcon);
+    });
+    expect(screen.getByText("Rotate the signing secret of Ops hook?")).toBeTruthy();
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
+    act(() => {
+      fireEvent.click(screen.getByRole("button", { name: "Rotate secret" }));
+    });
+    expect((await screen.findByTestId("one-time-secret")).textContent).toBe("nfsec_new");
   });
 });

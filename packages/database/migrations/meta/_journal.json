@@ -99,6 +99,13 @@
       "when": 1790859392239,
       "tag": "0015_mcp_exposure_source",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1791236240723,
+      "tag": "0016_credential_owner",
+      "breakpoints": true
     }
   ]
 }

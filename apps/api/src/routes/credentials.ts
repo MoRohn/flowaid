@@ -1,10 +1,25 @@
-/** Credentials (API.md §3.6): values sealed with per-credential data keys, never returned. */
+/**
+ * Credentials (API.md §3.6): values sealed with per-credential data keys, never returned. A signing
+ * secret FlowAId generated for a webhook or notification channel belongs to it (`owner`): it is left
+ * out of the list and only its owner rotates or deletes it, so it can't be broken from here.
+ */
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { and, asc, eq, isNull, or } from "drizzle-orm";
 import { assertExternalRef, secretFields } from "@flowaid/credentials";
-import { credentials, environments, secretReferences, type Tx } from "@flowaid/database";
+import {
+  credentials,
+  environments,
+  knowledgeSources,
+  mcpServers,
+  notifications,
+  secretReferences,
+  tools,
+  webhooks,
+  workflows,
+  type Tx,
+} from "@flowaid/database";
 import { uuidv7 } from "@flowaid/shared";
 import {
   BadRequestError,
@@ -14,6 +29,7 @@ import {
 } from "@flowaid/workflow-core";
 import {
   assertEnvironmentAllowed,
+  canSeeWorkflow,
   canUseEnvironment,
   hasScope,
   type Principal,
@@ -48,7 +64,58 @@ export const CredentialSummarySchema = z.object({
   lastUsedAt: z.string().nullable(),
   rotatedAt: z.string().nullable(),
   createdAt: z.string(),
+  /** the webhook or notification channel whose generated secret this is (never in the list) */
+  owner: z
+    .object({ kind: z.enum(["webhook", "notification"]), id: z.uuid(), name: z.string() })
+    .nullable(),
 });
+
+type CredentialOwner = { kind: "webhook" | "notification"; id: string; name: string };
+
+/** The webhook or channel an owned secret belongs to, and what the secret is for it. */
+async function ownerOf(
+  tx: Tx,
+  row: CredentialRow,
+): Promise<(CredentialOwner & { slack: boolean }) | null> {
+  if (row.ownerWebhookId) {
+    const [w] = await tx
+      .select({ path: webhooks.path })
+      .from(webhooks)
+      .where(eq(webhooks.id, row.ownerWebhookId));
+    return w ? { kind: "webhook", id: row.ownerWebhookId, name: w.path, slack: false } : null;
+  }
+  if (row.ownerNotificationId) {
+    const [n] = await tx
+      .select({ name: notifications.name, kind: notifications.kind })
+      .from(notifications)
+      .where(eq(notifications.id, row.ownerNotificationId));
+    return n
+      ? {
+          kind: "notification",
+          id: row.ownerNotificationId,
+          name: n.name,
+          slack: n.kind === "slack_webhook",
+        }
+      : null;
+  }
+  return null;
+}
+
+/** Why an owned secret can't be changed or deleted here, naming its owner and where to go. */
+export function ownedMessage(owner: CredentialOwner & { slack: boolean }): string {
+  return owner.kind === "webhook"
+    ? `this is the signing secret of webhook ${owner.name}: rotate it from Triggers → Webhooks; it is deleted with the webhook`
+    : `this is the ${owner.slack ? "Slack webhook URL" : "signing secret"} of the notification channel "${owner.name}": change it from Settings → Notifications; it is deleted with the channel`;
+}
+
+/** Refuses a change to a secret that belongs to a webhook or channel (409, owner named). */
+async function assertNotOwned(tx: Tx, row: CredentialRow): Promise<void> {
+  const owner = await ownerOf(tx, row);
+  if (owner)
+    throw new ConflictError(ownedMessage(owner), {
+      owner: { kind: owner.kind, id: owner.id, name: owner.name },
+    });
+}
 
 const CreateCredentialSchema = z.object({
   name: z.string().min(1).max(100),
@@ -76,7 +143,11 @@ export function maskSecret(value: string): string {
   return `${value.slice(0, 3)}…${value.slice(-4)}`;
 }
 
-function dto(row: CredentialRow, hints: Record<string, string> = {}) {
+function dto(
+  row: CredentialRow,
+  hints: Record<string, string> = {},
+  owner: CredentialOwner | null = null,
+) {
   return {
     id: row.id,
     name: row.name,
@@ -93,7 +164,132 @@ function dto(row: CredentialRow, hints: Record<string, string> = {}) {
     lastUsedAt: row.lastUsedAt?.toISOString() ?? null,
     rotatedAt: row.rotatedAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
+    owner: owner ? { kind: owner.kind, id: owner.id, name: owner.name } : null,
   };
+}
+
+export const CredentialUseSchema = z.object({
+  kind: z.enum([
+    "workflow_secret",
+    "toolset",
+    "mcp_server",
+    "knowledge_source",
+    "webhook",
+    "notification",
+  ]),
+  /** the workflow (workflow_secret) or the resource that uses the credential */
+  id: z.string(),
+  name: z.string(),
+  /** workflow_secret: the binding's environment; webhook: the webhook's */
+  environmentId: z.string().nullable(),
+  /** workflow_secret: the secret name the workflow binds */
+  secretName: z.string().nullable(),
+  /** webhook: the workflow it starts */
+  workflowId: z.string().nullable(),
+});
+export type CredentialUse = z.infer<typeof CredentialUseSchema>;
+
+/** Everything that refers to a credential: every foreign key to `credentials`, by kind. */
+export async function credentialUses(tx: Tx, credentialId: string): Promise<CredentialUse[]> {
+  const use = (u: Partial<CredentialUse> & Pick<CredentialUse, "kind" | "id" | "name">) => ({
+    environmentId: null,
+    secretName: null,
+    workflowId: null,
+    ...u,
+  });
+  const [bound, toolsets, servers, sources, hooks, channels] = await Promise.all([
+    tx
+      .select({
+        workflowId: secretReferences.workflowId,
+        environmentId: secretReferences.environmentId,
+        secretName: secretReferences.secretName,
+        name: workflows.name,
+      })
+      .from(secretReferences)
+      .innerJoin(workflows, eq(workflows.id, secretReferences.workflowId))
+      .where(eq(secretReferences.credentialId, credentialId)),
+    tx
+      .select({ id: tools.id, name: tools.name })
+      .from(tools)
+      .where(eq(tools.credentialId, credentialId)),
+    tx
+      .select({ id: mcpServers.id, name: mcpServers.name })
+      .from(mcpServers)
+      .where(eq(mcpServers.credentialId, credentialId)),
+    tx
+      .select({ id: knowledgeSources.id, name: knowledgeSources.name })
+      .from(knowledgeSources)
+      .where(eq(knowledgeSources.credentialId, credentialId)),
+    tx
+      .select({
+        id: webhooks.id,
+        path: webhooks.path,
+        environmentId: webhooks.environmentId,
+        workflowId: webhooks.workflowId,
+      })
+      .from(webhooks)
+      .where(
+        or(
+          eq(webhooks.secretCredentialId, credentialId),
+          eq(webhooks.callbackSecretCredentialId, credentialId),
+        ),
+      ),
+    tx
+      .select({ id: notifications.id, name: notifications.name })
+      .from(notifications)
+      .where(eq(notifications.credentialId, credentialId)),
+  ]);
+  return [
+    ...bound.map((b) =>
+      use({
+        kind: "workflow_secret",
+        id: b.workflowId,
+        name: b.name,
+        environmentId: b.environmentId,
+        secretName: b.secretName,
+      }),
+    ),
+    ...toolsets.map((x) => use({ kind: "toolset", ...x })),
+    ...servers.map((x) => use({ kind: "mcp_server", ...x })),
+    ...sources.map((x) => use({ kind: "knowledge_source", ...x })),
+    ...hooks.map((h) =>
+      use({
+        kind: "webhook",
+        id: h.id,
+        name: h.path,
+        environmentId: h.environmentId,
+        workflowId: h.workflowId,
+      }),
+    ),
+    ...channels.map((x) => use({ kind: "notification", ...x })),
+  ];
+}
+
+const USE_NOUN: Record<CredentialUse["kind"], [string, string]> = {
+  workflow_secret: ["workflow secret binding", "workflow secret bindings"],
+  toolset: ["OpenAPI toolset", "OpenAPI toolsets"],
+  mcp_server: ["MCP server", "MCP servers"],
+  knowledge_source: ["knowledge source", "knowledge sources"],
+  webhook: ["webhook", "webhooks"],
+  notification: ["notification channel", "notification channels"],
+};
+
+/** "2 workflow secret bindings and the MCP server GitHub" */
+export function describeUses(uses: readonly CredentialUse[]): string {
+  const parts = (Object.keys(USE_NOUN) as CredentialUse["kind"][]).flatMap((kind) => {
+    const of = uses.filter((u) => u.kind === kind);
+    const [first] = of;
+    if (!first) return [];
+    if (of.length > 1) return [`${of.length} ${USE_NOUN[kind][1]}`];
+    return [
+      kind === "workflow_secret"
+        ? `the secret ${first.secretName ?? ""} of the workflow ${first.name}`
+        : `the ${USE_NOUN[kind][0]} ${first.name}`,
+    ];
+  });
+  return parts.length <= 1
+    ? (parts[0] ?? "nothing")
+    : `${parts.slice(0, -1).join(", ")} and ${parts.at(-1) ?? ""}`;
 }
 
 export function credentialRoutes(app: FastifyInstance, ctx: ApiContext): void {
@@ -194,6 +390,9 @@ export function credentialRoutes(app: FastifyInstance, ctx: ApiContext): void {
           .where(
             and(
               eq(credentials.workspaceId, p.workspaceId),
+              // secrets that belong to a webhook or channel are managed there
+              isNull(credentials.ownerWebhookId),
+              isNull(credentials.ownerNotificationId),
               req.query.type ? eq(credentials.type, req.query.type) : undefined,
               req.query.environmentId
                 ? eq(credentials.environmentId, req.query.environmentId)
@@ -319,7 +518,43 @@ export function credentialRoutes(app: FastifyInstance, ctx: ApiContext): void {
     },
     async (req) => {
       const p = need(req.principal);
-      return dto(await ctx.db.tenant(p.workspaceId, (tx) => load(tx, p, req.params.id)));
+      return ctx.db.tenant(p.workspaceId, async (tx) => {
+        const row = await load(tx, p, req.params.id);
+        return dto(row, {}, await ownerOf(tx, row));
+      });
+    },
+  );
+
+  r.get(
+    "/v1/credentials/:id/uses",
+    {
+      config: {
+        auth: "session_or_api_key",
+        scope: "credentials:read",
+        cli: { noun: "credential", verb: "uses", positional: ["id"] },
+      },
+      schema: {
+        tags: ["credentials"],
+        summary:
+          "Where the credential is used: workflow secret bindings, OpenAPI toolsets, MCP servers, knowledge sources, webhooks and notification channels",
+        params: IdParams,
+        response: { 200: z.array(CredentialUseSchema) },
+      },
+    },
+    async (req) => {
+      const p = need(req.principal);
+      const uses = await ctx.db.tenant(p.workspaceId, async (tx) => {
+        const row = await load(tx, p, req.params.id);
+        return credentialUses(tx, row.id);
+      });
+      // a key pinned to workflows or an environment sees only those bindings
+      return uses.filter((u) =>
+        u.kind === "workflow_secret"
+          ? canSeeWorkflow(p, u.id) && canUseEnvironment(p, u.environmentId)
+          : u.kind === "webhook"
+            ? canSeeWorkflow(p, u.workflowId ?? "")
+            : true,
+      );
     },
   );
 
@@ -341,9 +576,11 @@ export function credentialRoutes(app: FastifyInstance, ctx: ApiContext): void {
     },
     async (req) => {
       const p = need(req.principal);
-      const current = await ctx.db.tenant(p.workspaceId, (tx) =>
-        loadForWrite(tx, p, req.params.id),
-      );
+      const current = await ctx.db.tenant(p.workspaceId, async (tx) => {
+        const row = await loadForWrite(tx, p, req.params.id);
+        await assertNotOwned(tx, row);
+        return row;
+      });
       if (req.body.environmentId !== undefined) assertEnvironmentAllowed(p, req.body.environmentId);
       let sealedPatch = {};
       let hints: Record<string, string> = {};
@@ -407,9 +644,11 @@ export function credentialRoutes(app: FastifyInstance, ctx: ApiContext): void {
     },
     async (req) => {
       const p = need(req.principal);
-      const current = await ctx.db.tenant(p.workspaceId, (tx) =>
-        loadForWrite(tx, p, req.params.id),
-      );
+      const current = await ctx.db.tenant(p.workspaceId, async (tx) => {
+        const row = await loadForWrite(tx, p, req.params.id);
+        await assertNotOwned(tx, row);
+        return row;
+      });
       if (current.storage === "external")
         throw new BadRequestError("rotate external credentials in their secret manager");
       // fields left out keep their values (a username, a header name, a base URL), as with PATCH
@@ -504,29 +743,34 @@ export function credentialRoutes(app: FastifyInstance, ctx: ApiContext): void {
     },
     async (req, reply) => {
       const p = need(req.principal);
-      await ctx.db.tenant(p.workspaceId, async (tx) => {
+      const unbound = await ctx.db.tenant(p.workspaceId, async (tx) => {
         const row = await loadForWrite(tx, p, req.params.id);
-        const bound = await tx
-          .select()
-          .from(secretReferences)
-          .where(eq(secretReferences.credentialId, row.id));
-        if (bound.length > 0) {
+        // not even with force: its webhook or channel would stop working
+        await assertNotOwned(tx, row);
+        // every use, not only workflow bindings: toolsets, MCP servers, knowledge sources,
+        // webhooks and channels would otherwise lose it silently (their keys are set null)
+        const uses = await credentialUses(tx, row.id);
+        if (uses.length > 0) {
           if (!req.query.force || !hasScope(p, "admin"))
             throw new ConflictError(
-              `the credential is bound to ${bound.length} workflow secret(s); unbind it or delete with ?force=true (admin)`,
+              `the credential is used by ${describeUses(uses)}; give those another credential first, or (admin) delete it anyway with force=true, which unbinds them`,
               {
-                bindings: bound.map((b) => ({
-                  workflowId: b.workflowId,
-                  environmentId: b.environmentId,
-                  secretName: b.secretName,
-                })),
+                uses,
+                bindings: uses
+                  .filter((u) => u.kind === "workflow_secret")
+                  .map((u) => ({
+                    workflowId: u.id,
+                    environmentId: u.environmentId,
+                    secretName: u.secretName,
+                  })),
               },
             );
           await tx.delete(secretReferences).where(eq(secretReferences.credentialId, row.id));
         }
         await tx.delete(credentials).where(eq(credentials.id, row.id));
+        return uses.map((u) => `${u.kind}:${u.id}`);
       });
-      req.audit.details = { force: req.query.force };
+      req.audit.details = { force: req.query.force, unbound };
       return reply.code(204).send(null);
     },
   );

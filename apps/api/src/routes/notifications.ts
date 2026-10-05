@@ -3,18 +3,20 @@
  * workspace admin subscribes to events (`GET /v1/notifications/events`). Secrets never come back:
  * a Slack webhook URL is sealed as a credential when it is set, and a `webhook` channel's HMAC
  * signing secret is generated on create (and on rotate) and returned once. `POST /:id/test`
- * delivers a test message now and reports the outcome.
+ * delivers a test message now and reports the outcome; `GET /:id/deliveries` lists what was sent
+ * to the channel (alerts and tests) with each outcome.
  */
 import { randomBytes } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
-import { and, asc, eq } from "drizzle-orm";
-import { credentials, notifications, type Tx } from "@flowaid/database";
+import { and, asc, desc, eq } from "drizzle-orm";
+import { alertDeliveries, credentials, notifications, type Tx } from "@flowaid/database";
 import {
   NOTIFICATION_EVENTS,
   NOTIFICATION_EVENT_LABELS,
   deliverNotification,
+  withPrivateNetworkFix,
 } from "@flowaid/observability";
 import { uuidv7 } from "@flowaid/shared";
 import {
@@ -78,7 +80,11 @@ const dto = (r: Row) => ({
   createdAt: r.createdAt.toISOString(),
 });
 
-/** The kind's config, validated; `webhook` URLs must be reachable from the server. */
+/**
+ * The kind's config, validated. A `webhook` URL is not called here: a private or local one is
+ * accepted, and its sends are refused (saying how to allow them) until the server allows such
+ * addresses.
+ */
 function checkConfig(kind: Row["kind"], config: unknown): JsonObject {
   const schema =
     kind === "email" ? EmailConfig : kind === "webhook" ? WebhookConfig : z.strictObject({});
@@ -107,8 +113,20 @@ export function notificationRoutes(app: FastifyInstance, ctx: ApiContext): void 
     if (!row) throw new NotFoundError("notification channel not found");
     return row;
   };
-  /** Seals a secret as an `http.header` credential of the workspace; returns its id. */
-  const sealSecret = async (tx: Tx, p: Principal, label: string, name: string, value: string) => {
+  /**
+   * Seals a secret as an `http.header` credential that belongs to the channel: left out of the
+   * credentials list and deleted with the channel. It replaces the channel's previous secret, which
+   * is deleted first (it stops working now, and it would hold the name).
+   */
+  const sealSecret = async (
+    tx: Tx,
+    p: Principal,
+    channelId: string,
+    label: string,
+    name: string,
+    value: string,
+  ) => {
+    await tx.delete(credentials).where(eq(credentials.ownerNotificationId, channelId));
     const id = uuidv7();
     const sealed = await ctx.credentials.seal(id, "http.header", { name, value });
     await tx.insert(credentials).values({
@@ -121,8 +139,10 @@ export function notificationRoutes(app: FastifyInstance, ctx: ApiContext): void 
       wrappedDataKey: sealed.wrappedDataKey,
       keyVersion: sealed.keyVersion,
       publicFields: sealed.publicFields,
+      ownerNotificationId: channelId,
       createdBy: p.userId,
     });
+    await tx.update(notifications).set({ credentialId: id }).where(eq(notifications.id, channelId));
     return id;
   };
   const newSigningSecret = () => `nfsec_${randomBytes(32).toString("base64url")}`;
@@ -211,24 +231,7 @@ export function notificationRoutes(app: FastifyInstance, ctx: ApiContext): void 
         throw new BadRequestError("slackWebhookUrl applies to slack_webhook channels only");
       const signingSecret = b.kind === "webhook" ? newSigningSecret() : undefined;
       const row = await ctx.db.tenant(p.workspaceId, async (tx) => {
-        const credentialId =
-          b.kind === "slack_webhook" && b.slackWebhookUrl
-            ? await sealSecret(
-                tx,
-                p,
-                `notification ${b.name} (Slack)`,
-                "Slack-Webhook-URL",
-                b.slackWebhookUrl,
-              )
-            : signingSecret
-              ? await sealSecret(
-                  tx,
-                  p,
-                  `notification ${b.name} (signing)`,
-                  "X-FlowAId-Signature",
-                  signingSecret,
-                )
-              : null;
+        // the channel first: its secret belongs to it
         const [created] = await tx
           .insert(notifications)
           .values({
@@ -237,12 +240,33 @@ export function notificationRoutes(app: FastifyInstance, ctx: ApiContext): void 
             kind: b.kind,
             name: b.name,
             config,
-            credentialId,
+            credentialId: null,
             events: b.events,
             enabled: b.enabled,
           })
           .returning();
-        return created as Row;
+        const channel = created as Row;
+        const credentialId =
+          b.kind === "slack_webhook" && b.slackWebhookUrl
+            ? await sealSecret(
+                tx,
+                p,
+                channel.id,
+                `notification ${b.name} (Slack)`,
+                "Slack-Webhook-URL",
+                b.slackWebhookUrl,
+              )
+            : signingSecret
+              ? await sealSecret(
+                  tx,
+                  p,
+                  channel.id,
+                  `notification ${b.name} (signing)`,
+                  "X-FlowAId-Signature",
+                  signingSecret,
+                )
+              : null;
+        return { ...channel, credentialId };
       });
       req.audit = { resourceId: row.id, details: { kind: row.kind, events: row.events } };
       return reply
@@ -278,6 +302,7 @@ export function notificationRoutes(app: FastifyInstance, ctx: ApiContext): void 
           ? await sealSecret(
               tx,
               p,
+              cur.id,
               `notification ${b.name ?? cur.name} (Slack)`,
               "Slack-Webhook-URL",
               b.slackWebhookUrl,
@@ -323,14 +348,14 @@ export function notificationRoutes(app: FastifyInstance, ctx: ApiContext): void 
         const cur = await load(tx, p, req.params.id);
         if (cur.kind !== "webhook")
           throw new BadRequestError("only webhook channels have a signing secret");
-        const credentialId = await sealSecret(
+        await sealSecret(
           tx,
           p,
+          cur.id,
           `notification ${cur.name} (signing)`,
           "X-FlowAId-Signature",
           signingSecret,
         );
-        await tx.update(notifications).set({ credentialId }).where(eq(notifications.id, cur.id));
       });
       return { signingSecret };
     },
@@ -351,6 +376,7 @@ export function notificationRoutes(app: FastifyInstance, ctx: ApiContext): void 
       const p = need(req.principal);
       await ctx.db.tenant(p.workspaceId, async (tx) => {
         const cur = await load(tx, p, req.params.id);
+        // its own secret goes with it (cascade); delete the one it points at for older rows too
         await tx.delete(notifications).where(eq(notifications.id, cur.id));
         if (cur.credentialId)
           await tx.delete(credentials).where(eq(credentials.id, cur.credentialId));
@@ -379,6 +405,20 @@ export function notificationRoutes(app: FastifyInstance, ctx: ApiContext): void 
     async (req) => {
       const p = need(req.principal);
       const row = await ctx.db.tenant(p.workspaceId, (tx) => load(tx, p, req.params.id));
+      // the channel's delivery history shows tests too
+      const record = (status: "sent" | "failed", error?: string) =>
+        ctx.db.tenant(p.workspaceId, (tx) =>
+          tx.insert(alertDeliveries).values({
+            id: uuidv7(),
+            workspaceId: p.workspaceId,
+            channelId: row.id,
+            event: "test",
+            key: `test:${uuidv7()}`,
+            status,
+            error: error?.slice(0, 500) ?? null,
+            ...(status === "sent" ? { sentAt: new Date(ctx.clock.now()) } : {}),
+          }),
+        );
       try {
         await deliverNotification(
           { id: row.id, kind: row.kind, name: row.name, config: row.config },
@@ -397,12 +437,67 @@ export function notificationRoutes(app: FastifyInstance, ctx: ApiContext): void 
           },
         );
         req.audit.details = { ok: true };
+        await record("sent");
         return { ok: true };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         req.audit.details = { ok: false, error: message.slice(0, 300) };
-        return { ok: false, error: message };
+        await record("failed", withPrivateNetworkFix(message));
+        return { ok: false, error: withPrivateNetworkFix(message) };
       }
+    },
+  );
+
+  r.get(
+    "/v1/notifications/:id/deliveries",
+    {
+      config: {
+        auth: "session_or_api_key",
+        scope: "admin",
+        cli: { noun: "notification", verb: "deliveries", positional: ["id"] },
+      },
+      schema: {
+        tags: ["notifications"],
+        summary: "What was sent to the channel (alerts and tests), newest first",
+        params: IdParams,
+        querystring: z.object({ limit: z.coerce.number().int().min(1).max(100).default(20) }),
+        response: {
+          200: z.object({
+            items: z.array(
+              z.object({
+                id: z.string(),
+                event: z.string(),
+                status: z.enum(["pending", "sent", "failed"]),
+                error: z.string().nullable(),
+                createdAt: z.string(),
+                sentAt: z.string().nullable(),
+              }),
+            ),
+          }),
+        },
+      },
+    },
+    async (req) => {
+      const p = need(req.principal);
+      const rows = await ctx.db.tenant(p.workspaceId, async (tx) => {
+        await load(tx, p, req.params.id);
+        return tx
+          .select()
+          .from(alertDeliveries)
+          .where(eq(alertDeliveries.channelId, req.params.id))
+          .orderBy(desc(alertDeliveries.createdAt), desc(alertDeliveries.id))
+          .limit(req.query.limit);
+      });
+      return {
+        items: rows.map((d) => ({
+          id: d.id,
+          event: d.event,
+          status: d.status,
+          error: d.error,
+          createdAt: d.createdAt.toISOString(),
+          sentAt: d.sentAt?.toISOString() ?? null,
+        })),
+      };
     },
   );
 }

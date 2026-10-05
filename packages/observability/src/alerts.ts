@@ -27,6 +27,30 @@ export type AlertEvent = (typeof ALERT_EVENTS)[number];
 
 export type AlertSeverity = "info" | "warning" | "critical";
 
+/**
+ * How to let FlowAId reach addresses on this computer or the local network, which its outbound
+ * guard refuses by default: one sentence for every such refusal (notification sends, MCP servers,
+ * OpenAPI tools), so each says what to change.
+ */
+export const PRIVATE_NETWORK_FIX =
+  "To allow addresses on this computer or your network, set FLOWAID_ALLOW_PRIVATE_NETWORK=true in .env.local and restart FlowAId.";
+
+const PRIVATE_REFUSAL =
+  /private (?:or reserved )?address|refused to connect to|E_TOOL_SERVER_PRIVATE/i;
+
+/** Whether an error message is the outbound guard refusing a private or local address. */
+export function isPrivateRefusal(message: string): boolean {
+  return PRIVATE_REFUSAL.test(message);
+}
+
+/** The message with `PRIVATE_NETWORK_FIX` when it is a private-address refusal (once). */
+export function withPrivateNetworkFix(message: string): string {
+  if (!isPrivateRefusal(message) || message.includes("FLOWAID_ALLOW_PRIVATE_NETWORK"))
+    return message;
+  const base = message.replace(/^E_TOOL_SERVER_PRIVATE:\s*/, "").replace(/[.\s]+$/, "");
+  return `${base}. ${PRIVATE_NETWORK_FIX}`;
+}
+
 export interface AlertMessage {
   event: AlertEvent | "test";
   title: string;
@@ -400,7 +424,9 @@ export class AlertDispatcher {
           await this.o.store
             .finish(id, {
               status: "failed",
-              error: (error instanceof Error ? error.message : String(error)).slice(0, 500),
+              error: withPrivateNetworkFix(
+                error instanceof Error ? error.message : String(error),
+              ).slice(0, 500),
             })
             .catch(() => undefined);
       }

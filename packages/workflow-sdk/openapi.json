@@ -1304,6 +1304,98 @@
         "responses": { "204": { "description": "No content" } }
       }
     },
+    "/v1/environments/{id}/usage": {
+      "get": {
+        "summary": "What depends on an environment, for the delete and rename confirmations: runs on record (which block a delete), active deployments, triggers, secret bindings, credentials limited to it and keys pinned to it",
+        "tags": ["environments"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "x-cli": { "noun": "environment", "verb": "usage", "positional": ["id"] },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["admin"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "runs": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "evaluationRuns": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "deployments": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "webhooks": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "schedules": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "mcpExposures": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "secretBindings": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "credentials": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "apiKeys": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "runs",
+                    "evaluationRuns",
+                    "deployments",
+                    "webhooks",
+                    "schedules",
+                    "mcpExposures",
+                    "secretBindings",
+                    "credentials",
+                    "apiKeys"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/api-keys": {
       "get": {
         "tags": ["api-keys"],
@@ -5668,7 +5760,26 @@
                           "lastTestOk": { "type": ["boolean", "null"] },
                           "lastUsedAt": { "type": ["string", "null"] },
                           "rotatedAt": { "type": ["string", "null"] },
-                          "createdAt": { "type": "string" }
+                          "createdAt": { "type": "string" },
+                          "owner": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": { "type": "string", "enum": ["webhook", "notification"] },
+                                  "id": {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                  },
+                                  "name": { "type": "string" }
+                                },
+                                "required": ["kind", "id", "name"],
+                                "additionalProperties": false
+                              },
+                              { "type": "null" }
+                            ]
+                          }
                         },
                         "required": [
                           "id",
@@ -5685,7 +5796,8 @@
                           "lastTestOk",
                           "lastUsedAt",
                           "rotatedAt",
-                          "createdAt"
+                          "createdAt",
+                          "owner"
                         ],
                         "additionalProperties": false
                       }
@@ -5796,7 +5908,26 @@
                     "lastTestOk": { "type": ["boolean", "null"] },
                     "lastUsedAt": { "type": ["string", "null"] },
                     "rotatedAt": { "type": ["string", "null"] },
-                    "createdAt": { "type": "string" }
+                    "createdAt": { "type": "string" },
+                    "owner": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": { "type": "string", "enum": ["webhook", "notification"] },
+                            "id": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            "name": { "type": "string" }
+                          },
+                          "required": ["kind", "id", "name"],
+                          "additionalProperties": false
+                        },
+                        { "type": "null" }
+                      ]
+                    }
                   },
                   "required": [
                     "id",
@@ -5813,7 +5944,8 @@
                     "lastTestOk",
                     "lastUsedAt",
                     "rotatedAt",
-                    "createdAt"
+                    "createdAt",
+                    "owner"
                   ],
                   "additionalProperties": false
                 }
@@ -5880,7 +6012,26 @@
                     "lastTestOk": { "type": ["boolean", "null"] },
                     "lastUsedAt": { "type": ["string", "null"] },
                     "rotatedAt": { "type": ["string", "null"] },
-                    "createdAt": { "type": "string" }
+                    "createdAt": { "type": "string" },
+                    "owner": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": { "type": "string", "enum": ["webhook", "notification"] },
+                            "id": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            "name": { "type": "string" }
+                          },
+                          "required": ["kind", "id", "name"],
+                          "additionalProperties": false
+                        },
+                        { "type": "null" }
+                      ]
+                    }
                   },
                   "required": [
                     "id",
@@ -5897,7 +6048,8 @@
                     "lastTestOk",
                     "lastUsedAt",
                     "rotatedAt",
-                    "createdAt"
+                    "createdAt",
+                    "owner"
                   ],
                   "additionalProperties": false
                 }
@@ -6009,7 +6161,26 @@
                     "lastTestOk": { "type": ["boolean", "null"] },
                     "lastUsedAt": { "type": ["string", "null"] },
                     "rotatedAt": { "type": ["string", "null"] },
-                    "createdAt": { "type": "string" }
+                    "createdAt": { "type": "string" },
+                    "owner": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": { "type": "string", "enum": ["webhook", "notification"] },
+                            "id": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            "name": { "type": "string" }
+                          },
+                          "required": ["kind", "id", "name"],
+                          "additionalProperties": false
+                        },
+                        { "type": "null" }
+                      ]
+                    }
                   },
                   "required": [
                     "id",
@@ -6026,7 +6197,8 @@
                     "lastTestOk",
                     "lastUsedAt",
                     "rotatedAt",
-                    "createdAt"
+                    "createdAt",
+                    "owner"
                   ],
                   "additionalProperties": false
                 }
@@ -6059,6 +6231,62 @@
         "x-auth": "session_or_api_key",
         "x-scopes": ["credentials:write"],
         "responses": { "204": { "description": "No content" } }
+      }
+    },
+    "/v1/credentials/{id}/uses": {
+      "get": {
+        "summary": "Where the credential is used: workflow secret bindings, OpenAPI toolsets, MCP servers, knowledge sources, webhooks and notification channels",
+        "tags": ["credentials"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "x-cli": { "noun": "credential", "verb": "uses", "positional": ["id"] },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["credentials:read"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "workflow_secret",
+                          "toolset",
+                          "mcp_server",
+                          "knowledge_source",
+                          "webhook",
+                          "notification"
+                        ]
+                      },
+                      "id": { "type": "string" },
+                      "name": { "type": "string" },
+                      "environmentId": { "type": ["string", "null"] },
+                      "secretName": { "type": ["string", "null"] },
+                      "workflowId": { "type": ["string", "null"] }
+                    },
+                    "required": ["kind", "id", "name", "environmentId", "secretName", "workflowId"],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/v1/credentials/{id}/rotate": {
@@ -6136,7 +6364,26 @@
                     "lastTestOk": { "type": ["boolean", "null"] },
                     "lastUsedAt": { "type": ["string", "null"] },
                     "rotatedAt": { "type": ["string", "null"] },
-                    "createdAt": { "type": "string" }
+                    "createdAt": { "type": "string" },
+                    "owner": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": { "type": "string", "enum": ["webhook", "notification"] },
+                            "id": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            "name": { "type": "string" }
+                          },
+                          "required": ["kind", "id", "name"],
+                          "additionalProperties": false
+                        },
+                        { "type": "null" }
+                      ]
+                    }
                   },
                   "required": [
                     "id",
@@ -6153,7 +6400,8 @@
                     "lastTestOk",
                     "lastUsedAt",
                     "rotatedAt",
-                    "createdAt"
+                    "createdAt",
+                    "owner"
                   ],
                   "additionalProperties": false
                 }
@@ -7411,6 +7659,75 @@
         "responses": { "200": { "description": "Default Response" } }
       }
     },
+    "/v1/audit/resource-types": {
+      "get": {
+        "summary": "The resource types the workspace's audit log holds (for its filter)",
+        "tags": ["audit"],
+        "x-cli": { "noun": "audit", "verb": "resource-types" },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["audit:read"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": { "schema": { "type": "array", "items": { "type": "string" } } }
+            }
+          }
+        }
+      }
+    },
+    "/v1/audit/export": {
+      "get": {
+        "summary": "The filtered audit log as a CSV or JSON file, newest first (at most 50000 events; x-flowaid-truncated says when more matched)",
+        "tags": ["audit"],
+        "parameters": [
+          { "schema": { "type": "string" }, "in": "query", "name": "actor", "required": false },
+          { "schema": { "type": "string" }, "in": "query", "name": "action", "required": false },
+          {
+            "schema": { "type": "string" },
+            "in": "query",
+            "name": "resourceType",
+            "required": false
+          },
+          {
+            "schema": { "type": "string" },
+            "in": "query",
+            "name": "resourceId",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+            },
+            "in": "query",
+            "name": "from",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+            },
+            "in": "query",
+            "name": "to",
+            "required": false
+          },
+          {
+            "schema": { "default": "csv", "type": "string", "enum": ["csv", "json"] },
+            "in": "query",
+            "name": "format",
+            "required": false
+          }
+        ],
+        "x-cli": { "noun": "audit", "verb": "export" },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["audit:read"],
+        "responses": { "200": { "description": "Default Response" } }
+      }
+    },
     "/v1/artifacts/{id}/download": {
       "get": {
         "tags": ["artifacts"],
@@ -7887,6 +8204,65 @@
                   "type": "object",
                   "properties": { "ok": { "type": "boolean" }, "error": { "type": "string" } },
                   "required": ["ok"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/notifications/{id}/deliveries": {
+      "get": {
+        "summary": "What was sent to the channel (alerts and tests), newest first",
+        "tags": ["notifications"],
+        "parameters": [
+          {
+            "schema": { "default": 20, "type": "integer", "minimum": 1, "maximum": 100 },
+            "in": "query",
+            "name": "limit",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "x-cli": { "noun": "notification", "verb": "deliveries", "positional": ["id"] },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["admin"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": { "type": "string" },
+                          "event": { "type": "string" },
+                          "status": { "type": "string", "enum": ["pending", "sent", "failed"] },
+                          "error": { "type": ["string", "null"] },
+                          "createdAt": { "type": "string" },
+                          "sentAt": { "type": ["string", "null"] }
+                        },
+                        "required": ["id", "event", "status", "error", "createdAt", "sentAt"],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["items"],
                   "additionalProperties": false
                 }
               }

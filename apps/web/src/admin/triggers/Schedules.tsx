@@ -2,20 +2,25 @@
 /**
  * Live schedules (materialised per environment on deploy): next and last runs, the last error,
  * and the environment-specific policy — enabled, overlap, missed runs (catch-up and its limit)
- * and jitter — plus a manual trigger. The cron and timezone belong to the workflow definition
- * (the API answers 409 to a cron edit), so they show as a read-only field.
+ * and jitter — plus a manual trigger, confirmed first (it is a real run in that environment). The
+ * cron and timezone belong to the workflow definition (the API answers 409 to a cron edit), so they
+ * show as a read-only field.
  */
 import { useQuery } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { CalendarClock, Play } from "lucide-react";
 import {
   Badge,
   Button,
+  ConfirmDialog,
   Hint,
   Input,
   NumberInput,
   Select,
   SelectItem,
   Switch,
+  toast,
 } from "@flowaid/ui/primitives";
 import { RelativeTime } from "@flowaid/ui/data";
 import { getAll, patch, post } from "~/api/client";
@@ -45,18 +50,29 @@ export function ScheduleList({
   workflowName?: (id: string) => string;
 }) {
   const s = useSession();
+  const router = useRouter();
   const key = ["triggers", s.ws, workflowId ?? "*", "schedules"];
   const schedules = useSchedules(workflowId);
   const envName = (id: string) => s.environments.find((e) => e.id === id)?.name ?? id.slice(0, 8);
+  // Run now asks first: it starts a real run in the schedule's environment
+  const [confirmRun, setConfirmRun] = useState<Schedule | null>(null);
   const patchSchedule = useMutate(
     (v: { id: string; body: Record<string, unknown> }) => patch(`/v1/schedules/${v.id}`, v.body),
-    { success: "Schedule updated", invalidate: [key] },
+    { success: "Schedule updated", invalidate: [key], errorTitle: "Could not update the schedule" },
   );
   const fire = useMutate((id: string) => post<{ run_id: string }>(`/v1/schedules/${id}/trigger`), {
-    success: "Run started",
     invalidate: [key],
+    onSuccess: (r) =>
+      toast.success("Run started", {
+        action: { label: "Open run", onClick: () => router.push(`/${s.ws}/runs/${r.run_id}`) },
+      }),
     errorTitle: "The run did not start",
   });
+  // a switch shows its change is being saved, and can't be flipped again meanwhile
+  const pendingRow = (id: string) => patchSchedule.isPending && patchSchedule.variables.id === id;
+  const confirmEnv = confirmRun
+    ? s.environments.find((e) => e.id === confirmRun.environmentId)
+    : undefined;
 
   if (!s.can("schedules:write"))
     return <Notice tone="info">You need the schedules:write scope to manage schedules.</Notice>;
@@ -120,7 +136,7 @@ export function ScheduleList({
                                 className="text-accent-text hover:underline"
                                 href={`/${s.ws}/runs/${x.lastRunId}`}
                               >
-                                (run)
+                                Open last run
                               </a>
                             </>
                           ) : null}
@@ -134,6 +150,8 @@ export function ScheduleList({
                       <Switch
                         size="sm"
                         checked={x.enabled}
+                        disabled={pendingRow(x.id)}
+                        aria-busy={pendingRow(x.id)}
                         onCheckedChange={(c) =>
                           patchSchedule.mutate({ id: x.id, body: { enabled: c } })
                         }
@@ -219,7 +237,7 @@ export function ScheduleList({
                         title={`Start one real run now with this schedule's input, in ${envName(x.environmentId)}`}
                         leadingIcon={<Play strokeWidth={1.75} />}
                         loading={fire.isPending && fire.variables === x.id}
-                        onClick={() => fire.mutate(x.id)}
+                        onClick={() => setConfirmRun(x)}
                       >
                         Run now
                       </Button>
@@ -228,6 +246,38 @@ export function ScheduleList({
                 </li>
               ))}
             </ul>
+            <ConfirmDialog
+              open={confirmRun !== null}
+              onOpenChange={(o) => {
+                if (!o) setConfirmRun(null);
+              }}
+              title={
+                confirmRun && workflowName
+                  ? `Run ${workflowName(confirmRun.workflowId)} now in ${confirmEnv?.name ?? "its environment"}?`
+                  : `Run this schedule now in ${confirmEnv?.name ?? "its environment"}?`
+              }
+              description="This starts one real run with the schedule's input, as a scheduled run would: its steps call their services, and paid model steps are charged."
+              confirmLabel={`Run now in ${confirmEnv?.name ?? "this environment"}`}
+              onConfirm={async () => {
+                // a failure is toasted by the mutation; the dialog closes either way
+                if (confirmRun) await fire.mutateAsync(confirmRun.id).catch(() => undefined);
+              }}
+            >
+              <div className="flex flex-col gap-2 text-xs text-ink-2">
+                {confirmEnv?.protected ? (
+                  <Notice>
+                    {confirmEnv.name} is a protected environment: this run uses its credentials and
+                    reaches the same systems as its scheduled runs.
+                  </Notice>
+                ) : null}
+                {confirmRun?.overlap === "skip" ? (
+                  <p className="m-0 text-ink-3">
+                    Overlap is Skip: a scheduled time that comes while this run is still going is
+                    skipped.
+                  </p>
+                ) : null}
+              </div>
+            </ConfirmDialog>
           </>
         )
       }

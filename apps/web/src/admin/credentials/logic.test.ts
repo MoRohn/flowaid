@@ -7,6 +7,7 @@ import {
   emptyCredentialDraft,
   externalRefProblem,
   keptDraft,
+  providerCredentialType,
   serverKeyProvider,
   serviceGroup,
   type CredentialContext,
@@ -162,5 +163,11 @@ describe("service grouping", () => {
     expect(serverKeyProvider("anthropic.api_key")).toBe("anthropic");
     expect(serverKeyProvider("ollama.none")).toBe("ollama");
     expect(serverKeyProvider("google.api_key")).toBeUndefined();
+  });
+
+  it("opens New credential on a provider's key type from Providers", () => {
+    expect(providerCredentialType("openai")).toBe("openai.api_key");
+    expect(providerCredentialType("anthropic")).toBe("anthropic.api_key");
+    expect(providerCredentialType("ollama")).toBe("ollama.host");
   });
 });
