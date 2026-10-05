@@ -380,6 +380,35 @@ describe("flowaid.ai.agent", () => {
     );
   });
 
+  it("takes Max steps from the preset when the step leaves it unset", async () => {
+    const presetTool: TestTool = {
+      definition: {
+        name: AGENT_PRESET_BUILTIN,
+        description: "",
+        inputSchema: { type: "object" },
+        idempotency: "safe",
+        approvalRequired: false,
+        source: { kind: "builtin", id: AGENT_PRESET_BUILTIN },
+      },
+      handler: () => ({
+        ok: true,
+        content: "",
+        structured: { model, maxSteps: 2, tools: [{ name: "lookup_order", approval: "never" }] },
+        latencyMs: 0,
+      }),
+    };
+    const gen = scripted([[call("c", "lookup_order", { id: "1" })]]);
+    const r = await runNode(agentNode, {
+      // a step added from Add node carries only the agent (no default 8 is filled in)
+      config: { agentId: "00000000-0000-4000-8000-00000000000a" },
+      input: { task: "loop" },
+      providers: { generation: gen },
+      tools: [presetTool, lookup],
+    });
+    expect(r.result.kind === "error" && r.result.error.code).toBe("BOUNDS_EXCEEDED");
+    expect(gen.requests).toHaveLength(2);
+  });
+
   it("merges settings and decides approval by mode", () => {
     expect(() => effectiveAgent({}, null)).toThrow(/no model/);
     expect(effectiveAgent({ maxSteps: 3 }, { model, maxSteps: 9, system: "p" })).toMatchObject({

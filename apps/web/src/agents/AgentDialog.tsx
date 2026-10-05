@@ -409,7 +409,7 @@ export function AgentDialog({
       done: LIMIT_FIELDS.every((f) => !check.errors[f]),
       requirement: "fix the limits marked in red",
       example:
-        "Raise Max steps only when the trace shows the agent stopping mid-task. A run's own budget, when it has one, caps the cost limit too.",
+        "Raise Max steps only when the trace shows the agent stopping mid-task. Steps added from Add node use the agent's limits; a step that sets its own Max steps keeps it. A run's own budget, when it has one, caps the cost limit too.",
       children: (
         <div className="flex flex-col gap-3">
           <div className="grid gap-4 sm:grid-cols-3">

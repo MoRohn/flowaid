@@ -1,5 +1,7 @@
 ---
 "@flowaid/web": patch
+"@flowaid/nodes-core": patch
+"@flowaid/workflow-compiler": patch
 ---
 
 Editing an agent keeps the settings the form doesn't show: temperature, max output tokens, the
@@ -15,3 +17,9 @@ choice no longer squeezes the tool's name, Edit no longer promises to keep chang
 (its links open a new tab, with a way to refresh the tool list), the card shows "approval" only
 for tools that really wait for a person, its buttons and switch are named after the agent, and
 "ready to use" says the agent is in Add node under its own name.
+
+An agent's Max steps reaches the steps that use it. Adding an agent from Add node copied its Max
+steps onto the step (and the Agent step filled in 8 when it had none), so raising it on the agent
+changed nothing. A step that uses an agent now leaves Max steps unset unless it sets its own, and
+the compiler accepts that for a step with an agent. Steps added before keep the value they have;
+clear it in the step's settings to use the agent's.

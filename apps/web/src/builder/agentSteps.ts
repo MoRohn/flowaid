@@ -1,8 +1,9 @@
 /**
  * Active agents (Agents page) as entries of the Add node palette (pure, so it is unit tested).
- * Picking one adds an Agent step that points at that agent and carries nothing else but the step
- * bound the compiler requires, so the agent's own model, instructions, tools and limits apply and
- * later edits to the agent reach every step that uses it.
+ * Picking one adds an Agent step that points at that agent and carries nothing else, so the
+ * agent's own model, instructions, tools and limits (Max steps included) apply and later edits
+ * to the agent reach every step that uses it. A step that sets its own Max steps overrides the
+ * agent's.
  */
 import type { WorkflowDefinition, WorkflowNode } from "@flowaid/workflow-core";
 import type { AgentPreset } from "~/agents/logic";
@@ -11,8 +12,6 @@ import { newNode, type Catalog } from "./model";
 
 export const AGENT_NODE_TYPE = "flowaid.ai.agent";
 const PREFIX = "agent-preset:";
-/** The step bound used when the agent sets none (the Agent node's own default). */
-const DEFAULT_MAX_STEPS = 8;
 
 /** The palette entry id of an agent. */
 export const agentPresetKind = (id: string) => `${PREFIX}${id}`;
@@ -38,13 +37,8 @@ export function agentStepFor(
   catalog: Catalog,
   parent?: string,
 ): WorkflowNode | null {
-  const steps = typeof a.config.maxSteps === "number" ? a.config.maxSteps : DEFAULT_MAX_STEPS;
-  const node = newNode(
-    def,
-    AGENT_NODE_TYPE,
-    catalog,
-    () => ({ agentId: a.id, maxSteps: steps }),
-    parent,
-  );
+  // no Max steps of its own: the agent's applies (the compiler accepts that for a step with an
+  // agent), so raising it on the agent reaches this step
+  const node = newNode(def, AGENT_NODE_TYPE, catalog, () => ({ agentId: a.id }), parent);
   return node ? { ...node, name: a.name } : null;
 }

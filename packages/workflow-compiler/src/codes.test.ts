@@ -679,6 +679,41 @@ describe("diagnostic codes", () => {
   });
 });
 
+describe("an agent step's step bound", () => {
+  const agentCatalog = withManifest(
+    manifestLike("flowaid.ai.agent", {
+      metadata: {
+        name: "Agent",
+        description: "Tool loop",
+        category: "agent",
+        icon: "bot",
+        tags: [],
+      },
+      configSchema: {
+        type: "object",
+        properties: { maxSteps: { type: "integer" }, agentId: { type: "string" } },
+      },
+    }),
+  );
+  const unbounded = (config: Doc) => {
+    const d = clone();
+    d.nodes.push(transform("agent", "1", { type: "flowaid.ai.agent", config }));
+    out(d, "out_auto").extra = ref("agent", "result");
+    return compile(d, { catalog: agentCatalog })
+      .diagnostics.filter((x) => x.code === "E_AGENT_UNBOUNDED")
+      .map((x) => x.message);
+  };
+
+  it("may come from the agent preset the step uses", () => {
+    // the preset's Max steps applies at run time, so a later change to it reaches the step
+    expect(unbounded({ agentId: "0199a000-0000-7000-8000-0000000000a1" })).toEqual([]);
+    expect(unbounded({})).toEqual(["Agent 'agent' needs config.maxSteps (a positive integer)"]);
+    expect(unbounded({ agentId: "0199a000-0000-7000-8000-0000000000a1", maxSteps: 0 })).toEqual([
+      "Agent 'agent' needs config.maxSteps (a positive integer)",
+    ]);
+  });
+});
+
 describe("unbound secrets the server has a key for", () => {
   const unbound = (serverCredentialTypes?: ReadonlySet<string>) =>
     compile(clone(), {
