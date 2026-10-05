@@ -2039,12 +2039,7 @@ export const OPERATIONS: readonly CliOperation[] = [
       { name: "limit", type: "integer", required: false },
       { name: "cursor", type: "string", required: false },
       { name: "order", type: "string", required: false, enum: ["asc", "desc"] },
-      {
-        name: "status",
-        type: "string",
-        required: false,
-        enum: ["open", "responded", "expired", "cancelled"],
-      },
+      { name: "status", type: "string", required: false },
       { name: "workflowId", type: "string", required: false },
       { name: "assignedToMe", type: "boolean", required: false },
     ],

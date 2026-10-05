@@ -2,6 +2,7 @@
 import type { ApprovalRequestView } from "@flowaid/ui";
 import type { PendingApprovalView } from "@flowaid/ui/data";
 import type { ApprovalRecord } from "@flowaid/ui/human";
+import { ApiError } from "~/api/client";
 import type { HumanTask, Member } from "~/api/types";
 import type { ExternalReviewView } from "./types";
 
@@ -30,6 +31,55 @@ export function taskToPending(
   };
   if (assignee) view.assigneeName = member?.name || member?.email || assignee;
   return view;
+}
+
+/** Resolved, by outcome: the statuses each asks the API for. */
+export const INBOX_OUTCOMES = [
+  { id: "all", label: "All", status: "responded,expired,cancelled" },
+  { id: "answered", label: "Answered", status: "responded" },
+  { id: "expired", label: "Expired", status: "expired" },
+  { id: "cancelled", label: "Cancelled", status: "cancelled" },
+] as const;
+export type InboxOutcome = (typeof INBOX_OUTCOMES)[number]["id"];
+
+/** The API query for a tab: Resolved covers every closed status, narrowed by outcome. */
+export function inboxQuery(
+  tab: "open" | "mine" | "resolved",
+  outcome: InboxOutcome = "all",
+  workflowId?: string,
+): Record<string, string | boolean | undefined> {
+  if (tab === "mine") return { status: "open", assignedToMe: true };
+  if (tab === "open") return { status: "open" };
+  return {
+    status: INBOX_OUTCOMES.find((o) => o.id === outcome)?.status ?? INBOX_OUTCOMES[0].status,
+    workflowId,
+  };
+}
+
+/**
+ * Why a task closed without an answer. A task is "cancelled" whenever its run ends first, so the
+ * run's status says how: cancelled, out of time, or failed.
+ */
+export function closedTaskNote(
+  status: "expired" | "cancelled",
+  runStatus: string | undefined,
+): string {
+  if (status === "expired")
+    return "Nobody answered before this task expired; the workflow went on as its expiry setting says.";
+  if (runStatus === "timed_out")
+    return "The run reached its time limit before anyone answered, so this task closed.";
+  if (runStatus === "failed") return "The run failed before anyone answered, so this task closed.";
+  if (runStatus === "cancelled")
+    return "The run was cancelled before anyone answered, so this task no longer needs an answer.";
+  return "The run ended before anyone answered, so this task no longer needs an answer.";
+}
+
+/**
+ * A 409 for a task that already has its answer (a double submit, another tab, the external link):
+ * the answer the person meant to give is recorded, so it is not a failure.
+ */
+export function alreadyAnswered(e: unknown): boolean {
+  return e instanceof ApiError && e.status === 409 && /responded|answered/.test(e.message);
 }
 
 /** What the card shows once the task is answered. */

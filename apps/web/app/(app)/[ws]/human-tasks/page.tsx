@@ -1,11 +1,23 @@
 "use client";
-/** Human task inbox: Open · Mine · Resolved (UI.md §1). Open tasks refresh every 10 s. */
+/**
+ * Human task inbox: Open · Mine · Resolved (UI.md §1). Open tasks refresh every 10 s. Resolved
+ * holds every closed task (answered, expired, or cancelled with its run), narrowed by outcome and
+ * workflow in the URL.
+ */
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useMemo } from "react";
 import { CheckSquare } from "lucide-react";
 import type { HumanTask, Page } from "~/api/types";
-import { Button, EmptyState, toast } from "@flowaid/ui/primitives";
+import {
+  Button,
+  EmptyState,
+  Select,
+  SelectItem,
+  ToggleGroup,
+  ToggleGroupItem,
+  toast,
+} from "@flowaid/ui/primitives";
 import { ApprovalsTable } from "@flowaid/ui/data";
 import { PageHeader } from "@flowaid/ui/shell";
 import { get, post, qs } from "~/api/client";
@@ -17,7 +29,7 @@ import { AppFrame, PageBody } from "~/shell/AppFrame";
 import { ErrorPanel, errorMessage } from "~/shell/states";
 import { useMembers, useWorkflowNames } from "~/runs/api";
 import { ResolvedTasksTable } from "~/runs/ResolvedTasksTable";
-import { taskToPending } from "~/runs/humanTasks";
+import { INBOX_OUTCOMES, inboxQuery, taskToPending, type InboxOutcome } from "~/runs/humanTasks";
 
 const TABS = [
   { id: "open", label: "Open" },
@@ -26,6 +38,8 @@ const TABS = [
 ] as const;
 type TabId = (typeof TABS)[number]["id"];
 
+const ANY_WORKFLOW = "any";
+
 function Inbox() {
   const s = useSession();
   const router = useRouter();
@@ -33,15 +47,13 @@ function Inbox() {
   const params = useSearchParams();
   const qc = useQueryClient();
   const tab: TabId = TABS.find((t) => t.id === params.get("tab"))?.id ?? "open";
-  const query =
-    tab === "resolved"
-      ? { status: "responded" }
-      : tab === "mine"
-        ? { status: "open", assignedToMe: true }
-        : { status: "open" };
+  const outcome: InboxOutcome =
+    INBOX_OUTCOMES.find((o) => o.id === params.get("outcome"))?.id ?? "all";
+  const workflowFilter = params.get("workflow") ?? undefined;
+  const query = inboxQuery(tab, outcome, workflowFilter);
 
   const tasks = useInfiniteQuery({
-    queryKey: ["human-tasks", s.ws, tab],
+    queryKey: ["human-tasks", s.ws, tab, query],
     initialPageParam: null as string | null,
     queryFn: ({ pageParam, signal }) =>
       get<Page<HumanTask>>(`/v1/human-tasks${qs({ ...query, limit: 50, cursor: pageParam })}`, {
@@ -83,6 +95,18 @@ function Inbox() {
 
   const setTab = (id: string) =>
     router.replace(id === "open" ? pathname : `${pathname}?tab=${id}`, { scroll: false });
+  const setResolvedFilter = (patch: { outcome?: string; workflow?: string }) => {
+    const next = new URLSearchParams(params.toString());
+    next.set("tab", "resolved");
+    for (const [k, v] of Object.entries(patch))
+      if (!v || v === "all" || v === ANY_WORKFLOW) next.delete(k);
+      else next.set(k, v);
+    router.replace(`${pathname}?${next.toString()}`, { scroll: false });
+  };
+  const workflowOptions = [...(names.data ?? new Map<string, string>())].sort((a, b) =>
+    a[1].localeCompare(b[1]),
+  );
+  const filtered = outcome !== "all" || Boolean(workflowFilter);
   const open = (id: string) => router.push(`/${s.ws}/human-tasks/${id}`);
 
   const empty = (
@@ -91,14 +115,18 @@ function Inbox() {
       icon={<CheckSquare strokeWidth={1.5} />}
       title={
         tab === "resolved"
-          ? "Nothing resolved yet"
+          ? filtered
+            ? "No closed tasks match"
+            : "Nothing resolved yet"
           : tab === "mine"
             ? "Nothing assigned to you"
             : "Inbox zero"
       }
       description={
         tab === "resolved"
-          ? "Answered approvals, reviews and forms appear here."
+          ? filtered
+            ? "Pick another outcome or workflow."
+            : "Answered, expired and cancelled approvals, reviews and forms appear here."
           : "When a workflow asks a person to approve, review or fill a form, the task waits here."
       }
     />
@@ -118,14 +146,45 @@ function Inbox() {
         {tasks.isError ? (
           <ErrorPanel error={tasks.error} onRetry={() => void tasks.refetch()} />
         ) : tab === "resolved" ? (
-          <ResolvedTasksTable
-            tasks={items}
-            workflowNames={names.data ?? new Map()}
-            members={members.data ?? []}
-            loading={tasks.isPending}
-            onOpen={open}
-            emptyState={empty}
-          />
+          <>
+            <div className="flex flex-wrap items-center gap-2">
+              <ToggleGroup
+                type="single"
+                size="sm"
+                value={outcome}
+                aria-label="Outcome"
+                onValueChange={(v) => v && setResolvedFilter({ outcome: v })}
+              >
+                {INBOX_OUTCOMES.map((o) => (
+                  <ToggleGroupItem key={o.id} value={o.id}>
+                    {o.label}
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
+              <Select
+                size="sm"
+                aria-label="Workflow"
+                className="w-56"
+                value={workflowFilter ?? ANY_WORKFLOW}
+                onValueChange={(v) => setResolvedFilter({ workflow: v })}
+              >
+                <SelectItem value={ANY_WORKFLOW}>All workflows</SelectItem>
+                {workflowOptions.map(([id, name]) => (
+                  <SelectItem key={id} value={id}>
+                    {name}
+                  </SelectItem>
+                ))}
+              </Select>
+            </div>
+            <ResolvedTasksTable
+              tasks={items}
+              workflowNames={names.data ?? new Map()}
+              members={members.data ?? []}
+              loading={tasks.isPending}
+              onOpen={open}
+              emptyState={empty}
+            />
+          </>
         ) : (
           <ApprovalsTable
             approvals={pending}

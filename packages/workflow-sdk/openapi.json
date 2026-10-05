@@ -5259,7 +5259,10 @@
             "required": false
           },
           {
-            "schema": { "type": "string", "enum": ["open", "responded", "expired", "cancelled"] },
+            "schema": {
+              "type": "string",
+              "pattern": "^(open|responded|expired|cancelled)(,(open|responded|expired|cancelled))*$"
+            },
             "in": "query",
             "name": "status",
             "required": false

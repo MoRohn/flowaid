@@ -31,3 +31,12 @@ cancelled" (or reached its time limit, or failed), and "after 1 minute" is the t
 not the step's own run time. A step retried in place reads once. A timed-out run gets a banner with
 the limit it reached and a "Workflow settings" button, and its Guide steps no longer send you to a
 failed step and Retry that don't exist.
+
+Human tasks that closed without an answer are read-only: an expired or cancelled task shows its
+status instead of a countdown, says why it closed (expired, or the run was cancelled, reached its
+time limit or failed), and has no answer buttons, comment box or shortcuts. An answer is sent once:
+the card stays locked after the API accepts it, so a double click or a second A sends nothing, and a
+409 "already answered" reads as done instead of an error. Resolved lists every closed task
+(answered, expired, cancelled) with an outcome filter and a workflow filter; `GET /v1/human-tasks`
+takes several statuses (`status=responded,expired,cancelled`). A closed task's guidance reads
+"About this task" and no longer gives a due time for a cancelled task.

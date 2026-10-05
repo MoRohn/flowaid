@@ -28,7 +28,7 @@ describe("TaskGuidancePanel", () => {
     expect(screen.getByText(/waits until someone answers/)).toBeTruthy();
   });
 
-  it("is folded once the task is answered", () => {
+  it("is folded and told in the past once the task is answered", () => {
     const { container } = render(
       <TaskGuidancePanel
         task={{ request, expiresAt: "2026-09-30T00:00:00Z", status: "responded" }}
@@ -36,6 +36,27 @@ describe("TaskGuidancePanel", () => {
       />,
     );
     expect(container.querySelector("details")?.open).toBe(false);
-    expect(screen.getByText(/Was due/)).toBeTruthy();
+    expect(screen.getByText("About this task")).toBeTruthy();
+    expect(screen.queryByText("Before you answer")).toBeNull();
+    expect(screen.queryByText(/Was due|Expires/)).toBeNull();
+  });
+
+  it("says when an expired task expired, and nothing about a due time once cancelled", () => {
+    const expired = render(
+      <TaskGuidancePanel
+        task={{ request, expiresAt: "2026-09-30T00:00:00Z", status: "expired" }}
+        node={undefined}
+      />,
+    );
+    expect(screen.getByText(/^Expired/)).toBeTruthy();
+    expired.unmount();
+    render(
+      <TaskGuidancePanel
+        // the run ended first: the task was still 13 minutes from its due time
+        task={{ request, expiresAt: "2099-09-30T00:00:00Z", status: "cancelled" }}
+        node={undefined}
+      />,
+    );
+    expect(screen.queryByText(/Was due|Expire/)).toBeNull();
   });
 });

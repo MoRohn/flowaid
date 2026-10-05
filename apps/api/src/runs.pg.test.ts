@@ -121,6 +121,20 @@ describeDb("runs, streams and human tasks (Postgres)", () => {
     expect(worker.jobs.some((j) => j.type === "run.resume" && j.runId === runId)).toBe(true);
   });
 
+  it("lists closed tasks of several statuses at once (the inbox's Resolved)", async () => {
+    const res = await run({ input: { message: "human" }, mode: "sync", waitTimeoutMs: 20_000 });
+    const expired = res.json().human_task.id as string;
+    await t.db.admin`update human_tasks set status = 'expired' where id = ${expired}`;
+    const list = (status: string) =>
+      call(t.app, jar, "GET", `/v1/human-tasks?status=${status}&limit=200`).then((r) =>
+        (r.json().items as { id: string; status: string }[]).map((x) => x.status),
+      );
+    const closed = await list("responded,expired,cancelled");
+    expect(new Set(closed)).toEqual(new Set(["responded", "expired"]));
+    expect(await list("expired")).toEqual(["expired"]);
+    expect((await call(t.app, jar, "GET", "/v1/human-tasks?status=done")).statusCode).toBe(400);
+  });
+
   it("sync: still running at the timeout answers 202 running", async () => {
     const res = await run({ input: { message: "hang" }, mode: "sync", waitTimeoutMs: 1000 });
     expect(res.statusCode).toBe(202);

@@ -13,7 +13,7 @@ import { useSession } from "~/session";
 import { AppFrame } from "~/shell/AppFrame";
 import { ErrorPanel, errorMessage } from "~/shell/states";
 import { useCatalog, useMembers, useWorkflowNames } from "~/runs/api";
-import { humanizeId, respondedRecord } from "~/runs/humanTasks";
+import { alreadyAnswered, closedTaskNote, humanizeId, respondedRecord } from "~/runs/humanTasks";
 import { ReviewLinks } from "~/runs/ReviewLinks";
 import { TaskGuidancePanel } from "~/runs/TaskGuidancePanel";
 import type { HumanTask, Page } from "~/api/types";
@@ -24,11 +24,6 @@ const ROLE_TARGETS: EscalationTarget[] = [
   { id: "role:admin", name: "Admins", kind: "team", description: "Everyone with the admin role" },
   { id: "role:owner", name: "Owners", kind: "team", description: "Workspace owners" },
 ];
-
-const STATUS_NOTE: Record<string, string> = {
-  expired: "This task expired before anyone answered; the workflow took its expiry path.",
-  cancelled: "The run was cancelled, so this task no longer needs an answer.",
-};
 
 export default function HumanTaskPage({ params }: { params: Promise<{ taskId: string }> }) {
   const { taskId } = use(params);
@@ -73,6 +68,11 @@ export default function HumanTaskPage({ params }: { params: Promise<{ taskId: st
     [run.data, catalog.data, version.data],
   );
 
+  const refresh = () => {
+    void qc.invalidateQueries({ queryKey: ["human-task", s.ws, taskId] });
+    void qc.invalidateQueries({ queryKey: ["human-tasks", s.ws] });
+    void qc.invalidateQueries({ queryKey: ["run", s.ws, runId] });
+  };
   const respond = useMutation({
     mutationFn: (response: HumanResponse) =>
       post(`/v1/human-tasks/${taskId}/respond`, { response }),
@@ -80,12 +80,24 @@ export default function HumanTaskPage({ params }: { params: Promise<{ taskId: st
       toast.success(
         response.action === "escalate" ? "Task reassigned" : "Response recorded; the run resumes",
       );
-      void qc.invalidateQueries({ queryKey: ["human-task", s.ws, taskId] });
-      void qc.invalidateQueries({ queryKey: ["human-tasks", s.ws] });
-      void qc.invalidateQueries({ queryKey: ["run", s.ws, runId] });
+      refresh();
     },
-    onError: (e) => toast.error(errorMessage(e)),
+    onError: (e) => {
+      refresh();
+      // a second answer to a task already answered (a double submit, another tab): it is done
+      if (alreadyAnswered(e)) toast.info("This task was already answered");
+      else toast.error(errorMessage(e));
+    },
   });
+  // the card stays locked after an answer the API already has; other failures let it try again
+  const answer = (r: HumanResponse) =>
+    respond.mutateAsync(r).then(
+      () => undefined,
+      (e: unknown) => {
+        if (alreadyAnswered(e)) return undefined;
+        throw e;
+      },
+    );
 
   const task = detail.data?.task;
   const workflowName = task ? (names.data?.get(task.workflowId) ?? "Workflow") : "";
@@ -127,15 +139,18 @@ export default function HumanTaskPage({ params }: { params: Promise<{ taskId: st
       ...ROLE_TARGETS,
     ];
     const canAnswer = task.status === "open" && s.can("runs:approve");
+    const closed =
+      task.status === "expired" || task.status === "cancelled"
+        ? { status: task.status, note: closedTaskNote(task.status, run.data?.status) }
+        : undefined;
     body = (
       <div className="flex flex-col gap-4 pb-10">
-        {STATUS_NOTE[task.status] || (task.status === "open" && !s.can("runs:approve")) ? (
+        {task.status === "open" && !s.can("runs:approve") ? (
           <p
             className="mx-auto mt-6 w-full max-w-[640px] rounded-md border border-border bg-surface-2 px-4 py-3 text-sm text-ink-2"
             role="status"
           >
-            {STATUS_NOTE[task.status] ??
-              "You can see this task, but answering it needs the approve permission (runs:approve)."}
+            You can see this task, but answering it needs the approve permission (runs:approve).
           </p>
         ) : null}
         {task.status === "responded" ? (
@@ -170,10 +185,11 @@ export default function HumanTaskPage({ params }: { params: Promise<{ taskId: st
             workflowName,
             onRespond: (r) => {
               if (!canAnswer) return;
-              return respond.mutateAsync(r).then(() => undefined);
+              return answer(r);
             },
             submitting: respond.isPending,
             ...(responded ? { responded } : {}),
+            ...(closed && !responded ? { closed } : {}),
             escalationTargets: targets,
             hotkeys: canAnswer,
           }}

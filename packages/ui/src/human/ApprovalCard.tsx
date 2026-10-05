@@ -37,7 +37,7 @@ import { EscalationDialog, type EscalationTarget } from "./EscalationDialog";
 import { isEditableTarget, ManualChoice, type ManualChoiceOption } from "./ManualChoice";
 import { ProposedOutputEditor } from "./ProposedOutputEditor";
 import { SlaChip } from "./SlaChip";
-import { formatAbsolute, formatRelativeShort, useReviewNow } from "./time";
+import { formatAbsolute, formatRelativeShort, toEpochMs, useReviewNow } from "./time";
 
 /** A finished review: what was answered, by whom and when. */
 export interface ApprovalRecord {
@@ -56,6 +56,11 @@ export interface ApprovalCardProps extends Omit<HTMLAttributes<HTMLDivElement>, 
   submitting?: boolean;
   /** Locks the card and shows the outcome. */
   responded?: ApprovalRecord;
+  /**
+   * The task closed without an answer: it expired, or its run ended first (`cancelled`). The card
+   * is read-only, shows the status instead of the countdown, and `note` says what happened.
+   */
+  closed?: { status: "expired" | "cancelled"; note?: ReactNode };
   /** Gate thresholds; renders the confidence meter under the decision. */
   thresholds?: ConfidenceThresholds;
   /** Teams and people offered by the Escalate action. Omit to hide it. */
@@ -276,6 +281,7 @@ export const ApprovalCard = forwardRef<HTMLDivElement, ApprovalCardProps>(functi
     onRespond,
     submitting,
     responded,
+    closed,
     thresholds,
     escalationTargets,
     hotkeys = true,
@@ -289,13 +295,18 @@ export const ApprovalCard = forwardRef<HTMLDivElement, ApprovalCardProps>(functi
   const task = request.request;
   const mode = task.mode;
   const originalText = mode.type === "review" ? reviewValueText(mode.value) : "";
-  const now = useReviewNow(30_000, !responded, fixedNow);
+  // keeps ticking once answered, so "answered 2 minutes ago" stays true
+  const now = useReviewNow(30_000, !closed, fixedNow);
   const [comment, setComment] = useState("");
   const [output, setOutput] = useState(originalText);
   const [optionId, setOptionId] = useState<string | null>(null);
   const formRef = useRef<SchemaFormHandle>(null);
   const [escalateOpen, setEscalateOpen] = useState(false);
   const [pending, setPending] = useState<PrimaryAction | null>(null);
+  // An answer was accepted: the card stays locked until `responded` arrives, so a second click
+  // (or a second A) cannot send another one.
+  const [sent, setSent] = useState(false);
+  const inFlight = useRef(false);
 
   // A different request (or a changed original value) starts a fresh draft. Adjusted during
   // render from the previous key, React's pattern for resetting state on a prop change.
@@ -306,10 +317,11 @@ export const ApprovalCard = forwardRef<HTMLDivElement, ApprovalCardProps>(functi
     setOutput(originalText);
     setOptionId(null);
     setComment("");
+    setSent(false);
   }
 
-  const locked = Boolean(responded);
-  const busy = submitting || pending !== null;
+  const locked = Boolean(responded) || Boolean(closed);
+  const busy = submitting || pending !== null || sent;
   const trimmedComment = comment.trim();
   const commentOrNone = trimmedComment ? { comment: trimmedComment } : {};
   const canEscalate = Boolean(escalationTargets && escalationTargets.length > 0);
@@ -353,15 +365,21 @@ export const ApprovalCard = forwardRef<HTMLDivElement, ApprovalCardProps>(functi
 
   const submit = useCallback(
     async (action: PrimaryAction, response: HumanResponse) => {
-      if (locked || busy) return;
-      const result = onRespond(response);
-      if (result instanceof Promise) {
-        setPending(action);
-        try {
+      if (locked || busy || inFlight.current) return;
+      inFlight.current = true;
+      try {
+        const result = onRespond(response);
+        if (result instanceof Promise) {
+          setPending(action);
           await result;
-        } finally {
-          setPending(null);
         }
+        // an escalation hands the task on: it stays open here
+        if (action !== "escalate") setSent(true);
+      } catch {
+        // the caller reports the failure; the card stays open for another try
+      } finally {
+        inFlight.current = false;
+        setPending(null);
       }
     },
     [locked, busy, onRespond],
@@ -401,7 +419,11 @@ export const ApprovalCard = forwardRef<HTMLDivElement, ApprovalCardProps>(functi
     return () => document.removeEventListener("keydown", onKey);
   }, [hotkeys, locked, busy, escalateOpen, primaryResponse, approve, reject, canEscalate]);
 
-  const outcome = responded ? approvalOutcomeFor(responded.response) : null;
+  const outcome = responded
+    ? approvalOutcomeFor(responded.response)
+    : closed
+      ? closed.status
+      : null;
   const escalatedTo = responded?.response.action === "escalate" ? responded.response.to : undefined;
   const respondedComment =
     responded && "comment" in responded.response ? responded.response.comment : undefined;
@@ -413,7 +435,8 @@ export const ApprovalCard = forwardRef<HTMLDivElement, ApprovalCardProps>(functi
       ref={ref}
       data-mode={mode.type}
       data-origin={task.origin}
-      data-responded={locked || undefined}
+      data-responded={responded ? true : undefined}
+      data-closed={closed ? closed.status : undefined}
       aria-busy={busy || undefined}
       className={cn(
         "flex min-w-0 flex-col rounded-md border border-border bg-surface text-ink shadow-1",
@@ -512,7 +535,17 @@ export const ApprovalCard = forwardRef<HTMLDivElement, ApprovalCardProps>(functi
         ) : null}
 
         {/* Response control */}
-        {locked ? (
+        {closed && !responded ? (
+          <section className="flex flex-col gap-2">
+            <SectionLabel>Response</SectionLabel>
+            <p className="m-0 text-sm text-ink-2">
+              {closed.note ??
+                (closed.status === "expired"
+                  ? "Nobody answered before this task expired."
+                  : "Nobody answered before the run ended, so this task closed.")}
+            </p>
+          </section>
+        ) : locked ? (
           <section className="flex flex-col gap-2">
             <SectionLabel>Response</SectionLabel>
             {responded?.response.action === "approve" && responded.response.value !== undefined ? (
@@ -633,8 +666,14 @@ export const ApprovalCard = forwardRef<HTMLDivElement, ApprovalCardProps>(functi
             by <span className="font-medium text-ink">{responded.by ?? "unknown reviewer"}</span>
           </span>
           <Hint hint={formatAbsolute(responded.at)} className="text-ink-3">
-            {formatRelativeShort(responded.at, now)}
+            {formatRelativeShort(responded.at, Math.max(now, toEpochMs(responded.at)))}
           </Hint>
+        </footer>
+      ) : closed && outcome ? (
+        <footer className="flex flex-wrap items-center gap-2 rounded-b-md border-t border-border bg-surface-2 px-4 py-2.5 text-xs text-ink-2">
+          <Lock className="size-3.5 text-ink-3" strokeWidth={1.75} aria-hidden="true" />
+          <ApprovalOutcomeBadge outcome={outcome} size="sm" noIcon />
+          <span>No answer is needed now.</span>
         </footer>
       ) : (
         <footer className="flex flex-wrap items-center gap-2 rounded-b-md border-t border-border bg-surface-2 px-4 py-2.5">

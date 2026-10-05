@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { act, cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { installDomStubs } from "@/primitives/testStubs";
 import { HumanResponseSchema } from "@flowaid/workflow-core";
@@ -125,12 +125,15 @@ describe("ApprovalCard", () => {
 
   it("approval mode emits approve / reject with the trimmed comment", async () => {
     const user = userEvent.setup();
-    const { onRespond } = setup();
-    await user.type(screen.getByRole("textbox", { name: /Comment/ }), "  Looks right  ");
-    await user.click(screen.getByRole("button", { name: /Approve/ }));
-    expect(lastResponse(onRespond)).toEqual({ action: "approve", comment: "Looks right" });
-    await user.click(screen.getByRole("button", { name: /Reject/ }));
-    expect(lastResponse(onRespond)).toEqual({ action: "reject", comment: "Looks right" });
+    for (const action of ["approve", "reject"] as const) {
+      cleanup();
+      const { onRespond } = setup();
+      await user.type(screen.getByRole("textbox", { name: /Comment/ }), "  Looks right  ");
+      await user.click(
+        screen.getByRole("button", { name: action === "approve" ? /Approve/ : /Reject/ }),
+      );
+      expect(lastResponse(onRespond)).toEqual({ action, comment: "Looks right" });
+    }
   });
 
   it("omits an empty comment", async () => {
@@ -142,9 +145,11 @@ describe("ApprovalCard", () => {
 
   it("review mode emits the edited value and relabels the primary action when edited", async () => {
     const user = userEvent.setup();
-    const { onRespond } = setup(EDIT_OUTPUT_REQUEST, { hotkeys: false });
+    const unedited = setup(EDIT_OUTPUT_REQUEST, { hotkeys: false });
     await user.click(screen.getByRole("button", { name: /Approve/ }));
-    expect(lastResponse(onRespond)).toEqual({ action: "approve" });
+    expect(lastResponse(unedited.onRespond)).toEqual({ action: "approve" });
+    cleanup();
+    const { onRespond } = setup(EDIT_OUTPUT_REQUEST, { hotkeys: false });
     await user.click(screen.getByRole("button", { name: "Edit" }));
     const box = screen.getByRole("textbox", { name: "Proposed by the model" });
     await user.clear(box);
@@ -186,17 +191,101 @@ describe("ApprovalCard", () => {
 
   it("keyboard shortcuts approve, reject and open escalation outside text fields", async () => {
     const user = userEvent.setup();
-    const { onRespond } = setup();
-    await user.keyboard("a");
-    expect(lastResponse(onRespond)).toEqual({ action: "approve" });
-    await user.keyboard("r");
-    expect(lastResponse(onRespond)).toEqual({ action: "reject" });
+    const first = setup();
     screen.getByRole("textbox", { name: /Comment/ }).focus();
     await user.keyboard("a");
-    expect(onRespond).toHaveBeenCalledTimes(2);
+    expect(first.onRespond).not.toHaveBeenCalled();
     (document.activeElement as HTMLElement | null)?.blur();
     await user.keyboard("e");
     expect(await screen.findByRole("dialog", { name: "Escalate review" })).toBeInTheDocument();
+    cleanup();
+    const approve = setup();
+    await user.keyboard("a");
+    expect(lastResponse(approve.onRespond)).toEqual({ action: "approve" });
+    cleanup();
+    const reject = setup();
+    await user.keyboard("r");
+    expect(lastResponse(reject.onRespond)).toEqual({ action: "reject" });
+  });
+
+  it("sends one answer: a double click or a second A after it is accepted sends nothing", async () => {
+    const user = userEvent.setup();
+    let accept: () => void = () => undefined;
+    const onRespond = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          accept = resolve;
+        }),
+    );
+    render(
+      <ApprovalCard request={APPROVE_REJECT_REQUEST} onRespond={onRespond} now={FIXTURE_NOW} />,
+    );
+    const approve = screen.getByRole("button", { name: /Approve/ });
+    await user.dblClick(approve);
+    expect(onRespond).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      accept();
+      await Promise.resolve();
+    });
+    // accepted, but the task has not come back as answered yet: still one answer
+    expect(screen.getByRole("button", { name: /Approve/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Reject/ })).toBeDisabled();
+    await user.keyboard("a");
+    await user.keyboard("r");
+    expect(onRespond).toHaveBeenCalledTimes(1);
+  });
+
+  it("stays open for another try when an answer fails, without an unhandled rejection", async () => {
+    const user = userEvent.setup();
+    const onRespond = vi.fn(() => Promise.reject(new Error("offline")));
+    render(
+      <ApprovalCard request={APPROVE_REJECT_REQUEST} onRespond={onRespond} now={FIXTURE_NOW} />,
+    );
+    await user.click(screen.getByRole("button", { name: /Reject/ }));
+    expect(screen.getByRole("button", { name: /Reject/ })).toBeEnabled();
+    await user.click(screen.getByRole("button", { name: /Reject/ }));
+    expect(onRespond).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps the card open after an escalation hands the task on", async () => {
+    const user = userEvent.setup();
+    const { onRespond } = setup(undefined, { hotkeys: false });
+    await user.click(screen.getByRole("button", { name: /Escalate/ }));
+    const dialog = await screen.findByRole("dialog", { name: "Escalate review" });
+    await user.click(within(dialog).getByRole("combobox"));
+    await user.click(await screen.findByRole("option", { name: /Billing team/ }));
+    await user.click(within(dialog).getByRole("button", { name: "Escalate" }));
+    expect(onRespond).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: /Approve/ })).toBeEnabled();
+  });
+
+  it("shows a closed task read-only: its status, no answer controls and no countdown", async () => {
+    const user = userEvent.setup();
+    const { onRespond, rerender } = setup(undefined, {
+      closed: {
+        status: "expired",
+        note: "Nobody answered in time; the workflow took its expiry path.",
+      },
+    });
+    for (const name of [/Approve/, /Reject/, /Escalate/])
+      expect(screen.queryByRole("button", { name })).toBeNull();
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(screen.queryByRole("timer")).toBeNull();
+    expect(screen.getAllByText("Expired").length).toBeGreaterThan(0);
+    expect(screen.getByText(/took its expiry path/)).toBeInTheDocument();
+    await user.keyboard("a");
+    await user.keyboard("r");
+    expect(onRespond).not.toHaveBeenCalled();
+    rerender(
+      <ApprovalCard
+        request={APPROVE_REJECT_REQUEST}
+        onRespond={onRespond}
+        now={FIXTURE_NOW}
+        closed={{ status: "cancelled" }}
+      />,
+    );
+    expect(screen.getAllByText("Cancelled").length).toBeGreaterThan(0);
+    expect(screen.getByText(/before the run ended/)).toBeInTheDocument();
   });
 
   it("escalation flows through the dialog to onRespond as a list of targets", async () => {

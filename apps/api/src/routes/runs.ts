@@ -1038,7 +1038,14 @@ export function runRoutes(app: FastifyInstance, ctx: ApiContext): void {
       schema: {
         tags: ["human-tasks"],
         querystring: ListQuery.extend({
-          status: z.enum(["open", "responded", "expired", "cancelled"]).optional(),
+          /** one status, or several: `responded,expired,cancelled` (every closed task) */
+          status: z
+            .string()
+            .regex(
+              /^(open|responded|expired|cancelled)(,(open|responded|expired|cancelled))*$/,
+              "open, responded, expired or cancelled (comma-separated)",
+            )
+            .optional(),
           workflowId: z.uuid().optional(),
           assignedToMe: queryBool(),
         }),
@@ -1066,7 +1073,12 @@ export function runRoutes(app: FastifyInstance, ctx: ApiContext): void {
           .where(
             and(
               eq(humanTasks.workspaceId, p.workspaceId),
-              req.query.status ? eq(humanTasks.status, req.query.status) : undefined,
+              req.query.status
+                ? inArray(
+                    humanTasks.status,
+                    req.query.status.split(",") as (typeof humanTasks.$inferSelect)["status"][],
+                  )
+                : undefined,
               req.query.workflowId ? eq(humanTasks.workflowId, req.query.workflowId) : undefined,
               p.workflowIds
                 ? p.workflowIds.size

@@ -2211,7 +2211,7 @@ export interface paths {
           cursor?: string;
           limit?: number;
           order?: "asc" | "desc";
-          status?: "open" | "responded" | "expired" | "cancelled";
+          status?: string;
           workflowId?: string;
         };
         header?: never;

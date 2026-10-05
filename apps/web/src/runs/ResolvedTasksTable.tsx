@@ -1,8 +1,11 @@
 "use client";
-/** Answered human tasks: what was asked, the outcome, who answered and when. */
+/**
+ * Closed human tasks: what was asked, the outcome (answered, expired, or cancelled with its run),
+ * who answered and when it closed.
+ */
 import type { ReactNode } from "react";
 import { DataTable, RelativeTime, createDataTableColumns } from "@flowaid/ui/data";
-import { ApprovalOutcomeBadge, approvalOutcomeFor } from "@flowaid/ui/human";
+import { ApprovalOutcomeBadge, approvalOutcomeFor, type ApprovalOutcome } from "@flowaid/ui/human";
 import type { HumanTask, Member } from "~/api/types";
 import { humanizeId, respondedRecord } from "./humanTasks";
 
@@ -10,6 +13,21 @@ interface Row {
   task: HumanTask;
   workflowName: string;
   by: string;
+}
+
+/** A closed task's outcome: its answer, or that nobody answered. */
+export function taskOutcome(task: HumanTask): ApprovalOutcome | null {
+  if (task.response) return approvalOutcomeFor(task.response);
+  if (task.status === "expired") return "expired";
+  if (task.status === "cancelled") return "cancelled";
+  return null;
+}
+
+/** When a closed task closed: answered, expired, or (cancelled) when it was asked. */
+export function taskClosedAt(task: HumanTask): string {
+  if (task.respondedAt) return task.respondedAt;
+  if (task.status === "expired" && task.expiresAt) return task.expiresAt;
+  return task.createdAt;
 }
 
 const helper = createDataTableColumns<Row>();
@@ -30,13 +48,13 @@ const columns = helper.columns([
   helper.display({
     id: "outcome",
     header: "Outcome",
-    cell: (c) =>
-      c.row.original.task.response ? (
-        <ApprovalOutcomeBadge outcome={approvalOutcomeFor(c.row.original.task.response)} />
-      ) : null,
+    cell: (c) => {
+      const outcome = taskOutcome(c.row.original.task);
+      return outcome ? <ApprovalOutcomeBadge outcome={outcome} /> : null;
+    },
   }),
   helper.accessor("by", { header: "Answered by" }),
-  helper.accessor((r) => r.task.respondedAt ?? r.task.createdAt, {
+  helper.accessor((r) => taskClosedAt(r.task), {
     id: "at",
     header: "When",
     cell: (c) => <RelativeTime date={c.getValue()} />,
@@ -61,7 +79,7 @@ export function ResolvedTasksTable({
   const rows: Row[] = tasks.map((task) => ({
     task,
     workflowName: workflowNames.get(task.workflowId) ?? "Workflow",
-    by: respondedRecord(task, members)?.by ?? "—",
+    by: respondedRecord(task, members)?.by ?? (task.response ? "—" : "Nobody"),
   }));
   return (
     <DataTable
