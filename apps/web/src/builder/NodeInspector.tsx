@@ -42,6 +42,7 @@ import type { Projection } from "./model";
 import { useModelViews } from "./models";
 import { CredentialSlots } from "./CredentialSlots";
 import { PolicyEditor } from "./PolicyEditor";
+import { savedStepConfig } from "./stepConfig";
 import { createLoadOptions } from "./optionProviders";
 
 // agent presets, MCP servers/tools/prompts and OpenAPI toolsets/operations for picker fields
@@ -178,7 +179,9 @@ export function NodeInspector({
             variables={variables}
             inContainer={inContainer}
             disabled={readOnly}
-            onChange={(values) => s.setNodeConfig(node.id, values)}
+            onChange={(values) =>
+              s.setNodeConfig(node.id, savedStepConfig(manifest.configSchema, values))
+            }
             aria-label={`${node.name} configuration`}
           />
           {view && view.inputs.length > 0 ? (

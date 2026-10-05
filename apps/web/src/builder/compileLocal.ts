@@ -41,7 +41,10 @@ export function compileLocal(req: CompileRequest): CompileResult {
     const k = toolKey(t.source);
     if (k) tools.set(k, t);
   }
-  return compile(req.definition, {
+  // the definition as the server will see it: JSON drops `undefined` (a cleared optional field),
+  // which the compiler would otherwise flag here and nowhere else
+  const definition: unknown = JSON.parse(JSON.stringify(req.definition ?? null));
+  return compile(definition, {
     catalog: { get: (id, version) => catalog.get(id, version), list: () => [...req.manifests] },
     resolveTool: (source) => {
       const k = toolKey(source);

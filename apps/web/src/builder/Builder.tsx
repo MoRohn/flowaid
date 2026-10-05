@@ -78,6 +78,7 @@ import {
 } from "./quickAdd";
 import { useCompiler } from "./useCompiler";
 import { useDraftSave } from "./useDraftSave";
+import { newStepConfig } from "./stepConfig";
 import { useLiveRun } from "./useLiveRun";
 import { describeInputIssue, describeRunError, type RunStartError } from "./errors";
 import { diagnosticNodeId, presentDiagnostic } from "./diagnostics";
@@ -491,13 +492,7 @@ function BuilderView({
       const preset = presetId ? activeAgents.data?.find((a) => a.id === presetId) : undefined;
       const node = preset
         ? agentStepFor(d, preset, catalog, after?.parent)
-        : newNode(
-            d,
-            def.kind,
-            catalog,
-            (schema) => withDefaults(schema as never, {}),
-            after?.parent,
-          );
+        : newNode(d, def.kind, catalog, newStepConfig, after?.parent);
       if (!node) return;
       const port = after
         ? freeControlPort(d, after, defaultControlOuts(after, catalog))
