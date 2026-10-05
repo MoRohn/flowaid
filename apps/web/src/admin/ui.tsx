@@ -236,7 +236,10 @@ export function Notice({
   );
 }
 
-/** Shown once after a key or token is minted: the only time its value is visible. */
+/**
+ * Shown once after a key or token is minted: the only time its value is visible. Only its own
+ * button closes it: a stray click outside or Escape would lose a value that cannot be shown again.
+ */
 export function OneTimeSecretDialog({
   secret,
   title,
@@ -252,7 +255,12 @@ export function OneTimeSecretDialog({
 }) {
   return (
     <Dialog open={secret !== null} onOpenChange={(o) => (o ? undefined : onClose())}>
-      <DialogContent size="md">
+      <DialogContent
+        size="md"
+        hideClose
+        onInteractOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
