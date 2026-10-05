@@ -6,6 +6,7 @@ import {
   draftOf,
   emptyDraft,
   hasAdvanced,
+  missingTools,
   modelLabel,
   modelProviders,
   reviewNotes,
@@ -134,6 +135,25 @@ describe("agent review notes", () => {
     expect(unguarded.map((n) => n.id)).toEqual(["unguarded"]);
     const bare = reviewNotes({ ...base, system: "" }, { providerReady: ready, changes: new Map() });
     expect(bare.map((n) => n.id)).toEqual(["no-tools", "no-instructions"]);
+  });
+
+  it("blocks saving while the agent lists a tool the catalog no longer has", () => {
+    const d = {
+      ...base,
+      tools: [
+        { name: "lookup_order", approval: "never" as const },
+        { name: "calculator", approval: "never" as const },
+      ],
+    };
+    // the catalog not loaded yet: nothing to say
+    expect(missingTools(d.tools, undefined)).toEqual([]);
+    const notes = reviewNotes(d, {
+      providerReady: ready,
+      changes: new Map(),
+      available: new Set(["calculator"]),
+    });
+    expect(notes[0]).toMatchObject({ id: "missing-tools", state: "blocker" });
+    expect(notes[0]?.message).toMatch(/^lookup_order is no longer available/);
   });
 
   it("treats non-idempotent or approval-marked tools as changing data", () => {

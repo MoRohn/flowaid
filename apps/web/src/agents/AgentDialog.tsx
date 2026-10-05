@@ -45,6 +45,7 @@ import {
   draftOf,
   emptyDraft,
   hasAdvanced,
+  missingTools,
   modelLabel,
   reviewNotes,
   type AgentDraft,
@@ -130,7 +131,18 @@ export function AgentDialog({
     () => new Map(available.map((t) => [t.name, changesData(t)])),
     [available],
   );
-  const notes = reviewNotes(draft, { providerReady: connections.ready, changes });
+  // every tool name the workspace offers; undefined until the catalog has loaded
+  const known = useMemo(
+    () => (catalog.data ? new Set(catalog.data.map((t) => t.name)) : undefined),
+    [catalog.data],
+  );
+  const missing = missingTools(draft.tools, known);
+  const notes = reviewNotes(draft, {
+    providerReady: connections.ready,
+    changes,
+    available: known,
+  });
+  const blocked = notes.some((n) => n.state === "blocker");
   const bounds = boundsOf(check.body?.config ?? {});
   const advanced = hasAdvanced(draft);
   // open when the agent already sets one of them, so nothing it carries is out of sight
@@ -139,7 +151,7 @@ export function AgentDialog({
   const advancedSummary = advancedLabel(check.body?.config ?? {});
   const submit = () => {
     setShown(true);
-    if (check.ok && check.body) save.mutate(check.body);
+    if (check.ok && check.body && !blocked) save.mutate(check.body);
   };
 
   const reviewChecks: Check[] = [
@@ -262,7 +274,7 @@ export function AgentDialog({
       id: "tools",
       title: "Give it tools",
       why: "Tools are what the agent may call to look things up or act. Pick only what the job needs. For each tool choose when a person must approve the call: approval pauses the run as a human task until someone answers.",
-      done: draft.tools.length > 0,
+      done: draft.tools.length > 0 && missing.length === 0,
       optional: true,
       example: (
         <>
@@ -292,6 +304,13 @@ export function AgentDialog({
             </p>
           ) : (
             <>
+              {missing.length ? (
+                <MissingTools
+                  names={missing}
+                  onRemove={(name) => toggleTool(name, false)}
+                  approvalOf={(name) => draft.tools.find((t) => t.name === name)?.approval}
+                />
+              ) : null}
               <ToolGroup
                 title="Built into FlowAId"
                 hint="Ready in every workspace, nothing to connect. Each only reads: none changes data."
@@ -478,7 +497,10 @@ export function AgentDialog({
             <dd className="m-0 text-ink">
               {draft.tools.length
                 ? draft.tools
-                    .map((t) => `${t.name} (${APPROVAL_LABEL[t.approval].toLowerCase()})`)
+                    .map(
+                      (t) =>
+                        `${t.name} (${missing.includes(t.name) ? "no longer available" : APPROVAL_LABEL[t.approval].toLowerCase()})`,
+                    )
                     .join(", ")
                 : "None"}
             </dd>
@@ -594,6 +616,11 @@ export function AgentDialog({
             </>
           ) : (
             <>
+              {shown && check.ok && blocked ? (
+                <p role="alert" className="m-0 mr-auto self-center text-sm text-danger-text">
+                  Not saved: remove the tools that are no longer available first.
+                </p>
+              ) : null}
               <Button variant="ghost" onClick={() => requestClose(false)}>
                 {editing ? "Cancel" : "Close"}
               </Button>
@@ -627,6 +654,59 @@ const BUILTIN_NOTE: Record<string, string> = {
   web_fetch:
     "Reaches the public internet. A page can contain instructions meant for the agent, and an address can carry data out: choose Always ask for agents that handle private data.",
 };
+
+/**
+ * Tools the agent lists that the workspace no longer offers. They stay checked (they are still
+ * saved on the agent) until unchecked, which removes them.
+ */
+function MissingTools({
+  names,
+  onRemove,
+  approvalOf,
+}: {
+  names: readonly string[];
+  onRemove: (name: string) => void;
+  approvalOf: (name: string) => ApprovalMode | undefined;
+}) {
+  const headingId = useId();
+  return (
+    <section aria-labelledby={headingId} className="flex flex-col gap-1.5">
+      <div>
+        <h4 id={headingId} className="m-0 text-xs font-semibold text-danger-text">
+          No longer available
+        </h4>
+        <p className="m-0 text-2xs text-ink-3">
+          The agent still lists these, but no connected server, import or workflow offers them any
+          more, so every run of the agent fails. Uncheck one to remove it.
+        </p>
+      </div>
+      <ul className="m-0 flex list-none flex-col divide-y divide-border rounded-sm border border-danger/40 p-0">
+        {names.map((name) => {
+          const approval = approvalOf(name);
+          return (
+            <li key={name} className="flex items-start gap-3 px-3 py-2">
+              <Checkbox
+                id={`missing-tool-${name}`}
+                className="mt-0.5"
+                checked
+                onCheckedChange={(v) => {
+                  if (v !== true) onRemove(name);
+                }}
+              />
+              <label htmlFor={`missing-tool-${name}`} className="min-w-0 flex-1">
+                <span className="block font-mono text-sm text-ink">{name}</span>
+                <span className="block text-xs text-danger-text">
+                  Not in this workspace's tool list
+                  {approval ? ` · was set to ${APPROVAL_LABEL[approval].toLowerCase()}` : ""}
+                </span>
+              </label>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
 
 function ToolGroup({
   title,

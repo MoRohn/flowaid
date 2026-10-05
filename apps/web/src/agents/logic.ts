@@ -256,9 +256,28 @@ export interface AgentReviewNote {
 }
 
 /**
- * What to know before saving, beyond the form's own errors: providers without a key (the agent
- * fails when it runs), tools that change data but never ask, and an agent with no tools or no
- * instructions (valid, but probably not what was meant).
+ * The agent's tools that the workspace's tool catalog no longer lists (an MCP server removed or
+ * switched off, a tool renamed): the Agent step refuses to run while the agent names one.
+ * `available` undefined (the catalog not loaded yet) reports none.
+ */
+export function missingTools(
+  tools: readonly { name: string }[],
+  available: ReadonlySet<string> | undefined,
+): string[] {
+  return available ? tools.map((t) => t.name).filter((n) => !available.has(n)) : [];
+}
+
+/** "lookup_order is" / "lookup_order and refund are" */
+const nameList = (names: readonly string[]) =>
+  names.length === 1
+    ? `${names[0]} is`
+    : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]} are`;
+
+/**
+ * What to know before saving, beyond the form's own errors: tools that are no longer available
+ * (a blocker: every run fails), providers without a key (the agent fails when it runs), tools that
+ * change data but never ask, and an agent with no tools or no instructions (valid, but probably
+ * not what was meant).
  */
 export function reviewNotes(
   d: AgentDraft,
@@ -266,9 +285,18 @@ export function reviewNotes(
     providerReady: (provider: string) => boolean;
     /** tool name → whether it changes data */
     changes: ReadonlyMap<string, boolean>;
+    /** every tool name in the catalog; undefined while it loads */
+    available?: ReadonlySet<string>;
   },
 ): AgentReviewNote[] {
   const notes: AgentReviewNote[] = [];
+  const gone = missingTools(d.tools, ctx.available);
+  if (gone.length)
+    notes.push({
+      id: "missing-tools",
+      state: "blocker",
+      message: `${nameList(gone)} no longer available in this workspace, so every run of the agent would fail. Remove ${gone.length === 1 ? "it" : "them"} under Tools, or reconnect the server or import ${gone.length === 1 ? "it" : "they"} came from.`,
+    });
   const missing = modelProviders(d.model).filter((p) => !ctx.providerReady(p));
   if (missing.length)
     notes.push({
