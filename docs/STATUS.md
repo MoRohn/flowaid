@@ -34,7 +34,7 @@ with the deferred remainder listed there. Highlights:
   JavaScript on 21 routes (code editors load on demand); the Runs page makes 10 requests instead
   of 15.
 
-Gates on the branch: `pnpm check` green (6,255 tests without PostgreSQL), every PostgreSQL suite
+Gates on the branch: `pnpm check` green (6,256 tests without PostgreSQL), every PostgreSQL suite
 green (database 70, runtime 92, nodes-core 228, api 240, worker 101), the acceptance suite green
 against the production builds with replayed providers. `@flowaid/workflow-core` gains a diagnostic
 (`W_HUMAN_EXPIRY_EXCEEDS_RUN_TIMEOUT`, RFC-0023), so the next release is a minor one.
