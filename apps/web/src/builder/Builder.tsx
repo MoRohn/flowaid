@@ -11,7 +11,15 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useStore } from "zustand";
 import { useReactFlow, type Connection, type EdgeChange, type NodeChange } from "@xyflow/react";
-import { CircleDollarSign, Copy, Download, ListChecks, Rocket, Trash2 } from "lucide-react";
+import {
+  CircleDollarSign,
+  Copy,
+  Download,
+  FolderDown,
+  ListChecks,
+  Rocket,
+  Trash2,
+} from "lucide-react";
 import type {
   CompileResult,
   NodeManifest,
@@ -20,7 +28,7 @@ import type {
   WorkflowDefinition,
 } from "@flowaid/workflow-core";
 import type { RunView } from "@flowaid/ui";
-import type { Diagnostic } from "@flowaid/workflow-core";
+import { DiagnosticSchema, type Diagnostic } from "@flowaid/workflow-core";
 import {
   FlowCanvas,
   autoLayout,
@@ -93,6 +101,7 @@ import { agentPaletteDescription, agentPresetKind, agentStepFor, presetIdOf } fr
 import { activeAgentsKey } from "~/agents/AgentActiveSwitch";
 import type { AgentPreset } from "~/agents/logic";
 import { PublishDialog } from "./PublishDialog";
+import { CodeExportDialog } from "~/workflows/CodeExport";
 import { RunTab, missingRequired } from "./RunTab";
 import { CostTab, ReviewTab, advisorAvailability, costDiagnostics, useAdvisor } from "./advisor";
 
@@ -588,6 +597,7 @@ function BuilderView({
 
   // --- panels ---
   const [publishOpen, setPublishOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const selectedId = selection.nodes.length === 1 ? selection.nodes[0] : undefined;
   // what to suggest in the palette: after the selected step, else after the last step
@@ -899,6 +909,7 @@ function BuilderView({
       running={starting || live?.status === "running" || live?.status === "queued"}
       {...(s.can("workflows:publish") ? { onPublish: () => setPublishOpen(true) } : {})}
       onExportJson={exportJson}
+      onDownloadCode={() => setExportOpen(true)}
       {...(s.can("workflows:write")
         ? {
             onDuplicate: () =>
@@ -926,6 +937,12 @@ function BuilderView({
           label: "Export definition (JSON)",
           icon: <Download strokeWidth={1.75} />,
           onSelect: exportJson,
+        },
+        {
+          id: "download-code",
+          label: "Download code",
+          icon: <FolderDown strokeWidth={1.75} />,
+          onSelect: () => setExportOpen(true),
         },
         ...(advisorOn
           ? [
@@ -1010,6 +1027,21 @@ function BuilderView({
         </div>
       </div>
 
+      <CodeExportDialog
+        open={exportOpen}
+        onOpenChange={setExportOpen}
+        workflow={{ id: workflow.id, name: title, slug: workflow.slug }}
+        defaultTarget="draft"
+        draft={{
+          saveDraft: saveNow,
+          describe: (d) => {
+            const parsed = DiagnosticSchema.safeParse(d);
+            if (!parsed.success) return d.message;
+            const shown = presentDiagnostic(parsed.data, definition);
+            return `${shown.where ? `${shown.where}: ` : ""}${shown.message}`;
+          },
+        }}
+      />
       <PublishDialog
         open={publishOpen}
         onOpenChange={setPublishOpen}

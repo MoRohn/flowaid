@@ -2,7 +2,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { use, useMemo, useState } from "react";
-import { Download, GitCompare, History, Rocket, Undo2 } from "lucide-react";
+import { Download, FolderDown, GitCompare, History, Rocket, Undo2 } from "lucide-react";
 import {
   Badge,
   Button,
@@ -25,6 +25,7 @@ import { WORKFLOW_VERSIONS } from "~/guide/capabilities/workflow";
 import { PageIntro } from "~/guide/PageIntro";
 import { publishedCheck } from "~/workflows/readiness";
 import { useSession } from "~/session";
+import { CodeExportDialog } from "~/workflows/CodeExport";
 import { errorMessage } from "~/shell/states";
 
 export default function VersionsPage({ params }: { params: Promise<{ id: string }> }) {
@@ -55,7 +56,9 @@ export default function VersionsPage({ params }: { params: Promise<{ id: string 
       onSuccess: restore.close,
     },
   );
-  const exportAs = (v: VersionSummary, format: "json" | "yaml") =>
+  // the version whose code package is being downloaded (Download code dialog)
+  const [packaging, setPackaging] = useState<string | null>(null);
+  const exportAs = (v: VersionSummary, format: "json" | "yaml" | "ts") =>
     downloadFrom(
       `/v1/workflow-versions/${v.id}/export?format=${format}`,
       `workflow-v${v.version}.${format}`,
@@ -89,7 +92,7 @@ export default function VersionsPage({ params }: { params: Promise<{ id: string 
 
   return (
     <WorkflowFrame id={id} tab="versions" actions={compareButton}>
-      {() => (
+      {(w) => (
         <>
           <PageIntro
             guide={WORKFLOW_VERSIONS}
@@ -171,11 +174,20 @@ export default function VersionsPage({ params }: { params: Promise<{ id: string 
                             </IconButton>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              icon={<FolderDown strokeWidth={1.75} />}
+                              onSelect={() => setPackaging(v.id)}
+                            >
+                              Download code…
+                            </DropdownMenuItem>
                             <DropdownMenuItem onSelect={() => void exportAs(v, "json")}>
                               Download JSON
                             </DropdownMenuItem>
                             <DropdownMenuItem onSelect={() => void exportAs(v, "yaml")}>
                               Download YAML
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => void exportAs(v, "ts")}>
+                              Download TypeScript (.ts)
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -196,6 +208,12 @@ export default function VersionsPage({ params }: { params: Promise<{ id: string 
               );
             }}
           </QueryView>
+          <CodeExportDialog
+            open={packaging !== null}
+            onOpenChange={(o) => (o ? undefined : setPackaging(null))}
+            workflow={{ id: w.id, name: w.name, slug: w.slug }}
+            {...(packaging ? { defaultTarget: packaging } : {})}
+          />
           <ConfirmDialog
             open={restore.target !== null}
             onOpenChange={(o) => (o ? undefined : restore.close())}

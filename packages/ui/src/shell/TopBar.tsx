@@ -3,6 +3,7 @@ import {
   Copy,
   Ellipsis,
   FileCode,
+  FolderDown,
   Menu,
   PanelBottom,
   PanelRight,
@@ -65,6 +66,8 @@ export interface TopBarProps extends Omit<HTMLAttributes<HTMLElement>, "title"> 
   publishDisabled?: boolean;
   onDuplicate?: () => void;
   onExportJson?: () => void;
+  /** "Download code": the workflow as a runnable package (CODE_EXPORT.md §4). */
+  onDownloadCode?: () => void;
   onImport?: () => void;
   onDelete?: () => void;
   /** Rendered before the breadcrumbs (a menu button in compact layouts). */
@@ -114,6 +117,7 @@ export const TopBar = forwardRef<HTMLElement, TopBarProps>(function TopBar(
     publishDisabled = false,
     onDuplicate,
     onExportJson,
+    onDownloadCode,
     onImport,
     onDelete,
     leading,
@@ -140,7 +144,8 @@ export const TopBar = forwardRef<HTMLElement, TopBarProps>(function TopBar(
     density !== "full";
   const [pendingProduction, setPendingProduction] = useState<string | null>(null);
   const pendingEnv = environments?.find((e) => e.id === pendingProduction);
-  const hasOverflow = onDuplicate || onExportJson || onImport || onDelete || envInMenu;
+  const hasOverflow =
+    onDuplicate || onExportJson || onDownloadCode || onImport || onDelete || envInMenu;
   const setRef = (node: HTMLElement | null) => {
     innerRef.current = node;
     if (typeof ref === "function") ref(node);
@@ -291,7 +296,7 @@ export const TopBar = forwardRef<HTMLElement, TopBarProps>(function TopBar(
                         </DropdownMenuRadioItem>
                       ))}
                     </DropdownMenuRadioGroup>
-                    {onDuplicate || onExportJson || onImport || onDelete ? (
+                    {onDuplicate || onExportJson || onDownloadCode || onImport || onDelete ? (
                       <DropdownMenuSeparator />
                     ) : null}
                   </>
@@ -308,6 +313,14 @@ export const TopBar = forwardRef<HTMLElement, TopBarProps>(function TopBar(
                 {onExportJson ? (
                   <DropdownMenuItem icon={<FileCode strokeWidth={1.75} />} onSelect={onExportJson}>
                     Export JSON
+                  </DropdownMenuItem>
+                ) : null}
+                {onDownloadCode ? (
+                  <DropdownMenuItem
+                    icon={<FolderDown strokeWidth={1.75} />}
+                    onSelect={onDownloadCode}
+                  >
+                    Download code
                   </DropdownMenuItem>
                 ) : null}
                 {onImport ? (
