@@ -1,10 +1,10 @@
 /** Run queries for the API: idempotency, listing with cursor pagination, human task inbox, audit. */
-import { and, desc, eq, inArray, lt, or, type SQL } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, inArray, lt, lte, or, sql, type SQL } from "drizzle-orm";
 import { uuidv7 } from "@flowaid/shared";
 import type { HumanTask, JsonObject, Run } from "@flowaid/workflow-core";
 import type { Tx } from "../db.js";
 import { toHumanTask, toRun } from "../mappers.js";
-import { auditEvents, humanTasks, runs } from "../schema.js";
+import { auditEvents, humanTasks, runs, workflows } from "../schema.js";
 
 /** A run started with the same idempotency key in the workspace (24 h window; the sweep nulls older keys). */
 export async function findRunByIdempotencyKey(
@@ -26,9 +26,36 @@ export interface RunListFilter {
   status?: Run["status"][];
   origin?: Run["origin"];
   sessionId?: string;
+  /**
+   * Search, case-insensitive: the start of the run id ("01a10cfc-be8a"), part of the workflow's
+   * name, or part of the error message.
+   */
+  q?: string;
+  /** Created at or after. */
+  from?: Date;
+  /** Created at or before. */
+  to?: Date;
   /** Opaque cursor from the previous page. */
   cursor?: string | null;
   limit?: number;
+}
+
+/** `text` for a LIKE pattern, with its wildcards taken literally. */
+const likeText = (text: string) => text.replace(/[\\%_]/g, "\\$&");
+
+function searchCondition(workspaceId: string, q: string): SQL | undefined {
+  const contains = `%${likeText(q)}%`;
+  return or(
+    sql`${runs.id}::text like ${`${likeText(q.toLowerCase())}%`}`,
+    inArray(
+      runs.workflowId,
+      sql`(select ${workflows.id} from ${workflows} where ${and(
+        eq(workflows.workspaceId, workspaceId),
+        ilike(workflows.name, contains),
+      )})`,
+    ),
+    sql`${runs.error}->>'message' ilike ${contains}`,
+  );
 }
 
 const encodeCursor = (createdAt: Date, id: string) =>
@@ -52,6 +79,9 @@ export async function listRuns(
     filter.status?.length ? inArray(runs.status, filter.status) : undefined,
     filter.origin ? eq(runs.origin, filter.origin) : undefined,
     filter.sessionId ? eq(runs.sessionId, filter.sessionId) : undefined,
+    filter.q?.trim() ? searchCondition(filter.workspaceId, filter.q.trim()) : undefined,
+    filter.from ? gte(runs.createdAt, filter.from) : undefined,
+    filter.to ? lte(runs.createdAt, filter.to) : undefined,
   ];
   const after = filter.cursor ? decodeCursor(filter.cursor) : null;
   if (after)

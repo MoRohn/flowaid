@@ -121,6 +121,38 @@ describeDb("runs, streams and human tasks (Postgres)", () => {
     expect(worker.jobs.some((j) => j.type === "run.resume" && j.runId === runId)).toBe(true);
   });
 
+  it("keeps an escalation's reason on the audit trail", async () => {
+    const res = await run({ input: { message: "human" }, mode: "sync", waitTimeoutMs: 20_000 });
+    const taskId = res.json().human_task.id as string;
+    const me = (await call(t.app, jar, "GET", "/v1/me")).json().user.id as string;
+    const escalated = await call(t.app, jar, "POST", `/v1/human-tasks/${taskId}/respond`, {
+      response: { action: "escalate", to: [me], comment: "Needs the finance lead" },
+    });
+    expect(escalated.statusCode).toBe(202);
+    const [row] = await t.db.admin`
+      select details from audit_events
+      where action = 'human_task.respond' and resource_id = ${taskId}`;
+    expect(row?.details).toMatchObject({
+      action: "escalate",
+      to: [me],
+      comment: "Needs the finance lead",
+    });
+  });
+
+  it("lists closed tasks of several statuses at once (the inbox's Resolved)", async () => {
+    const res = await run({ input: { message: "human" }, mode: "sync", waitTimeoutMs: 20_000 });
+    const expired = res.json().human_task.id as string;
+    await t.db.admin`update human_tasks set status = 'expired' where id = ${expired}`;
+    const list = (status: string) =>
+      call(t.app, jar, "GET", `/v1/human-tasks?status=${status}&limit=200`).then((r) =>
+        (r.json().items as { id: string; status: string }[]).map((x) => x.status),
+      );
+    const closed = await list("responded,expired,cancelled");
+    expect(new Set(closed)).toEqual(new Set(["responded", "expired"]));
+    expect(await list("expired")).toEqual(["expired"]);
+    expect((await call(t.app, jar, "GET", "/v1/human-tasks?status=done")).statusCode).toBe(400);
+  });
+
   it("sync: still running at the timeout answers 202 running", async () => {
     const res = await run({ input: { message: "hang" }, mode: "sync", waitTimeoutMs: 1000 });
     expect(res.statusCode).toBe(202);
@@ -218,6 +250,65 @@ describeDb("runs, streams and human tasks (Postgres)", () => {
     ]);
     expect((await call(t.app, jar, "DELETE", `/v1/runs/${done}`)).statusCode).toBe(204);
     expect((await call(t.app, jar, "GET", `/v1/runs/${done}`)).statusCode).toBe(404);
+  });
+
+  it("searches every run, not one page: id start, workflow name, error text and created time", async () => {
+    const all = (await call(t.app, jar, "GET", `/v1/runs?limit=200`)).json().items as {
+      id: string;
+      createdAt: string;
+      workflowId: string;
+      error: { message: string } | null;
+    }[];
+    expect(all.length).toBeGreaterThan(3);
+    const oldest = all.at(-1) as (typeof all)[number];
+    const ids = (q: string, limit = 2) =>
+      call(t.app, jar, "GET", `/v1/runs?q=${encodeURIComponent(q)}&limit=${limit}`).then((r) =>
+        (r.json().items as { id: string }[]).map((x) => x.id),
+      );
+    // the oldest run is far past the first page of 2, and still found by the start of its id
+    expect(await ids(oldest.id.slice(0, 13).toUpperCase())).toEqual([oldest.id]);
+    expect((await ids("ECHO", 200)).sort()).toEqual(
+      all
+        .filter((r) => r.workflowId === workflowId)
+        .map((r) => r.id)
+        .sort(),
+    );
+    const failed = all.filter((r) => r.error?.message.includes("refused")).map((r) => r.id);
+    expect(failed.length).toBeGreaterThan(0);
+    expect(await ids("model REFUSED", 200)).toEqual(failed);
+    // LIKE wildcards are plain characters
+    expect(await ids("%")).toEqual([]);
+    expect(await ids("_")).toEqual([]);
+    const range = (from: string, to: string) =>
+      call(
+        t.app,
+        jar,
+        "GET",
+        `/v1/runs?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&limit=200`,
+      ).then((r) => (r.json().items as { id: string }[]).map((x) => x.id));
+    // (the test database's clock stands still: every run here has the same creation time)
+    const at = Date.parse(oldest.createdAt);
+    const iso = (ms: number) => new Date(ms).toISOString();
+    expect(await range(iso(at - 1000), iso(at + 1000))).toHaveLength(all.length);
+    expect(await range(iso(at - 60_000), iso(at - 1000))).toEqual([]);
+    expect(await range(iso(at + 1000), "2100-01-01T00:00:00Z")).toEqual([]);
+    expect((await call(t.app, jar, "GET", `/v1/runs?from=yesterday`)).statusCode).toBe(400);
+  });
+
+  it("returns each run's version number with include=version (null for a draft)", async () => {
+    const draft = (await run({ input: { message: "x" }, draft: true })).json().run_id as string;
+    const list = (
+      await call(t.app, jar, "GET", `/v1/runs?workflowId=${workflowId}&limit=200&include=version`)
+    ).json().items as { id: string; version: number | null; decisions?: unknown }[];
+    expect(list.find((r) => r.id === draft)?.version).toBeNull();
+    expect(list.filter((r) => r.id !== draft).every((r) => r.version === 1)).toBe(true);
+    expect(list[0]).not.toHaveProperty("decisions");
+    const both = (
+      await call(t.app, jar, "GET", `/v1/runs?limit=1&include=decisions,version`)
+    ).json().items[0] as { version: unknown; decisions: unknown };
+    expect(both.decisions).toEqual([]);
+    expect(both).toHaveProperty("version");
+    expect((await call(t.app, jar, "GET", `/v1/runs?include=nodes`)).statusCode).toBe(400);
   });
 
   it("applies backpressure when the workspace has too many runs in flight", async () => {

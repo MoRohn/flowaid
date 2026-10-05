@@ -7,7 +7,8 @@ export interface OnboardingState {
   serverKeys: Readonly<Record<string, boolean>>;
   /** credential types stored in the workspace (`typesafe.api_key`, `openai.api_key`, …) */
   credentialTypes: readonly string[];
-  workflows: readonly { id: string; latestVersion: number | null }[];
+  /** `deployed`: a version runs in an environment (absent from servers without `include=activity`) */
+  workflows: readonly { id: string; latestVersion: number | null; deployed?: boolean }[];
   hasRun: boolean;
   hasAnsweredTask: boolean;
   hasApiKey: boolean;
@@ -39,7 +40,11 @@ export function onboardingSteps(s: OnboardingState): OnboardingStep[] {
     { id: "workflow", done: s.workflows.length > 0 },
     { id: "run", done: s.hasRun },
     { id: "review", done: s.hasAnsweredTask },
-    { id: "publish", done: s.workflows.some((w) => w.latestVersion !== null) },
+    // published is half of it: the step is "publish and deploy"
+    {
+      id: "publish",
+      done: s.workflows.some((w) => w.deployed ?? w.latestVersion !== null),
+    },
     { id: "api", done: s.hasApiKey },
   ];
 }

@@ -10,7 +10,8 @@ import { useEffect, useSyncExternalStore, type ReactNode } from "react";
 import { Check, ExternalLink, X } from "lucide-react";
 import { Badge, Button, IconButton, ProgressBar } from "@flowaid/ui/primitives";
 import { get, getAll } from "~/api/client";
-import type { Page, WorkflowSummary } from "~/api/types";
+import type { Page } from "~/api/types";
+import { overviewWorkflows } from "~/dashboard/queries";
 import { useSession } from "~/session";
 import { HELP, PROVIDER_KEY_URL } from "~/shell/help";
 import {
@@ -170,10 +171,8 @@ export function GettingStarted() {
     queryFn: () => getAll<{ type: string }>("/v1/credentials"),
     enabled: s.can("credentials:read"),
   });
-  const workflows = useQuery({
-    queryKey: ["onboarding", "workflows", s.ws],
-    queryFn: () => get<Page<WorkflowSummary>>("/v1/workflows?limit=50"),
-  });
+  // the Overview's own workflow list (one request), with each workflow's deployments
+  const workflows = useQuery(overviewWorkflows(s.ws));
   const runs = useQuery({
     queryKey: ["onboarding", "runs", s.ws],
     queryFn: () => get<Page<{ id: string }>>("/v1/runs?limit=1"),
@@ -197,7 +196,11 @@ export function GettingStarted() {
   const steps = onboardingSteps({
     serverKeys: Object.fromEntries((providers.data ?? []).map((p) => [p.id, p.configuredOnServer])),
     credentialTypes: (credentials.data ?? []).map((c) => c.type),
-    workflows: wfs.map((w) => ({ id: w.id, latestVersion: w.latestVersion })),
+    workflows: wfs.map((w) => ({
+      id: w.id,
+      latestVersion: w.latestVersion,
+      ...(w.deployments ? { deployed: w.deployments.length > 0 } : {}),
+    })),
     hasRun: (runs.data?.items.length ?? 0) > 0,
     hasAnsweredTask: (tasks.data?.items.length ?? 0) > 0,
     hasApiKey: (keys.data?.length ?? 0) > 0,

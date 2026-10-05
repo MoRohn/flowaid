@@ -2211,7 +2211,7 @@ export interface paths {
           cursor?: string;
           limit?: number;
           order?: "asc" | "desc";
-          status?: "open" | "responded" | "expired" | "cancelled";
+          status?: string;
           workflowId?: string;
         };
         header?: never;
@@ -6750,12 +6750,15 @@ export interface paths {
         query?: {
           cursor?: string;
           environmentId?: string;
-          include?: "decisions";
+          from?: string;
+          include?: string;
           limit?: number;
           order?: "asc" | "desc";
           origin?: string;
+          q?: string;
           sessionId?: string;
           status?: string | string[];
+          to?: string;
           workflowId?: string;
         };
         header?: never;
@@ -6802,6 +6805,7 @@ export interface paths {
                 startedAt: string | null;
                 status: string;
                 usage: unknown;
+                version?: number | null;
                 /** Format: uuid */
                 workflowId: string;
                 /** Format: uuid */

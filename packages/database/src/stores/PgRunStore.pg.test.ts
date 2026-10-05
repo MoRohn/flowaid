@@ -113,7 +113,8 @@ describeDb("PgRunStore", () => {
       expect(list.map((n) => [n.nodeId, n.attempt, n.status])).toEqual([
         ["start", 1, "completed"],
         ["intent", 1, "completed"],
-        ["fetch_account", 1, "retry_wait"],
+        // the attempt the retry replaced failed; it does not wait for good
+        ["fetch_account", 1, "failed"],
         ["fetch_account", 2, "completed"],
         ["draft", 1, "completed"],
         ["approve", 1, "completed"],
@@ -126,6 +127,7 @@ describeDb("PgRunStore", () => {
       // Scheduled and started in one batch: the events share a timestamp.
       expect(intent?.queueLatencyMs).toBe(0);
       expect(byId.get(played.ids.fetch1)?.error?.code).toBe("NETWORK_ERROR");
+      expect(byId.get(played.ids.fetch1)?.endedAt).not.toBeNull();
       expect(byId.get(played.ids.draft)?.usage).toEqual({ inputTokens: 640, outputTokens: 118 });
       const [decisionCols] = await t.app.system((tx) =>
         tx.select().from(nodeRuns).where(eq(nodeRuns.id, played.ids.intent)),

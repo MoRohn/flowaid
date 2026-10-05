@@ -34,6 +34,42 @@ export interface MetricsSeries {
   };
 }
 
+/** What the Overview shows: a time range, and optionally one workflow and one environment. */
+export interface DashboardFilters {
+  preset: TimeRangePreset;
+  workflowId?: string | undefined;
+  environmentId?: string | undefined;
+}
+
+export const DEFAULT_PRESET: TimeRangePreset = "24h";
+
+/** `?range=7d&workflow=<id>&env=<id>` (the runs list's keys) → filters; unknown ranges read 24h. */
+export function parseDashboardFilters(params: URLSearchParams): DashboardFilters {
+  const range = params.get("range");
+  const preset = TIME_RANGE_PRESETS.find((p) => p.id === range)?.id ?? DEFAULT_PRESET;
+  const workflowId = params.get("workflow") || undefined;
+  const environmentId = params.get("env") || undefined;
+  return {
+    preset,
+    ...(workflowId ? { workflowId } : {}),
+    ...(environmentId ? { environmentId } : {}),
+  };
+}
+
+/** Inverse of {@link parseDashboardFilters}, keeping other parameters; the default range is left out. */
+export function serializeDashboardFilters(
+  f: DashboardFilters,
+  base: URLSearchParams = new URLSearchParams(),
+): string {
+  const out = new URLSearchParams(base);
+  const set = (key: string, value: string | undefined) =>
+    value ? out.set(key, value) : out.delete(key);
+  set("range", f.preset === DEFAULT_PRESET ? undefined : f.preset);
+  set("workflow", f.workflowId);
+  set("env", f.environmentId);
+  return out.toString();
+}
+
 /** The time window and a bucket that keeps charts at 24–90 points. */
 export function rangeFor(
   preset: TimeRangePreset,

@@ -27,6 +27,39 @@ const click = (name: string | RegExp) =>
   });
 
 describe("run action dialogs", () => {
+  it("cancel asks first, names the waiting task and sends the optional reason", async () => {
+    const { onSubmit, onOpenChange } = open({ kind: "cancel", waitingFor: "Approve payout" });
+    // a danger confirmation is an alertdialog once F-04 lands; a dialog before
+    const dialog = screen.queryByRole("alertdialog") ?? screen.getByRole("dialog");
+    expect(dialog.textContent).toContain("can't be undone");
+    expect(dialog.textContent).toContain("“Approve payout” closes unanswered");
+    expect(onSubmit).not.toHaveBeenCalled();
+    act(() => {
+      fireEvent.change(screen.getByRole("textbox", { name: /Reason/ }), {
+        target: { value: "  Duplicate request  " },
+      });
+    });
+    click("Cancel run");
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+    expect(onSubmit).toHaveBeenCalledWith({
+      path: `/v1/runs/${RUN}/cancel`,
+      body: { reason: "Duplicate request" },
+    });
+  });
+
+  it("cancel without a reason sends none, and Keep running sends nothing", async () => {
+    const first = open({ kind: "cancel" });
+    click("Keep running");
+    expect(first.onSubmit).not.toHaveBeenCalled();
+    expect(first.onOpenChange).toHaveBeenCalledWith(false);
+    cleanup();
+    const second = open({ kind: "cancel" });
+    click("Cancel run");
+    await waitFor(() =>
+      expect(second.onSubmit).toHaveBeenCalledWith({ path: `/v1/runs/${RUN}/cancel`, body: {} }),
+    );
+  });
+
   it("replay asks for the mode and sends it", async () => {
     const { onSubmit, onOpenChange } = open({ kind: "replay" });
     act(() => {

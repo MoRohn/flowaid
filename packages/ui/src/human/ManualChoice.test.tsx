@@ -20,12 +20,13 @@ const TEAMS: ManualChoiceOption[] = [
 describe("defaultModelPick", () => {
   it("returns the highest-probability option", () => {
     expect(defaultModelPick(TEAMS)).toBe("security");
+    // no probabilities, no model: nothing is "the model's pick"
     expect(
       defaultModelPick([
         { id: "a", label: "A" },
         { id: "b", label: "B" },
       ]),
-    ).toBe("a");
+    ).toBeUndefined();
     expect(defaultModelPick([])).toBeUndefined();
   });
 });

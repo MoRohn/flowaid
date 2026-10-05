@@ -38,7 +38,6 @@ export {
   EscalationDialog,
   type EscalationDialogProps,
   type EscalationTarget,
-  type EscalationOptions,
   type EscalateResponse,
 } from "./EscalationDialog";
 export {

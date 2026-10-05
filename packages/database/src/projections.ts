@@ -7,7 +7,7 @@
  * Changes to the `runs` row are accumulated in memory (`RunProjection`) and written once per
  * batch; node-level changes are written per event, keyed by node run id.
  */
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, lt, sql } from "drizzle-orm";
 import { sha256Hex } from "@flowaid/shared";
 import type { DurableRunEvent, ErrorInfo, JsonValue, TokenUsage } from "@flowaid/workflow-core";
 import type { Queryable } from "./db.js";
@@ -208,6 +208,21 @@ export async function applyProjection(
         .returning({ id: nodeRuns.id });
       if (inserted.length > 0) run.nodeRunCount += 1;
       if (run.status === "starting") run.status = "running";
+      // The attempt this one replaces failed: it no longer waits for a retry (it stayed
+      // `retry_wait`, an active span, for good).
+      if (event.attempt > 1)
+        await tx
+          .update(nodeRuns)
+          .set({ status: "failed", endedAt: at, endedSeq: event.seq })
+          .where(
+            and(
+              eq(nodeRuns.runId, run.id),
+              eq(nodeRuns.nodeId, event.nodeId),
+              eq(nodeRuns.scope, event.scope),
+              eq(nodeRuns.status, "retry_wait"),
+              lt(nodeRuns.attempt, event.attempt),
+            ),
+          );
       return;
     }
     case "NODE_STARTED":

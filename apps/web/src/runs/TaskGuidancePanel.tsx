@@ -28,7 +28,7 @@ export function TaskGuidancePanel({
     >
       <summary className="flex cursor-pointer select-none items-center gap-2 rounded-xs font-medium text-ink focus-visible:shadow-(--focus) focus-visible:outline-none">
         <Compass className="size-4 text-accent-text" strokeWidth={1.75} aria-hidden />
-        Before you answer
+        {task.status === "open" ? "Before you answer" : "About this task"}
       </summary>
       <dl className="m-0 mt-3 grid gap-3">
         <div>
@@ -50,9 +50,9 @@ export function TaskGuidancePanel({
         <div>
           <dt className="text-xs font-medium text-ink-3">If nobody answers</dt>
           <dd className="m-0 text-ink-2">
-            {task.expiresAt ? (
+            {task.expiresAt && (task.status === "open" || task.status === "expired") ? (
               <p className="m-0">
-                {task.status === "open" ? "Expires " : "Was due "}
+                {task.status === "open" ? "Expires " : "Expired "}
                 <RelativeTime date={task.expiresAt} />.
               </p>
             ) : null}

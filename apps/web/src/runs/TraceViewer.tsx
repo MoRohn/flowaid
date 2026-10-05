@@ -3,11 +3,12 @@
  * The trace viewer (UI.md §7): RunHeader, then Timeline · Graph · Events · Output · Logs · Cost
  * over one folded RunView, with node selection shared by every tab and a node-run detail panel.
  * The initial state is the stored run (node runs + every durable event); while the run is
- * active the SSE stream appends events and the fold re-derives the view.
+ * active, new events arrive over the SSE stream (or by polling while it waits; `useRunStream`)
+ * and the fold re-derives the view.
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { FlaskConical, WifiOff } from "lucide-react";
 import type { NodeRunView, RunView } from "@flowaid/ui";
 import type { WorkflowDefinition } from "@flowaid/workflow-core";
@@ -48,6 +49,8 @@ import {
   lastDurableSeq,
   mergeEvents,
   nodeIndex,
+  runCancelReason,
+  runTimeoutMs,
   taskToApproval,
   toLiveRunView,
 } from "./views";
@@ -99,17 +102,6 @@ export function TraceViewer({ runId }: { runId: string }) {
   const catalog = useCatalog(s.ws);
   const names = useWorkflowNames(s.ws);
 
-  const active = detail.data ? isActiveRun(detail.data.status) : false;
-  const stream = useRunStream(runId, {
-    enabled: events.isSuccess && active,
-    afterSeq: lastDurableSeq(events.data ?? []),
-    onEvents: (batch) => setLive((l) => [...l, ...batch]),
-  });
-  // The stream ended (terminal or suspended): reload the stored projection for inputs/outputs.
-  useEffect(() => {
-    if (stream.status === "ended") void qc.invalidateQueries({ queryKey: ["run", s.ws, runId] });
-  }, [stream.status, qc, s.ws, runId]);
-
   const allEvents = useMemo(() => mergeEvents(events.data ?? [], live), [events.data, live]);
   const definition = version.data?.definition;
   const cat = catalog.data;
@@ -133,6 +125,16 @@ export function TraceViewer({ runId }: { runId: string }) {
     });
   }, [detail.data, cat, allEvents, definition, names.data, version.data, s.environments]);
 
+  // Streams while the run moves and the tab is visible; polls while it waits for a person.
+  const stream = useRunStream(runId, {
+    enabled: events.isSuccess,
+    status: live0?.view.status,
+    afterSeq: lastDurableSeq(allEvents),
+    onEvents: (batch) => setLive((l) => [...l, ...batch]),
+    // the stream ended or a poll found events: reload the stored run for inputs and outputs
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["run", s.ws, runId] }),
+  });
+
   const openTaskId = live0 ? Object.values(live0.folded.openHumanTasks)[0] : undefined;
   const task = useQuery({
     queryKey: ["human-task", s.ws, openTaskId],
@@ -141,12 +143,17 @@ export function TraceViewer({ runId }: { runId: string }) {
   });
 
   const cancel = useMutation({
-    mutationFn: () => post(`/v1/runs/${runId}/cancel`, {}),
+    mutationFn: (body: Record<string, unknown>) => post(`/v1/runs/${runId}/cancel`, body),
     onSuccess: () => toast.success("Cancel requested; running nodes finish their current step"),
     onError: (e) => toast.error(errorMessage(e)),
   });
-  // Replay, fork and restart open the new run; retry-node reopens this one in place.
+  // Replay, fork and restart open the new run; retry-node reopens this one in place; cancel
+  // (confirmed in the same dialog) stops this one.
   const runAction = async ({ path, body }: RunActionRequest) => {
+    if (path.endsWith("/cancel")) {
+      await cancel.mutateAsync(body ?? {});
+      return;
+    }
     try {
       const r = await post<{ run_id: string; status?: string }>(path, body ?? {});
       if (r.run_id === runId) {
@@ -185,6 +192,8 @@ export function TraceViewer({ runId }: { runId: string }) {
     );
   }
   const isLive = isActiveRun(run.status);
+  const timeoutMs = run.status === "timed_out" ? runTimeoutMs(allEvents) : undefined;
+  const cancelReason = run.status === "cancelled" ? runCancelReason(allEvents) : undefined;
   const byId = new Map(run.nodeRuns.map((n) => [n.id, n]));
   const current = selected ? byId.get(selected) : undefined;
   const attempts = current
@@ -242,7 +251,15 @@ export function TraceViewer({ runId }: { runId: string }) {
       <div className="flex flex-col gap-3 border-b border-border px-6 py-4">
         <RunHeader
           run={run}
-          {...(isLive && s.can("runs:cancel") ? { onCancel: () => cancel.mutate() } : {})}
+          {...(isLive && s.can("runs:cancel")
+            ? {
+                onCancel: () =>
+                  setAction({
+                    kind: "cancel",
+                    ...(run.pendingApproval ? { waitingFor: run.pendingApproval.nodeName } : {}),
+                  }),
+              }
+            : {})}
           {...(canReplay
             ? {
                 onReplay: () => setAction({ kind: "replay" }),
@@ -276,6 +293,8 @@ export function TraceViewer({ runId }: { runId: string }) {
             ? { onOpenReview: () => router.push(`/${s.ws}/human-tasks/${openTaskId}`) }
             : {})}
           cancelling={cancel.isPending}
+          {...(timeoutMs !== undefined ? { timeoutMs } : {})}
+          onOpenSettings={() => router.push(`/${s.ws}/workflows/${run.workflowId}`)}
           actions={
             s.features.evaluations && s.can("evaluations:write") && !isLive ? (
               <Button
@@ -289,14 +308,27 @@ export function TraceViewer({ runId }: { runId: string }) {
             ) : undefined
           }
         />
-        <RunStory run={run} {...(definition ? { definition } : {})} />
+        <RunStory
+          run={run}
+          {...(definition ? { definition } : {})}
+          {...(timeoutMs !== undefined ? { timeoutMs } : {})}
+          {...(cancelReason ? { cancelReason } : {})}
+        />
         <PageIntro guide={RUN_DETAIL} defaultCollapsed className="" />
-        {stream.status === "reconnecting" || stream.status === "failed" ? (
+        {isLive && (stream.fallback || stream.pollError) ? (
+          <p className="flex flex-wrap items-center gap-2 text-xs text-warn-text" role="status">
+            <WifiOff className="size-3.5" strokeWidth={1.75} />
+            {stream.pollError
+              ? `Can't reach FlowAId (${stream.pollError}). Trying again every 10 seconds.`
+              : "Live updates interrupted. This page checks for changes every 10 seconds."}
+            <Button variant="secondary" size="sm" onClick={stream.reconnect}>
+              Reconnect
+            </Button>
+          </p>
+        ) : isLive && stream.mode === "stream" && stream.status === "reconnecting" ? (
           <p className="flex items-center gap-2 text-xs text-warn-text" role="status">
             <WifiOff className="size-3.5" strokeWidth={1.75} />
-            {stream.status === "failed"
-              ? "Live updates stopped. Reload the page to see the latest state."
-              : `Live updates interrupted, reconnecting (attempt ${stream.attempt} of 5)…`}
+            {`Live updates interrupted, reconnecting (attempt ${stream.attempt} of 5)…`}
           </p>
         ) : stream.resumed && isLive ? (
           <p className="text-xs text-ink-3" role="status">
@@ -422,14 +454,27 @@ export function TraceSkeleton() {
 }
 
 /** What happened, in plain words, under the header; the Guide shows the same story. */
-function RunStory({ run, definition }: { run: RunView; definition?: WorkflowDefinition }) {
+function RunStory({
+  run,
+  definition,
+  timeoutMs,
+  cancelReason,
+}: {
+  run: RunView;
+  definition?: WorkflowDefinition;
+  timeoutMs?: number;
+  cancelReason?: string;
+}) {
   useGuideContext(
     useMemo(
       () => ({ kind: "run" as const, run, ...(definition ? { definition } : {}) }),
       [run, definition],
     ),
   );
-  const story = explainRun(run, definition);
+  const story = explainRun(run, definition, {
+    ...(timeoutMs !== undefined ? { timeoutMs } : {}),
+    ...(cancelReason ? { cancelReason } : {}),
+  });
   if (!story.length) return null;
   return (
     <details open className="rounded-sm border border-border bg-surface-2 px-3 py-2">

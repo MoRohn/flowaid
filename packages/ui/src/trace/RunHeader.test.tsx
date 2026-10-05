@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { installDomStubs } from "@/primitives/testStubs";
 import type { NodeRunView, RunView } from "@/types";
@@ -79,5 +79,48 @@ describe("RunHeader failure banner", () => {
       error: { ...failedRun.error, nodeId: undefined } as RunView["error"],
     };
     expect(failedNode(unnamed)?.id).toBe("nr-1");
+  });
+});
+
+describe("RunHeader time limit banner", () => {
+  it("says a timed-out run stopped at its limit, and where to change it", async () => {
+    const onOpenSettings = vi.fn();
+    render(
+      <RunHeader
+        run={{ ...failedRun, status: "timed_out", error: undefined }}
+        timeoutMs={20_000}
+        onOpenSettings={onOpenSettings}
+      />,
+    );
+    const banner = screen
+      .getByText(/Stopped at the run's time limit of 20/)
+      .closest("[role=status]");
+    expect(banner?.textContent).toContain("No step failed");
+    await userEvent.click(screen.getByRole("button", { name: "Workflow settings" }));
+    expect(onOpenSettings).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows no time limit banner for other runs", () => {
+    render(<RunHeader run={failedRun} timeoutMs={20_000} onOpenSettings={vi.fn()} />);
+    expect(screen.queryByText(/time limit/)).toBeNull();
+  });
+});
+
+describe("RunHeader clock", () => {
+  it("keeps the relative times of a finished run current", () => {
+    vi.useFakeTimers({
+      now: Date.parse("2026-09-28T10:00:05.000Z"),
+      toFake: ["Date", "setTimeout", "setInterval", "clearTimeout", "clearInterval"],
+    });
+    try {
+      render(<RunHeader run={{ ...failedRun, error: undefined }} />);
+      act(() => void vi.advanceTimersByTime(0));
+      const ended = () => screen.getByText("Ended").nextElementSibling?.textContent;
+      expect(ended()).not.toContain("minute");
+      act(() => void vi.advanceTimersByTime(3 * 60_000));
+      expect(ended()).toContain("3 minutes ago");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

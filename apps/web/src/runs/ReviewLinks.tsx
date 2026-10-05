@@ -3,10 +3,12 @@
  * External review links for one task (API.md §3.5): single-use, revocable, and bound by the task's
  * expiry. The token lives only in the URL fragment, so a link's URL is shown once, right after it
  * is created; every link of the task is listed with its state and can be revoked while active.
+ * A link opens FlowAId's web address: when that is this computer or a private network, the panel
+ * says who can open it before anyone sends one.
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
-import { Link2 } from "lucide-react";
+import { useState, useSyncExternalStore } from "react";
+import { Link2, MonitorSmartphone } from "lucide-react";
 import { Badge, Button, CopyButton, Input, toast } from "@flowaid/ui/primitives";
 import { RelativeTime } from "@flowaid/ui/data";
 import { del, get, post } from "~/api/client";
@@ -23,10 +25,56 @@ export const LINK_STATUS: Record<
   expired: { label: "Expired", tone: "warn" },
 };
 
-export function ReviewLinks({ taskId }: { taskId: string }) {
+/** Who can open an address: only this computer, only the local network, or anyone. */
+export type LinkReach = "computer" | "network" | "anyone";
+
+/** Loopback (this computer) or a private network address, from a URL's host name. */
+export function linkReach(address: string): LinkReach {
+  let host: string;
+  try {
+    host = new URL(address).hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  } catch {
+    return "anyone";
+  }
+  if (
+    host === "localhost" ||
+    host.endsWith(".localhost") ||
+    host === "::1" ||
+    host === "0.0.0.0" ||
+    /^127\./.test(host)
+  )
+    return "computer";
+  if (
+    /^10\./.test(host) ||
+    /^192\.168\./.test(host) ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(host) ||
+    /^169\.254\./.test(host) ||
+    /^(fc|fd|fe80)[0-9a-f]*:/.test(host) ||
+    host.endsWith(".local") ||
+    host.endsWith(".internal") ||
+    host.endsWith(".lan") ||
+    !host.includes(".")
+  )
+    return "network";
+  return "anyone";
+}
+
+const noSubscribe = () => () => undefined;
+
+export function ReviewLinks({ taskId, local = false }: { taskId: string; local?: boolean }) {
   const qc = useQueryClient();
   // URLs of the links created in this session: the server never returns a token again
   const [urls, setUrls] = useState<Record<string, string>>({});
+  // where a link points: the last created link's address, else this page's (the same app)
+  const [created, setCreated] = useState<string>();
+  const here = useSyncExternalStore(
+    noSubscribe,
+    () => window.location.origin,
+    () => null,
+  );
+  const address = created ?? here;
+  // on your own computer (local mode) FlowAId's web address is always a loopback one
+  const reach: LinkReach = local ? "computer" : address ? linkReach(address) : "anyone";
   const key = ["review-links", taskId];
   const links = useQuery({
     queryKey: key,
@@ -36,6 +84,7 @@ export function ReviewLinks({ taskId }: { taskId: string }) {
     mutationFn: () => post<ReviewLink>(`/v1/human-tasks/${taskId}/review-link`, {}),
     onSuccess: (l) => {
       setUrls((u) => ({ ...u, [l.id]: l.url }));
+      setCreated(new URL(l.url).origin);
       void qc.invalidateQueries({ queryKey: key });
     },
     onError: (e) => toast.error(errorMessage(e)),
@@ -73,6 +122,28 @@ export function ReviewLinks({ taskId }: { taskId: string }) {
           Create link
         </Button>
       </div>
+      {reach !== "anyone" ? (
+        <p
+          role="note"
+          className="m-0 flex items-start gap-2 rounded-sm border border-warn/30 bg-warn-soft px-3 py-2 text-xs text-ink"
+        >
+          <MonitorSmartphone
+            className="mt-px size-3.5 shrink-0 text-warn-text"
+            strokeWidth={1.75}
+            aria-hidden="true"
+          />
+          <span>
+            {reach === "computer"
+              ? "Only this computer can open these links: "
+              : "Only people on your network can open these links: "}
+            FlowAId&apos;s web address
+            {address ? <span className="font-mono"> {address}</span> : null} is{" "}
+            {reach === "computer" ? "on this computer" : "a private network address"}. To ask
+            someone else, run FlowAId where they can reach it and set its web address
+            (FLOWAID_WEB_URL) to that address.
+          </span>
+        </p>
+      ) : null}
       {links.data?.length ? (
         <ul className="flex flex-col gap-2" role="list" aria-label="Review links">
           {links.data.map((l) => {
