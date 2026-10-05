@@ -61,6 +61,39 @@ export function createSseParser(onMessage: (m: SseMessage) => void) {
 
 export const STREAM_MAX_ATTEMPTS = 5;
 
+/** How often a page checks for new events while it does not hold a stream. */
+export const FOLLOW_POLL_MS = 10_000;
+/** A stream that has not connected by then (a browser queues it behind its six connections). */
+export const FOLLOW_CONNECT_TIMEOUT_MS = 15_000;
+
+/**
+ * How a page follows one run:
+ * - `stream`: an open SSE stream (`until=suspend`, so it ends when the run starts waiting);
+ * - `poll`: a short request every {@link FOLLOW_POLL_MS} for events after the last one;
+ * - `paused`: nothing while the tab is hidden (it catches up when shown again);
+ * - `idle`: the run has ended.
+ *
+ * A browser allows six HTTP/1.1 connections per host, shared by every tab, so a stream is held only
+ * while the run is moving and the tab is visible: six tabs of waiting runs used to hold all six,
+ * and no other FlowAId page could load.
+ */
+export type FollowMode = "stream" | "poll" | "paused" | "idle";
+
+const ENDED_RUN = new Set(["completed", "failed", "cancelled", "timed_out"]);
+const SUSPENDED_RUN = new Set(["waiting", "waiting_for_human"]);
+
+export function followMode(i: {
+  status: string;
+  visible: boolean;
+  /** The stream failed, timed out connecting or ended without the run ending. */
+  streamDown: boolean;
+}): FollowMode {
+  if (ENDED_RUN.has(i.status)) return "idle";
+  if (!i.visible) return "paused";
+  if (SUSPENDED_RUN.has(i.status) || i.streamDown) return "poll";
+  return "stream";
+}
+
 /** Delay before reconnect attempt `attempt` (1-based): 1 s · 2^(n-1), capped at 30 s, jittered to 50–100 %. */
 export function backoffDelay(attempt: number, random: () => number = Math.random): number {
   const base = Math.min(30_000, 1000 * 2 ** Math.max(0, attempt - 1));

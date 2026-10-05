@@ -3,11 +3,12 @@
  * The trace viewer (UI.md §7): RunHeader, then Timeline · Graph · Events · Output · Logs · Cost
  * over one folded RunView, with node selection shared by every tab and a node-run detail panel.
  * The initial state is the stored run (node runs + every durable event); while the run is
- * active the SSE stream appends events and the fold re-derives the view.
+ * active, new events arrive over the SSE stream (or by polling while it waits; `useRunStream`)
+ * and the fold re-derives the view.
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { FlaskConical, WifiOff } from "lucide-react";
 import type { NodeRunView, RunView } from "@flowaid/ui";
 import type { WorkflowDefinition } from "@flowaid/workflow-core";
@@ -99,17 +100,6 @@ export function TraceViewer({ runId }: { runId: string }) {
   const catalog = useCatalog(s.ws);
   const names = useWorkflowNames(s.ws);
 
-  const active = detail.data ? isActiveRun(detail.data.status) : false;
-  const stream = useRunStream(runId, {
-    enabled: events.isSuccess && active,
-    afterSeq: lastDurableSeq(events.data ?? []),
-    onEvents: (batch) => setLive((l) => [...l, ...batch]),
-  });
-  // The stream ended (terminal or suspended): reload the stored projection for inputs/outputs.
-  useEffect(() => {
-    if (stream.status === "ended") void qc.invalidateQueries({ queryKey: ["run", s.ws, runId] });
-  }, [stream.status, qc, s.ws, runId]);
-
   const allEvents = useMemo(() => mergeEvents(events.data ?? [], live), [events.data, live]);
   const definition = version.data?.definition;
   const cat = catalog.data;
@@ -132,6 +122,16 @@ export function TraceViewer({ runId }: { runId: string }) {
       ...(env ? { environment: env } : {}),
     });
   }, [detail.data, cat, allEvents, definition, names.data, version.data, s.environments]);
+
+  // Streams while the run moves and the tab is visible; polls while it waits for a person.
+  const stream = useRunStream(runId, {
+    enabled: events.isSuccess,
+    status: live0?.view.status,
+    afterSeq: lastDurableSeq(allEvents),
+    onEvents: (batch) => setLive((l) => [...l, ...batch]),
+    // the stream ended or a poll found events: reload the stored run for inputs and outputs
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["run", s.ws, runId] }),
+  });
 
   const openTaskId = live0 ? Object.values(live0.folded.openHumanTasks)[0] : undefined;
   const task = useQuery({
@@ -291,12 +291,20 @@ export function TraceViewer({ runId }: { runId: string }) {
         />
         <RunStory run={run} {...(definition ? { definition } : {})} />
         <PageIntro guide={RUN_DETAIL} defaultCollapsed className="" />
-        {stream.status === "reconnecting" || stream.status === "failed" ? (
+        {isLive && (stream.fallback || stream.pollError) ? (
+          <p className="flex flex-wrap items-center gap-2 text-xs text-warn-text" role="status">
+            <WifiOff className="size-3.5" strokeWidth={1.75} />
+            {stream.pollError
+              ? `Can't reach FlowAId (${stream.pollError}). Trying again every 10 seconds.`
+              : "Live updates interrupted. This page checks for changes every 10 seconds."}
+            <Button variant="secondary" size="sm" onClick={stream.reconnect}>
+              Reconnect
+            </Button>
+          </p>
+        ) : isLive && stream.mode === "stream" && stream.status === "reconnecting" ? (
           <p className="flex items-center gap-2 text-xs text-warn-text" role="status">
             <WifiOff className="size-3.5" strokeWidth={1.75} />
-            {stream.status === "failed"
-              ? "Live updates stopped. Reload the page to see the latest state."
-              : `Live updates interrupted, reconnecting (attempt ${stream.attempt} of 5)…`}
+            {`Live updates interrupted, reconnecting (attempt ${stream.attempt} of 5)…`}
           </p>
         ) : stream.resumed && isLive ? (
           <p className="text-xs text-ink-3" role="status">
