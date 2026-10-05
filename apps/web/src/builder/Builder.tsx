@@ -1045,6 +1045,8 @@ function BuilderView({
       ]}
     >
       <div className="flex h-full flex-col">
+        {/* the page's heading for screen readers; the top bar shows the name */}
+        <h1 className="sr-only">{title}</h1>
         <OpenInspectorOnSelect
           nodeId={selection.nodes.length === 1 ? selection.nodes[0] : undefined}
           reveal={(reveal?.n ?? 0) + (panelFocus?.n ?? 0)}

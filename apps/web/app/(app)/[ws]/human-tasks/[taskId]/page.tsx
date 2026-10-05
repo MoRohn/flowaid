@@ -185,6 +185,10 @@ export default function HumanTaskPage({ params }: { params: Promise<{ taskId: st
             ) : null}
           </div>
         ) : null}
+        {/* the page's heading for screen readers; the card below shows the request's title */}
+        <h1 className="sr-only">
+          {nodeName} · {workflowName}
+        </h1>
         <TaskGuidancePanel task={task} node={node} className="mx-auto mt-6 w-full max-w-[640px]" />
         <ReviewPage
           card={{
