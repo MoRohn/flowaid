@@ -8,7 +8,10 @@ import type { NotificationChannel, Schedule, Webhook } from "../types";
 
 const scopes = new Set(["admin", "webhooks:write", "schedules:write", "runs:create"]);
 const { push } = vi.hoisted(() => ({ push: vi.fn() }));
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push }),
+  usePathname: () => "/acme/triggers",
+}));
 vi.mock("~/session", () => ({
   useSession: () => ({
     ws: "acme",
