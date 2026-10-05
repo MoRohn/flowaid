@@ -4,11 +4,12 @@
  * the workspace's events — a run waiting for a person, a failed run, a schedule that could not
  * start, a rejected webhook call. A new channel is set up step by step (where, which events,
  * review); nothing is sent until someone presses Send a test. A webhook channel's signing secret
- * is shown once, on create and on rotate.
+ * is shown once, on create and on rotate. Each channel's History lists what was sent to it (alerts
+ * and tests) and why a send failed.
  */
 import { useQuery } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
-import { Bell, CheckCircle2, KeyRound, Pencil, Plus, Send, Trash2 } from "lucide-react";
+import { Bell, CheckCircle2, History, KeyRound, Pencil, Plus, Send, Trash2 } from "lucide-react";
 import {
   Badge,
   Button,
@@ -25,18 +26,25 @@ import {
   FieldRow,
   IconButton,
   Input,
+  Sheet,
+  SheetBody,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
   Switch,
   Textarea,
   ToggleGroup,
   ToggleGroupItem,
   toast,
 } from "@flowaid/ui/primitives";
-import { del, getAll, patch, post } from "~/api/client";
+import { RelativeTime } from "@flowaid/ui/data";
+import { del, get, getAll, patch, post } from "~/api/client";
 import { DraftStatus, GuidedFlow, type FlowStep } from "~/guide/GuidedFlow";
 import { CheckList, type Check } from "~/guide/Readiness";
 import { useKeptDraft } from "~/guide/useKeptDraft";
 import { useSession } from "~/session";
-import type { NotificationChannel } from "../types";
+import type { NotificationChannel, NotificationDelivery } from "../types";
 import { Notice, OneTimeSecretDialog, QueryView, Section, useConfirm, useMutate } from "../ui";
 import {
   KIND_LABEL,
@@ -58,6 +66,7 @@ export function NotificationsTab() {
     null,
   );
   const remove = useConfirm<NotificationChannel>();
+  const [history, setHistory] = useState<NotificationChannel | null>(null);
   // replacing a signing secret that receivers verify with asks first
   const confirmRotate = useConfirm<NotificationChannel>();
   const channels = useQuery({
@@ -78,6 +87,8 @@ export function NotificationsTab() {
         if (r.ok) toast.success(`Test sent to ${c.name}`);
         else toast.error(`${c.name} did not receive the test`, { description: r.error });
       },
+      // the test is recorded in the channel's history
+      invalidate: [["notification-deliveries", s.ws]],
     },
   );
   const rotate = useMutate(
@@ -177,6 +188,14 @@ export function NotificationsTab() {
                     <IconButton
                       size="sm"
                       variant="ghost"
+                      label={`What was sent to ${c.name}`}
+                      onClick={() => setHistory(c)}
+                    >
+                      <History strokeWidth={1.75} />
+                    </IconButton>
+                    <IconButton
+                      size="sm"
+                      variant="ghost"
                       label={`Edit ${c.name}`}
                       onClick={() => setEditing(c)}
                     >
@@ -250,6 +269,7 @@ export function NotificationsTab() {
         description="Verify deliveries with it: X-FlowAId-Signature is sha256=HMAC(secret, `<X-FlowAId-Timestamp>.<body>`). It cannot be shown again."
         onClose={() => setSecret(null)}
       />
+      <DeliveriesSheet channel={history} onClose={() => setHistory(null)} />
       <ConfirmDialog
         open={confirmRotate.target !== null}
         onOpenChange={(o) => (o ? undefined : confirmRotate.close())}
@@ -280,6 +300,90 @@ export function NotificationsTab() {
 }
 
 /** What a new channel does from now on, and a test only when asked for. */
+const DELIVERY_EVENT: Record<string, string> = {
+  ...Object.fromEntries(NOTIFICATION_EVENTS.map((e) => [e.id, e.label])),
+  test: "Test message",
+};
+
+/** What was sent to one channel, newest first: alerts and tests, with why a send failed. */
+function DeliveriesSheet({
+  channel,
+  onClose,
+}: {
+  channel: NotificationChannel | null;
+  onClose: () => void;
+}) {
+  const s = useSession();
+  const deliveries = useQuery({
+    queryKey: ["notification-deliveries", s.ws, channel?.id],
+    queryFn: () =>
+      get<{ items: NotificationDelivery[] }>(
+        `/v1/notifications/${channel?.id ?? ""}/deliveries?limit=50`,
+      ),
+    enabled: channel !== null,
+    refetchInterval: 15_000,
+  });
+  return (
+    <Sheet open={channel !== null} onOpenChange={(o) => (o ? undefined : onClose())}>
+      <SheetContent side="right" width={520}>
+        <SheetHeader>
+          <SheetTitle>Sent to {channel?.name}</SheetTitle>
+          <SheetDescription>
+            The latest alerts and tests for this channel, newest first. A failed send is not
+            retried; the reason says what to fix.
+          </SheetDescription>
+        </SheetHeader>
+        <SheetBody>
+          <QueryView query={deliveries}>
+            {(page) =>
+              page.items.length === 0 ? (
+                <p className="text-xs text-ink-3">
+                  Nothing has been sent to this channel yet. Send a test to check it.
+                </p>
+              ) : (
+                <ul
+                  className="flex flex-col divide-y divide-border rounded-md border border-border"
+                  aria-label="Deliveries"
+                >
+                  {page.items.map((d) => (
+                    <li key={d.id} className="flex flex-col gap-1 px-3 py-2 text-xs">
+                      <div className="flex items-center gap-2">
+                        <Badge
+                          tone={
+                            d.status === "sent"
+                              ? "ok"
+                              : d.status === "failed"
+                                ? "danger"
+                                : "neutral"
+                          }
+                          dot
+                        >
+                          {d.status === "sent"
+                            ? "Sent"
+                            : d.status === "failed"
+                              ? "Failed"
+                              : "Sending"}
+                        </Badge>
+                        <span className="min-w-0 flex-1 truncate text-ink">
+                          {DELIVERY_EVENT[d.event] ?? d.event}
+                        </span>
+                        <span className="shrink-0 text-2xs text-ink-3">
+                          <RelativeTime date={d.createdAt} />
+                        </span>
+                      </div>
+                      {d.error ? <p className="m-0 text-danger-text">{d.error}</p> : null}
+                    </li>
+                  ))}
+                </ul>
+              )
+            }
+          </QueryView>
+        </SheetBody>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
 function ChannelNext({
   channel,
   test,

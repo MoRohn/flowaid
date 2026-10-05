@@ -253,6 +253,17 @@ export interface NotificationChannel {
   createdAt: string;
 }
 
+/** One send to a notification channel (`GET /v1/notifications/:id/deliveries`). */
+export interface NotificationDelivery {
+  id: string;
+  /** a notification event, or "test" */
+  event: string;
+  status: "pending" | "sent" | "failed";
+  error: string | null;
+  createdAt: string;
+  sentAt: string | null;
+}
+
 export interface DeployResult {
   triggers: {
     webhooks: { id: string; path: string; url: string; signature: string; secretBound: boolean }[];

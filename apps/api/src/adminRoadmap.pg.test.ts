@@ -434,6 +434,40 @@ describeDb("admin roadmap (Postgres)", () => {
     });
   });
 
+  describe("E-09: a notification channel's delivery history", () => {
+    it("lists what was sent to the channel, tests included, with each outcome", async () => {
+      const channel = (
+        await call(t.app, jar, "POST", "/v1/notifications", {
+          kind: "webhook",
+          name: "History hook",
+          config: { url: "http://127.0.0.1:9/flowaid-test" },
+          events: ["run.failed"],
+        })
+      ).json().channel as { id: string };
+      const empty = await call(t.app, jar, "GET", `/v1/notifications/${channel.id}/deliveries`);
+      expect(empty.json().items).toEqual([]);
+      // nothing listens on port 9: the test fails and the history says why
+      const sent = await call(t.app, jar, "POST", `/v1/notifications/${channel.id}/test`);
+      expect(sent.json().ok).toBe(false);
+      const history = (
+        await call(t.app, jar, "GET", `/v1/notifications/${channel.id}/deliveries`)
+      ).json() as { items: { event: string; status: string; error: string | null }[] };
+      expect(history.items).toEqual([
+        expect.objectContaining({ event: "test", status: "failed", error: sent.json().error }),
+      ]);
+      expect(
+        (
+          await call(
+            t.app,
+            jar,
+            "GET",
+            "/v1/notifications/00000000-0000-4000-8000-000000000000/deliveries",
+          )
+        ).statusCode,
+      ).toBe(404);
+    });
+  });
+
   describe("E-06, E-07: private-address refusals say how to allow them", () => {
     let strict: TestApp;
     let strictJar: Jar;

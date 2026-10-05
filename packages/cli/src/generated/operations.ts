@@ -1379,6 +1379,17 @@ export const OPERATIONS: readonly CliOperation[] = [
   },
   {
     noun: "notification",
+    verb: "deliveries",
+    method: "GET",
+    path: "/v1/notifications/{id}/deliveries",
+    summary: "What was sent to the channel (alerts and tests), newest first",
+    auth: "session_or_api_key",
+    positional: ["id"],
+    query: [{ name: "limit", type: "integer", required: false }],
+    body: null,
+  },
+  {
+    noun: "notification",
     verb: "events",
     method: "GET",
     path: "/v1/notifications/events",

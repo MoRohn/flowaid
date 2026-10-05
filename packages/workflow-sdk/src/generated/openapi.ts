@@ -4854,6 +4854,56 @@ export interface paths {
     };
     trace?: never;
   };
+  "/v1/notifications/{id}/deliveries": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** What was sent to the channel (alerts and tests), newest first */
+    get: {
+      parameters: {
+        query?: {
+          limit?: number;
+        };
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              items: {
+                createdAt: string;
+                error: string | null;
+                event: string;
+                id: string;
+                sentAt: string | null;
+                /** @enum {string} */
+                status: "pending" | "sent" | "failed";
+              }[];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/notifications/{id}/rotate-secret": {
     parameters: {
       query?: never;

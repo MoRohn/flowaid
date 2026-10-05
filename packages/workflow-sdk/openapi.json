@@ -8009,6 +8009,65 @@
         }
       }
     },
+    "/v1/notifications/{id}/deliveries": {
+      "get": {
+        "summary": "What was sent to the channel (alerts and tests), newest first",
+        "tags": ["notifications"],
+        "parameters": [
+          {
+            "schema": { "default": 20, "type": "integer", "minimum": 1, "maximum": 100 },
+            "in": "query",
+            "name": "limit",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "x-cli": { "noun": "notification", "verb": "deliveries", "positional": ["id"] },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["admin"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": { "type": "string" },
+                          "event": { "type": "string" },
+                          "status": { "type": "string", "enum": ["pending", "sent", "failed"] },
+                          "error": { "type": ["string", "null"] },
+                          "createdAt": { "type": "string" },
+                          "sentAt": { "type": ["string", "null"] }
+                        },
+                        "required": ["id", "event", "status", "error", "createdAt", "sentAt"],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["items"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/evaluations/sets": {
       "get": {
         "tags": ["datasets"],

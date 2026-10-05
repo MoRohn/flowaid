@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { installDomStubs } from "@/primitives/testStubs";
@@ -348,6 +348,44 @@ describe("notification channels", () => {
       fireEvent.click(send);
     });
     expect(await screen.findByText("Ops hook did not receive the test")).toBeTruthy();
+  });
+
+  it("lists what was sent to a channel, with why a send failed", async () => {
+    stubApi({
+      "GET /v1/notifications": () => ({ items: [channel], next_cursor: null }),
+      "GET /v1/notifications/nc-1/deliveries": () => ({
+        items: [
+          {
+            id: "d-2",
+            event: "test",
+            status: "failed",
+            error: "the endpoint answered HTTP 500",
+            createdAt: "2026-10-05T12:00:00.000Z",
+            sentAt: null,
+          },
+          {
+            id: "d-1",
+            event: "run.failed",
+            status: "sent",
+            error: null,
+            createdAt: "2026-10-05T11:00:00.000Z",
+            sentAt: "2026-10-05T11:00:01.000Z",
+          },
+        ],
+      }),
+    });
+    render(withClient(<NotificationsTab />));
+    const open = await screen.findByRole("button", { name: "What was sent to Ops hook" });
+    act(() => {
+      fireEvent.click(open);
+    });
+    expect(await screen.findByText("Sent to Ops hook")).toBeTruthy();
+    const list = await screen.findByRole("list", { name: "Deliveries" });
+    expect(within(list).getByText("Test message")).toBeTruthy();
+    expect(within(list).getByText("Failed")).toBeTruthy();
+    expect(within(list).getByText("the endpoint answered HTTP 500")).toBeTruthy();
+    expect(within(list).getByText("A run failed")).toBeTruthy();
+    expect(within(list).getByText("Sent")).toBeTruthy();
   });
 
   it("asks before rotating a channel's signing secret", async () => {

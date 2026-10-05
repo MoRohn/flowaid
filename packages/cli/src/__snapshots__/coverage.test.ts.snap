@@ -131,6 +131,7 @@ node list {--out}
 notification
 notification create {--kind --name --config --events --enabled --slack-webhook-url --body --out}
 notification delete <id> {--out}
+notification deliveries <id> {--limit --out}
 notification events {--out}
 notification list {--limit --cursor --out}
 notification rotate-secret <id> {--out}

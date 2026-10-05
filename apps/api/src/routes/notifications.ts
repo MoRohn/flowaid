@@ -3,14 +3,15 @@
  * workspace admin subscribes to events (`GET /v1/notifications/events`). Secrets never come back:
  * a Slack webhook URL is sealed as a credential when it is set, and a `webhook` channel's HMAC
  * signing secret is generated on create (and on rotate) and returned once. `POST /:id/test`
- * delivers a test message now and reports the outcome.
+ * delivers a test message now and reports the outcome; `GET /:id/deliveries` lists what was sent
+ * to the channel (alerts and tests) with each outcome.
  */
 import { randomBytes } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
-import { and, asc, eq } from "drizzle-orm";
-import { credentials, notifications, type Tx } from "@flowaid/database";
+import { and, asc, desc, eq } from "drizzle-orm";
+import { alertDeliveries, credentials, notifications, type Tx } from "@flowaid/database";
 import {
   NOTIFICATION_EVENTS,
   NOTIFICATION_EVENT_LABELS,
@@ -404,6 +405,20 @@ export function notificationRoutes(app: FastifyInstance, ctx: ApiContext): void 
     async (req) => {
       const p = need(req.principal);
       const row = await ctx.db.tenant(p.workspaceId, (tx) => load(tx, p, req.params.id));
+      // the channel's delivery history shows tests too
+      const record = (status: "sent" | "failed", error?: string) =>
+        ctx.db.tenant(p.workspaceId, (tx) =>
+          tx.insert(alertDeliveries).values({
+            id: uuidv7(),
+            workspaceId: p.workspaceId,
+            channelId: row.id,
+            event: "test",
+            key: `test:${uuidv7()}`,
+            status,
+            error: error?.slice(0, 500) ?? null,
+            ...(status === "sent" ? { sentAt: new Date(ctx.clock.now()) } : {}),
+          }),
+        );
       try {
         await deliverNotification(
           { id: row.id, kind: row.kind, name: row.name, config: row.config },
@@ -422,12 +437,67 @@ export function notificationRoutes(app: FastifyInstance, ctx: ApiContext): void 
           },
         );
         req.audit.details = { ok: true };
+        await record("sent");
         return { ok: true };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         req.audit.details = { ok: false, error: message.slice(0, 300) };
+        await record("failed", withPrivateNetworkFix(message));
         return { ok: false, error: withPrivateNetworkFix(message) };
       }
+    },
+  );
+
+  r.get(
+    "/v1/notifications/:id/deliveries",
+    {
+      config: {
+        auth: "session_or_api_key",
+        scope: "admin",
+        cli: { noun: "notification", verb: "deliveries", positional: ["id"] },
+      },
+      schema: {
+        tags: ["notifications"],
+        summary: "What was sent to the channel (alerts and tests), newest first",
+        params: IdParams,
+        querystring: z.object({ limit: z.coerce.number().int().min(1).max(100).default(20) }),
+        response: {
+          200: z.object({
+            items: z.array(
+              z.object({
+                id: z.string(),
+                event: z.string(),
+                status: z.enum(["pending", "sent", "failed"]),
+                error: z.string().nullable(),
+                createdAt: z.string(),
+                sentAt: z.string().nullable(),
+              }),
+            ),
+          }),
+        },
+      },
+    },
+    async (req) => {
+      const p = need(req.principal);
+      const rows = await ctx.db.tenant(p.workspaceId, async (tx) => {
+        await load(tx, p, req.params.id);
+        return tx
+          .select()
+          .from(alertDeliveries)
+          .where(eq(alertDeliveries.channelId, req.params.id))
+          .orderBy(desc(alertDeliveries.createdAt), desc(alertDeliveries.id))
+          .limit(req.query.limit);
+      });
+      return {
+        items: rows.map((d) => ({
+          id: d.id,
+          event: d.event,
+          status: d.status,
+          error: d.error,
+          createdAt: d.createdAt.toISOString(),
+          sentAt: d.sentAt?.toISOString() ?? null,
+        })),
+      };
     },
   );
 }

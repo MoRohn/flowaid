@@ -43,3 +43,6 @@ FLOWAID_ALLOW_PRIVATE_NETWORK=true, instead of "You do not have access".
 OpenAPI toolsets have a Details view: their operations (method, path, what each does), the
 document and server they came from, and a form to rename them or change their credential
 (a taken name is refused with 409 instead of failing).
+
+Each notification channel has a History (`GET /v1/notifications/:id/deliveries`): the alerts
+and tests sent to it, newest first, with why a send failed. Test sends are now recorded there too.
