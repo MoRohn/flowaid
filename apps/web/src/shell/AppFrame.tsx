@@ -11,7 +11,7 @@ import { Compass, MessageSquareText, Plus } from "lucide-react";
 import { AppShell, SideNav, TopBar, UserMenu, type TopBarProps } from "@flowaid/ui/shell";
 import { Button, IconButton } from "@flowaid/ui/primitives";
 import { useAssistant } from "~/assistant/AssistantProvider";
-import { GUIDE_PANEL_ID, GUIDE_TOGGLE_ATTRIBUTE } from "~/guide/GuidePanel";
+import { GUIDE_PANEL_ID, GUIDE_ROOM, GUIDE_TOGGLE_ATTRIBUTE, guideDock } from "~/guide/GuidePanel";
 import { useGuide } from "~/guide/GuideProvider";
 import { useSession } from "~/session";
 import { useDesktop } from "./desktop";
@@ -82,7 +82,7 @@ export function AppFrame({
       storageKey={storageKey}
       // where there is room the open Guide sits beside the page instead of over it; narrower
       // screens keep the page's full width and the Guide floats as a card (GuidePanel)
-      {...(guide?.open ? { className: "min-[1680px]:[&>[data-shell-body]]:pr-[380px]" } : {})}
+      {...(guide?.open ? { className: GUIDE_ROOM[guideDock(guide.context)] } : {})}
       topbar={
         <TopBar
           breadcrumbs={links.map((c, i) => ({

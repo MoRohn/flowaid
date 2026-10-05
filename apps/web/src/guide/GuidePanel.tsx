@@ -67,6 +67,35 @@ export const GUIDE_PANEL_ID = "flowaid-guide";
 /** Marks the top bar's Guide button, where focus goes when the panel closes from inside. */
 export const GUIDE_TOGGLE_ATTRIBUTE = "data-guide-toggle";
 
+/**
+ * Where the Guide docks beside the page instead of floating over it: from 1280 px (laptops) on
+ * list and detail pages; on the builder's canvas only from 1680 px, so the canvas keeps its width
+ * and the Guide floats over its edge below that.
+ */
+export function guideDock(context: GuideContext | null): "laptop" | "wide" {
+  return context?.kind === "builder" ? "wide" : "laptop";
+}
+
+// Tailwind needs the full class names in the source, one set per breakpoint.
+const DOCKED = {
+  laptop: {
+    panel:
+      "min-[1280px]:bottom-0 min-[1280px]:right-0 min-[1280px]:top-11 min-[1280px]:rounded-none min-[1280px]:border-y-0 min-[1280px]:border-r-0 min-[1280px]:shadow-none",
+    footer: "min-[1280px]:rounded-none",
+  },
+  wide: {
+    panel:
+      "min-[1680px]:bottom-0 min-[1680px]:right-0 min-[1680px]:top-11 min-[1680px]:rounded-none min-[1680px]:border-y-0 min-[1680px]:border-r-0 min-[1680px]:shadow-none",
+    footer: "min-[1680px]:rounded-none",
+  },
+} as const;
+
+/** The room AppFrame makes beside the page while the Guide is docked. */
+export const GUIDE_ROOM = {
+  laptop: "min-[1280px]:[&>[data-shell-body]]:pr-[380px]",
+  wide: "min-[1680px]:[&>[data-shell-body]]:pr-[380px]",
+} as const;
+
 function guideFor(pathname: string, context: GuideContext | null): PageGuide | undefined {
   if (context?.kind === "builder") return BUILDER_GUIDE;
   if (context?.kind === "run") return RUN_GUIDE;
@@ -240,7 +269,7 @@ export function GuidePanel({
       // Wide screens (where AppFrame makes room): docked full height beside the page.
       className={
         "fa-sheet-right fixed bottom-3 right-3 top-14 z-40 flex flex-col rounded-md border border-border bg-surface text-ink shadow-3 " +
-        "min-[1680px]:bottom-0 min-[1680px]:right-0 min-[1680px]:top-11 min-[1680px]:rounded-none min-[1680px]:border-y-0 min-[1680px]:border-r-0 min-[1680px]:shadow-none"
+        DOCKED[guideDock(context)].panel
       }
     >
       <header className="relative flex shrink-0 flex-col gap-2 border-b border-border px-4 pb-3.5 pr-11 pt-3.5">
@@ -319,7 +348,9 @@ export function GuidePanel({
         ) : null}
       </div>
 
-      <footer className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 rounded-b-md border-t border-border bg-surface-2 px-4 py-2.5 min-[1680px]:rounded-none">
+      <footer
+        className={`flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 rounded-b-md border-t border-border bg-surface-2 px-4 py-2.5 ${DOCKED[guideDock(context)].footer}`}
+      >
         {assistant?.available ? (
           <Button
             size="sm"

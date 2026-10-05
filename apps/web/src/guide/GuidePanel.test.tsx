@@ -15,7 +15,7 @@ vi.mock("next/navigation", () => ({
 vi.mock("~/session", () => ({ useSession: () => ({ ws: "acme" }) }));
 vi.mock("~/assistant/AssistantProvider", () => ({ useAssistant: () => null }));
 
-const { GuidePanel, GUIDE_TOGGLE_ATTRIBUTE } = await import("./GuidePanel");
+const { GuidePanel, GUIDE_ROOM, GUIDE_TOGGLE_ATTRIBUTE, guideDock } = await import("./GuidePanel");
 
 beforeAll(() => installDomStubs());
 afterEach(cleanup);
@@ -71,5 +71,18 @@ describe("GuidePanel", () => {
     fireEvent.keyDown(inside, { key: "Escape" });
     expect(screen.queryByRole("complementary", { name: "Guide" })).toBeNull();
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "Guide" }));
+  });
+
+  // F-07: below 1680 px it floated over the page's header buttons on laptops
+  it("docks beside the page from 1280 px, and on the canvas only from 1680 px", () => {
+    expect(guideDock(null)).toBe("laptop");
+    expect(GUIDE_ROOM.laptop).toContain("min-[1280px]");
+    render(<Page />);
+    expect(screen.getByRole("complementary", { name: "Guide" }).className).toContain(
+      "min-[1280px]:top-11",
+    );
+    const builder = { kind: "builder", definition: { nodes: [], edges: [] } } as never;
+    expect(guideDock(builder)).toBe("wide");
+    expect(GUIDE_ROOM.wide).toContain("min-[1680px]");
   });
 });
