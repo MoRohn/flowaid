@@ -58,3 +58,7 @@ so a reload or a shared link shows the same view (7d used to come back as 24h). 
 the environment filter like everything else on the page, the success-rate hint counts timed-out runs
 with the failures, the page and its getting-started checklist share one workflow list, and "Publish
 and deploy" ticks off only once a version is deployed, not just published.
+
+"Ask someone outside the workspace" says who can open a review link before you send one: only this
+computer when FlowAId runs locally (its web address is on this computer), or only people on your
+network for a private address, with how to change that (FLOWAID_WEB_URL).

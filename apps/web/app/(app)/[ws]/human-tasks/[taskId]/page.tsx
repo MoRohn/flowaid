@@ -210,7 +210,9 @@ export default function HumanTaskPage({ params }: { params: Promise<{ taskId: st
           defaultRunOpen
           className="min-h-0"
         />
-        {canAnswer && task.request.externalReview ? <ReviewLinks taskId={task.id} /> : null}
+        {canAnswer && task.request.externalReview ? (
+          <ReviewLinks taskId={task.id} local={s.local} />
+        ) : null}
       </div>
     );
   }
