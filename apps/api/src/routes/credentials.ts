@@ -1,10 +1,21 @@
-/** Credentials (API.md §3.6): values sealed with per-credential data keys, never returned. */
+/**
+ * Credentials (API.md §3.6): values sealed with per-credential data keys, never returned. A signing
+ * secret FlowAId generated for a webhook or notification channel belongs to it (`owner`): it is left
+ * out of the list and only its owner rotates or deletes it, so it can't be broken from here.
+ */
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { and, asc, eq, isNull, or } from "drizzle-orm";
 import { assertExternalRef, secretFields } from "@flowaid/credentials";
-import { credentials, environments, secretReferences, type Tx } from "@flowaid/database";
+import {
+  credentials,
+  environments,
+  notifications,
+  secretReferences,
+  webhooks,
+  type Tx,
+} from "@flowaid/database";
 import { uuidv7 } from "@flowaid/shared";
 import {
   BadRequestError,
@@ -48,7 +59,58 @@ export const CredentialSummarySchema = z.object({
   lastUsedAt: z.string().nullable(),
   rotatedAt: z.string().nullable(),
   createdAt: z.string(),
+  /** the webhook or notification channel whose generated secret this is (never in the list) */
+  owner: z
+    .object({ kind: z.enum(["webhook", "notification"]), id: z.uuid(), name: z.string() })
+    .nullable(),
 });
+
+type CredentialOwner = { kind: "webhook" | "notification"; id: string; name: string };
+
+/** The webhook or channel an owned secret belongs to, and what the secret is for it. */
+async function ownerOf(
+  tx: Tx,
+  row: CredentialRow,
+): Promise<(CredentialOwner & { slack: boolean }) | null> {
+  if (row.ownerWebhookId) {
+    const [w] = await tx
+      .select({ path: webhooks.path })
+      .from(webhooks)
+      .where(eq(webhooks.id, row.ownerWebhookId));
+    return w ? { kind: "webhook", id: row.ownerWebhookId, name: w.path, slack: false } : null;
+  }
+  if (row.ownerNotificationId) {
+    const [n] = await tx
+      .select({ name: notifications.name, kind: notifications.kind })
+      .from(notifications)
+      .where(eq(notifications.id, row.ownerNotificationId));
+    return n
+      ? {
+          kind: "notification",
+          id: row.ownerNotificationId,
+          name: n.name,
+          slack: n.kind === "slack_webhook",
+        }
+      : null;
+  }
+  return null;
+}
+
+/** Why an owned secret can't be changed or deleted here, naming its owner and where to go. */
+export function ownedMessage(owner: CredentialOwner & { slack: boolean }): string {
+  return owner.kind === "webhook"
+    ? `this is the signing secret of webhook ${owner.name}: rotate it from Triggers → Webhooks; it is deleted with the webhook`
+    : `this is the ${owner.slack ? "Slack webhook URL" : "signing secret"} of the notification channel "${owner.name}": change it from Settings → Notifications; it is deleted with the channel`;
+}
+
+/** Refuses a change to a secret that belongs to a webhook or channel (409, owner named). */
+async function assertNotOwned(tx: Tx, row: CredentialRow): Promise<void> {
+  const owner = await ownerOf(tx, row);
+  if (owner)
+    throw new ConflictError(ownedMessage(owner), {
+      owner: { kind: owner.kind, id: owner.id, name: owner.name },
+    });
+}
 
 const CreateCredentialSchema = z.object({
   name: z.string().min(1).max(100),
@@ -76,7 +138,11 @@ export function maskSecret(value: string): string {
   return `${value.slice(0, 3)}…${value.slice(-4)}`;
 }
 
-function dto(row: CredentialRow, hints: Record<string, string> = {}) {
+function dto(
+  row: CredentialRow,
+  hints: Record<string, string> = {},
+  owner: CredentialOwner | null = null,
+) {
   return {
     id: row.id,
     name: row.name,
@@ -93,6 +159,7 @@ function dto(row: CredentialRow, hints: Record<string, string> = {}) {
     lastUsedAt: row.lastUsedAt?.toISOString() ?? null,
     rotatedAt: row.rotatedAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
+    owner: owner ? { kind: owner.kind, id: owner.id, name: owner.name } : null,
   };
 }
 
@@ -194,6 +261,9 @@ export function credentialRoutes(app: FastifyInstance, ctx: ApiContext): void {
           .where(
             and(
               eq(credentials.workspaceId, p.workspaceId),
+              // secrets that belong to a webhook or channel are managed there
+              isNull(credentials.ownerWebhookId),
+              isNull(credentials.ownerNotificationId),
               req.query.type ? eq(credentials.type, req.query.type) : undefined,
               req.query.environmentId
                 ? eq(credentials.environmentId, req.query.environmentId)
@@ -319,7 +389,10 @@ export function credentialRoutes(app: FastifyInstance, ctx: ApiContext): void {
     },
     async (req) => {
       const p = need(req.principal);
-      return dto(await ctx.db.tenant(p.workspaceId, (tx) => load(tx, p, req.params.id)));
+      return ctx.db.tenant(p.workspaceId, async (tx) => {
+        const row = await load(tx, p, req.params.id);
+        return dto(row, {}, await ownerOf(tx, row));
+      });
     },
   );
 
@@ -341,9 +414,11 @@ export function credentialRoutes(app: FastifyInstance, ctx: ApiContext): void {
     },
     async (req) => {
       const p = need(req.principal);
-      const current = await ctx.db.tenant(p.workspaceId, (tx) =>
-        loadForWrite(tx, p, req.params.id),
-      );
+      const current = await ctx.db.tenant(p.workspaceId, async (tx) => {
+        const row = await loadForWrite(tx, p, req.params.id);
+        await assertNotOwned(tx, row);
+        return row;
+      });
       if (req.body.environmentId !== undefined) assertEnvironmentAllowed(p, req.body.environmentId);
       let sealedPatch = {};
       let hints: Record<string, string> = {};
@@ -407,9 +482,11 @@ export function credentialRoutes(app: FastifyInstance, ctx: ApiContext): void {
     },
     async (req) => {
       const p = need(req.principal);
-      const current = await ctx.db.tenant(p.workspaceId, (tx) =>
-        loadForWrite(tx, p, req.params.id),
-      );
+      const current = await ctx.db.tenant(p.workspaceId, async (tx) => {
+        const row = await loadForWrite(tx, p, req.params.id);
+        await assertNotOwned(tx, row);
+        return row;
+      });
       if (current.storage === "external")
         throw new BadRequestError("rotate external credentials in their secret manager");
       // fields left out keep their values (a username, a header name, a base URL), as with PATCH
@@ -506,6 +583,8 @@ export function credentialRoutes(app: FastifyInstance, ctx: ApiContext): void {
       const p = need(req.principal);
       await ctx.db.tenant(p.workspaceId, async (tx) => {
         const row = await loadForWrite(tx, p, req.params.id);
+        // not even with force: its webhook or channel would stop working
+        await assertNotOwned(tx, row);
         const bound = await tx
           .select()
           .from(secretReferences)

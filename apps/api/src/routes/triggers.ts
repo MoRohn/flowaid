@@ -19,6 +19,7 @@ import {
   isNull,
   lt,
   lte,
+  ne,
   or,
   sql,
   type AnyColumn,
@@ -55,6 +56,15 @@ import {
 import { startRun } from "../services/runs.js";
 
 type WebhookRow = typeof webhooks.$inferSelect;
+
+/** Deletes the secrets generated for a webhook other than the one it uses now (`keep`). */
+async function dropReplacedSecrets(tx: Tx, webhookId: string, keep: string | null) {
+  await tx
+    .delete(credentials)
+    .where(
+      and(eq(credentials.ownerWebhookId, webhookId), keep ? ne(credentials.id, keep) : undefined),
+    );
+}
 
 /** Only the workflows `p` may see, in SQL so a page is not thinned after the fact. */
 const visibleWorkflows = (p: Principal, col: AnyColumn) =>
@@ -208,6 +218,13 @@ export function triggerRoutes(app: FastifyInstance, ctx: ApiContext): void {
               ),
             );
           if (!c) throw new BadRequestError("secret credential not found");
+          if (
+            c.ownerNotificationId ||
+            (c.ownerWebhookId !== null && c.ownerWebhookId !== req.params.id)
+          )
+            throw new ConflictError(
+              "that credential is the signing secret of another webhook or notification channel",
+            );
         }
         const { path: _path, ...fields } = req.body;
         const [u] = await tx
@@ -215,6 +232,9 @@ export function triggerRoutes(app: FastifyInstance, ctx: ApiContext): void {
           .set(fields)
           .where(eq(webhooks.id, req.params.id))
           .returning();
+        // a secret generated for this webhook and no longer used by it is deleted
+        if (req.body.secretCredentialId !== undefined)
+          await dropReplacedSecrets(tx, req.params.id, req.body.secretCredentialId);
         return u as WebhookRow;
       });
       return webhookDto(w, ctx, p.workspaceSlug);
@@ -247,6 +267,10 @@ export function triggerRoutes(app: FastifyInstance, ctx: ApiContext): void {
       });
       await ctx.db.tenant(p.workspaceId, async (tx) => {
         const w = await loadHook(tx, p, req.params.id);
+        // the previous secret stops working now, so it is deleted rather than left behind (first:
+        // it may hold the name)
+        await dropReplacedSecrets(tx, w.id, null);
+        // the webhook owns it: not listed under Credentials, deleted with the webhook
         await tx.insert(credentials).values({
           id: credentialId,
           workspaceId: p.workspaceId,
@@ -258,6 +282,7 @@ export function triggerRoutes(app: FastifyInstance, ctx: ApiContext): void {
           keyVersion: sealed.keyVersion,
           publicFields: sealed.publicFields,
           environmentId: w.environmentId,
+          ownerWebhookId: w.id,
           createdBy: p.userId,
         });
         await tx

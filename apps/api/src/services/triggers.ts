@@ -288,7 +288,10 @@ export async function materialiseTriggers(
   return out;
 }
 
-/** Deletes a switched-off webhook whose path another workflow takes over (deliveries cascade). */
+/**
+ * Deletes a switched-off webhook whose path another workflow takes over. Its deliveries and the
+ * signing secret generated for it go with it (cascade).
+ */
 export async function releaseWebhook(tx: Tx, webhookId: string): Promise<void> {
   await tx.delete(webhooks).where(eq(webhooks.id, webhookId));
 }

@@ -35,6 +35,8 @@ export interface Credential {
   lastUsedAt: string | null;
   rotatedAt: string | null;
   createdAt: string;
+  /** a webhook's or notification channel's generated secret (never listed; managed there) */
+  owner?: { kind: "webhook" | "notification"; id: string; name: string } | null;
 }
 export interface SecretUse {
   workflowId: string;

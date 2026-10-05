@@ -997,6 +997,13 @@ export interface paths {
                 lastTestOk: boolean | null;
                 lastUsedAt: string | null;
                 name: string;
+                owner: {
+                  /** Format: uuid */
+                  id: string;
+                  /** @enum {string} */
+                  kind: "webhook" | "notification";
+                  name: string;
+                } | null;
                 publicFields: {
                   [key: string]: string;
                 };
@@ -1062,6 +1069,13 @@ export interface paths {
               lastTestOk: boolean | null;
               lastUsedAt: string | null;
               name: string;
+              owner: {
+                /** Format: uuid */
+                id: string;
+                /** @enum {string} */
+                kind: "webhook" | "notification";
+                name: string;
+              } | null;
               publicFields: {
                 [key: string]: string;
               };
@@ -1119,6 +1133,13 @@ export interface paths {
               lastTestOk: boolean | null;
               lastUsedAt: string | null;
               name: string;
+              owner: {
+                /** Format: uuid */
+                id: string;
+                /** @enum {string} */
+                kind: "webhook" | "notification";
+                name: string;
+              } | null;
               publicFields: {
                 [key: string]: string;
               };
@@ -1201,6 +1222,13 @@ export interface paths {
               lastTestOk: boolean | null;
               lastUsedAt: string | null;
               name: string;
+              owner: {
+                /** Format: uuid */
+                id: string;
+                /** @enum {string} */
+                kind: "webhook" | "notification";
+                name: string;
+              } | null;
               publicFields: {
                 [key: string]: string;
               };
@@ -1264,6 +1292,13 @@ export interface paths {
               lastTestOk: boolean | null;
               lastUsedAt: string | null;
               name: string;
+              owner: {
+                /** Format: uuid */
+                id: string;
+                /** @enum {string} */
+                kind: "webhook" | "notification";
+                name: string;
+              } | null;
               publicFields: {
                 [key: string]: string;
               };

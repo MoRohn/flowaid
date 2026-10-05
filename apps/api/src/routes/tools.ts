@@ -134,6 +134,10 @@ export function toolRoutes(app: FastifyInstance, ctx: ApiContext): void {
       .from(credentials)
       .where(and(eq(credentials.id, id), eq(credentials.workspaceId, p.workspaceId)));
     if (!c) throw new BadRequestError("credential not found");
+    if (c.ownerWebhookId || c.ownerNotificationId)
+      throw new BadRequestError(
+        "that credential is the signing secret of a webhook or notification channel; choose another",
+      );
     return c;
   };
 

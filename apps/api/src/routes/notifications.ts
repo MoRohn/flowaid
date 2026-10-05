@@ -107,8 +107,20 @@ export function notificationRoutes(app: FastifyInstance, ctx: ApiContext): void 
     if (!row) throw new NotFoundError("notification channel not found");
     return row;
   };
-  /** Seals a secret as an `http.header` credential of the workspace; returns its id. */
-  const sealSecret = async (tx: Tx, p: Principal, label: string, name: string, value: string) => {
+  /**
+   * Seals a secret as an `http.header` credential that belongs to the channel: left out of the
+   * credentials list and deleted with the channel. It replaces the channel's previous secret, which
+   * is deleted first (it stops working now, and it would hold the name).
+   */
+  const sealSecret = async (
+    tx: Tx,
+    p: Principal,
+    channelId: string,
+    label: string,
+    name: string,
+    value: string,
+  ) => {
+    await tx.delete(credentials).where(eq(credentials.ownerNotificationId, channelId));
     const id = uuidv7();
     const sealed = await ctx.credentials.seal(id, "http.header", { name, value });
     await tx.insert(credentials).values({
@@ -121,8 +133,10 @@ export function notificationRoutes(app: FastifyInstance, ctx: ApiContext): void 
       wrappedDataKey: sealed.wrappedDataKey,
       keyVersion: sealed.keyVersion,
       publicFields: sealed.publicFields,
+      ownerNotificationId: channelId,
       createdBy: p.userId,
     });
+    await tx.update(notifications).set({ credentialId: id }).where(eq(notifications.id, channelId));
     return id;
   };
   const newSigningSecret = () => `nfsec_${randomBytes(32).toString("base64url")}`;
@@ -211,24 +225,7 @@ export function notificationRoutes(app: FastifyInstance, ctx: ApiContext): void 
         throw new BadRequestError("slackWebhookUrl applies to slack_webhook channels only");
       const signingSecret = b.kind === "webhook" ? newSigningSecret() : undefined;
       const row = await ctx.db.tenant(p.workspaceId, async (tx) => {
-        const credentialId =
-          b.kind === "slack_webhook" && b.slackWebhookUrl
-            ? await sealSecret(
-                tx,
-                p,
-                `notification ${b.name} (Slack)`,
-                "Slack-Webhook-URL",
-                b.slackWebhookUrl,
-              )
-            : signingSecret
-              ? await sealSecret(
-                  tx,
-                  p,
-                  `notification ${b.name} (signing)`,
-                  "X-FlowAId-Signature",
-                  signingSecret,
-                )
-              : null;
+        // the channel first: its secret belongs to it
         const [created] = await tx
           .insert(notifications)
           .values({
@@ -237,12 +234,33 @@ export function notificationRoutes(app: FastifyInstance, ctx: ApiContext): void 
             kind: b.kind,
             name: b.name,
             config,
-            credentialId,
+            credentialId: null,
             events: b.events,
             enabled: b.enabled,
           })
           .returning();
-        return created as Row;
+        const channel = created as Row;
+        const credentialId =
+          b.kind === "slack_webhook" && b.slackWebhookUrl
+            ? await sealSecret(
+                tx,
+                p,
+                channel.id,
+                `notification ${b.name} (Slack)`,
+                "Slack-Webhook-URL",
+                b.slackWebhookUrl,
+              )
+            : signingSecret
+              ? await sealSecret(
+                  tx,
+                  p,
+                  channel.id,
+                  `notification ${b.name} (signing)`,
+                  "X-FlowAId-Signature",
+                  signingSecret,
+                )
+              : null;
+        return { ...channel, credentialId };
       });
       req.audit = { resourceId: row.id, details: { kind: row.kind, events: row.events } };
       return reply
@@ -278,6 +296,7 @@ export function notificationRoutes(app: FastifyInstance, ctx: ApiContext): void 
           ? await sealSecret(
               tx,
               p,
+              cur.id,
               `notification ${b.name ?? cur.name} (Slack)`,
               "Slack-Webhook-URL",
               b.slackWebhookUrl,
@@ -323,14 +342,14 @@ export function notificationRoutes(app: FastifyInstance, ctx: ApiContext): void 
         const cur = await load(tx, p, req.params.id);
         if (cur.kind !== "webhook")
           throw new BadRequestError("only webhook channels have a signing secret");
-        const credentialId = await sealSecret(
+        await sealSecret(
           tx,
           p,
+          cur.id,
           `notification ${cur.name} (signing)`,
           "X-FlowAId-Signature",
           signingSecret,
         );
-        await tx.update(notifications).set({ credentialId }).where(eq(notifications.id, cur.id));
       });
       return { signingSecret };
     },
@@ -351,6 +370,7 @@ export function notificationRoutes(app: FastifyInstance, ctx: ApiContext): void 
       const p = need(req.principal);
       await ctx.db.tenant(p.workspaceId, async (tx) => {
         const cur = await load(tx, p, req.params.id);
+        // its own secret goes with it (cascade); delete the one it points at for older rows too
         await tx.delete(notifications).where(eq(notifications.id, cur.id));
         if (cur.credentialId)
           await tx.delete(credentials).where(eq(credentials.id, cur.credentialId));
