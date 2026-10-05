@@ -48,3 +48,7 @@ step) instead of "by the model", in the app and on external review links. On you
 else to hand a task to. The escalation dialog's "Notify now" box, which sent nothing, is gone, and
 the escalation reason is now kept on the audit trail as the dialog says. Assignees read as names
 ("Admins", a member's name) instead of ids.
+
+Cancelling a run asks first, in the trace header and the runs list's row menu: the confirmation
+says it can't be undone and names the task that will close unanswered, takes an optional reason
+(kept with the run), and offers "Keep running". The run's story ends with the reason.

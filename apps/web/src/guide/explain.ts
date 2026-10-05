@@ -461,12 +461,13 @@ const RUN_ENDED = new Set<RunView["status"]>(["completed", "failed", "cancelled"
  * What happened in a run, in plain sentences, from its node runs: what came in, what each
  * decision answered and how sure it was, which way each rule sent it, what a person did (or that
  * nobody did), and how it ended. Steps that did not run are left out. `timeoutMs` is the limit a
- * timed-out run reached (its RUN_TIMED_OUT event), else the definition's.
+ * timed-out run reached (its RUN_TIMED_OUT event), else the definition's; `cancelReason` is what
+ * the person who cancelled it wrote.
  */
 export function explainRun(
   run: Pick<RunView, "status" | "nodeRuns" | "error">,
   def?: WorkflowDefinition,
-  o: { timeoutMs?: number } = {},
+  o: { timeoutMs?: number; cancelReason?: string } = {},
 ): string[] {
   const lines: string[] = [];
   const runs = latestAttempts(run.nodeRuns).sort((a, b) =>
@@ -544,7 +545,8 @@ export function explainRun(
     lines.push("It finished.");
   if (run.status === "failed" && !lines.some((l) => l.startsWith("It stopped")))
     lines.push(`It failed${run.error ? `: ${run.error.message}` : ""}.`);
-  if (run.status === "cancelled") lines.push("It was cancelled.");
+  if (run.status === "cancelled")
+    lines.push(o.cancelReason ? `It was cancelled: ${o.cancelReason}` : "It was cancelled.");
   if (run.status === "timed_out") {
     const limit = o.timeoutMs ?? def?.execution?.timeoutMs;
     lines.push(

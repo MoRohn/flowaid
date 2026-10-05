@@ -6,7 +6,7 @@
  * still active. While older runs exist the count says "loaded", and a sort other than newest
  * first says it orders the loaded runs.
  */
-import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { Play } from "lucide-react";
@@ -29,7 +29,7 @@ import { useSession } from "~/session";
 import { ErrorPanel, errorMessage } from "~/shell/states";
 import { toEnvironmentViews } from "~/views";
 import { useWorkflowNames } from "./api";
-import { RunActionDialog, type RunActionRequest } from "./RunActionDialog";
+import { RunActionDialog, type RunAction, type RunActionRequest } from "./RunActionDialog";
 import { SavedViewsMenu } from "./SavedViewsMenu";
 import { isActiveRun, toRunRow } from "./views";
 
@@ -124,20 +124,15 @@ export function RunsList({ workflowId }: { workflowId?: string }) {
     router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
   };
 
-  const cancel = useMutation({
-    mutationFn: (id: string) => post(`/v1/runs/${id}/cancel`, {}),
-    onSuccess: () => {
-      toast.success("Cancel requested");
-      void qc.invalidateQueries({ queryKey: ["runs", s.ws] });
-    },
-    onError: (e) => toast.error(errorMessage(e)),
-  });
-  // replay re-executes (and may pay for) every step, so a row's Replay asks first
-  const [replaying, setReplaying] = useState<string | null>(null);
-  const replay = async ({ path, body }: RunActionRequest) => {
+  // a row's Replay re-executes (and may pay for) every step and Cancel can't be undone: both ask
+  const [pending, setPending] = useState<{ runId: string; action: RunAction } | null>(null);
+  const submitAction = async ({ path, body }: RunActionRequest) => {
     try {
       const r = await post<{ run_id: string }>(path, body ?? {});
-      router.push(`/${s.ws}/runs/${r.run_id}`);
+      if (path.endsWith("/cancel")) {
+        toast.success("Cancel requested");
+        void qc.invalidateQueries({ queryKey: ["runs", s.ws] });
+      } else router.push(`/${s.ws}/runs/${r.run_id}`);
     } catch (e) {
       toast.error(errorMessage(e));
       throw e;
@@ -174,8 +169,12 @@ export function RunsList({ workflowId }: { workflowId?: string }) {
         onOpen={(r) => router.push(`/${s.ws}/runs/${r.id}`)}
         rowHref={(r) => `/${s.ws}/runs/${r.id}`}
         {...(workflowId ? { defaultColumnVisibility: { workflowName: false } } : {})}
-        {...(s.can("runs:cancel") ? { onCancel: (r) => cancel.mutate(r.id) } : {})}
-        {...(s.can("runs:replay") ? { onReplay: (r) => setReplaying(r.id) } : {})}
+        {...(s.can("runs:cancel")
+          ? { onCancel: (r) => setPending({ runId: r.id, action: { kind: "cancel" } }) }
+          : {})}
+        {...(s.can("runs:replay")
+          ? { onReplay: (r) => setPending({ runId: r.id, action: { kind: "replay" } }) }
+          : {})}
         toolbar={
           <FilterBar
             value={filters}
@@ -224,14 +223,14 @@ export function RunsList({ workflowId }: { workflowId?: string }) {
         }
         aria-label="Runs"
       />
-      {replaying ? (
+      {pending ? (
         <RunActionDialog
-          runId={replaying}
-          action={{ kind: "replay" }}
+          runId={pending.runId}
+          action={pending.action}
           onOpenChange={(open) => {
-            if (!open) setReplaying(null);
+            if (!open) setPending(null);
           }}
-          onSubmit={replay}
+          onSubmit={submitAction}
         />
       ) : null}
       {runs.hasNextPage ? (

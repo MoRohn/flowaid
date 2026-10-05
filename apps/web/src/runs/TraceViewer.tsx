@@ -49,6 +49,7 @@ import {
   lastDurableSeq,
   mergeEvents,
   nodeIndex,
+  runCancelReason,
   runTimeoutMs,
   taskToApproval,
   toLiveRunView,
@@ -142,12 +143,17 @@ export function TraceViewer({ runId }: { runId: string }) {
   });
 
   const cancel = useMutation({
-    mutationFn: () => post(`/v1/runs/${runId}/cancel`, {}),
+    mutationFn: (body: Record<string, unknown>) => post(`/v1/runs/${runId}/cancel`, body),
     onSuccess: () => toast.success("Cancel requested; running nodes finish their current step"),
     onError: (e) => toast.error(errorMessage(e)),
   });
-  // Replay, fork and restart open the new run; retry-node reopens this one in place.
+  // Replay, fork and restart open the new run; retry-node reopens this one in place; cancel
+  // (confirmed in the same dialog) stops this one.
   const runAction = async ({ path, body }: RunActionRequest) => {
+    if (path.endsWith("/cancel")) {
+      await cancel.mutateAsync(body ?? {});
+      return;
+    }
     try {
       const r = await post<{ run_id: string; status?: string }>(path, body ?? {});
       if (r.run_id === runId) {
@@ -187,6 +193,7 @@ export function TraceViewer({ runId }: { runId: string }) {
   }
   const isLive = isActiveRun(run.status);
   const timeoutMs = run.status === "timed_out" ? runTimeoutMs(allEvents) : undefined;
+  const cancelReason = run.status === "cancelled" ? runCancelReason(allEvents) : undefined;
   const byId = new Map(run.nodeRuns.map((n) => [n.id, n]));
   const current = selected ? byId.get(selected) : undefined;
   const attempts = current
@@ -244,7 +251,15 @@ export function TraceViewer({ runId }: { runId: string }) {
       <div className="flex flex-col gap-3 border-b border-border px-6 py-4">
         <RunHeader
           run={run}
-          {...(isLive && s.can("runs:cancel") ? { onCancel: () => cancel.mutate() } : {})}
+          {...(isLive && s.can("runs:cancel")
+            ? {
+                onCancel: () =>
+                  setAction({
+                    kind: "cancel",
+                    ...(run.pendingApproval ? { waitingFor: run.pendingApproval.nodeName } : {}),
+                  }),
+              }
+            : {})}
           {...(canReplay
             ? {
                 onReplay: () => setAction({ kind: "replay" }),
@@ -297,6 +312,7 @@ export function TraceViewer({ runId }: { runId: string }) {
           run={run}
           {...(definition ? { definition } : {})}
           {...(timeoutMs !== undefined ? { timeoutMs } : {})}
+          {...(cancelReason ? { cancelReason } : {})}
         />
         <PageIntro guide={RUN_DETAIL} defaultCollapsed className="" />
         {isLive && (stream.fallback || stream.pollError) ? (
@@ -442,10 +458,12 @@ function RunStory({
   run,
   definition,
   timeoutMs,
+  cancelReason,
 }: {
   run: RunView;
   definition?: WorkflowDefinition;
   timeoutMs?: number;
+  cancelReason?: string;
 }) {
   useGuideContext(
     useMemo(
@@ -453,7 +471,10 @@ function RunStory({
       [run, definition],
     ),
   );
-  const story = explainRun(run, definition, timeoutMs !== undefined ? { timeoutMs } : {});
+  const story = explainRun(run, definition, {
+    ...(timeoutMs !== undefined ? { timeoutMs } : {}),
+    ...(cancelReason ? { cancelReason } : {}),
+  });
   if (!story.length) return null;
   return (
     <details open className="rounded-sm border border-border bg-surface-2 px-3 py-2">

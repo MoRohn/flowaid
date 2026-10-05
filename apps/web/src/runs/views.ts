@@ -126,6 +126,16 @@ export function toLiveRunView(i: LiveRunInput) {
   return { view, folded };
 }
 
+/** The reason given when the run was cancelled (its RUN_CANCEL_REQUESTED), if any. */
+export function runCancelReason(events: readonly unknown[]): string | undefined {
+  for (let i = events.length - 1; i >= 0; i--) {
+    const e = events[i] as { type?: unknown; reason?: unknown };
+    if (e.type === "RUN_CANCEL_REQUESTED")
+      return typeof e.reason === "string" && e.reason.trim() ? e.reason.trim() : undefined;
+  }
+  return undefined;
+}
+
 /** The time limit a timed-out run reached, from its RUN_TIMED_OUT event. */
 export function runTimeoutMs(events: readonly unknown[]): number | undefined {
   for (let i = events.length - 1; i >= 0; i--) {

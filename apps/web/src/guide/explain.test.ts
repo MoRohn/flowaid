@@ -438,6 +438,14 @@ describe("explainRun", () => {
       );
   });
 
+  it("tells why a run was cancelled when the person said", () => {
+    const run = { status: "cancelled" as const, nodeRuns: [nr("start", 0)] };
+    expect(explainRun(run, def, { cancelReason: "Duplicate request" })).toEqual([
+      "A request came in.",
+      "It was cancelled: Duplicate request",
+    ]);
+  });
+
   it("gives a timed-out run its own next steps, with no failed step to open", () => {
     const next = nextForRun({ status: "timed_out", nodeRuns: [] }).join(" ");
     expect(next).toContain("time limit");
