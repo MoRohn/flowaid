@@ -11,6 +11,7 @@ import { Compass, MessageSquareText, Plus } from "lucide-react";
 import { AppShell, SideNav, TopBar, UserMenu, type TopBarProps } from "@flowaid/ui/shell";
 import { Button, IconButton } from "@flowaid/ui/primitives";
 import { useAssistant } from "~/assistant/AssistantProvider";
+import { GUIDE_PANEL_ID, GUIDE_TOGGLE_ATTRIBUTE } from "~/guide/GuidePanel";
 import { useGuide } from "~/guide/GuideProvider";
 import { useSession } from "~/session";
 import { useDesktop } from "./desktop";
@@ -96,7 +97,9 @@ export function AppFrame({
                 <Button
                   variant="ghost"
                   size="sm"
-                  aria-pressed={guide.open}
+                  aria-expanded={guide.open}
+                  {...(guide.open ? { "aria-controls": GUIDE_PANEL_ID } : {})}
+                  {...{ [GUIDE_TOGGLE_ATTRIBUTE]: "" }}
                   className={guide.open ? "bg-accent-soft text-accent-text" : undefined}
                   leadingIcon={<Compass strokeWidth={1.75} />}
                   onClick={() => guide.setOpen(!guide.open)}
