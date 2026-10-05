@@ -48,7 +48,12 @@ export function AgentCard({
   const missing = new Set(missingTools(tools, known));
   const bounds = boundsOf(a.config);
   return (
-    <Card className={a.active === false ? "opacity-80" : undefined}>
+    // an inactive agent's card is marked by its border and its switch's words, never by dimming
+    // the text (that took it below 4.5:1 contrast)
+    <Card
+      className={a.active === false ? "border-dashed shadow-none" : undefined}
+      data-inactive={a.active === false || undefined}
+    >
       <CardHeader>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">

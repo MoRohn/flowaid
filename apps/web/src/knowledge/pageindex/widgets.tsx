@@ -152,7 +152,7 @@ function Picker({
         >
           <span className="min-w-0 flex-1">
             {UNAVAILABLE}
-            <span className="ml-1.5 font-mono text-2xs opacity-80">{id}</span>
+            <span className="ml-1.5 font-mono text-2xs">{id}</span>
           </span>
           <IconButton
             size="sm"

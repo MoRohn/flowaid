@@ -77,6 +77,25 @@ describe("an agent card", () => {
     );
   });
 
+  it("marks an inactive agent without dimming its text", () => {
+    const { container } = render(
+      withClient(
+        <AgentCard
+          agent={{ ...agent, active: false }}
+          catalog={[]}
+          canWrite
+          onEdit={() => undefined}
+          onDelete={() => undefined}
+        />,
+      ),
+    );
+    const cardEl = container.querySelector("[data-inactive]");
+    expect(cardEl).not.toBeNull();
+    // opacity took the labels and tool chips below 4.5:1 contrast (axe, light theme)
+    expect(cardEl?.className).not.toMatch(/(^|\s)opacity-/);
+    expect(screen.getByRole("switch", { name: /^Stale helper: Inactive/ })).toBeDefined();
+  });
+
   it("names its actions and its switch after the agent", () => {
     card([]);
     expect(screen.getByRole("button", { name: "Edit Stale helper" })).toBeDefined();
