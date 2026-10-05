@@ -8,6 +8,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { DialogOverlay } from "./Dialog";
+import { useReturnFocus } from "./focusReturn";
 import { IconButton } from "./IconButton";
 
 export const Sheet = DialogPrimitive.Root;
@@ -27,7 +28,8 @@ export interface SheetContentProps extends ComponentPropsWithoutRef<
 
 /**
  * Side panel variant of Dialog. Slides in from the right (default) and takes
- * the full height; use it for run detail, node settings and long forms.
+ * the full height; use it for run detail, node settings and long forms. Like Dialog, closing
+ * returns focus to whatever opened it.
  */
 export const SheetContent = forwardRef<
   ComponentRef<typeof DialogPrimitive.Content>,
@@ -41,16 +43,20 @@ export const SheetContent = forwardRef<
     noOverlay = false,
     children,
     style,
+    onOpenAutoFocus,
+    onCloseAutoFocus,
     ...rest
   },
   ref,
 ) {
   const w = typeof width === "number" ? `${width}px` : width;
+  const focus = useReturnFocus({ onOpenAutoFocus, onCloseAutoFocus });
   return (
     <DialogPrimitive.Portal>
       {noOverlay ? null : <DialogOverlay />}
       <DialogPrimitive.Content
         ref={ref}
+        data-fa-overlay=""
         style={{ "--sheet-w": w, ...style }}
         className={cn(
           "fixed inset-y-0 z-50 flex w-[min(var(--sheet-w),calc(100vw-32px))] flex-col border-border bg-surface text-ink shadow-3 outline-none",
@@ -58,6 +64,8 @@ export const SheetContent = forwardRef<
           className,
         )}
         {...rest}
+        onOpenAutoFocus={focus.onOpenAutoFocus}
+        onCloseAutoFocus={focus.onCloseAutoFocus}
       >
         {children}
         {!hideClose ? (

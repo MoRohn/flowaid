@@ -4,6 +4,7 @@
  * respond to the keyboard, Tooltip shows its content on focus.
  */
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { useState } from "react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
@@ -17,6 +18,12 @@ import {
   DialogTrigger,
 } from "./Dialog";
 import { Sheet, SheetBody, SheetContent, SheetTitle, SheetTrigger } from "./Sheet";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "./DropdownMenu";
 import { Popover, PopoverContent, PopoverTrigger } from "./Popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./Tabs";
 import { Switch } from "./Switch";
@@ -95,6 +102,158 @@ describe("Sheet", () => {
     expect(sheet.getAttribute("data-side") ?? sheet.className).toMatch(/left/);
     await user.click(screen.getByRole("button", { name: /close/i }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+});
+
+// F-05: overlays opened from code (no Radix trigger) gave focus to <body> when they closed
+describe("focus return", () => {
+  function FromButton({ sheet = false }: { sheet?: boolean }) {
+    const [open, setOpen] = useState(false);
+    const Root = sheet ? Sheet : Dialog;
+    const Content = sheet ? SheetContent : DialogContent;
+    const Title = sheet ? SheetTitle : DialogTitle;
+    return (
+      <>
+        <button type="button">Before</button>
+        <button type="button" onClick={() => setOpen(true)}>
+          Open navigation
+        </button>
+        <Root open={open} onOpenChange={setOpen}>
+          <Content aria-describedby={undefined}>
+            <Title>Navigation</Title>
+            <button type="button">Workflows</button>
+          </Content>
+        </Root>
+      </>
+    );
+  }
+
+  it("returns focus to the button that opened a dialog from code", async () => {
+    const user = userEvent.setup();
+    render(<FromButton />);
+    const opener = screen.getByRole("button", { name: "Open navigation" });
+    await user.click(opener);
+    await screen.findByRole("dialog", { name: "Navigation" });
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await waitFor(() => expect(opener).toHaveFocus());
+  });
+
+  it("returns focus to the button that opened a sheet from code", async () => {
+    const user = userEvent.setup();
+    render(<FromButton sheet />);
+    const opener = screen.getByRole("button", { name: "Open navigation" });
+    await user.click(opener);
+    await screen.findByRole("dialog", { name: "Navigation" });
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await waitFor(() => expect(opener).toHaveFocus());
+  });
+
+  it("returns focus to the menu button when a menu item opened the dialog", async () => {
+    function FromMenu() {
+      const [open, setOpen] = useState(false);
+      return (
+        <>
+          <DropdownMenu>
+            <DropdownMenuTrigger>Close or quit</DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onSelect={() => setOpen(true)}>Quit FlowAId…</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogContent aria-describedby={undefined}>
+              <DialogTitle>Quit FlowAId?</DialogTitle>
+              <button type="button">Quit</button>
+            </DialogContent>
+          </Dialog>
+        </>
+      );
+    }
+    const user = userEvent.setup();
+    render(<FromMenu />);
+    const trigger = screen.getByRole("button", { name: "Close or quit" });
+    await user.click(trigger);
+    await user.click(await screen.findByRole("menuitem", { name: "Quit FlowAId…" }));
+    await screen.findByRole("dialog", { name: "Quit FlowAId?" });
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await waitFor(() => expect(trigger).toHaveFocus());
+  });
+
+  it("passes over a control that went with an overlay to that overlay's own opener", async () => {
+    // ⌘K → "Quit FlowAId…": the palette closes as the confirmation opens
+    function FromPalette() {
+      const [palette, setPalette] = useState(false);
+      const [confirm, setConfirm] = useState(false);
+      return (
+        <>
+          <button type="button" onClick={() => setPalette(true)}>
+            Search
+          </button>
+          <Dialog open={palette} onOpenChange={setPalette}>
+            <DialogContent aria-describedby={undefined}>
+              <DialogTitle>Command menu</DialogTitle>
+              <button
+                type="button"
+                onClick={() => {
+                  setPalette(false);
+                  setConfirm(true);
+                }}
+              >
+                Quit FlowAId…
+              </button>
+            </DialogContent>
+          </Dialog>
+          <Dialog open={confirm} onOpenChange={setConfirm}>
+            <DialogContent aria-describedby={undefined}>
+              <DialogTitle>Quit FlowAId?</DialogTitle>
+              <button type="button">Quit</button>
+            </DialogContent>
+          </Dialog>
+        </>
+      );
+    }
+    const user = userEvent.setup();
+    render(<FromPalette />);
+    const search = screen.getByRole("button", { name: "Search" });
+    await user.click(search);
+    await user.click(await screen.findByRole("button", { name: "Quit FlowAId…" }));
+    await screen.findByRole("dialog", { name: "Quit FlowAId?" });
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await waitFor(() => expect(search).toHaveFocus());
+  });
+
+  it("keeps the caller's own close focus when it prevents the default", async () => {
+    const user = userEvent.setup();
+    function Custom() {
+      const [open, setOpen] = useState(false);
+      return (
+        <>
+          <button type="button" onClick={() => setOpen(true)}>
+            Open
+          </button>
+          <input aria-label="Name" />
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogContent
+              aria-describedby={undefined}
+              onCloseAutoFocus={(e) => {
+                e.preventDefault();
+                screen.getByRole("textbox", { name: "Name" }).focus();
+              }}
+            >
+              <DialogTitle>Rename</DialogTitle>
+            </DialogContent>
+          </Dialog>
+        </>
+      );
+    }
+    render(<Custom />);
+    await user.click(screen.getByRole("button", { name: "Open" }));
+    await screen.findByRole("dialog");
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.getByRole("textbox", { name: "Name" })).toHaveFocus());
   });
 });
 
