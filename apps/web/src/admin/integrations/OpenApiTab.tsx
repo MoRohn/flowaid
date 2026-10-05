@@ -756,7 +756,18 @@ export function OpenApiTab() {
               icon={<FileCode2 strokeWidth={1.5} />}
               title="No OpenAPI tools"
               description="Import an OpenAPI 3 document to call its operations from workflows. You need the document's address (or its text) and, if the API needs one, its key stored under Credentials."
-              primaryAction={button ?? undefined}
+              primaryAction={
+                canWrite ? (
+                  // the section's own Import OpenAPI is the screen's one filled button
+                  <Button
+                    variant="secondary"
+                    leadingIcon={<Plus strokeWidth={1.75} />}
+                    onClick={() => setImporting(true)}
+                  >
+                    Import OpenAPI
+                  </Button>
+                ) : undefined
+              }
             />
           ) : (
             <ul

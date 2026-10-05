@@ -347,8 +347,9 @@ function ServersSection() {
               description="Connect a server to call its tools from MCP steps and agents. You need its address, and a key stored under Credentials if it asks for one."
               primaryAction={
                 canWrite ? (
+                  // the section's own Connect server is the screen's one filled button
                   <Button
-                    variant="primary"
+                    variant="secondary"
                     leadingIcon={<Plus strokeWidth={1.75} />}
                     onClick={() => setCreating(true)}
                   >
