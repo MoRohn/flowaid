@@ -5,6 +5,7 @@
 "@flowaid/ui": patch
 "@flowaid/cli": patch
 "@flowaid/workflow-sdk": patch
+"@flowaid/observability": patch
 ---
 
 Signing secrets FlowAId generates for webhooks and notification channels now belong to them
@@ -32,3 +33,9 @@ A schedule's Run now asks first, naming the environment (and saying when it is p
 offers Open run; the schedule's last run shows the manual run. Rotating a webhook's or
 notification channel's signing secret asks first, since the current secret stops working at once.
 Switches, Send a test and rotation buttons show that they are working and can't be fired twice.
+
+MCP servers can be edited (name, address or program, sign-in); changing where one runs or how it
+signs in sets it back to Pending. Test and Discover show that they are running, record their
+outcome on the row at once, and name the real cause of a failure. Every refusal of a private or
+local address (MCP servers, OpenAPI documents and tools, notification sends) now says to set
+FLOWAID_ALLOW_PRIVATE_NETWORK=true, instead of "You do not have access".

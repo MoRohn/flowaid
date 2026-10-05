@@ -15,6 +15,7 @@ import {
   NOTIFICATION_EVENTS,
   NOTIFICATION_EVENT_LABELS,
   deliverNotification,
+  withPrivateNetworkFix,
 } from "@flowaid/observability";
 import { uuidv7 } from "@flowaid/shared";
 import {
@@ -78,7 +79,11 @@ const dto = (r: Row) => ({
   createdAt: r.createdAt.toISOString(),
 });
 
-/** The kind's config, validated; `webhook` URLs must be reachable from the server. */
+/**
+ * The kind's config, validated. A `webhook` URL is not called here: a private or local one is
+ * accepted, and its sends are refused (saying how to allow them) until the server allows such
+ * addresses.
+ */
 function checkConfig(kind: Row["kind"], config: unknown): JsonObject {
   const schema =
     kind === "email" ? EmailConfig : kind === "webhook" ? WebhookConfig : z.strictObject({});
@@ -421,7 +426,7 @@ export function notificationRoutes(app: FastifyInstance, ctx: ApiContext): void 
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         req.audit.details = { ok: false, error: message.slice(0, 300) };
-        return { ok: false, error: message };
+        return { ok: false, error: withPrivateNetworkFix(message) };
       }
     },
   );

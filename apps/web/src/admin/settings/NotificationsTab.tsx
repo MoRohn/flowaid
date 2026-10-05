@@ -46,6 +46,7 @@ import {
   draftOf,
   type ChannelDraft,
 } from "../triggers/logic";
+import { isPrivateUrl } from "../integrations/guide";
 
 export function NotificationsTab() {
   const s = useSession();
@@ -502,6 +503,13 @@ function ChannelDialog({
               />
             </FieldRow>
           )}
+          {d.kind === "webhook" && isPrivateUrl(d.url.trim()) ? (
+            <Notice tone="info">
+              This address is on this computer or your private network. FlowAId sends to such
+              addresses only when it runs with FLOWAID_ALLOW_PRIVATE_NETWORK=true (in .env.local);
+              otherwise every send is refused.
+            </Notice>
+          ) : null}
         </>
       ),
     },

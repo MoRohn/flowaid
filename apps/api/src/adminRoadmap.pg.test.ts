@@ -352,4 +352,102 @@ describeDb("admin roadmap (Postgres)", () => {
       expect(row?.lastRunAt).not.toBeNull();
     });
   });
+
+  describe("E-06: MCP servers can be edited, and their errors are named", () => {
+    it("a changed address sets the status back to pending", async () => {
+      const created = await call(t.app, jar, "POST", "/v1/mcp/servers", {
+        name: "Editable MCP",
+        transport: "streamable_http",
+        url: "http://127.0.0.1:9/mcp",
+        authKind: "none",
+      });
+      const id = created.json().id as string;
+      // nothing listens on port 9: the saved test fails and the row says so at once
+      const tested = await call(t.app, jar, "POST", `/v1/mcp/servers/${id}/test`);
+      expect(tested.json().ok).toBe(false);
+      const failed = (await call(t.app, jar, "GET", `/v1/mcp/servers/${id}`)).json();
+      expect(failed.status).toBe("error");
+      expect(failed.lastError).toBeTruthy();
+      expect(failed.lastCheckedAt).not.toBeNull();
+
+      const renamed = await call(t.app, jar, "PATCH", `/v1/mcp/servers/${id}`, {
+        name: "Edited MCP",
+      });
+      expect(renamed.json()).toMatchObject({ name: "Edited MCP", status: "error" });
+      const moved = await call(t.app, jar, "PATCH", `/v1/mcp/servers/${id}`, {
+        url: "http://127.0.0.1:10/mcp",
+      });
+      expect(moved.json()).toMatchObject({ status: "pending", lastError: null });
+
+      await call(t.app, jar, "POST", "/v1/mcp/servers", {
+        name: "Other MCP",
+        transport: "streamable_http",
+        url: "https://mcp.example.com/mcp",
+        authKind: "none",
+      });
+      expect(
+        (await call(t.app, jar, "PATCH", `/v1/mcp/servers/${id}`, { name: "Other MCP" }))
+          .statusCode,
+      ).toBe(409);
+    });
+  });
+
+  describe("E-06, E-07: private-address refusals say how to allow them", () => {
+    let strict: TestApp;
+    let strictJar: Jar;
+    beforeAll(async () => {
+      strict = await createTestApp({ allowPrivateNetwork: false });
+      strictJar = await login(strict.app);
+    });
+    afterAll(async () => {
+      await strict.close();
+    });
+
+    it("MCP discover and test, OpenAPI preview and a notification test name the setting", async () => {
+      const server = await call(strict.app, strictJar, "POST", "/v1/mcp/servers", {
+        name: "Local MCP",
+        transport: "streamable_http",
+        url: "http://127.0.0.1:9/mcp",
+        authKind: "none",
+      });
+      const id = server.json().id as string;
+      const discover = await call(strict.app, strictJar, "POST", `/v1/mcp/servers/${id}/discover`);
+      // not 403 ("you have no access"): the address was refused
+      expect(discover.statusCode).toBe(400);
+      expect(discover.json().error.message).toContain("FLOWAID_ALLOW_PRIVATE_NETWORK=true");
+      const row = (await call(strict.app, strictJar, "GET", `/v1/mcp/servers/${id}`)).json();
+      expect(row.status).toBe("error");
+      expect(row.lastError).toContain("FLOWAID_ALLOW_PRIVATE_NETWORK=true");
+      const test = await call(strict.app, strictJar, "POST", `/v1/mcp/servers/${id}/test`);
+      expect(test.json().ok).toBe(false);
+      expect(test.json().message).toContain("FLOWAID_ALLOW_PRIVATE_NETWORK=true");
+
+      const preview = await call(strict.app, strictJar, "POST", "/v1/tools/openapi/preview", {
+        document: {
+          openapi: "3.0.3",
+          info: { title: "Local", version: "1" },
+          servers: [{ url: "http://localhost:3101" }],
+          paths: {},
+        },
+      });
+      expect(preview.statusCode).toBe(400);
+      expect(preview.json().error.message).toContain("FLOWAID_ALLOW_PRIVATE_NETWORK=true");
+      expect(preview.json().error.message).not.toContain("E_TOOL_SERVER_PRIVATE:");
+
+      const channel = await call(strict.app, strictJar, "POST", "/v1/notifications", {
+        kind: "webhook",
+        name: "Local hook",
+        config: { url: "http://127.0.0.1:9/flowaid-test" },
+        events: ["run.failed"],
+      });
+      const sent = await call(
+        strict.app,
+        strictJar,
+        "POST",
+        `/v1/notifications/${channel.json().channel.id as string}/test`,
+      );
+      expect(sent.json().ok).toBe(false);
+      expect(sent.json().error).toContain("FLOWAID_ALLOW_PRIVATE_NETWORK=true");
+    });
+  });
 });

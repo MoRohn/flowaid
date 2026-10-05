@@ -90,8 +90,10 @@ export function QueryView<T>({
 }
 
 /**
- * A mutation that toasts its outcome and invalidates the given query keys on success. The
- * error toast carries the API's message; `onSuccess` runs before invalidation.
+ * A mutation that toasts its outcome and invalidates the given query keys on success (and on
+ * failure with `refreshOnError`, for actions whose failure the server records, such as a failed
+ * discovery marking a row as errored). The error toast carries the API's message; `onSuccess` runs
+ * before invalidation.
  */
 export function useMutate<TVars, TData = unknown>(
   fn: (vars: TVars) => Promise<TData>,
@@ -100,6 +102,7 @@ export function useMutate<TVars, TData = unknown>(
     invalidate?: QueryKey[];
     onSuccess?: (data: TData, vars: TVars) => void;
     errorTitle?: string;
+    refreshOnError?: boolean;
   } = {},
 ) {
   const qc = useQueryClient();
@@ -111,8 +114,12 @@ export function useMutate<TVars, TData = unknown>(
       if (msg) toast.success(msg);
       await Promise.all((o.invalidate ?? []).map((queryKey) => qc.invalidateQueries({ queryKey })));
     },
-    onError: (error) => {
+    onError: async (error) => {
       toast.error(o.errorTitle ?? "That did not work", { description: errorMessage(error) });
+      if (o.refreshOnError)
+        await Promise.all(
+          (o.invalidate ?? []).map((queryKey) => qc.invalidateQueries({ queryKey })),
+        );
     },
   });
 }

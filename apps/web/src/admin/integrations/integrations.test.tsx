@@ -15,6 +15,7 @@ vi.mock("~/session", () => ({
 }));
 
 const { McpServerDialog } = await import("./McpServerDialog");
+const { McpTab } = await import("./McpTab");
 const { OpenApiTab } = await import("./OpenApiTab");
 
 function memoryStorage(): Storage {
@@ -311,6 +312,76 @@ describe("exposing a workflow as an MCP tool", () => {
     expect(bodyOf(callsTo(fetchMock, "PATCH /v1/mcp/exposures/e-1")[0]?.[1])).toEqual({
       enabled: true,
     });
+  });
+});
+
+describe("saved MCP servers", () => {
+  it("edits a server, sending only what changed, and asks for a new test", async () => {
+    const fetchMock = stubApi({
+      "GET /v1/mcp/servers": () => ({
+        items: [{ ...server, status: "error", lastError: "connect ECONNREFUSED" }],
+        next_cursor: null,
+      }),
+      "GET /v1/credentials": () => ({ items: [], next_cursor: null }),
+      "PATCH /v1/mcp/servers/srv-1": () => ({
+        ...server,
+        url: "https://mcp.example.com/mcp",
+        status: "pending",
+      }),
+    });
+    render(withClient(<McpTab />));
+    fireEvent.click(await screen.findByRole("button", { name: "Edit files" }));
+    expect(screen.getByText(/sets it back to Pending/)).toBeTruthy();
+    expect(button("Save changes").disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText(/^URL/), {
+      target: { value: "https://mcp.example.com/mcp" },
+    });
+    fireEvent.click(button("Save changes"));
+    await waitFor(() => expect(callsTo(fetchMock, "PATCH /v1/mcp/servers/srv-1")).toHaveLength(1));
+    expect(bodyOf(callsTo(fetchMock, "PATCH /v1/mcp/servers/srv-1")[0]?.[1])).toEqual({
+      url: "https://mcp.example.com/mcp",
+    });
+    expect(await screen.findByText(/test it or discover its tools again/)).toBeTruthy();
+  });
+
+  it("names why discovery was refused, shows it busy, and refreshes the row", async () => {
+    let listed = 0;
+    let refuse: (r: Response) => void = () => undefined;
+    // the discovery answers only when the test says so
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: string, init?: RequestInit) => {
+        const key = `${init?.method ?? "GET"} ${input.split("?")[0] ?? input}`;
+        if (key === "POST /v1/mcp/servers/srv-1/discover")
+          return new Promise<Response>((resolve) => (refuse = resolve));
+        if (key === "GET /v1/mcp/servers") {
+          listed++;
+          return Promise.resolve(Response.json({ items: [server], next_cursor: null }));
+        }
+        return Promise.resolve(apiError(404, "NOT_FOUND", `no ${key}`));
+      }),
+    );
+    render(withClient(<McpTab />));
+    const discover = await screen.findByRole<HTMLButtonElement>("button", {
+      name: "Discover tools of files",
+    });
+    fireEvent.click(discover);
+    // running: it can't be fired twice
+    await waitFor(() => expect(button("Discover tools of files").disabled).toBe(true));
+    await act(async () => {
+      refuse(
+        apiError(
+          400,
+          "BAD_REQUEST",
+          "refused to connect to localhost. To allow addresses on this computer or your network, set FLOWAID_ALLOW_PRIVATE_NETWORK=true in .env.local and restart FlowAId.",
+        ),
+      );
+      await Promise.resolve();
+    });
+    expect(
+      await screen.findByText(/set FLOWAID_ALLOW_PRIVATE_NETWORK=true in .env.local/),
+    ).toBeTruthy();
+    await waitFor(() => expect(listed).toBe(2));
   });
 });
 
