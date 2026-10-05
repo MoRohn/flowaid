@@ -1,6 +1,8 @@
 /** Agent presets (`/v1/agents`): the form's draft ⇄ the preset config the API stores. */
 
 export type ApprovalMode = "always" | "irreversible" | "never";
+/** Streaming as the form sets it: unset (the Agent step's default, off), or on/off explicitly. */
+export type StreamMode = "default" | "on" | "off";
 
 export interface AgentPreset {
   id: string;
@@ -22,7 +24,28 @@ export interface AgentDraft {
   maxSteps: string;
   maxToolCalls: string;
   maxCostUsd: string;
+  /** the "Advanced" limits: sampling temperature, output tokens per turn, token cap, streaming */
+  temperature: string;
+  maxOutputTokens: string;
+  maxTokens: string;
+  stream: StreamMode;
+  /** stored settings the form has no field for, saved back unchanged */
+  extra: Record<string, unknown>;
 }
+
+/** The config keys the form edits; any other key of a stored config travels in `extra`. */
+const FORM_KEYS: ReadonlySet<string> = new Set([
+  "model",
+  "system",
+  "tools",
+  "maxSteps",
+  "maxToolCalls",
+  "maxCostUsd",
+  "temperature",
+  "maxOutputTokens",
+  "maxTokens",
+  "stream",
+]);
 
 export const APPROVAL_LABEL: Record<ApprovalMode, string> = {
   always: "Always ask",
@@ -39,7 +62,17 @@ export const emptyDraft = (): AgentDraft => ({
   maxSteps: "8",
   maxToolCalls: "16",
   maxCostUsd: "1",
+  temperature: "",
+  maxOutputTokens: "",
+  maxTokens: "",
+  stream: "default",
+  extra: {},
 });
+
+/** Whether any of the "Advanced" limits is set (the form opens that group for them). */
+export const hasAdvanced = (d: AgentDraft): boolean =>
+  Boolean(d.temperature.trim() || d.maxOutputTokens.trim() || d.maxTokens.trim()) ||
+  d.stream !== "default";
 
 /** A stored number or string as form text ("" for anything else). */
 const text = (v: unknown): string =>
@@ -84,6 +117,11 @@ export function draftOf(p: AgentPreset): AgentDraft {
     maxSteps: text(c.maxSteps),
     maxToolCalls: text(c.maxToolCalls),
     maxCostUsd: text(c.maxCostUsd),
+    temperature: text(c.temperature),
+    maxOutputTokens: text(c.maxOutputTokens),
+    maxTokens: text(c.maxTokens),
+    stream: c.stream === true ? "on" : c.stream === false ? "off" : "default",
+    extra: Object.fromEntries(Object.entries(c).filter(([k]) => !FORM_KEYS.has(k))),
   };
 }
 
@@ -93,25 +131,40 @@ export interface DraftCheck {
   body?: { name: string; description: string; config: Record<string, unknown> };
 }
 
-function num(
-  raw: string,
-  field: "maxSteps" | "maxToolCalls" | "maxCostUsd",
-  errors: DraftCheck["errors"],
-): number | undefined {
+type NumberField =
+  "maxSteps" | "maxToolCalls" | "maxCostUsd" | "temperature" | "maxOutputTokens" | "maxTokens";
+
+/** Each number's range (the API's, `routes/agents.ts`), whether it is whole, and its error. */
+const RANGES: Record<NumberField, { min: number; max: number; integer: boolean; error: string }> = {
+  maxSteps: { min: 1, max: 50, integer: true, error: "A whole number from 1 to 50" },
+  maxToolCalls: { min: 0, max: 200, integer: true, error: "A whole number from 0 to 200" },
+  maxCostUsd: { min: 0, max: Infinity, integer: false, error: "A cost in USD, 0 or more" },
+  temperature: { min: 0, max: 2, integer: false, error: "A number from 0 to 2" },
+  maxOutputTokens: {
+    min: 1,
+    max: 65_536,
+    integer: true,
+    error: "A whole number from 1 to 65536",
+  },
+  maxTokens: { min: 1, max: Infinity, integer: true, error: "A whole number, 1 or more" },
+};
+
+function num(raw: string, field: NumberField, errors: DraftCheck["errors"]): number | undefined {
   if (!raw.trim()) return undefined;
   const n = Number(raw);
-  const integer = field !== "maxCostUsd";
-  const [min, max] =
-    field === "maxSteps" ? [1, 50] : field === "maxToolCalls" ? [0, 200] : [0, Infinity];
+  const { min, max, integer, error } = RANGES[field];
   if (!Number.isFinite(n) || (integer && !Number.isInteger(n)) || n < min || n > max) {
-    errors[field] =
-      field === "maxCostUsd" ? "A cost in USD, 0 or more" : `A whole number from ${min} to ${max}`;
+    errors[field] = error;
     return undefined;
   }
   return n;
 }
 
-/** Validates the draft and builds the request body (only the settings that are set). */
+/**
+ * Validates the draft and builds the request body (only the settings that are set). Saving
+ * replaces the stored config as a whole, so settings the form has no field for (`extra`) go back
+ * with it unchanged.
+ */
 export function checkDraft(d: AgentDraft): DraftCheck {
   const errors: DraftCheck["errors"] = {};
   if (!d.name.trim()) errors.name = "Give the agent a name";
@@ -125,6 +178,9 @@ export function checkDraft(d: AgentDraft): DraftCheck {
   const maxSteps = num(d.maxSteps, "maxSteps", errors);
   const maxToolCalls = num(d.maxToolCalls, "maxToolCalls", errors);
   const maxCostUsd = num(d.maxCostUsd, "maxCostUsd", errors);
+  const temperature = num(d.temperature, "temperature", errors);
+  const maxOutputTokens = num(d.maxOutputTokens, "maxOutputTokens", errors);
+  const maxTokens = num(d.maxTokens, "maxTokens", errors);
   const names = d.tools.map((t) => t.name);
   if (new Set(names).size !== names.length) errors.tools = "Each tool can be listed once";
   if (Object.keys(errors).length) return { ok: false, errors };
@@ -135,15 +191,36 @@ export function checkDraft(d: AgentDraft): DraftCheck {
       name: d.name.trim(),
       description: d.description.trim(),
       config: {
+        ...d.extra,
         model: d.model,
         ...(d.system.trim() ? { system: d.system.trim() } : {}),
         tools: d.tools,
         ...(maxSteps !== undefined ? { maxSteps } : {}),
         ...(maxToolCalls !== undefined ? { maxToolCalls } : {}),
         ...(maxCostUsd !== undefined ? { maxCostUsd } : {}),
+        ...(temperature !== undefined ? { temperature } : {}),
+        ...(maxOutputTokens !== undefined ? { maxOutputTokens } : {}),
+        ...(maxTokens !== undefined ? { maxTokens } : {}),
+        ...(d.stream !== "default" ? { stream: d.stream === "on" } : {}),
       },
     },
   };
+}
+
+/** The "Advanced" settings a config sets, for the review ("" when none is set). */
+export function advancedLabel(config: Record<string, unknown>): string {
+  const n = (v: unknown) => (typeof v === "number" ? v : undefined);
+  const temperature = n(config.temperature);
+  const output = n(config.maxOutputTokens);
+  const cap = n(config.maxTokens);
+  return [
+    temperature !== undefined ? `temperature ${temperature}` : "",
+    output !== undefined ? `${output} output tokens a turn` : "",
+    cap !== undefined ? `${cap} tokens a run` : "",
+    typeof config.stream === "boolean" ? `streaming ${config.stream ? "on" : "off"}` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 /** "gpt-6-luna", or "cheapest · gpt-6-luna +1" for a failover policy. */

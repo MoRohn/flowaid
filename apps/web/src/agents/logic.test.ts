@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  advancedLabel,
   changesData,
   checkDraft,
   draftOf,
   emptyDraft,
+  hasAdvanced,
   modelLabel,
   modelProviders,
   reviewNotes,
@@ -45,6 +47,58 @@ describe("agent preset drafts", () => {
     expect(d.tools).toEqual([{ name: "x", approval: "irreversible" }]);
     expect(checkDraft({ ...d, tools: [...d.tools, ...d.tools] }).errors.tools).toBeDefined();
     expect(checkDraft(d).body?.config).toMatchObject({ system: "Be kind", maxSteps: 3 });
+  });
+
+  it("keeps every stored setting through an edit of another field", () => {
+    const config = {
+      model,
+      system: "Be kind",
+      tools: [{ name: "lookup", approval: "always" }],
+      temperature: 0.2,
+      maxOutputTokens: 800,
+      maxTokens: 20000,
+      stream: true,
+      maxSteps: 4,
+      // a setting a newer server may add: carried through, not dropped
+      futureSetting: { on: true },
+    };
+    const d = draftOf({
+      id: "a",
+      name: "A",
+      description: "",
+      config,
+      createdAt: "",
+      updatedAt: "",
+    });
+    expect(d).toMatchObject({
+      temperature: "0.2",
+      maxOutputTokens: "800",
+      maxTokens: "20000",
+      stream: "on",
+    });
+    const saved = checkDraft({ ...d, description: "Answers order questions" }).body;
+    expect(saved?.description).toBe("Answers order questions");
+    expect(saved?.config).toEqual(config);
+    expect(advancedLabel(saved?.config ?? {})).toBe(
+      "temperature 0.2 · 800 output tokens a turn · 20000 tokens a run · streaming on",
+    );
+  });
+
+  it("checks the advanced settings and leaves unset ones out", () => {
+    const bad = checkDraft({
+      ...emptyDraft(),
+      name: "A",
+      model,
+      temperature: "3",
+      maxOutputTokens: "0",
+      maxTokens: "1.5",
+    });
+    expect(Object.keys(bad.errors).sort()).toEqual(["maxOutputTokens", "maxTokens", "temperature"]);
+    const off = checkDraft({ ...emptyDraft(), name: "A", model, stream: "off" }).body?.config;
+    expect(off).toMatchObject({ stream: false });
+    expect(off).not.toHaveProperty("temperature");
+    expect(hasAdvanced(emptyDraft())).toBe(false);
+    expect(hasAdvanced({ ...emptyDraft(), stream: "off" })).toBe(true);
   });
 
   it("labels single models and failover policies", () => {

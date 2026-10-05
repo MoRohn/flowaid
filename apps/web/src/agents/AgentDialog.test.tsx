@@ -171,6 +171,47 @@ describe("editing an agent", () => {
     });
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
+
+  it("saves a description change without dropping the advanced settings, which it shows", async () => {
+    const tuned = {
+      ...preset,
+      config: {
+        ...preset.config,
+        temperature: 0.2,
+        maxOutputTokens: 800,
+        maxTokens: 20000,
+        stream: true,
+      },
+    };
+    const fetch = stubApi({
+      "GET /v1/models": () => [{ provider: "openai", model: "gpt-test", kind: "chat" }],
+      "GET /v1/providers": () => [{ id: "openai", models: 1, configuredOnServer: true }],
+      "GET /v1/credentials": () => ({ items: [], next_cursor: null }),
+      "GET /v1/tools/catalog": () => [],
+      "PATCH /v1/agents/a1": () => tuned,
+    });
+    render(withClient(<AgentDialog open editing={tuned} onOpenChange={() => undefined} />));
+    act(() => {
+      fireEvent.click(screen.getByRole("radio", { name: /All fields/ }));
+    });
+    // the group opens on its own: the agent sets values there
+    expect(screen.getByLabelText<HTMLInputElement>(/Temperature/).value).toBe("0.2");
+    expect(screen.getByLabelText<HTMLInputElement>(/Token cap/).value).toBe("20000");
+    act(() => {
+      fireEvent.change(screen.getByLabelText(/Description/), {
+        target: { value: "Answers order questions" },
+      });
+    });
+    act(() => {
+      fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    });
+    await waitFor(() => expect(callsTo(fetch, "PATCH /v1/agents/a1")).toHaveLength(1));
+    expect(bodyOf(callsTo(fetch, "PATCH /v1/agents/a1")[0]?.[1])).toEqual({
+      name: "Order helper",
+      description: "Answers order questions",
+      config: { ...tuned.config, tools: [] },
+    });
+  });
 });
 
 describe("the tools step", () => {

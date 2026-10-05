@@ -13,6 +13,7 @@ import { ModelFallbacks } from "@flowaid/ui/forms";
 import {
   Button,
   Checkbox,
+  Collapsible,
   Dialog,
   DialogBody,
   DialogContent,
@@ -37,16 +38,19 @@ import { useSession } from "~/session";
 import {
   APPROVAL_LABEL,
   EXAMPLE_INSTRUCTIONS,
+  advancedLabel,
   boundsOf,
   changesData,
   checkDraft,
   draftOf,
   emptyDraft,
+  hasAdvanced,
   modelLabel,
   reviewNotes,
   type AgentDraft,
   type AgentPreset,
   type ApprovalMode,
+  type StreamMode,
 } from "./logic";
 
 export function AgentDialog({
@@ -128,6 +132,11 @@ export function AgentDialog({
   );
   const notes = reviewNotes(draft, { providerReady: connections.ready, changes });
   const bounds = boundsOf(check.body?.config ?? {});
+  const advanced = hasAdvanced(draft);
+  // open when the agent already sets one of them, so nothing it carries is out of sight
+  const [advancedOpen, setAdvancedOpen] = useState(advanced);
+  const advancedInvalid = ADVANCED_FIELDS.some((f) => Boolean(check.errors[f]));
+  const advancedSummary = advancedLabel(check.body?.config ?? {});
   const submit = () => {
     setShown(true);
     if (check.ok && check.body) save.mutate(check.body);
@@ -331,51 +340,117 @@ export function AgentDialog({
       id: "limits",
       title: "Set its limits",
       why: "Limits stop an agent that loops or overspends. When a run reaches one, the Agent step fails with a limits error you can see in the trace, rather than carrying on. The defaults suit most jobs; leave a field empty to use the default.",
-      done: !check.errors.maxSteps && !check.errors.maxToolCalls && !check.errors.maxCostUsd,
+      done: LIMIT_FIELDS.every((f) => !check.errors[f]),
       requirement: "fix the limits marked in red",
       example:
         "Raise Max steps only when the trace shows the agent stopping mid-task. A run's own budget, when it has one, caps the cost limit too.",
       children: (
-        <div className="grid gap-4 sm:grid-cols-3">
-          <FieldRow
-            label="Max steps"
-            htmlFor="agent-steps"
-            error={check.errors.maxSteps}
-            hint="Model turns before it must answer (1–50, default 8)"
+        <div className="flex flex-col gap-3">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <FieldRow
+              label="Max steps"
+              htmlFor="agent-steps"
+              error={check.errors.maxSteps}
+              hint="Model turns before it must answer (1–50, default 8)"
+            >
+              <Input
+                id="agent-steps"
+                inputMode="numeric"
+                value={draft.maxSteps}
+                onChange={(e) => set("maxSteps", e.target.value)}
+              />
+            </FieldRow>
+            <FieldRow
+              label="Max tool calls"
+              htmlFor="agent-calls"
+              error={check.errors.maxToolCalls}
+              hint="Across all steps (0–200, default 16)"
+            >
+              <Input
+                id="agent-calls"
+                inputMode="numeric"
+                value={draft.maxToolCalls}
+                onChange={(e) => set("maxToolCalls", e.target.value)}
+              />
+            </FieldRow>
+            <FieldRow
+              label="Max cost (USD)"
+              htmlFor="agent-cost"
+              error={check.errors.maxCostUsd}
+              hint="Per run of the Agent step (default 1)"
+            >
+              <Input
+                id="agent-cost"
+                inputMode="decimal"
+                value={draft.maxCostUsd}
+                onChange={(e) => set("maxCostUsd", e.target.value)}
+              />
+            </FieldRow>
+          </div>
+          <Collapsible
+            title="Advanced"
+            meta={advanced ? "set" : undefined}
+            open={advancedOpen || advancedInvalid}
+            onOpenChange={setAdvancedOpen}
+            contentClassName="pl-0"
           >
-            <Input
-              id="agent-steps"
-              inputMode="numeric"
-              value={draft.maxSteps}
-              onChange={(e) => set("maxSteps", e.target.value)}
-            />
-          </FieldRow>
-          <FieldRow
-            label="Max tool calls"
-            htmlFor="agent-calls"
-            error={check.errors.maxToolCalls}
-            hint="Across all steps (0–200, default 16)"
-          >
-            <Input
-              id="agent-calls"
-              inputMode="numeric"
-              value={draft.maxToolCalls}
-              onChange={(e) => set("maxToolCalls", e.target.value)}
-            />
-          </FieldRow>
-          <FieldRow
-            label="Max cost (USD)"
-            htmlFor="agent-cost"
-            error={check.errors.maxCostUsd}
-            hint="Per run of the Agent step (default 1)"
-          >
-            <Input
-              id="agent-cost"
-              inputMode="decimal"
-              value={draft.maxCostUsd}
-              onChange={(e) => set("maxCostUsd", e.target.value)}
-            />
-          </FieldRow>
+            <div className="grid gap-4 pt-1 sm:grid-cols-2">
+              <FieldRow
+                label="Temperature"
+                htmlFor="agent-temperature"
+                error={check.errors.temperature}
+                hint="0–2: lower answers more steadily, higher more varied (default 0.2)"
+              >
+                <Input
+                  id="agent-temperature"
+                  inputMode="decimal"
+                  value={draft.temperature}
+                  onChange={(e) => set("temperature", e.target.value)}
+                />
+              </FieldRow>
+              <FieldRow
+                label="Max output tokens"
+                htmlFor="agent-output"
+                error={check.errors.maxOutputTokens}
+                hint="The longest reply one model turn may write (default 2048)"
+              >
+                <Input
+                  id="agent-output"
+                  inputMode="numeric"
+                  value={draft.maxOutputTokens}
+                  onChange={(e) => set("maxOutputTokens", e.target.value)}
+                />
+              </FieldRow>
+              <FieldRow
+                label="Token cap"
+                htmlFor="agent-tokens"
+                error={check.errors.maxTokens}
+                hint="Input and output tokens across a whole run of the step (empty: no cap)"
+              >
+                <Input
+                  id="agent-tokens"
+                  inputMode="numeric"
+                  value={draft.maxTokens}
+                  onChange={(e) => set("maxTokens", e.target.value)}
+                />
+              </FieldRow>
+              <FieldRow
+                label="Streaming"
+                htmlFor="agent-stream"
+                hint="Shows the answer as it is written. Streamed turns arrive without a price, so the cost limit counts them at list prices."
+              >
+                <Select
+                  id="agent-stream"
+                  value={draft.stream}
+                  onValueChange={(v) => set("stream", v as StreamMode)}
+                >
+                  <SelectItem value="default">Default (off)</SelectItem>
+                  <SelectItem value="on">On</SelectItem>
+                  <SelectItem value="off">Off</SelectItem>
+                </Select>
+              </FieldRow>
+            </div>
+          </Collapsible>
         </div>
       ),
     },
@@ -413,6 +488,12 @@ export function AgentDialog({
                 ? `${bounds.maxSteps} steps · ${bounds.maxToolCalls} tool calls · $${bounds.maxCostUsd}`
                 : "—"}
             </dd>
+            {advancedSummary ? (
+              <>
+                <dt className="text-ink-3">Advanced</dt>
+                <dd className="m-0 font-mono text-ink">{advancedSummary}</dd>
+              </>
+            ) : null}
           </dl>
           <CheckList checks={reviewChecks} aria-label="Before you save" />
           <QualityNote>
@@ -526,6 +607,9 @@ export function AgentDialog({
     </Dialog>
   );
 }
+
+const ADVANCED_FIELDS = ["temperature", "maxOutputTokens", "maxTokens"] as const;
+const LIMIT_FIELDS = ["maxSteps", "maxToolCalls", "maxCostUsd", ...ADVANCED_FIELDS] as const;
 
 /** The tools built into FlowAId (calculator, current_time, web_fetch), as the catalog marks them. */
 const isBuiltinTool = (t: ToolDefinition) => t.source.kind === "builtin";
