@@ -259,6 +259,61 @@ export function placeNewStep(
 }
 
 /**
+ * What a step picked in the palette follows, and where it goes. With one step selected it follows
+ * that step. With nothing selected it follows the step the palette's suggestions were for (the
+ * last step, as its "Suggested after …" heading says), so it does not start unconnected. It sits
+ * beside the step it follows, unless the palette opened at a right-click: then it goes where the
+ * pointer was. Several selected steps leave it unconnected at `wanted`.
+ */
+export function quickAddPlan(
+  def: WorkflowDefinition,
+  selection: readonly string[],
+  wanted: { x: number; y: number },
+  origin: "pointer" | "view",
+): { after: WorkflowNode | undefined; position: { x: number; y: number } } {
+  const selected =
+    selection.length === 1 ? def.nodes.find((n) => n.id === selection[0]) : undefined;
+  const after = selected ?? (selection.length === 0 ? lastStep(def) : undefined);
+  const beside = selected !== undefined || origin === "view";
+  return { after, position: placeNewStep(def, wanted, beside ? after : undefined) };
+}
+
+/**
+ * The condition of the first case of a Branch added after a yes/no decision: its answer, so "yes"
+ * means yes. The new Branch's own default ("true") would always take the first path.
+ */
+export function branchConditionAfter(
+  after: WorkflowNode | undefined,
+  decisionKind: string | undefined,
+): string | undefined {
+  if (after?.kind !== "task" || decisionKind !== "boolean") return undefined;
+  return `${after.id}.decision.value`;
+}
+
+/**
+ * Where to centre the view so a step at `rect` (flow coordinates) is fully visible, keeping the
+ * zoom; null when it already is. `margin` is the room kept from the edges, in screen pixels
+ * (panels such as the minimap and the controls sit there).
+ */
+export function centreToShow(
+  rect: { x: number; y: number; w: number; h: number },
+  view: { x: number; y: number; zoom: number },
+  size: { width: number; height: number },
+  margin = 48,
+): { x: number; y: number } | null {
+  const left = rect.x * view.zoom + view.x;
+  const top = rect.y * view.zoom + view.y;
+  const right = left + rect.w * view.zoom;
+  const bottom = top + rect.h * view.zoom;
+  const inside =
+    left >= margin &&
+    top >= margin &&
+    right <= size.width - margin &&
+    bottom <= size.height - margin;
+  return inside ? null : { x: rect.x + rect.w / 2, y: rect.y + rect.h / 2 };
+}
+
+/**
  * The control port a new step following `after` hangs off: the first one nothing follows yet,
  * else the first. None for steps that cannot lead anywhere.
  */

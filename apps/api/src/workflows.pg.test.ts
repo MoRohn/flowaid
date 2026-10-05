@@ -61,6 +61,18 @@ describeDb("workflows, versions and deployments (Postgres)", () => {
     ).toBeGreaterThanOrEqual(2);
   });
 
+  it("puts the description given at creation in the draft too, which the builder shows", async () => {
+    const res = await call(t.app, jar, "POST", "/v1/workflows", {
+      name: "Described",
+      description: "Routes refund requests",
+    });
+    expect(res.statusCode).toBe(201);
+    expect(res.json()).toMatchObject({
+      description: "Routes refund requests",
+      draft: { description: "Routes refund requests" },
+    });
+  });
+
   it("saves drafts with If-Match, stores diagnostics and answers 412 on stale revisions", async () => {
     const w = await blank("Draft Test");
     const draft = { ...w.draft, description: "changed" };

@@ -135,6 +135,9 @@ export function hintsOf(schema: JsonSchema): FieldHints {
     hints = { ...rest };
     const known = LANGUAGES.find((l) => l === language);
     if (known) hints.language = known;
+    // a FlowExpr field is an expression with the step's references, not a JavaScript code box
+    if (language === "flowexpr" && (hints.widget === undefined || hints.widget === "code"))
+      hints.widget = "flowexpr";
     if (isRecord(legacy))
       devWarn(`"x-flowaid" ${JSON.stringify(legacy)} is ignored next to "x-ui"; delete it.`);
   } else if (isRecord(legacy)) {
@@ -346,7 +349,9 @@ export function isMapSchema(schema: JsonSchema): boolean {
 /**
  * Builds a value satisfying the schema's declared defaults. Objects get every
  * property's default (so react-hook-form sees a stable shape); arrays start
- * empty unless a default is given; primitives fall back to `undefined`.
+ * empty unless a default is given; primitives fall back to `undefined`. A saved
+ * value goes through `pruneUnset`, which drops the stubs this builds for
+ * optional settings nobody filled in.
  */
 export function defaultValueFor(schema: JsonSchema, root: JsonSchema): unknown {
   const s = resolveSchema(schema, root);
@@ -381,6 +386,76 @@ export function defaultValueFor(schema: JsonSchema, root: JsonSchema): unknown {
     default:
       return undefined;
   }
+}
+
+/**
+ * A form's values as they are saved. `withDefaults` gives every optional setting a slot so the form
+ * can show its defaults; saving those slots would set what the person never did. This drops:
+ * - keys left `undefined` (JSON drops them on the way to the server, so the local compile must not
+ *   see them either);
+ * - an optional object with fixed fields, without a default of its own, that holds nothing beyond
+ *   the stub `defaultValueFor` builds for it (empty text and lists count as nothing). Its presence
+ *   can switch a behaviour on (a Mock's `fail`) and it fails its own required fields (a Boolean's
+ *   `criteria: {}`);
+ * - an optional empty list or map below its minimum size.
+ * Required settings keep their place, and a setting the person changed is kept as it is.
+ */
+export function pruneUnset(schema: JsonSchema, values: SchemaValues): SchemaValues {
+  return pruneObject(schema, values, schema);
+}
+
+function pruneObject(schema: JsonSchema, values: SchemaValues, root: JsonSchema): SchemaValues {
+  const s = resolveSchema(schema, root);
+  const required = new Set(s.required ?? []);
+  const out: SchemaValues = {};
+  for (const [key, raw] of Object.entries(values)) {
+    if (raw === undefined) continue;
+    const prop = s.properties?.[key];
+    const ps = prop ? resolveSchema(prop, root) : undefined;
+    if (!ps) {
+      out[key] = raw;
+      continue;
+    }
+    const optional = !required.has(key) && ps.default === undefined;
+    if (Array.isArray(raw)) {
+      if (!(optional && raw.length === 0 && (ps.minItems ?? 0) > 0)) out[key] = raw;
+      continue;
+    }
+    if (!isRecord(raw)) {
+      out[key] = raw;
+      continue;
+    }
+    // a union's members are objects too: prune within the member the value carries
+    const variants = variantInfo(ps, root);
+    const shape = variants
+      ? variants.variants.find((v) => v.value === enumKey(raw[variants.discriminator]))?.schema
+      : ps;
+    if (!shape || isMapSchema(shape) || !shape.properties) {
+      const empty = Object.keys(raw).length === 0;
+      if (!(optional && empty && (ps.minProperties ?? 0) > 0)) out[key] = raw;
+      continue;
+    }
+    const pruned = pruneObject(shape, raw, root);
+    if (optional) {
+      const stub = defaultValueFor(shape, root);
+      const unset = isRecord(stub) ? pruneObject(shape, stub, root) : {};
+      if (jsonEqual(meaningful(pruned), meaningful(unset))) continue;
+    }
+    out[key] = pruned;
+  }
+  return out;
+}
+
+/** The value without empty text, empty lists and empty objects, for comparing with a stub. */
+function meaningful(value: unknown): unknown {
+  if (Array.isArray(value)) return value.length ? value : undefined;
+  if (!isRecord(value)) return value === "" ? undefined : value;
+  const out: SchemaValues = {};
+  for (const [k, v] of Object.entries(value)) {
+    const m = meaningful(v);
+    if (m !== undefined) out[k] = m;
+  }
+  return Object.keys(out).length ? out : undefined;
 }
 
 function structuredCloneSafe<T>(value: T): T {

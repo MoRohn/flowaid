@@ -5,6 +5,7 @@ import type { NodeManifest, ToolDefinition } from "@flowaid/workflow-core";
 import { get } from "~/api/client";
 import type { WorkflowDetail } from "~/api/types";
 import { Builder } from "~/builder/Builder";
+import { draftSaved } from "~/builder/useDraftSave";
 import { FullPageSpinner } from "~/session";
 import { AppFrame, PageBody } from "~/shell/AppFrame";
 import { ErrorPanel } from "~/shell/states";
@@ -13,7 +14,8 @@ export default function BuilderPage({ params }: { params: Promise<{ ws: string; 
   const { ws, id } = use(params);
   const workflow = useQuery({
     queryKey: ["workflow", id],
-    queryFn: () => get<WorkflowDetail>(`/v1/workflows/${id}`),
+    // an edit sent as the builder closed lands before the draft is read again
+    queryFn: () => draftSaved(id).then(() => get<WorkflowDetail>(`/v1/workflows/${id}`)),
     staleTime: Infinity,
     refetchOnMount: "always",
   });
@@ -42,10 +44,11 @@ export default function BuilderPage({ params }: { params: Promise<{ ws: string; 
       </AppFrame>
     );
   if (!workflow.data || !nodes.data || !tools.data) return <FullPageSpinner />;
-  // keyed by id + revision so a restored draft (versions page) remounts with fresh state
+  // keyed by the workflow: a newer draft from elsewhere (a restored version) is adopted by the
+  // builder itself, so its own saves, a publish or a refetch never reset the canvas or a run view
   return (
     <Builder
-      key={`${workflow.data.id}:${workflow.data.draftRevision}`}
+      key={workflow.data.id}
       workflow={workflow.data}
       manifests={nodes.data}
       tools={tools.data}

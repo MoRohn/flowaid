@@ -1,6 +1,7 @@
-import { memo, type ComponentType } from "react";
+import { memo, useEffect, type ComponentType } from "react";
 import {
   Position,
+  useUpdateNodeInternals,
   type Node,
   type NodeHandle,
   type NodeProps,
@@ -157,6 +158,19 @@ export function flowNodeTypeFor(variant: NodeCardVariant): FlowNodeType {
 const FlowaidNode = memo(function FlowaidNode({ data, selected, dragging }: FlowNodeProps) {
   const { node, run, extras } = data;
   const variant = flowNodeVariant(data);
+  // A pill's handles are measured from the DOM (`toFlowNode` declares none): when its ports
+  // change without the pill changing size, xyflow must measure them again or edges keep leaving
+  // from where the old handles were.
+  const updateInternals = useUpdateNodeInternals();
+  const pillHandles =
+    variant === "start" || variant === "end"
+      ? flowNodeHandles(node, variant)
+          .map((h) => h.id)
+          .join(" ")
+      : "";
+  useEffect(() => {
+    if (pillHandles) updateInternals(node.id);
+  }, [pillHandles, node.id, updateInternals]);
   if (variant === "note") return <NoteCard node={node} selected={selected} dragging={dragging} />;
   const Card = VARIANT_CARDS[variant];
   const { actions, ...cardExtras } = extras ?? {};
@@ -372,7 +386,12 @@ export function toFlowNode(
     type: flowNodeTypeFor(variant),
     position: { x: placement.x, y: placement.y },
     data,
-    handles: flowNodeHandles(node, variant, width),
+    // Declared handles replace xyflow's DOM measurement on every update. A card's geometry is
+    // fixed (its width, its handle offsets), so declaring it draws edges before the first
+    // measure; a pill's width follows its name, so its handles are left to the measurement.
+    ...(variant === "start" || variant === "end"
+      ? null
+      : { handles: flowNodeHandles(node, variant, width) }),
     ariaLabel: `${node.name} (${nodeTypeId(node)})`,
     ...(node.parent !== undefined ? { parentId: node.parent, extent: "parent" as const } : null),
     ...(width !== undefined && height !== undefined

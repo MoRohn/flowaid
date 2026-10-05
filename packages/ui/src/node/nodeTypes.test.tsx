@@ -89,6 +89,9 @@ describe("cardVariantFor", () => {
       }),
     ).toBe("decision");
     expect(cardVariantFor(task("@acme/dev.echo", "developer"))).toBe("code");
+    // FlowAId's own developer steps hold no code: an Assert is not "js · No code yet"
+    expect(cardVariantFor(task("flowaid.dev.assert", "developer"))).toBe("default");
+    expect(cardVariantFor(task("flowaid.tools.code", "developer"))).toBe("code");
     expect(cardVariantFor({ kind: "task", category: "data" })).toBe("default");
   });
 
@@ -268,6 +271,36 @@ describe("toFlowNode", () => {
     expect(screen.getByText("Intent")).toBeInTheDocument();
     expect(container.querySelector(".fa-node")).toHaveAttribute("data-selected", "true");
     expect(container.querySelector("[data-decision-kind]")).not.toBeNull();
+  });
+
+  it("leaves a pill's handles to the DOM measurement, and declares a card's", () => {
+    // declared handles replace xyflow's measurement on every update: a start pill's sources
+    // would sit at its left edge, where the edges then started
+    expect(toFlowNode(triage.start, { x: 0, y: 0 }).handles).toBeUndefined();
+    expect(toFlowNode(triage.end, { x: 0, y: 0 }).handles).toBeUndefined();
+    expect(toFlowNode(triage.intent, { x: 0, y: 0 }).handles?.length).toBeGreaterThan(0);
+  });
+
+  it("gives a pill's handles the reason a dragged connection is refused, not the DOM", () => {
+    const errors: unknown[][] = [];
+    const original = console.error;
+    console.error = (...args: unknown[]) => void errors.push(args);
+    try {
+      const flow = toFlowNode(triage.start, { x: 0, y: 0 }, undefined, {
+        compatibleHandles: [],
+        handleReasons: { "out:out": "Types do not match" },
+      });
+      const { container } = render(
+        <ReactFlowProvider>
+          <nodeTypes.flowaid {...props(flow)} />
+        </ReactFlowProvider>,
+      );
+      expect(container.querySelector('[data-reason="Types do not match"]')).not.toBeNull();
+      expect(container.querySelector("[handlereasons]")).toBeNull();
+    } finally {
+      console.error = original;
+    }
+    expect(errors.filter((e) => String(e[0]).includes("handleReasons"))).toEqual([]);
   });
 
   it("dispatches join, wait and note nodes to their cards", () => {

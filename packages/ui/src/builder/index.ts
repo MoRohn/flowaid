@@ -73,6 +73,14 @@ export {
   type EvaluationFailedCheck,
 } from "./EvaluationReport";
 export {
+  ExportDialog,
+  type ExportDialogProps,
+  type ExportDialogStatus,
+  type ExportChoice,
+  type ExportMode,
+  type ExportTargetOption,
+} from "./ExportDialog";
+export {
   ImportDialog,
   type ImportDialogProps,
   type ImportDialogStatus,

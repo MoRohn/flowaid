@@ -2,7 +2,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useDeferredValue, useState } from "react";
-import { Plus, Workflow } from "lucide-react";
+import { Plus, SearchX, Workflow } from "lucide-react";
 import { Button, EmptyState, SearchInput, Skeleton } from "@flowaid/ui/primitives";
 import { WorkflowsBrowser } from "@flowaid/ui/data";
 import { PageHeader } from "@flowaid/ui/shell";
@@ -95,6 +95,24 @@ export default function WorkflowsPage() {
               environments={envs}
               onOpen={(w) => router.push(`/${s.ws}/workflows/${w.id}`)}
               tableProps={{ rowHref: (w) => `/${s.ws}/workflows/${w.id}` }}
+              {...(query
+                ? {
+                    // in the list and the grid alike: say the search found nothing, and undo it
+                    emptyState: (
+                      <EmptyState
+                        size="sm"
+                        icon={<SearchX strokeWidth={1.5} />}
+                        title={`No workflows match “${query}”`}
+                        description="The search looks at names, descriptions and tags."
+                        primaryAction={
+                          <Button variant="secondary" onClick={() => setQ("")}>
+                            Clear the search
+                          </Button>
+                        }
+                      />
+                    ),
+                  }
+                : {})}
               toolbar={
                 <SearchInput
                   value={q}

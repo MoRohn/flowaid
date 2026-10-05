@@ -11,6 +11,9 @@ describe("secretChecks", () => {
   it("is one ok line when nothing is required", () => {
     const checks = secretChecks([{ name: "OPTIONAL", required: false }], envs, () => ({}), opts);
     expect(checks).toMatchObject([{ id: "secrets", state: "ok" }]);
+    // an optional key (a TypeSafe step's) is named, not "none of this workflow's do yet"
+    expect(checks[0]?.detail).toMatch(/^OPTIONAL is optional/);
+    expect(secretChecks([], envs, () => ({}), opts)[0]?.detail).toMatch(/none of this workflow/);
   });
 
   it("warns per environment with a required secret unbound", () => {

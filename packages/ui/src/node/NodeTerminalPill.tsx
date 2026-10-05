@@ -49,6 +49,7 @@ export const NodeTerminalPill = forwardRef<HTMLDivElement, NodeTerminalPillProps
       dragging,
       disabled,
       compatibleHandles,
+      handleReasons,
       className,
       style,
       ...rest
@@ -84,6 +85,7 @@ export const NodeTerminalPill = forwardRef<HTMLDivElement, NodeTerminalPillProps
             offset={20}
             category={node.category}
             compatible={compatible ? compatible.has(handleId("ctl-in")) : undefined}
+            reason={handleReasons?.[handleId("ctl-in")]}
           />
         ) : null}
         {controls.map((route, i) => (
@@ -96,6 +98,7 @@ export const NodeTerminalPill = forwardRef<HTMLDivElement, NodeTerminalPillProps
             offset={offsets[i]}
             connected={run?.status === "completed"}
             compatible={compatible ? compatible.has(handleId("ctl", route.id)) : undefined}
+            reason={handleReasons?.[handleId("ctl", route.id)]}
           />
         ))}
         {ports.map((port, i) => {
@@ -109,6 +112,7 @@ export const NodeTerminalPill = forwardRef<HTMLDivElement, NodeTerminalPillProps
               category={node.category}
               offset={offsets[kind === "start" ? controls.length + i : i]}
               compatible={compatible ? compatible.has(handleId(handleKind, port.id)) : undefined}
+              reason={handleReasons?.[handleId(handleKind, port.id)]}
             />
           );
         })}

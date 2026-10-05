@@ -14,7 +14,7 @@ export interface PresentedDiagnostic {
   /** What to do next, when the code says. */
   hint?: string;
   /** Which kind of fix the builder can offer. */
-  remedy?: "node" | "credential" | "integration" | "knowledge";
+  remedy?: "node" | "credential" | "integration" | "knowledge" | "cost-limit" | "time-limit";
 }
 
 const HINTS: Partial<
@@ -31,6 +31,14 @@ const HINTS: Partial<
   E_INPUT_REQUIRED_MISSING: {
     hint: "Connect an earlier step's output to this input, or type a value on the node.",
     remedy: "node",
+  },
+  W_COST_ESTIMATE: {
+    hint: "Set a cost limit per run under Execution, so a run stops before it spends more.",
+    remedy: "cost-limit",
+  },
+  W_HUMAN_EXPIRY_EXCEEDS_RUN_TIMEOUT: {
+    hint: "Raise the run time limit under Execution above how long the step waits, or give the step a shorter expiry.",
+    remedy: "time-limit",
   },
 };
 

@@ -34,7 +34,7 @@ const GOLDEN_HASHES: Readonly<Record<string, string>> = {
   "example-support-reply.json": "d86f40190bb139f3aca03f12fcb59cfe8c327db928c410e772bf949e701d9228",
   "github-issue-triage.json": "3f175e94242d7d49a352641988098e0e75ce22d1df61e055c069bf3cbe92baa9",
   "research-agent.json": "45e437d3a1eb08aa544993bc42e88daff3119a5224c3eaaf5a8d81fd21254562",
-  "support-triage.json": "9de3c758aa2e1ce58d8f887c7ebf0a0163aee29382b95c9443a7ed3f3718188f",
+  "support-triage.json": "4ff8c71496be37401b66531d80cdfbb5c72899df303ce12a68ba1b657bef325b",
 };
 
 function readRaw(file: string): unknown {

@@ -53,7 +53,7 @@ export const PLANNED: Partial<Record<UiGroup, readonly string[]>> = {
   shell: ["DraftStatusPill"],
   observability: ["CostBreakdown"],
   human: ["ReviewForm", "ExternalReviewPage"],
-  builder: ["PublishDialog", "ConflictDialog", "ExportDialog", "RunPanel"],
+  builder: ["PublishDialog", "ConflictDialog", "RunPanel"],
 };
 
 /** Exports that exist but mount only behind their `FeatureKey`; marked *(later phase)* in the doc. */

@@ -63,6 +63,7 @@ export {
   isMapSchema,
   defaultValueFor,
   withDefaults,
+  pruneUnset,
   buildRules,
   inputModeFor,
   type SchemaValues,
@@ -233,7 +234,14 @@ export {
   type TemplateInputProps,
   type TemplateRef,
 } from "./TemplateEditor";
-export { checkTemplate, templateRefsFromScope, type TemplateCheck } from "./templateCheck";
+export {
+  checkExpression,
+  checkTemplate,
+  templateRefsFromScope,
+  type TemplateCheck,
+} from "./templateCheck";
+export { FlowExprEditor, FlowExprWidget, type FlowExprEditorProps } from "./FlowExprEditor";
+export { flowExprCompletions } from "./FlowExprEditorView";
 export {
   LevelsList,
   validateLevels,

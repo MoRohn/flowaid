@@ -2,12 +2,19 @@
 /**
  * The inspector when no node is selected: the workflow itself. Its name and description, and its
  * settings — the workflow variables (`$vars.<name>`) that templates use for limits, windows and
- * scores — edited as plain fields with their own validation. Environments can still override a
- * setting per deployment; what is edited here is the default every run starts from.
+ * scores — edited as plain fields with their own validation, and its execution limits (time, cost,
+ * steps at once). Environments can still override a setting per deployment; what is edited here
+ * is the default every run starts from.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import type { Draft } from "immer";
 import { Plus, Trash2 } from "lucide-react";
-import type { JsonValue, Variable, WorkflowDefinition } from "@flowaid/workflow-core";
+import {
+  ExecutionPolicySchema,
+  type JsonValue,
+  type Variable,
+  type WorkflowDefinition,
+} from "@flowaid/workflow-core";
 import {
   Button,
   FieldHint,
@@ -77,6 +84,7 @@ export function WorkflowPanel({
   name,
   onRename,
   onDescribe,
+  focus,
 }: {
   definition: WorkflowDefinition;
   store: BuilderStore;
@@ -85,6 +93,8 @@ export function WorkflowPanel({
   onRename?: (name: string) => void;
   /** Saves the description on the workflow itself (lists, search), besides the draft. */
   onDescribe?: (description: string) => void;
+  /** An Execution field to focus (a problem's "Set a cost limit"); `n` repeats the request. */
+  focus?: { field: ExecutionField; n: number };
 }) {
   const settings = definition.variables.filter((v) => v.source !== "environment");
   const setDefault = (varName: string, value: JsonValue) =>
@@ -180,7 +190,225 @@ export function WorkflowPanel({
           />
         ) : null}
       </section>
+
+      <ExecutionSettings
+        execution={definition.execution}
+        readOnly={readOnly}
+        {...(focus ? { focus } : {})}
+        onChange={(recipe, label) =>
+          store.getState().updateDefinition((d) => recipe(d.execution), label)
+        }
+      />
     </div>
+  );
+}
+
+const EXECUTION_DEFAULTS = ExecutionPolicySchema.parse({});
+
+/** Fields of the Execution section a problem's action can lead to. */
+export type ExecutionField = "timeout" | "max-cost";
+export const EXECUTION_FIELD_ID: Record<ExecutionField, string> = {
+  timeout: "wf-exec-timeout",
+  "max-cost": "wf-exec-max-cost",
+};
+
+const UNITS = [
+  { id: "s", label: "seconds", ms: 1000 },
+  { id: "min", label: "minutes", ms: 60_000 },
+  { id: "h", label: "hours", ms: 3_600_000 },
+  { id: "d", label: "days", ms: 86_400_000 },
+] as const;
+type Unit = (typeof UNITS)[number]["id"];
+
+/** A duration as a number in its largest whole unit: 10 800 000 → 3 hours. */
+export function durationParts(ms: number): { value: number; unit: Unit } {
+  for (const u of [...UNITS].reverse())
+    if (ms >= u.ms && ms % u.ms === 0) return { value: ms / u.ms, unit: u.id };
+  return { value: ms / 1000, unit: "s" };
+}
+
+/** Checks a typed run time limit; the schema wants whole milliseconds, at least one second. */
+export function parseDuration(
+  text: string,
+  unit: Unit,
+): { ok: true; ms: number } | { ok: false; error: string } {
+  const n = Number(text);
+  if (text.trim() === "" || !Number.isFinite(n) || n <= 0)
+    return { ok: false, error: "Enter how long a run may take, for example 15." };
+  const ms = Math.round(n * (UNITS.find((u) => u.id === unit)?.ms ?? 1000));
+  if (ms < 1000) return { ok: false, error: "Use at least 1 second." };
+  return { ok: true, ms };
+}
+
+/** Checks a typed cost limit: empty means no limit. */
+export function parseCostLimit(
+  text: string,
+): { ok: true; usd: number | undefined } | { ok: false; error: string } {
+  const t = text.trim().replace(/^\$/, "");
+  if (t === "") return { ok: true, usd: undefined };
+  const n = Number(t);
+  if (!Number.isFinite(n) || n <= 0)
+    return { ok: false, error: "Enter an amount in US dollars above 0, for example 0.25." };
+  return { ok: true, usd: n };
+}
+
+/**
+ * The run's execution policy as fields (`execution` in the workflow JSON): how long a run may take
+ * (waiting for a person counts), how much it may spend, and how many steps run at once. A problem
+ * about either limit leads here (`focus`).
+ */
+function ExecutionSettings({
+  execution: stored,
+  readOnly,
+  focus,
+  onChange,
+}: {
+  execution: WorkflowDefinition["execution"];
+  readOnly: boolean;
+  focus?: { field: ExecutionField; n: number };
+  onChange: (recipe: (e: Draft<WorkflowDefinition["execution"]>) => void, label: string) => void;
+}) {
+  // a draft written without them (a new blank workflow) runs with the schema's defaults
+  const execution = { ...EXECUTION_DEFAULTS, ...stored };
+  // the limit as typed, in the unit chosen; an edit from elsewhere (undo, JSON) shows anew
+  const [text, setText] = useState(() => String(durationParts(execution.timeoutMs).value));
+  const [unit, setUnit] = useState<Unit>(() => durationParts(execution.timeoutMs).unit);
+  const [seenMs, setSeenMs] = useState(execution.timeoutMs);
+  if (execution.timeoutMs !== seenMs) {
+    const shown = durationParts(execution.timeoutMs);
+    setSeenMs(execution.timeoutMs);
+    setText(String(shown.value));
+    setUnit(shown.unit);
+  }
+  const [timeoutError, setTimeoutError] = useState<string | null>(null);
+  const [costError, setCostError] = useState<string | null>(null);
+  const [concurrencyError, setConcurrencyError] = useState<string | null>(null);
+  const focusN = focus?.n;
+  const focusField = focus?.field;
+  useEffect(() => {
+    if (!focusField) return;
+    const el = document.getElementById(EXECUTION_FIELD_ID[focusField]);
+    el?.scrollIntoView?.({ block: "center" });
+    el?.focus();
+  }, [focusField, focusN]);
+
+  const commitTimeout = (typed: string, u: Unit) => {
+    const parsed = parseDuration(typed, u);
+    if (!parsed.ok) return setTimeoutError(parsed.error);
+    if (parsed.ms === execution.timeoutMs) return;
+    setSeenMs(parsed.ms); // keep the unit chosen here: 90 minutes stays 90 minutes
+    onChange((e) => {
+      e.timeoutMs = parsed.ms;
+    }, "Change the run time limit");
+  };
+
+  return (
+    <section aria-labelledby="wf-execution" className="flex flex-col gap-3">
+      <div>
+        <h3 id="wf-execution" className="text-eyebrow">
+          Execution
+        </h3>
+        <FieldHint>
+          Limits every run of this workflow keeps to. A run that reaches one stops.
+        </FieldHint>
+      </div>
+      <FieldRow
+        label="Run time limit"
+        htmlFor={EXECUTION_FIELD_ID.timeout}
+        hint="How long a run may take from start to end. Time spent waiting for a person counts, so allow for your approvals' expiry."
+        error={timeoutError ?? undefined}
+      >
+        <div className="flex gap-2">
+          <Input
+            id={EXECUTION_FIELD_ID.timeout}
+            inputMode="decimal"
+            className="w-24 font-mono"
+            value={text}
+            disabled={readOnly}
+            aria-invalid={timeoutError ? true : undefined}
+            onChange={(e) => {
+              setText(e.target.value);
+              setTimeoutError(null);
+            }}
+            onBlur={() => commitTimeout(text, unit)}
+          />
+          <Select
+            value={unit}
+            disabled={readOnly}
+            aria-label="Run time limit unit"
+            onValueChange={(v) => {
+              const next = UNITS.find((u) => u.id === v)?.id;
+              if (!next) return;
+              setUnit(next);
+              commitTimeout(text, next);
+            }}
+          >
+            {UNITS.map((u) => (
+              <SelectItem key={u.id} value={u.id}>
+                {u.label}
+              </SelectItem>
+            ))}
+          </Select>
+        </div>
+      </FieldRow>
+      <FieldRow
+        label="Cost limit per run"
+        htmlFor={EXECUTION_FIELD_ID["max-cost"]}
+        hint="US dollars of model and decision calls a run may spend. Leave empty for no limit."
+        error={costError ?? undefined}
+        optional
+      >
+        <Input
+          id={EXECUTION_FIELD_ID["max-cost"]}
+          key={`cost:${execution.maxCostUsd ?? ""}`}
+          inputMode="decimal"
+          className="font-mono"
+          placeholder="No limit"
+          defaultValue={execution.maxCostUsd === undefined ? "" : String(execution.maxCostUsd)}
+          disabled={readOnly}
+          aria-invalid={costError ? true : undefined}
+          onChange={() => setCostError(null)}
+          onBlur={(e) => {
+            const parsed = parseCostLimit(e.target.value);
+            if (!parsed.ok) return setCostError(parsed.error);
+            if (parsed.usd === execution.maxCostUsd) return;
+            onChange(
+              (x) => {
+                if (parsed.usd === undefined) delete x.maxCostUsd;
+                else x.maxCostUsd = parsed.usd;
+              },
+              parsed.usd === undefined ? "Remove the cost limit" : "Change the cost limit",
+            );
+          }}
+        />
+      </FieldRow>
+      <FieldRow
+        label="Steps at once"
+        htmlFor="wf-exec-concurrency"
+        hint="How many steps of one run may work at the same time (1 to 64)."
+        error={concurrencyError ?? undefined}
+      >
+        <Input
+          id="wf-exec-concurrency"
+          key={`concurrency:${execution.concurrency}`}
+          inputMode="numeric"
+          className="w-24 font-mono"
+          defaultValue={String(execution.concurrency)}
+          disabled={readOnly}
+          aria-invalid={concurrencyError ? true : undefined}
+          onChange={() => setConcurrencyError(null)}
+          onBlur={(e) => {
+            const n = Number(e.target.value);
+            if (!Number.isInteger(n) || n < 1 || n > 64)
+              return setConcurrencyError("Use a whole number from 1 to 64.");
+            if (n !== execution.concurrency)
+              onChange((x) => {
+                x.concurrency = n;
+              }, "Change steps at once");
+          }}
+        />
+      </FieldRow>
+    </section>
   );
 }
 

@@ -321,7 +321,11 @@ function Deployments({ workflow }: { workflow: WorkflowDetail }) {
     [versions.data],
   );
   const byEnv = new Map((deployments.data ?? []).map((d) => [d.environmentId, d]));
+  // a version chosen elsewhere (Compare's Promote or Rollback, Versions' Deploy) is the one every
+  // Deploy button here starts on, and the page says so
   const wanted = params.get("version");
+  const chosen = wanted ? published.find((v) => v.id === wanted) : undefined;
+  const latest = published[0];
   const doRollback = useMutate(
     (d: Deployment) =>
       post<Deployment & DeployResult>(
@@ -385,6 +389,29 @@ function Deployments({ workflow }: { workflow: WorkflowDetail }) {
   return (
     <div className="flex flex-col gap-4">
       {intro}
+      {chosen && canDeploy ? (
+        <Notice tone="info">
+          <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span>
+              You chose v{chosen.version}
+              {chosen.label ? ` (${chosen.label})` : ""}. Press Deploy v{chosen.version} on the
+              environment it should run in.
+            </span>
+            <Link
+              className="underline"
+              href={`/${s.ws}/workflows/${workflow.id}/deployments`}
+              replace
+            >
+              Choose another version
+            </Link>
+          </span>
+        </Notice>
+      ) : wanted && versions.data && !chosen ? (
+        <Notice tone="warn">
+          The version in this link is not a published version of this workflow; Deploy starts on the
+          newest one.
+        </Notice>
+      ) : null}
       {s.environments.map((env) => {
         const d = byEnv.get(env.id);
         const envHooks = (hooks.data ?? []).filter((h) => h.environmentId === env.id);
@@ -418,6 +445,9 @@ function Deployments({ workflow }: { workflow: WorkflowDetail }) {
                   {d.deployedBy ? ` by ${members.get(d.deployedBy) ?? "a member"}` : ""}
                   {Object.keys(d.variableOverrides).length
                     ? ` · ${Object.keys(d.variableOverrides).length} variable override(s)`
+                    : ""}
+                  {latest && (latest.version ?? 0) > (d.version ?? 0)
+                    ? ` · v${latest.version} is newer`
                     : ""}
                 </>
               ) : (
@@ -460,17 +490,9 @@ function Deployments({ workflow }: { workflow: WorkflowDetail }) {
                     size="sm"
                     variant="primary"
                     leadingIcon={<Rocket strokeWidth={1.75} />}
-                    onClick={() =>
-                      setTarget({
-                        env,
-                        versionId:
-                          wanted && published.some((v) => v.id === wanted)
-                            ? wanted
-                            : (published[0]?.id ?? ""),
-                      })
-                    }
+                    onClick={() => setTarget({ env, versionId: chosen?.id ?? latest?.id ?? "" })}
                   >
-                    Deploy
+                    {chosen ? `Deploy v${chosen.version}` : "Deploy"}
                   </Button>
                 </>
               ) : null

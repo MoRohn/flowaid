@@ -1,8 +1,8 @@
 import { forwardRef, useMemo, useState, type HTMLAttributes } from "react";
-import { LayoutGrid, List } from "lucide-react";
+import { Inbox, LayoutGrid, List } from "lucide-react";
 import { cn } from "@/lib/cn";
 import type { EnvironmentView } from "@/types";
-import { StatusChip, ToggleGroup, ToggleGroupItem, Tooltip } from "@/primitives";
+import { EmptyState, StatusChip, ToggleGroup, ToggleGroupItem, Tooltip } from "@/primitives";
 import {
   createDataTableColumns,
   DataTable,
@@ -182,6 +182,8 @@ export interface WorkflowsBrowserProps extends Omit<HTMLAttributes<HTMLDivElemen
   environments: readonly EnvironmentView[];
   onOpen?: (workflow: WorkflowListItemView) => void;
   selectedId?: string;
+  /** Shown when there are no workflows to show (a search that matches none), in either view. */
+  emptyState?: React.ReactNode;
   /** Extra toolbar content on the left (a search, filters). */
   toolbar?: React.ReactNode;
   tableProps?: Omit<
@@ -204,6 +206,7 @@ export const WorkflowsBrowser = forwardRef<HTMLDivElement, WorkflowsBrowserProps
       onViewChange,
       onOpen,
       selectedId,
+      emptyState,
       toolbar,
       tableProps,
       className,
@@ -228,6 +231,7 @@ export const WorkflowsBrowser = forwardRef<HTMLDivElement, WorkflowsBrowserProps
             toolbar={toolbar}
             toolbarEnd={toggle}
             isRowActive={selectedId ? (w) => w.id === selectedId : undefined}
+            {...(emptyState !== undefined ? { emptyState } : {})}
             {...tableProps}
           />
         ) : (
@@ -236,17 +240,28 @@ export const WorkflowsBrowser = forwardRef<HTMLDivElement, WorkflowsBrowserProps
               <div className="flex min-w-0 flex-1 items-center gap-2">{toolbar}</div>
               {toggle}
             </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {workflows.map((w) => (
-                <WorkflowCard
-                  key={w.id}
-                  workflow={w}
-                  environments={environments}
-                  onOpen={onOpen}
-                  selected={w.id === selectedId}
+            {workflows.length === 0 ? (
+              (emptyState ?? (
+                <EmptyState
+                  size="sm"
+                  icon={<Inbox strokeWidth={1.75} />}
+                  title="No workflows"
+                  description="Nothing matches yet."
                 />
-              ))}
-            </div>
+              ))
+            ) : (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {workflows.map((w) => (
+                  <WorkflowCard
+                    key={w.id}
+                    workflow={w}
+                    environments={environments}
+                    onOpen={onOpen}
+                    selected={w.id === selectedId}
+                  />
+                ))}
+              </div>
+            )}
           </>
         )}
       </div>

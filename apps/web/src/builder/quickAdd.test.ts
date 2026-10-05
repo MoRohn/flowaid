@@ -2,7 +2,14 @@ import { describe, expect, it } from "vitest";
 import type { WorkflowDefinition, WorkflowNode } from "@flowaid/workflow-core";
 import type { NodeDefinitionView } from "@flowaid/ui";
 import { blankDefinition } from "./model";
-import { freeControlPort, lastStep, placeNewStep, suggestNext } from "./quickAdd";
+import {
+  centreToShow,
+  freeControlPort,
+  lastStep,
+  placeNewStep,
+  quickAddPlan,
+  suggestNext,
+} from "./quickAdd";
 
 const view = (kind: string, category: NodeDefinitionView["category"]): NodeDefinitionView => ({
   kind,
@@ -109,6 +116,63 @@ describe("placeNewStep", () => {
     const d = def();
     const at = placeNewStep(d, { x: 10, y: 10 });
     expect(at).not.toEqual({ x: 10, y: 10 });
+  });
+});
+
+describe("quickAddPlan", () => {
+  it("follows the suggested step when nothing is selected, beside it", () => {
+    const d = def();
+    const start = d.nodes.find((n) => n.kind === "input") as WorkflowNode;
+    const plan = quickAddPlan(d, [], { x: 900, y: 900 }, "view");
+    expect(plan.after?.id).toBe(lastStep(d)?.id);
+    expect(plan.after?.id).toBe(start.id);
+    expect(plan.position.x).toBe((d.layout?.nodes[start.id]?.x ?? 0) + 232 + 72);
+  });
+
+  it("follows the selected step", () => {
+    const d = def();
+    const t = task("t", "flowaid.data.transform");
+    d.nodes.push(t);
+    (d.layout ?? { nodes: {} }).nodes.t = { x: 1200, y: 400 };
+    const plan = quickAddPlan(d, ["t"], { x: 0, y: 0 }, "view");
+    expect(plan.after?.id).toBe("t");
+    expect(plan.position).toEqual({ x: 1200 + 232 + 72, y: 400 });
+  });
+
+  it("still connects a step placed at a right-click, but leaves it where the pointer was", () => {
+    const d = def();
+    const plan = quickAddPlan(d, [], { x: 40, y: 600 }, "pointer");
+    expect(plan.after?.id).toBe(lastStep(d)?.id);
+    expect(plan.position).toEqual({ x: 40, y: 600 });
+  });
+
+  it("connects nothing when several steps are selected", () => {
+    const d = def();
+    const ids = d.nodes.map((n) => n.id);
+    expect(quickAddPlan(d, ids, { x: 40, y: 600 }, "view").after).toBeUndefined();
+  });
+});
+
+describe("centreToShow", () => {
+  const size = { width: 1000, height: 600 };
+  it("leaves the view alone when the step is in sight", () => {
+    expect(centreToShow({ x: 100, y: 100, w: 232, h: 96 }, { x: 0, y: 0, zoom: 1 }, size)).toBe(
+      null,
+    );
+  });
+
+  it("centres on a step past the right edge or under the bottom panels", () => {
+    expect(centreToShow({ x: 900, y: 100, w: 232, h: 96 }, { x: 0, y: 0, zoom: 1 }, size)).toEqual({
+      x: 1016,
+      y: 148,
+    });
+    // at half zoom the same step is in sight
+    expect(centreToShow({ x: 900, y: 100, w: 232, h: 96 }, { x: 0, y: 0, zoom: 0.5 }, size)).toBe(
+      null,
+    );
+    expect(centreToShow({ x: 100, y: 520, w: 232, h: 96 }, { x: 0, y: 0, zoom: 1 }, size)).not.toBe(
+      null,
+    );
   });
 });
 

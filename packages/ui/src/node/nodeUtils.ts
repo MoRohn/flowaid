@@ -83,6 +83,9 @@ const TYPE_GROUP_VARIANT: Record<string, NodeCardVariant> = {
   safety: "safety",
   state: "state",
   retrieval: "retrieval",
+  // the developer steps (assert, log, mock, metric, test, trace) hold no code: the code card
+  // would read "js · No code yet" on an Assert
+  dev: "default",
 };
 
 const DECISION_KIND_VARIANT: Partial<
