@@ -88,8 +88,9 @@ describeDb("run actions (Postgres, real orchestrator)", () => {
     const retried = events.find((e) => e.type === "NODE_RETRIED");
     expect(retried).toMatchObject({ nodeId: "gate", nextAttempt: 2, delayMs: 0 });
     const gate = (await h.store.listNodeRuns(failedRunId)).filter((n) => n.nodeId === "gate");
+    // the attempt the retry replaced is finished as failed, not left waiting (roadmap C-06)
     expect(gate.map((n) => [n.attempt, n.status])).toEqual([
-      [1, "retry_wait"],
+      [1, "failed"],
       [2, "completed"],
     ]);
   });
