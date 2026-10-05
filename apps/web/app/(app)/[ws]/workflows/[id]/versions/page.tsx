@@ -1,7 +1,7 @@
 "use client";
 import { useQuery } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
-import { use, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, use, useEffect, useMemo, useState } from "react";
 import { Download, FolderDown, GitCompare, History, Rocket, Undo2 } from "lucide-react";
 import {
   Badge,
@@ -30,8 +30,23 @@ import { errorMessage } from "~/shell/states";
 
 export default function VersionsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  return (
+    <Suspense>
+      <Versions id={id} />
+    </Suspense>
+  );
+}
+
+function Versions({ id }: { id: string }) {
   const s = useSession();
   const router = useRouter();
+  // "Open" on Compare links here with ?focus=<version id>: that row is marked and scrolled to
+  const focus = useSearchParams().get("focus");
+  useEffect(() => {
+    if (!focus) return;
+    const row = document.querySelector<HTMLElement>(`[data-version-id="${CSS.escape(focus)}"]`);
+    row?.scrollIntoView?.({ block: "center" });
+  });
   const [picked, setPicked] = useState<string[]>([]);
   const restore = useConfirm<VersionSummary>();
   const versions = useQuery({
@@ -128,7 +143,16 @@ export default function VersionsPage({ params }: { params: Promise<{ id: string 
                   {published.map((v) => {
                     const deps = deployedTo.get(v.id) ?? [];
                     return (
-                      <li key={v.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
+                      <li
+                        key={v.id}
+                        data-version-id={v.id}
+                        aria-current={v.id === focus ? "true" : undefined}
+                        className={`flex flex-wrap items-center gap-3 px-4 py-3 ${
+                          v.id === focus
+                            ? "bg-accent-soft shadow-[inset_2px_0_0_0_var(--accent)]"
+                            : ""
+                        }`}
+                      >
                         <Checkbox
                           aria-label={`Select v${v.version} to compare`}
                           checked={picked.includes(v.id)}
