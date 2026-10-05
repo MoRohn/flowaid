@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { installDomStubs } from "@/primitives/testStubs";
 import type { NodeRunView, RunView } from "@/types";
@@ -79,5 +79,24 @@ describe("RunHeader failure banner", () => {
       error: { ...failedRun.error, nodeId: undefined } as RunView["error"],
     };
     expect(failedNode(unnamed)?.id).toBe("nr-1");
+  });
+});
+
+describe("RunHeader clock", () => {
+  it("keeps the relative times of a finished run current", () => {
+    vi.useFakeTimers({
+      now: Date.parse("2026-09-28T10:00:05.000Z"),
+      toFake: ["Date", "setTimeout", "setInterval", "clearTimeout", "clearInterval"],
+    });
+    try {
+      render(<RunHeader run={{ ...failedRun, error: undefined }} />);
+      act(() => void vi.advanceTimersByTime(0));
+      const ended = () => screen.getByText("Ended").nextElementSibling?.textContent;
+      expect(ended()).not.toContain("minute");
+      act(() => void vi.advanceTimersByTime(3 * 60_000));
+      expect(ended()).toContain("3 minutes ago");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

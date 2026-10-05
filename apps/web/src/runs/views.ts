@@ -88,10 +88,12 @@ export function toLiveRunView(i: LiveRunInput) {
   });
   // The stored projection wins for fields events do not carry (input/output of node runs).
   const stored = new Map(base.map((n) => [n.id, n]));
-  const nodeRuns = folded.nodeRuns.map((n) => {
-    const s = stored.get(n.id);
-    return s ? { ...n, input: n.input ?? s.input, output: n.output ?? s.output } : n;
-  });
+  const nodeRuns = supersedeRetried(
+    folded.nodeRuns.map((n) => {
+      const s = stored.get(n.id);
+      return s ? { ...n, input: n.input ?? s.input, output: n.output ?? s.output } : n;
+    }),
+  );
   const view = toRunView(i.run as Parameters<typeof toRunView>[0], {
     workflowName: i.workflowName,
     version: i.version,
@@ -99,13 +101,59 @@ export function toLiveRunView(i: LiveRunInput) {
     ...(i.environment ? { environment: i.environment } : {}),
     ...(i.pendingApproval ? { pendingApproval: i.pendingApproval } : {}),
   });
-  if (folded.status) view.status = folded.status;
+  const reopened =
+    folded.status === "failed" &&
+    (retriedAfterFailure(i.events) ||
+      (isActiveRun(i.run.status) && i.run.lastSeq >= folded.lastSeq));
+  if (reopened) {
+    // a retry-node reopened the failed run in place: it runs again, with no error or end yet
+    view.status = isActiveRun(i.run.status) ? i.run.status : "running";
+    delete view.error;
+    delete view.endedAt;
+    delete view.durationMs;
+  } else {
+    if (folded.status) view.status = folded.status;
+    if (folded.error) view.error = folded.error;
+    if (folded.durationMs !== undefined) view.durationMs = folded.durationMs;
+  }
   if (folded.output !== undefined) view.output = folded.output;
-  if (folded.error) view.error = folded.error;
   if (folded.costUsd !== undefined) view.costUsd = folded.costUsd;
   if (folded.usage) view.usage = folded.usage;
-  if (folded.durationMs !== undefined) view.durationMs = folded.durationMs;
   return { view, folded };
+}
+
+/**
+ * Whether a retry-node reopened the run after it failed (ARCHITECTURE.md §5.9): its events go on
+ * after RUN_FAILED with NODE_RETRIED. The fold keeps the last RUN_* status, so without this the
+ * header read "Failed" while the retry ran.
+ */
+export function retriedAfterFailure(events: readonly unknown[]): boolean {
+  let failed = -1;
+  let retried = -1;
+  for (const e of events) {
+    const x = e as { type?: unknown; seq?: unknown; ephemeral?: unknown };
+    if (x.ephemeral === true || typeof x.seq !== "number") continue;
+    if (x.type === "RUN_FAILED") failed = Math.max(failed, x.seq);
+    else if (x.type === "NODE_RETRIED") retried = Math.max(retried, x.seq);
+  }
+  return failed >= 0 && retried > failed;
+}
+
+/**
+ * An attempt that a later attempt of the same step replaced has failed: the fold leaves it
+ * `retry_wait` (its NODE_RETRIED), which read as one more active span for good.
+ */
+function supersedeRetried(nodeRuns: NodeRunView[]): NodeRunView[] {
+  const latest = new Map<string, number>();
+  for (const n of nodeRuns) {
+    const key = `${n.scope ?? ""}|${n.nodeId}`;
+    latest.set(key, Math.max(latest.get(key) ?? 0, n.attempt));
+  }
+  return nodeRuns.map((n) =>
+    n.status === "retry_wait" && n.attempt < (latest.get(`${n.scope ?? ""}|${n.nodeId}`) ?? 0)
+      ? { ...n, status: "failed" }
+      : n,
+  );
 }
 
 /** Durable events only, parsed, in seq order (EventLog input). */

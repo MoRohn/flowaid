@@ -98,7 +98,8 @@ export const RunHeader = forwardRef<HTMLDivElement, RunHeaderProps>(function Run
   ref,
 ) {
   const active = isActive(run.status);
-  const nowMs = useNow(active, 1000, now);
+  // "Started 4 minutes ago" and "Ended …" stay true on a finished run too, at a slower tick
+  const nowMs = useNow(true, active ? 1000 : 30_000, now);
   const waiting = run.status === "waiting_for_human" ? waitingNode(run) : undefined;
   const failed = run.error ? failedNode(run) : undefined;
   const startedIso = run.startedAt ?? run.createdAt;

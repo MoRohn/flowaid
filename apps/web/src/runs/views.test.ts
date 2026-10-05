@@ -219,6 +219,90 @@ describe("toLiveRunView", () => {
   });
 });
 
+describe("toLiveRunView after a retry-node", () => {
+  const nodeEvent = (
+    seq: number,
+    type: string,
+    nodeRunId: string,
+    attempt: number,
+    extra = {},
+  ) => ({
+    type,
+    runId: RUN,
+    seq,
+    at: at(Math.min(seq, 9)),
+    nodeRunId,
+    nodeId: "draft",
+    scope: "",
+    attempt,
+    ...extra,
+  });
+  const error = { code: "NETWORK_ERROR", message: "down", retryable: true };
+  const failed = {
+    type: "RUN_FAILED",
+    runId: RUN,
+    seq: 5,
+    at: at(4),
+    error,
+    usage: { inputTokens: 0, outputTokens: 0 },
+    costUsd: 0,
+    durationMs: 4000,
+  };
+  const failedLog = [
+    ...events,
+    nodeEvent(4, "NODE_FAILED", NR, 1, { error, firedPorts: [], latencyMs: 10, terminal: true }),
+    failed,
+  ];
+  const view = (r: Partial<Run>, evs: unknown[]) =>
+    toLiveRunView({
+      run: { ...run, ...r },
+      nodeRuns: [],
+      events: evs,
+      definition,
+      catalog,
+      workflowName: "Reply",
+      version: 3,
+    }).view;
+
+  it("still reads failed when the run failed after the stored row was read", () => {
+    expect(view({ status: "running", lastSeq: 3 }, failedLog)).toMatchObject({
+      status: "failed",
+      error,
+    });
+  });
+
+  it("reads the stored status once the retry is accepted, before any new event", () => {
+    const v = view({ status: "retrying", lastSeq: 5 }, failedLog);
+    expect(v.status).toBe("retrying");
+    expect(v.error).toBeUndefined();
+    expect(v.durationMs).toBeUndefined();
+  });
+
+  it("runs again once the retry's events arrive, and the replaced attempt reads failed", () => {
+    const NR2 = "0192f0a1-5b3c-7d4e-8f60-0000000000b6";
+    const v = view({ status: "failed", lastSeq: 5, error }, [
+      ...failedLog,
+      nodeEvent(6, "NODE_RETRIED", NR, 1, { error, nextAttempt: 2, delayMs: 0, timerId: "t" }),
+      nodeEvent(7, "NODE_SCHEDULED", NR2, 2, {
+        kind: "task",
+        nodeType: "flowaid.ai.generate",
+        inputHash: "h",
+        idempotencyKey: null,
+        reusedFromNodeRunId: null,
+        batchId: null,
+      }),
+      nodeEvent(8, "NODE_STARTED", NR2, 2, { input: {}, pool: "general", workerId: "w" }),
+    ]);
+    expect(v.status).toBe("running");
+    expect(v.error).toBeUndefined();
+    expect(isActiveRun(v.status)).toBe(true);
+    expect(v.nodeRuns.map((n) => [n.attempt, n.status])).toEqual([
+      [1, "failed"],
+      [2, "running"],
+    ]);
+  });
+});
+
 describe("list rows", () => {
   it("joins workflow names, version numbers and environments", () => {
     const row = toRunRow(run, {
