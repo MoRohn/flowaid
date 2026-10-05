@@ -227,6 +227,43 @@ describeDb("data safety (Postgres)", () => {
     });
   });
 
+  describe("evaluation gate links (migration 0017)", () => {
+    it("repairs links to deleted sets and clears them when a set is deleted", async () => {
+      const w = await create("Gate link");
+      const newSet = async (name: string) =>
+        (await call(t.app, jar, "POST", "/v1/evaluations/sets", { name, workflowId: w.id })).json()
+          .id as string;
+      const link = (setId: string) =>
+        call(t.app, jar, "PATCH", `/v1/workflows/${w.id}`, { evaluationSetId: setId });
+      const linked = async () =>
+        (await t.db.admin`select evaluation_set_id from workflows where id = ${w.id}`)[0]
+          ?.evaluation_set_id as string | null;
+
+      // a database from before 0017: no key, and a link left pointing at a deleted set
+      const gone = await newSet("Deleted before 0017");
+      expect((await link(gone)).statusCode).toBe(200);
+      await t.db.owner.sql.unsafe(
+        'ALTER TABLE "workflows" DROP CONSTRAINT IF EXISTS "workflows_evaluation_set_id_evaluation_sets_id_fk"',
+      );
+      await t.db.admin`delete from evaluation_sets where id = ${gone}`;
+      expect(await linked()).toBe(gone);
+
+      const { readFileSync } = await import("node:fs");
+      const { MIGRATIONS_DIR } = await import("@flowaid/database");
+      const migration = readFileSync(`${MIGRATIONS_DIR}/0017_evaluation_set_fk.sql`, "utf8");
+      for (let i = 0; i < 2; i++)
+        for (const statement of migration.split("--> statement-breakpoint"))
+          await t.db.owner.sql.unsafe(statement);
+      expect(await linked()).toBeNull();
+
+      // from now on the database clears the link itself, whoever deletes the set
+      const kept = await newSet("Deleted after 0017");
+      expect((await link(kept)).statusCode).toBe(200);
+      await t.db.admin`delete from evaluation_sets where id = ${kept}`;
+      expect(await linked()).toBeNull();
+    });
+  });
+
   describe("environments", () => {
     it("refuses a rename onto another environment's name", async () => {
       const res = await call(t.app, jar, "PATCH", `/v1/environments/${envs.staging as string}`, {

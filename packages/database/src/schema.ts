@@ -307,7 +307,9 @@ export const workflows = pgTable(
     draftRevision: integer("draft_revision").notNull().default(1), // optimistic concurrency (If-Match)
     draftDiagnostics: jsonb("draft_diagnostics").$type<Diagnostic[]>().notNull().default([]),
     latestVersionId: uuid("latest_version_id"),
-    evaluationSetId: uuid("evaluation_set_id"), // linked set for the publish-time regression report
+    evaluationSetId: uuid("evaluation_set_id").references((): AnyPgColumn => evaluationSets.id, {
+      onDelete: "set null",
+    }), // linked set for the publish-time regression report (0017: cleared when the set is deleted)
     archivedAt: ts("archived_at"),
     createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: createdAt(),

@@ -9,7 +9,7 @@ import type {
   NodeCategory,
   WorkflowVersionView,
 } from "@flowaid/ui";
-import type { CalibrationBin, ConfusionPair } from "@flowaid/ui/decision";
+import type { CalibrationBin } from "@flowaid/ui/decision";
 import type { WorkflowTemplateView } from "@flowaid/ui/builder";
 import type { SecretDecl } from "@flowaid/workflow-core";
 import type { VersionSummary } from "~/api/types";
@@ -319,27 +319,6 @@ export function toCalibrationBins(
 const label = (v: unknown): string =>
   v === undefined ? "—" : typeof v === "string" ? v : JSON.stringify(v);
 
-/** Expected vs actual decision values per decision node, for confusion matrices. */
-export function confusionPairs(
-  results: readonly CaseResultRow[],
-  cases: readonly EvaluationCase[],
-): Record<string, ConfusionPair[]> {
-  const byId = new Map(cases.map((c) => [c.id, c]));
-  const out: Record<string, ConfusionPair[]> = {};
-  for (const r of results) {
-    const expected = (byId.get(r.caseId)?.expected.decisions ?? {}) as Record<
-      string,
-      { value?: unknown }
-    >;
-    for (const [node, e] of Object.entries(expected)) {
-      if (e.value === undefined) continue;
-      const actual = r.metrics?.decisions[node]?.value;
-      (out[node] ??= []).push({ expected: label(e.value), actual: label(actual) });
-    }
-  }
-  return out;
-}
-
 /** A short, stable case name: first string field of the input, else the ordinal. */
 export function caseName(c: EvaluationCase | undefined, fallback: string): string {
   if (!c) return fallback;
@@ -425,18 +404,6 @@ export function expectationSummary(e: Record<string, unknown>): string {
   if (typeof e.maxLatencyMs === "number") parts.push(`≤ ${e.maxLatencyMs} ms`);
   if (typeof e.maxCostUsd === "number") parts.push(`≤ $${e.maxCostUsd}`);
   return parts.join(", ") || "runs to completion";
-}
-
-/** pass / warn (warnings without a failing gate) / fail. */
-export function gateOf(
-  report: {
-    verdict: "pass" | "fail";
-    warnings: readonly unknown[];
-  } | null,
-): "pass" | "warn" | "fail" {
-  if (!report) return "warn";
-  if (report.verdict === "fail") return "fail";
-  return report.warnings.length > 0 ? "warn" : "pass";
 }
 
 /** "ECE 0.031 (was 0.052)" for the worst-calibrated decision node. */

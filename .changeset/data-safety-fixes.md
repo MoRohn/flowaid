@@ -16,3 +16,5 @@ test no longer records "OK". Tall form dialogs (New credential with all fields, 
 scroll their body so the submit button stays on screen; before, a click there closed the dialog
 and nothing was saved. A recorded replay runs again a step whose output was not stored (privacy "do not persist")
 instead of handing later steps the stored placeholder.
+A workflow's evaluation gate link is cleared by the database when its set is deleted (migration
+0017), and links left pointing at sets deleted earlier are cleared.
