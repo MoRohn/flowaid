@@ -2,11 +2,12 @@
 /**
  * Workspace name and `WorkspaceSettingsSchema` (retention, queue limit, budget). Each hint says
  * what the server actually does with the value: the nightly retention sweep reads the retention
- * days, and run start refuses new runs once this month's spend reaches the budget.
+ * days, and run start refuses new runs once this month's spend reaches the budget. Saving a
+ * shorter retention asks first, since the next sweep clears data that can't be brought back.
  */
 import { useQuery } from "@tanstack/react-query";
-import type { FormEvent } from "react";
-import { Button, FieldRow, Input, NumberInput } from "@flowaid/ui/primitives";
+import { useState, type FormEvent } from "react";
+import { Button, ConfirmDialog, FieldRow, Input, NumberInput } from "@flowaid/ui/primitives";
 import { get, patch } from "~/api/client";
 import { useSession } from "~/session";
 import type { Workspace, WorkspaceBudget, WorkspaceSettings } from "../types";
@@ -33,6 +34,34 @@ export function spendLine(b: WorkspaceBudget): string {
   return `Spent this month (UTC): ${usd(b.spentUsd)} of ${usd(b.monthlyCostUsd)} (${pct}%)${
     b.reached ? ". New runs are refused until next month." : "."
   }`;
+}
+
+/** The server's defaults when a retention field is empty (retention.ts). */
+const DEFAULT_RUNS_DAYS = 90;
+const DEFAULT_AUDIT_DAYS = 400;
+
+/**
+ * What saving `next` over `saved` would clear sooner, in words; empty when nothing is shortened.
+ * Empty fields count as the server's defaults; artifacts without their own days go with the run.
+ */
+export function retentionCuts(saved: Draft, next: Draft): string[] {
+  const runs = (d: Draft) => d.runsDays ?? DEFAULT_RUNS_DAYS;
+  const audit = (d: Draft) => d.auditDays ?? DEFAULT_AUDIT_DAYS;
+  const files = (d: Draft) => d.artifactsDays ?? runs(d);
+  const cuts: string[] = [];
+  if (runs(next) < runs(saved))
+    cuts.push(
+      `Runs: ${runs(saved)} → ${runs(next)} days. Runs that finished more than ${runs(next)} days ago lose their inputs, outputs, steps and files.`,
+    );
+  if (files(next) < files(saved) && next.artifactsDays !== null)
+    cuts.push(
+      `Artifacts: ${files(saved)} → ${files(next)} days. Files runs wrote more than ${files(next)} days ago are deleted.`,
+    );
+  if (audit(next) < audit(saved))
+    cuts.push(
+      `Audit log: ${audit(saved)} → ${audit(next)} days. Entries older than ${audit(next)} days are deleted.`,
+    );
+  return cuts;
 }
 
 const fromWorkspace = (w: Workspace): Draft => {
@@ -105,13 +134,17 @@ function WorkspaceForm({ w }: { w: Workspace }) {
   });
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setDraft((d) => ({ ...d, [k]: v }));
   const auditTooShort = draft.auditDays !== null && draft.auditDays < 90;
+  // a shorter retention clears data at the next nightly sweep: say what, and ask
+  const [confirmCuts, setConfirmCuts] = useState<string[] | null>(null);
 
   return (
     <form
       className="flex flex-col gap-5"
       onSubmit={(e: FormEvent) => {
         e.preventDefault();
-        save.mutate(draft);
+        const cuts = retentionCuts(fromWorkspace(w), draft);
+        if (cuts.length) setConfirmCuts(cuts);
+        else save.mutate(draft);
       }}
     >
       <Section title="General">
@@ -221,6 +254,12 @@ function WorkspaceForm({ w }: { w: Workspace }) {
               disabled={!canEdit}
               onValueChange={(v) => set("monthlyCostUsd", v)}
             />
+            {draft.monthlyCostUsd === 0 ? (
+              <p className="text-xs text-warn-text" role="note">
+                $0 means no budget: runs are never refused for what they cost. To limit spending,
+                enter the most the workspace may spend in a month.
+              </p>
+            ) : null}
             {budget.data ? (
               <p
                 className={budget.data.reached ? "text-xs text-danger-text" : "text-xs text-ink-3"}
@@ -253,6 +292,26 @@ function WorkspaceForm({ w }: { w: Workspace }) {
       ) : (
         <Notice tone="info">Only workspace admins can change these settings.</Notice>
       )}
+      <ConfirmDialog
+        open={confirmCuts !== null}
+        onOpenChange={(o) => {
+          if (!o) setConfirmCuts(null);
+        }}
+        variant="danger"
+        title="Keep data for a shorter time?"
+        description="At the next nightly clean-up, data older than the new limits is cleared for good. Runs stay listed with their cost."
+        confirmLabel="Save and shorten"
+        onConfirm={async () => {
+          // a failure is toasted by the mutation and keeps the form as typed
+          await save.mutateAsync(draft).catch(() => undefined);
+        }}
+      >
+        <ul className="m-0 flex list-disc flex-col gap-1 pl-5 text-xs text-ink-2">
+          {(confirmCuts ?? []).map((c) => (
+            <li key={c}>{c}</li>
+          ))}
+        </ul>
+      </ConfirmDialog>
     </form>
   );
 }

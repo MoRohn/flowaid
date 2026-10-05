@@ -36,6 +36,7 @@ vi.mock("next/navigation", () => ({
 const { ApiKeysTab } = await import("./ApiKeysTab");
 const { NotificationsTab } = await import("./NotificationsTab");
 const { AuditTab, auditFilters } = await import("./AuditTab");
+const { WorkspaceTab, retentionCuts } = await import("./WorkspaceTab");
 
 function memoryStorage(): Storage {
   const data = new Map<string, string>();
@@ -225,6 +226,67 @@ describe("Audit log", () => {
       resourceType: "tool",
       from: undefined,
     });
+  });
+});
+
+describe("Workspace settings", () => {
+  const workspace = {
+    id: "",
+    slug: "acme",
+    name: "Acme",
+    settings: { retention: { runsDays: 90 } },
+    createdAt: "2026-09-01T00:00:00.000Z",
+  };
+  const type = (label: RegExp, value: string) =>
+    act(() => {
+      const input = screen.getByRole("spinbutton", { name: label });
+      fireEvent.change(input, { target: { value } });
+      fireEvent.blur(input);
+    });
+
+  it("asks before keeping runs for a shorter time, and says $0 is no budget", async () => {
+    const fetchMock = stubApi({
+      "GET /v1/workspaces/": () => workspace,
+      "GET /v1/workspaces//budget": () => ({
+        month: "2026-10",
+        spentUsd: 0,
+        monthlyCostUsd: null,
+        reached: false,
+      }),
+      "PATCH /v1/workspaces/": () => workspace,
+    });
+    const patches = () => fetchMock.mock.calls.filter(([, init]) => init?.method === "PATCH");
+    render(withClient(<WorkspaceTab />));
+    await screen.findByRole("spinbutton", { name: /^Runs/ });
+    type(/^Monthly budget/, "0");
+    expect(screen.getByText(/\$0 means no budget/)).toBeTruthy();
+    type(/^Runs/, "30");
+    click(screen.getByRole("button", { name: "Save changes" }));
+    expect(screen.getByText("Keep data for a shorter time?")).toBeTruthy();
+    expect(screen.getByText(/Runs: 90 → 30 days/)).toBeTruthy();
+    expect(patches()).toHaveLength(0);
+    click(screen.getByRole("button", { name: "Save and shorten" }));
+    await waitFor(() => expect(patches()).toHaveLength(1));
+    expect(JSON.parse(patches()[0]?.[1]?.body as string)).toMatchObject({
+      settings: { retention: { runsDays: 30 }, budgets: { monthlyCostUsd: 0 } },
+    });
+  });
+
+  it("names each shortened period, counting empty fields as the defaults", () => {
+    const d = {
+      name: "Acme",
+      runsDays: null,
+      auditDays: null,
+      artifactsDays: null,
+      maxQueuedRuns: null,
+      monthlyCostUsd: null,
+    };
+    expect(retentionCuts(d, { ...d, runsDays: 120 })).toEqual([]);
+    expect(retentionCuts(d, { ...d, auditDays: 200, artifactsDays: 30 })).toEqual([
+      "Artifacts: 90 → 30 days. Files runs wrote more than 30 days ago are deleted.",
+      "Audit log: 400 → 200 days. Entries older than 200 days are deleted.",
+    ]);
+    expect(retentionCuts({ ...d, runsDays: 30 }, d)).toEqual([]);
   });
 });
 

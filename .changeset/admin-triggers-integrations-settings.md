@@ -51,3 +51,6 @@ The audit log exports the filtered range as CSV or JSON (`GET /v1/audit/export`;
 CSV fields are defused), offers the resource types it actually holds
 (`GET /v1/audit/resource-types`) instead of a fixed list, and its period now reaches a year or
 all time.
+
+Saving a shorter run, artifact or audit retention asks first and says what the next nightly
+clean-up will clear; a monthly budget of $0 says that it means no budget.
