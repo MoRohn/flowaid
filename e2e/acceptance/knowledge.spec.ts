@@ -39,7 +39,7 @@ test("knowledge: create a source, add a document, search it", async ({ page }) =
   await expect(row.getByText("indexed")).toBeVisible({ timeout: 60_000 });
 
   await page.getByLabel("Query").fill("refunds original card");
-  await page.getByRole("button", { name: "Search" }).click();
+  await page.getByRole("button", { name: "Search", exact: true }).click();
   const results = page.getByRole("list", { name: "Search results" });
   await expect(results.getByText("Refund policy")).toBeVisible();
   await expect(results.getByText(/five business days/)).toBeVisible();
