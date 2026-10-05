@@ -116,6 +116,16 @@ describe("PageIntro while the page loads", () => {
     expect(expanded()).toBe(true);
   });
 
+  // F-11: Hide and "About …" each left focus on <body>
+  it("keeps keyboard focus on the toggle when it is hidden or shown", () => {
+    renderPage(() => Promise.resolve([]));
+    act(() => screen.getByRole("button", { name: "Hide" }).click());
+    const about = screen.getByRole("button", { name: /About Things/ });
+    expect(document.activeElement).toBe(about);
+    act(() => about.click());
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Hide" }));
+  });
+
   it("starts collapsed on a phone so the page comes first, unless opened by hand", () => {
     phone = true;
     const { unmount } = renderPage(() => Promise.resolve([]));

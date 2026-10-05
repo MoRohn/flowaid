@@ -126,4 +126,23 @@ describe("SideNav", () => {
     expect(dark).toHaveAttribute("aria-checked", "true");
     expect(document.documentElement).toHaveAttribute("data-theme", "dark");
   });
+
+  // F-11: each theme was its own Tab stop and the arrow keys did nothing
+  it("makes the theme a radio group: one Tab stop, arrow keys move and choose", async () => {
+    const user = userEvent.setup();
+    renderNav();
+    const group = screen.getByRole("radiogroup", { name: "Theme" });
+    const light = screen.getByRole("radio", { name: "Light" });
+    const dark = screen.getByRole("radio", { name: "Dark" });
+    const system = screen.getByRole("radio", { name: "System" });
+    expect([light, dark, system].map((r) => r.tabIndex)).toEqual([0, -1, -1]);
+    light.focus();
+    await user.keyboard("{ArrowRight}");
+    expect(dark).toHaveFocus();
+    expect(dark).toHaveAttribute("aria-checked", "true");
+    expect(group.querySelectorAll('[tabindex="0"]')).toHaveLength(1);
+    await user.keyboard("{ArrowLeft}{ArrowLeft}");
+    expect(system).toHaveFocus();
+    expect(system).toHaveAttribute("aria-checked", "true");
+  });
 });

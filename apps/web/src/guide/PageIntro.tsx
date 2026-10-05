@@ -9,7 +9,7 @@
  * page's `defaultCollapsed` as it stands), so the content below does not jump when it decides.
  */
 import { QueryClientContext, type Query, type QueryClient } from "@tanstack/react-query";
-import { useContext, useEffect, useState, type ReactNode } from "react";
+import { useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { BookOpenText, ChevronDown, ChevronRight, Compass, Lightbulb, Eye } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { Badge, Button } from "@flowaid/ui/primitives";
@@ -104,7 +104,18 @@ export function PageIntro({
     const outcome = defaultCollapsed ? "collapsed" : "expanded";
     if (settled && last !== outcome) setLast(outcome);
   }, [settled, defaultCollapsed, last, setLast]);
-  const setCollapsed = (next: boolean) => setPref(next ? "hidden" : "shown");
+  // Hide and "About …" replace each other: focus follows to the one that appears
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  const refocus = useRef(false);
+  const setCollapsed = (next: boolean) => {
+    refocus.current = true;
+    setPref(next ? "hidden" : "shown");
+  };
+  useEffect(() => {
+    if (!refocus.current) return;
+    refocus.current = false;
+    toggleRef.current?.focus();
+  }, [collapsed]);
   const helper = useGuide();
   const missing = checks.filter((c) => c.state === "blocker").length;
   const warnings = checks.filter((c) => c.state === "warning").length;
@@ -117,6 +128,7 @@ export function PageIntro({
       >
         <button
           type="button"
+          ref={toggleRef}
           onClick={() => setCollapsed(false)}
           aria-expanded={false}
           className="inline-flex items-center gap-1.5 rounded-xs text-xs font-medium text-ink-2 hover:text-ink focus-visible:shadow-(--focus) focus-visible:outline-none"
@@ -162,6 +174,7 @@ export function PageIntro({
           variant="ghost"
           leadingIcon={<ChevronDown strokeWidth={1.75} />}
           aria-expanded
+          ref={toggleRef}
           onClick={() => setCollapsed(true)}
         >
           Hide
