@@ -3,7 +3,7 @@
  * Live webhooks (materialised per environment on deploy): the environment-specific settings
  * (enabled, signed timestamps, idempotency header, signing secret) and the delivery log with
  * accepted, duplicate and rejected calls. The path and signature scheme belong to the workflow
- * definition and are read-only here.
+ * definition and are read-only here. Rotating a secret asks first: the current one stops working.
  */
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
@@ -11,6 +11,7 @@ import { History, KeyRound, Webhook } from "lucide-react";
 import {
   Badge,
   Button,
+  ConfirmDialog,
   CopyButton,
   Input,
   Sheet,
@@ -55,13 +56,18 @@ export function WebhookList({
   const s = useSession();
   const [secret, setSecret] = useState<{ value: string; env: string } | null>(null);
   const [log, setLog] = useState<WebhookRow | null>(null);
+  // replacing a secret that callers use asks first
+  const [confirmRotate, setConfirmRotate] = useState<WebhookRow | null>(null);
   const key = ["triggers", s.ws, workflowId ?? "*", "webhooks"];
   const hooks = useWebhooks(workflowId);
   const envName = (id: string) => s.environments.find((e) => e.id === id)?.name ?? id.slice(0, 8);
   const patchHook = useMutate(
     (v: { id: string; body: Record<string, unknown> }) => patch(`/v1/webhooks/${v.id}`, v.body),
-    { success: "Webhook updated", invalidate: [key] },
+    { success: "Webhook updated", invalidate: [key], errorTitle: "Could not update the webhook" },
   );
+  // a switch shows its change is being saved, and can't be flipped again meanwhile
+  const pending = (id: string, field: string) =>
+    patchHook.isPending && patchHook.variables.id === id && field in patchHook.variables.body;
   const rotate = useMutate(
     (h: WebhookRow) => post<{ secret: string }>(`/v1/webhooks/${h.id}/rotate-secret`),
     {
@@ -119,6 +125,8 @@ export function WebhookList({
                         <Switch
                           size="sm"
                           checked={h.enabled}
+                          disabled={pending(h.id, "enabled")}
+                          aria-busy={pending(h.id, "enabled")}
                           onCheckedChange={(c) =>
                             patchHook.mutate({ id: h.id, body: { enabled: c } })
                           }
@@ -129,7 +137,10 @@ export function WebhookList({
                         <Switch
                           size="sm"
                           checked={h.requireTimestamp}
-                          disabled={h.signature !== "hmac_sha256"}
+                          disabled={
+                            h.signature !== "hmac_sha256" || pending(h.id, "requireTimestamp")
+                          }
+                          aria-busy={pending(h.id, "requireTimestamp")}
                           onCheckedChange={(c) =>
                             patchHook.mutate({ id: h.id, body: { requireTimestamp: c } })
                           }
@@ -173,7 +184,7 @@ export function WebhookList({
                             variant="ghost"
                             leadingIcon={<KeyRound strokeWidth={1.75} />}
                             loading={rotate.isPending && rotate.variables?.id === h.id}
-                            onClick={() => rotate.mutate(h)}
+                            onClick={() => (h.secretBound ? setConfirmRotate(h) : rotate.mutate(h))}
                           >
                             {h.secretBound ? "Rotate secret" : "Generate secret"}
                           </Button>
@@ -238,6 +249,20 @@ export function WebhookList({
         title={`Webhook signing secret for ${secret?.env ?? "this environment"}`}
         description="Give it to the sender now: it is stored encrypted and cannot be shown again. It works only in this environment, and any earlier secret here stops working."
         onClose={() => setSecret(null)}
+      />
+      <ConfirmDialog
+        open={confirmRotate !== null}
+        onOpenChange={(o) => {
+          if (!o) setConfirmRotate(null);
+        }}
+        variant="danger"
+        title={`Rotate the signing secret of /${confirmRotate?.path ?? ""}?`}
+        description="The current secret stops working as soon as the new one is made: calls signed with it are refused until the sender uses the new secret, which is shown once."
+        confirmLabel="Rotate secret"
+        onConfirm={async () => {
+          // a failure is toasted by the mutation; the dialog closes either way
+          if (confirmRotate) await rotate.mutateAsync(confirmRotate).catch(() => undefined);
+        }}
       />
       <DeliveriesSheet hook={log} onClose={() => setLog(null)} />
     </>

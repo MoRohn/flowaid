@@ -27,3 +27,8 @@ toolsets, MCP servers, knowledge sources, webhooks and notification channels
 (`GET /v1/credentials/:id/uses`, also shown in the credential's details). The delete
 confirmation lists those uses with links; an admin can unbind and delete, anyone else is asked to
 give them another credential first. The API refuses the delete (409, uses listed) unless forced.
+
+A schedule's Run now asks first, naming the environment (and saying when it is protected), then
+offers Open run; the schedule's last run shows the manual run. Rotating a webhook's or
+notification channel's signing secret asks first, since the current secret stops working at once.
+Switches, Send a test and rotation buttons show that they are working and can't be fired twice.

@@ -467,6 +467,13 @@ export function triggerRoutes(app: FastifyInstance, ctx: ApiContext): void {
         },
         { origin: "schedule" },
       );
+      // the row's "last run" shows it, like a scheduled fire (overlap: skip waits for it too)
+      await ctx.db.tenant(p.workspaceId, (tx) =>
+        tx
+          .update(schedules)
+          .set({ lastRunAt: new Date(ctx.clock.now()), lastRunId: started.run.id })
+          .where(eq(schedules.id, s.id)),
+      );
       req.audit.details = { runId: started.run.id };
       return reply.code(202).send({ run_id: started.run.id });
     },

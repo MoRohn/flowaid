@@ -57,6 +57,8 @@ export function NotificationsTab() {
     null,
   );
   const remove = useConfirm<NotificationChannel>();
+  // replacing a signing secret that receivers verify with asks first
+  const confirmRotate = useConfirm<NotificationChannel>();
   const channels = useQuery({
     queryKey: key,
     queryFn: () => getAll<NotificationChannel>("/v1/notifications"),
@@ -64,7 +66,7 @@ export function NotificationsTab() {
   });
   const toggle = useMutate(
     (c: NotificationChannel) => patch(`/v1/notifications/${c.id}`, { enabled: !c.enabled }),
-    { invalidate: [key] },
+    { invalidate: [key], errorTitle: "Could not switch the channel" },
   );
   const test = useMutate(
     (c: NotificationChannel) =>
@@ -80,8 +82,17 @@ export function NotificationsTab() {
   const rotate = useMutate(
     (c: NotificationChannel) =>
       post<{ signingSecret: string }>(`/v1/notifications/${c.id}/rotate-secret`),
-    { invalidate: [key], onSuccess: (r) => setSecret(r.signingSecret) },
+    {
+      invalidate: [key],
+      onSuccess: (r) => setSecret(r.signingSecret),
+      errorTitle: "Could not rotate the signing secret",
+    },
   );
+  // row actions show they are running, and can't be fired twice meanwhile
+  const busy = (
+    m: { isPending: boolean; variables?: NotificationChannel },
+    c: NotificationChannel,
+  ) => m.isPending && m.variables?.id === c.id;
   const drop = useMutate((c: NotificationChannel) => del(`/v1/notifications/${c.id}`), {
     success: (_, c) => `Deleted ${c.name}`,
     invalidate: [key],
@@ -137,12 +148,16 @@ export function NotificationsTab() {
                       size="sm"
                       checked={c.enabled}
                       aria-label={`${c.name} enabled`}
+                      disabled={busy(toggle, c)}
+                      aria-busy={busy(toggle, c)}
                       onCheckedChange={() => toggle.mutate(c)}
                     />
                     <IconButton
                       size="sm"
                       variant="ghost"
                       label={`Send a test to ${c.name}`}
+                      loading={busy(test, c)}
+                      disabled={busy(test, c)}
                       onClick={() => test.mutate(c)}
                     >
                       <Send strokeWidth={1.75} />
@@ -152,7 +167,8 @@ export function NotificationsTab() {
                         size="sm"
                         variant="ghost"
                         label={`Rotate the signing secret of ${c.name}`}
-                        onClick={() => rotate.mutate(c)}
+                        loading={busy(rotate, c)}
+                        onClick={() => confirmRotate.ask(c)}
                       >
                         <KeyRound strokeWidth={1.75} />
                       </IconButton>
@@ -232,6 +248,19 @@ export function NotificationsTab() {
         title="Signing secret"
         description="Verify deliveries with it: X-FlowAId-Signature is sha256=HMAC(secret, `<X-FlowAId-Timestamp>.<body>`). It cannot be shown again."
         onClose={() => setSecret(null)}
+      />
+      <ConfirmDialog
+        open={confirmRotate.target !== null}
+        onOpenChange={(o) => (o ? undefined : confirmRotate.close())}
+        title={`Rotate the signing secret of ${confirmRotate.target?.name ?? "the channel"}?`}
+        description="The current secret stops working as soon as the new one is made: the receiver must verify deliveries with the new secret, which is shown once."
+        variant="danger"
+        confirmLabel="Rotate secret"
+        onConfirm={async () => {
+          // a failure is toasted by the mutation; the dialog closes either way
+          if (confirmRotate.target)
+            await rotate.mutateAsync(confirmRotate.target).catch(() => undefined);
+        }}
       />
       <ConfirmDialog
         open={remove.target !== null}

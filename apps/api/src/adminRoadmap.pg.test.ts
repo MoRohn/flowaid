@@ -332,4 +332,24 @@ describeDb("admin roadmap (Postgres)", () => {
       expect(bindings).toEqual({});
     });
   });
+
+  describe("E-03: a schedule's Run now", () => {
+    it("records the run as the schedule's last run", async () => {
+      const w = await create("Run me now", [
+        { type: "schedule", cron: "0 3 1 1 *", input: { message: "yearly" } },
+      ]);
+      const scheduleId = (await deploy(w.id, await publish(w.id))).json().triggers.schedules[0]
+        .id as string;
+      const fired = await call(t.app, jar, "POST", `/v1/schedules/${scheduleId}/trigger`);
+      expect(fired.statusCode).toBe(202);
+      const runId = fired.json().run_id as string;
+      const row = (
+        await list<{ id: string; lastRunId: string | null; lastRunAt: string | null }>(
+          `/v1/schedules?workflowId=${w.id}`,
+        )
+      ).find((x) => x.id === scheduleId);
+      expect(row?.lastRunId).toBe(runId);
+      expect(row?.lastRunAt).not.toBeNull();
+    });
+  });
 });
