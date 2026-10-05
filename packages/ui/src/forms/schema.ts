@@ -135,6 +135,9 @@ export function hintsOf(schema: JsonSchema): FieldHints {
     hints = { ...rest };
     const known = LANGUAGES.find((l) => l === language);
     if (known) hints.language = known;
+    // a FlowExpr field is an expression with the step's references, not a JavaScript code box
+    if (language === "flowexpr" && (hints.widget === undefined || hints.widget === "code"))
+      hints.widget = "flowexpr";
     if (isRecord(legacy))
       devWarn(`"x-flowaid" ${JSON.stringify(legacy)} is ignored next to "x-ui"; delete it.`);
   } else if (isRecord(legacy)) {

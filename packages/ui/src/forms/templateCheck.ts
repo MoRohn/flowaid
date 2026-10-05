@@ -5,7 +5,13 @@
  * parse error, if any. The compiler still has the last word (it also knows which steps run
  * before this one), so unknown references are warnings, not errors.
  */
-import { collectRefs, formatRef, parseTemplate, type Ref } from "@flowaid/workflow-core";
+import {
+  collectRefs,
+  formatRef,
+  parseExpression,
+  parseTemplate,
+  type Ref,
+} from "@flowaid/workflow-core";
 import type { ExpressionScope } from "@/types";
 import type { EditorDiagnostic } from "./expressionExtensions";
 import type { TemplateRef } from "./TemplateEditor";
@@ -66,6 +72,59 @@ function sentence(message: string): string {
   return /[.!?]$/.test(text) ? text : `${text}.`;
 }
 
+/**
+ * Checks a field whose whole text is one FlowExpr expression (a Transform's `expr`, an Assert's
+ * `condition`) the way `checkTemplate` checks a template's holes: the parse error, and each
+ * reference this field cannot use underlined where it is written.
+ */
+export function checkExpression(
+  source: string,
+  refs: readonly TemplateRef[],
+  variables: readonly string[],
+  inContainer: boolean,
+): TemplateCheck {
+  if (source.trim() === "") return { references: [], diagnostics: [], error: null };
+  const parsed = parseExpression(source);
+  if (!parsed.ok) {
+    const from = Math.max(0, Math.min(parsed.offset, source.length - 1));
+    const error = sentence(parsed.message);
+    return {
+      references: [],
+      diagnostics: [{ from, to: from + 1, severity: "error", message: error }],
+      error,
+    };
+  }
+  const ports = portsOf(refs);
+  const vars = new Set(variables);
+  const references: string[] = [];
+  const diagnostics: EditorDiagnostic[] = [];
+  for (const ref of collectRefs(parsed.ast)) {
+    const text = formatRef(ref);
+    if (!references.includes(text)) references.push(text);
+    const problem = refProblem(ref, ports, vars, inContainer);
+    if (!problem) continue;
+    const at = source.indexOf(text);
+    diagnostics.push({
+      from: at >= 0 ? at : 0,
+      to: at >= 0 ? at + text.length : source.length,
+      severity: "warning",
+      message: problem,
+    });
+  }
+  return { references, diagnostics, error: null };
+}
+
+function portsOf(refs: readonly TemplateRef[]): Map<string, Set<string>> {
+  const ports = new Map<string, Set<string>>();
+  for (const r of refs) {
+    if (r.ref.kind !== "port") continue;
+    const set = ports.get(r.ref.node) ?? new Set<string>();
+    set.add(r.ref.port);
+    ports.set(r.ref.node, set);
+  }
+  return ports;
+}
+
 export function checkTemplate(
   source: string,
   refs: readonly TemplateRef[],
@@ -82,13 +141,7 @@ export function checkTemplate(
       error,
     };
   }
-  const ports = new Map<string, Set<string>>();
-  for (const r of refs) {
-    if (r.ref.kind !== "port") continue;
-    const set = ports.get(r.ref.node) ?? new Set<string>();
-    set.add(r.ref.port);
-    ports.set(r.ref.node, set);
-  }
+  const ports = portsOf(refs);
   const vars = new Set(variables);
   const references: string[] = [];
   const diagnostics: EditorDiagnostic[] = [];

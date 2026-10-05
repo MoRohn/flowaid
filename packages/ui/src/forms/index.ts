@@ -234,7 +234,18 @@ export {
   type TemplateInputProps,
   type TemplateRef,
 } from "./TemplateEditor";
-export { checkTemplate, templateRefsFromScope, type TemplateCheck } from "./templateCheck";
+export {
+  checkExpression,
+  checkTemplate,
+  templateRefsFromScope,
+  type TemplateCheck,
+} from "./templateCheck";
+export {
+  FlowExprEditor,
+  FlowExprWidget,
+  flowExprCompletions,
+  type FlowExprEditorProps,
+} from "./FlowExprEditor";
 export {
   LevelsList,
   validateLevels,
