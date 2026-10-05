@@ -17,6 +17,7 @@ import {
   KIND_LABEL,
   countsLine,
   isPageIndexKind,
+  isWorking,
   sourceTone,
   type KnowledgeSource,
 } from "~/knowledge/model";
@@ -33,12 +34,7 @@ export default function KnowledgePage() {
   const sources = useQuery({
     queryKey: ["knowledge-sources", s.ws],
     queryFn: () => getAll<KnowledgeSource>("/v1/knowledge/sources"),
-    refetchInterval: (q) =>
-      q.state.data?.some(
-        (x) => !isPageIndexKind(x.kind) && (x.status === "syncing" || x.status === "new"),
-      )
-        ? 3000
-        : false,
+    refetchInterval: (q) => (q.state.data?.some(isWorking) ? 3000 : false),
   });
   const connections = useConnections();
   const models = useQuery({

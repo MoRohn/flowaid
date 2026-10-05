@@ -10,7 +10,11 @@ import {
   embeddingOptions,
   formOf,
   indexingErrorFix,
+  indexingErrorText,
+  isWorking,
   sourcePatch,
+  UPLOAD_LIMIT_BYTES,
+  uploadSizeError,
   type KnowledgeSource,
 } from "./model";
 
@@ -165,6 +169,40 @@ describe("a source's settings", () => {
       reindex: false,
       refetch: true,
     });
+  });
+});
+
+describe("knowledge details", () => {
+  const base = { kind: "text" as const, status: "new" as const, documents: 0 };
+
+  it("polls only a source that is working, not an empty upload source", () => {
+    // it used to poll forever while an upload source waited for its first document
+    expect(isWorking(base)).toBe(false);
+    expect(isWorking({ ...base, documents: 2 })).toBe(true);
+    expect(isWorking({ ...base, kind: "url" })).toBe(true);
+    expect(isWorking({ ...base, status: "syncing" })).toBe(true);
+    expect(isWorking({ ...base, kind: "pageindex", status: "syncing" })).toBe(false);
+  });
+
+  it("refuses an upload bigger than one request takes", () => {
+    expect(uploadSizeError([{ title: "a", text: "short" }])).toBeNull();
+    expect(uploadSizeError([{ title: "a", text: "x".repeat(UPLOAD_LIMIT_BYTES + 1) }])).toMatch(
+      /split it into smaller files/,
+    );
+    const half = "x".repeat(UPLOAD_LIMIT_BYTES / 2 + 10);
+    expect(
+      uploadSizeError([
+        { title: "a", text: half },
+        { title: "b", text: half },
+      ]),
+    ).toMatch(/a few at a time/);
+  });
+
+  it("puts a missing embedding key in plain words", () => {
+    expect(indexingErrorText("No google.api_key credential is bound for google")).toMatch(
+      /^Google has no API key in this workspace/,
+    );
+    expect(indexingErrorText("fetch failed")).toBe("fetch failed");
   });
 });
 

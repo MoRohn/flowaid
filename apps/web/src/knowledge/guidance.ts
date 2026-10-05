@@ -166,9 +166,13 @@ export function sourceStatusHelp(
   src: Pick<KnowledgeSource, "kind" | "status" | "documents" | "stats" | "lastError">,
 ): string {
   const failed = src.stats.lastRun?.failed ?? 0;
-  const failedNote = failed
-    ? ` ${failed} document${failed === 1 ? "" : "s"} failed on the last sync: the Error badge in the table gives each reason.`
-    : "";
+  // the failed documents may have been removed since: point at the table only while it has rows
+  const failedNote =
+    failed && src.documents > 0
+      ? ` ${failed} document${failed === 1 ? "" : "s"} failed on the last sync: the Error badge in the table gives each reason.`
+      : "";
+  if (src.status === "error" && isUploadKind(src.kind) && src.documents === 0)
+    return "Indexing failed and no document is left: add documents again once the cause below is fixed.";
   switch (src.status) {
     case "new":
       return isUploadKind(src.kind) && src.documents === 0

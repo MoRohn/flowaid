@@ -39,10 +39,13 @@ import {
   countsLine,
   documentTone,
   indexingErrorFix,
+  indexingErrorText,
   isPageIndexKind,
   isUploadKind,
+  isWorking,
   mimeOf,
   sourceTone,
+  uploadSizeError,
   type KnowledgeChunk,
   type KnowledgeDocument,
   type KnowledgeSource,
@@ -77,11 +80,14 @@ function UploadDialog({
   const [title, setTitle] = useState("");
   const [text, setText] = useState("");
   const [files, setFiles] = useState<Draft[]>([]);
+  // files that could not be read or hold no text: named, so the person can pick them again
+  const [skipped, setSkipped] = useState<string[]>([]);
   const docs: Draft[] = files.length
     ? files
     : text.trim()
       ? [{ title: title.trim() || "Untitled", text, mimeType: "text/markdown" }]
       : [];
+  const sizeError = uploadSizeError(docs);
   const upload = useMutate(
     () =>
       post<{ documents: KnowledgeDocument[] }>(`/v1/knowledge/sources/${source.id}/documents`, {
@@ -97,19 +103,36 @@ function UploadDialog({
         setTitle("");
         setText("");
         setFiles([]);
+        setSkipped([]);
         onOpenChange(false);
       },
+      errorTitle: "The documents were not added",
     },
   );
   const readFiles = async (list: FileList | null) => {
     const picked = [...(list ?? [])].slice(0, 100);
+    const read = await Promise.all(
+      picked.map(async (f) => {
+        try {
+          return { file: f, text: await f.text() };
+        } catch {
+          // a file moved, locked or unreadable since it was picked
+          return { file: f, text: null };
+        }
+      }),
+    );
     setFiles(
-      await Promise.all(
-        picked.map(async (f) => ({
-          title: f.name,
-          text: await f.text(),
-          mimeType: mimeOf(f.name),
-        })),
+      read.flatMap(({ file, text }) =>
+        text?.trim() ? [{ title: file.name, text, mimeType: mimeOf(file.name) }] : [],
+      ),
+    );
+    setSkipped(
+      read.flatMap(({ file, text }) =>
+        text === null
+          ? [`${file.name} could not be read: pick it again, or paste its text`]
+          : text.trim()
+            ? []
+            : [`${file.name} holds no text`],
       ),
     );
   };
@@ -119,7 +142,7 @@ function UploadDialog({
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            if (docs.length) upload.mutate(undefined);
+            if (docs.length && !sizeError && !upload.isPending) upload.mutate(undefined);
           }}
         >
           <DialogHeader>
@@ -140,6 +163,20 @@ function UploadDialog({
                 onChange={(e) => void readFiles(e.target.files)}
               />
             </FieldRow>
+            {skipped.length ? (
+              <ul role="alert" className="m-0 flex list-none flex-col gap-0.5 p-0 text-xs">
+                {skipped.map((m) => (
+                  <li key={m} className="text-warn-text">
+                    {m}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            {sizeError ? (
+              <p role="alert" className="m-0 text-xs text-danger-text">
+                {sizeError}
+              </p>
+            ) : null}
             {files.length ? (
               <p className="text-xs text-ink-3">
                 {files.length} file{files.length === 1 ? "" : "s"} selected:{" "}
@@ -178,7 +215,7 @@ function UploadDialog({
               type="submit"
               variant="primary"
               loading={upload.isPending}
-              disabled={docs.length === 0}
+              disabled={docs.length === 0 || sizeError !== null}
             >
               Add
             </Button>
@@ -189,7 +226,16 @@ function UploadDialog({
   );
 }
 
-function ChunksDialog({ doc, onClose }: { doc: KnowledgeDocument; onClose: () => void }) {
+function ChunksDialog({
+  doc,
+  keywordOnly,
+  onClose,
+}: {
+  doc: KnowledgeDocument;
+  /** the source has no embedding model: no chunk is meant to be embedded */
+  keywordOnly: boolean;
+  onClose: () => void;
+}) {
   const s = useSession();
   const chunks = useQuery({
     queryKey: ["knowledge-chunks", s.ws, doc.id],
@@ -223,7 +269,7 @@ function ChunksDialog({ doc, onClose }: { doc: KnowledgeDocument; onClose: () =>
                       {typeof c.metadata.heading === "string" ? (
                         <span>· {c.metadata.heading}</span>
                       ) : null}
-                      {c.embedded ? null : <Badge size="sm">not embedded</Badge>}
+                      {c.embedded || keywordOnly ? null : <Badge size="sm">not embedded</Badge>}
                     </div>
                     <p className="whitespace-pre-wrap text-xs text-ink-2">{c.content}</p>
                   </div>
@@ -377,8 +423,7 @@ export default function KnowledgeSourcePage({ params }: { params: Promise<{ sour
   const [editing, setEditing] = useState(false);
   const [viewing, setViewing] = useState<KnowledgeDocument | null>(null);
   const confirmDoc = useConfirm<KnowledgeDocument>();
-  const busy = (x?: KnowledgeSource) =>
-    x !== undefined && !isPageIndexKind(x.kind) && (x.status === "syncing" || x.status === "new");
+  const busy = (x?: KnowledgeSource) => x !== undefined && isWorking(x);
 
   const source = useQuery({
     queryKey: ["knowledge-source", s.ws, sourceId],
@@ -445,7 +490,11 @@ export default function KnowledgeSourcePage({ params }: { params: Promise<{ sour
               </Badge>
             );
             // the reason a document failed is reachable by keyboard and screen reader, not a title
-            return row.original.error ? <Hint hint={row.original.error}>{badge}</Hint> : badge;
+            return row.original.error ? (
+              <Hint hint={indexingErrorText(row.original.error)}>{badge}</Hint>
+            ) : (
+              badge
+            );
           },
         }),
         col.accessor("chunkCount", {
@@ -603,7 +652,10 @@ export default function KnowledgeSourcePage({ params }: { params: Promise<{ sour
                 {src.lastError ? (
                   <div className="mt-3">
                     <Notice tone={src.status === "error" ? "danger" : "warn"}>
-                      <p>{src.lastError}</p>
+                      <p>{indexingErrorText(src.lastError)}</p>
+                      {indexingErrorText(src.lastError) !== src.lastError ? (
+                        <p className="mt-1 font-mono text-2xs opacity-80">{src.lastError}</p>
+                      ) : null}
                       <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
                         {indexingErrorFix(src.lastError) === "credentials" ? (
                           <a className="font-medium underline" href={`/${s.ws}/credentials`}>
@@ -671,7 +723,13 @@ export default function KnowledgeSourcePage({ params }: { params: Promise<{ sour
           }
         </QueryView>
       </PageBody>
-      {viewing ? <ChunksDialog doc={viewing} onClose={() => setViewing(null)} /> : null}
+      {viewing ? (
+        <ChunksDialog
+          doc={viewing}
+          keywordOnly={!x?.pipeline.embedding}
+          onClose={() => setViewing(null)}
+        />
+      ) : null}
       {editing && x ? (
         <NewSourceDialog
           key={x.id}

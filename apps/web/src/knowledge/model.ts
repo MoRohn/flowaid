@@ -425,6 +425,48 @@ export function embeddingOptions(
     );
 }
 
+/**
+ * Whether the source is still working in the background, so its page and the list refresh. An
+ * upload source that is new and empty is waiting for documents, not working: nothing changes
+ * until someone adds one, so it is not polled.
+ */
+export function isWorking(s: Pick<KnowledgeSource, "kind" | "status" | "documents">): boolean {
+  if (isPageIndexKind(s.kind)) return false;
+  if (s.status === "syncing") return true;
+  return s.status === "new" && !(isUploadKind(s.kind) && s.documents === 0);
+}
+
+/** What one Add documents request may carry: the API takes request bodies up to 2 MiB. */
+export const UPLOAD_LIMIT_BYTES = 2 * 1024 * 1024 - 64 * 1024;
+
+/** Why the documents can't be added in one go (null when they can). */
+export function uploadSizeError(docs: readonly { title: string; text: string }[]): string | null {
+  const encoder = new TextEncoder();
+  const bytes = docs.reduce((n, d) => n + encoder.encode(d.text).length + d.title.length, 0);
+  if (bytes <= UPLOAD_LIMIT_BYTES) return null;
+  const mb = (bytes / (1024 * 1024)).toFixed(1);
+  return docs.length > 1
+    ? `Together they are ${mb} MB, more than one request takes (about 1.9 MB): add them a few at a time.`
+    : `It is ${mb} MB, more than one request takes (about 1.9 MB): split it into smaller files.`;
+}
+
+/**
+ * An indexing error in plain words, for the source's notice and a document's badge. The worker
+ * names a missing key by its credential type ("No google.api_key credential is bound for
+ * google"); that becomes what to do about it.
+ */
+export function indexingErrorText(message: string): string {
+  const missingKey = /No ([a-z0-9_-]+)\.api_key credential is bound for ([a-z0-9_-]+)/i.exec(
+    message,
+  );
+  if (missingKey) {
+    const provider = missingKey[2] ?? missingKey[1] ?? "";
+    const name = provider.charAt(0).toUpperCase() + provider.slice(1);
+    return `${name} has no API key in this workspace, so the documents can't be embedded. Add a key under Credentials, or switch the source to keywords only under Settings.`;
+  }
+  return message;
+}
+
 /** What to do about an indexing error: fix a key (Credentials), or retry once the cause is gone. */
 export function indexingErrorFix(message: string): "credentials" | "retry" {
   return /credential|api[ _-]?key|unauthori[sz]ed|\b401\b|\b403\b|forbidden/i.test(message)

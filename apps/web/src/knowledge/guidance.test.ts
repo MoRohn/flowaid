@@ -129,6 +129,20 @@ describe("sourceStatusHelp", () => {
     ).toMatch(/1 document failed/);
     expect(sourceStatusHelp({ ...src, status: "error", lastError: "401" })).toMatch(/retry/);
   });
+
+  it("does not point at the table's badges once the failed documents are gone", () => {
+    const failed = { lastRun: { indexed: 0, unchanged: 0, deleted: 0, failed: 1 } };
+    const help = sourceStatusHelp({
+      ...src,
+      kind: "text",
+      status: "error",
+      documents: 0,
+      stats: failed,
+      lastError: "no key",
+    });
+    expect(help).not.toMatch(/Error badge in the table/);
+    expect(help).toMatch(/no document is left/);
+  });
 });
 
 describe("scoreReading", () => {

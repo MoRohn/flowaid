@@ -14,3 +14,9 @@ is off and how to turn it on, the documents it holds are listed (the list no lon
 service), and uploads, document actions and Try a question are not offered. Before, the banner
 said the service was not answering, the table failed to load and Try a question said nothing was
 indexed.
+
+Knowledge details: removing the last failed document of an upload source takes it out of Error
+(it stayed in Error over an empty table); keyword-only sources no longer mark every chunk "not
+embedded"; a missing embedding key reads as what to do about it; Add documents names files it
+could not read or that hold no text, and refuses an upload larger than one request takes, instead
+of failing silently; and an empty upload source is no longer polled every few seconds.
