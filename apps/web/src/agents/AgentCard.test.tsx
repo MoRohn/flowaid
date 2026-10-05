@@ -1,5 +1,6 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import type { ToolDefinition } from "@flowaid/workflow-core";
 import { installDomStubs } from "@/primitives/testStubs";
 import { withClient } from "~/knowledge/pageindex/testApi";
 import type { AgentPreset } from "./logic";
@@ -15,12 +16,13 @@ afterEach(() => cleanup());
 const agent: AgentPreset = {
   id: "a1",
   name: "Stale helper",
-  description: "",
+  description: "Answers order questions",
   config: {
     model: { provider: "openai", model: "gpt-test" },
     tools: [
       { name: "lookup_order", approval: "never" },
-      { name: "calculator", approval: "never" },
+      { name: "calculator", approval: "irreversible" },
+      { name: "refund", approval: "irreversible" },
     ],
   },
   active: true,
@@ -28,12 +30,21 @@ const agent: AgentPreset = {
   updatedAt: "",
 };
 
-const card = (known: ReadonlySet<string> | undefined) =>
+const tool = (name: string, idempotency: "safe" | "none"): ToolDefinition => ({
+  name,
+  description: name,
+  inputSchema: {},
+  idempotency,
+  approvalRequired: false,
+  source: { kind: "builtin", id: name },
+});
+
+const card = (catalog: ToolDefinition[] | undefined) =>
   render(
     withClient(
       <AgentCard
         agent={agent}
-        known={known}
+        catalog={catalog}
         canWrite
         onEdit={() => undefined}
         onDelete={() => undefined}
@@ -43,15 +54,33 @@ const card = (known: ReadonlySet<string> | undefined) =>
 
 describe("an agent card", () => {
   it("flags a tool the workspace no longer offers", () => {
-    card(new Set(["calculator"]));
+    card([tool("calculator", "safe"), tool("refund", "none")]);
     expect(screen.getByText(/no longer available/).parentElement?.textContent).toBe(
       "lookup_order · no longer available",
     );
     expect(screen.getByText(/Runs of this agent fail until that tool is removed/)).toBeDefined();
   });
 
-  it("says nothing while the tool list is still loading", () => {
+  it("says nothing about missing tools while the tool list is still loading", () => {
     card(undefined);
     expect(screen.queryByText(/no longer available/)).toBeNull();
+  });
+
+  it("marks approval only where a person is really asked", () => {
+    card([tool("calculator", "safe"), tool("refund", "none")]);
+    // "Ask for irreversible calls" on a read-only tool never asks
+    expect(screen.getByText("calculator").parentElement?.textContent).toBe(
+      "calculator (runs without asking)",
+    );
+    expect(screen.getByText("refund").parentElement?.textContent).toBe(
+      "refund (asks a person first) · approval",
+    );
+  });
+
+  it("names its actions and its switch after the agent", () => {
+    card([]);
+    expect(screen.getByRole("button", { name: "Edit Stale helper" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Delete Stale helper" })).toBeDefined();
+    expect(screen.getByRole("switch", { name: /^Stale helper: Active/ })).toBeDefined();
   });
 });

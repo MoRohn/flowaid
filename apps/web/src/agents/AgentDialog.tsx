@@ -327,27 +327,74 @@ export function AgentDialog({
                 onToggle={toggleTool}
                 onApproval={setApproval}
                 empty={
-                  <p className="m-0 rounded-sm border border-dashed border-border px-3 py-2.5 text-sm text-ink-3">
-                    None yet. Your draft is kept while you{" "}
-                    <a className="text-accent-text hover:underline" href={`/${s.ws}/integrations`}>
-                      connect an MCP server
-                    </a>
-                    ,{" "}
-                    <a
-                      className="text-accent-text hover:underline"
-                      href={`/${s.ws}/integrations?tab=openapi`}
-                    >
-                      import an OpenAPI document
-                    </a>{" "}
-                    or{" "}
-                    <a
-                      className="text-accent-text hover:underline"
-                      href={`/${s.ws}/triggers?tab=mcp`}
-                    >
-                      expose a workflow as a tool
-                    </a>
-                    ; come back and it is here.
-                  </p>
+                  editing ? (
+                    // an edit is not kept if the page is left, so these open in a new tab
+                    <p className="m-0 rounded-sm border border-dashed border-border px-3 py-2.5 text-sm text-ink-3">
+                      None yet. Changes to this agent are kept only while this page is open, so
+                      these open in a new tab:{" "}
+                      <a
+                        className="text-accent-text hover:underline"
+                        href={`/${s.ws}/integrations`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        connect an MCP server
+                      </a>
+                      ,{" "}
+                      <a
+                        className="text-accent-text hover:underline"
+                        href={`/${s.ws}/integrations?tab=openapi`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        import an OpenAPI document
+                      </a>{" "}
+                      or{" "}
+                      <a
+                        className="text-accent-text hover:underline"
+                        href={`/${s.ws}/triggers?tab=mcp`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        expose a workflow as a tool
+                      </a>
+                      . Then{" "}
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="link"
+                        onClick={() => void catalog.refetch()}
+                      >
+                        refresh this list
+                      </Button>
+                      .
+                    </p>
+                  ) : (
+                    <p className="m-0 rounded-sm border border-dashed border-border px-3 py-2.5 text-sm text-ink-3">
+                      None yet. Your draft is kept while you{" "}
+                      <a
+                        className="text-accent-text hover:underline"
+                        href={`/${s.ws}/integrations`}
+                      >
+                        connect an MCP server
+                      </a>
+                      ,{" "}
+                      <a
+                        className="text-accent-text hover:underline"
+                        href={`/${s.ws}/integrations?tab=openapi`}
+                      >
+                        import an OpenAPI document
+                      </a>{" "}
+                      or{" "}
+                      <a
+                        className="text-accent-text hover:underline"
+                        href={`/${s.ws}/triggers?tab=mcp`}
+                      >
+                        expose a workflow as a tool
+                      </a>
+                      ; come back and it is here.
+                    </p>
+                  )
                 }
               />
             </>
@@ -383,7 +430,7 @@ export function AgentDialog({
               label="Max tool calls"
               htmlFor="agent-calls"
               error={check.errors.maxToolCalls}
-              hint="Across all steps (0–200, default 16)"
+              hint="Across all steps (0–200, default 16). 0: it may not call any tool"
             >
               <Input
                 id="agent-calls"
@@ -396,7 +443,7 @@ export function AgentDialog({
               label="Max cost (USD)"
               htmlFor="agent-cost"
               error={check.errors.maxCostUsd}
-              hint="Per run of the Agent step (default 1)"
+              hint="Per run of the Agent step (default 1). 0: only a model without a price can run"
             >
               <Input
                 id="agent-cost"
@@ -541,8 +588,10 @@ export function AgentDialog({
           </DialogHeader>
           <DialogBody>
             <ol className="m-0 flex list-decimal flex-col gap-1.5 pl-5 text-sm text-ink-2">
-              <li>Open a workflow and add an Agent step (Add node, then search “Agent”).</li>
-              <li>In the step's settings, choose {created.name} as its agent preset.</li>
+              <li>
+                Open a workflow, press Add node and pick {created.name}: active agents are listed
+                there by name.
+              </li>
               <li>
                 Press Run draft with a realistic request. The trace lists each model turn and tool
                 call, and approvals wait under Human tasks.
@@ -743,7 +792,12 @@ function ToolGroup({
             const pick = chosen.find((x) => x.name === t.name);
             const note = t.source.kind === "builtin" ? BUILTIN_NOTE[t.name] : undefined;
             return (
-              <li key={`${t.source.kind}:${t.name}`} className="flex items-start gap-3 px-3 py-2">
+              // the approval choice keeps a fixed width beside the tool, and goes under it on a
+              // narrow screen, so the name and description are never squeezed
+              <li
+                key={`${t.source.kind}:${t.name}`}
+                className="flex flex-wrap items-start gap-x-3 gap-y-1.5 px-3 py-2"
+              >
                 <Checkbox
                   id={`tool-${t.name}`}
                   className="mt-0.5"
@@ -757,30 +811,37 @@ function ToolGroup({
                       <span className="ml-1.5 font-sans text-2xs text-warn-text">changes data</span>
                     ) : null}
                   </span>
-                  <span className="block text-xs text-ink-3">
+                  <span className="line-clamp-2 text-xs text-ink-3">
                     <span className="text-ink-2">
                       {SOURCE_LABEL[t.source.kind] ?? t.source.kind}
                     </span>
                     {" · "}
-                    <span className="line-clamp-2">{t.description}</span>
+                    {t.description}
                   </span>
+                  {pick && pick.approval === "irreversible" && !changesData(t) ? (
+                    <span className="mt-0.5 block text-2xs text-ink-3">
+                      Only reads, so it runs without asking.
+                    </span>
+                  ) : null}
                   {note && pick ? (
                     <span className="mt-1 block text-2xs text-warn-text">{note}</span>
                   ) : null}
                 </label>
                 {pick ? (
-                  <Select
-                    size="sm"
-                    value={pick.approval}
-                    onValueChange={(v) => onApproval(t.name, v as ApprovalMode)}
-                    aria-label={`Approval for ${t.name}`}
-                  >
-                    {(Object.keys(APPROVAL_LABEL) as ApprovalMode[]).map((m) => (
-                      <SelectItem key={m} value={m}>
-                        {APPROVAL_LABEL[m]}
-                      </SelectItem>
-                    ))}
-                  </Select>
+                  <div className="w-full pl-7 sm:w-52 sm:shrink-0 sm:pl-0">
+                    <Select
+                      size="sm"
+                      value={pick.approval}
+                      onValueChange={(v) => onApproval(t.name, v as ApprovalMode)}
+                      aria-label={`Approval for ${t.name}`}
+                    >
+                      {(Object.keys(APPROVAL_LABEL) as ApprovalMode[]).map((m) => (
+                        <SelectItem key={m} value={m}>
+                          {APPROVAL_LABEL[m]}
+                        </SelectItem>
+                      ))}
+                    </Select>
+                  </div>
                 ) : null}
               </li>
             );

@@ -214,6 +214,35 @@ describe("editing an agent", () => {
   });
 });
 
+describe("editing an agent's tools", () => {
+  it("does not promise to keep an edit across pages: the links open a new tab", async () => {
+    stubApi({
+      "GET /v1/models": () => [],
+      "GET /v1/providers": () => [],
+      "GET /v1/credentials": () => ({ items: [], next_cursor: null }),
+      "GET /v1/tools/catalog": () => [],
+    });
+    const preset = {
+      id: "a1",
+      name: "Order helper",
+      description: "",
+      config: { model: { provider: "openai", model: "gpt-test" } },
+      createdAt: "",
+      updatedAt: "",
+    };
+    render(withClient(<AgentDialog open editing={preset} onOpenChange={() => undefined} />));
+    act(() => {
+      fireEvent.click(screen.getByRole("radio", { name: /All fields/ }));
+    });
+    const own = await screen.findByRole("region", { name: "Your tools" });
+    expect(own.textContent).not.toMatch(/draft is kept/);
+    expect(own.textContent).toMatch(/kept only while this page is open/);
+    const link = screen.getByRole("link", { name: "connect an MCP server" });
+    expect(link.getAttribute("target")).toBe("_blank");
+    expect(screen.getByRole("button", { name: "refresh this list" })).toBeDefined();
+  });
+});
+
 describe("a tool that is no longer available", () => {
   const stale = {
     id: "a2",

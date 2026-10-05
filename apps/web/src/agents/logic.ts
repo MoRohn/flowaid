@@ -249,6 +249,14 @@ export function changesData(tool: { approvalRequired?: boolean; idempotency?: un
   return tool.approvalRequired === true || tool.idempotency === "none";
 }
 
+/**
+ * Whether a call to the tool waits for a person: always for `always`, and for `irreversible`
+ * only when the tool changes data. `changes` undefined (the catalog not loaded) assumes it does.
+ */
+export function asksFirst(approval: ApprovalMode, changes: boolean | undefined): boolean {
+  return approval === "always" || (approval === "irreversible" && changes !== false);
+}
+
 export interface AgentReviewNote {
   id: string;
   state: "blocker" | "warning" | "info";
@@ -310,6 +318,20 @@ export function reviewNotes(
       id: "unguarded",
       state: "warning",
       message: `${unguarded.map((t) => t.name).join(", ")} can change data and will run without asking anyone.`,
+    });
+  // limits of 0 are valid, but stop the agent where it starts (agent.ts checks both before acting)
+  if (d.maxCostUsd.trim() !== "" && Number(d.maxCostUsd) === 0)
+    notes.push({
+      id: "no-spend",
+      state: "warning",
+      message:
+        "Max cost is $0: the agent stops before its first model turn that has a price, so it can only run on a model without one (such as a local Ollama model).",
+    });
+  if (d.maxToolCalls.trim() !== "" && Number(d.maxToolCalls) === 0 && d.tools.length)
+    notes.push({
+      id: "no-tool-calls",
+      state: "warning",
+      message: `Max tool calls is 0 but the agent has ${d.tools.length === 1 ? "a tool" : `${d.tools.length} tools`}: it fails the first time it calls one. Raise the limit, or remove the tools.`,
     });
   if (!d.tools.length)
     notes.push({

@@ -2,7 +2,7 @@
 /** Agents (P6-10): presets the Agent node references, listed with their model, tools and bounds. */
 import { useQuery } from "@tanstack/react-query";
 import type { ToolDefinition } from "@flowaid/workflow-core";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Bot, Plus } from "lucide-react";
 import { Button, ConfirmDialog, EmptyState } from "@flowaid/ui/primitives";
 import { PageHeader } from "@flowaid/ui/shell";
@@ -37,11 +37,6 @@ export default function AgentsPage() {
     queryKey: ["catalog", "tools", s.ws],
     queryFn: () => get<ToolDefinition[]>("/v1/tools/catalog"),
   });
-  // every tool name the workspace offers; undefined until the catalog has loaded
-  const known = useMemo(
-    () => (tools.data ? new Set(tools.data.map((t) => t.name)) : undefined),
-    [tools.data],
-  );
   const checks: Check[] = [
     generationCheck(connections, s.ws, { required: true, need: "Agents" }),
     tools.isPending
@@ -100,7 +95,7 @@ export default function AgentsPage() {
                     <li key={a.id}>
                       <AgentCard
                         agent={a}
-                        known={known}
+                        catalog={tools.data}
                         canWrite={canWrite}
                         onEdit={() => setEditing(a)}
                         onDelete={() => confirm.ask(a)}

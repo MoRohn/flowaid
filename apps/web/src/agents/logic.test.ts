@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   advancedLabel,
+  asksFirst,
   changesData,
   checkDraft,
   draftOf,
@@ -154,6 +155,36 @@ describe("agent review notes", () => {
     });
     expect(notes[0]).toMatchObject({ id: "missing-tools", state: "blocker" });
     expect(notes[0]?.message).toMatch(/^lookup_order is no longer available/);
+  });
+
+  it("warns about limits of 0 that stop the agent where it starts", () => {
+    const notes = reviewNotes(
+      {
+        ...base,
+        maxCostUsd: "0",
+        maxToolCalls: "0",
+        tools: [{ name: "calculator", approval: "never" }],
+      },
+      { providerReady: ready, changes: new Map() },
+    );
+    expect(notes.map((n) => `${n.id}:${n.state}`)).toEqual([
+      "no-spend:warning",
+      "no-tool-calls:warning",
+    ]);
+    // no tools: 0 tool calls is what was meant
+    expect(
+      reviewNotes({ ...base, maxToolCalls: "0" }, { providerReady: ready, changes: new Map() }).map(
+        (n) => n.id,
+      ),
+    ).toEqual(["no-tools"]);
+  });
+
+  it("knows when a call waits for a person", () => {
+    expect(asksFirst("always", false)).toBe(true);
+    expect(asksFirst("irreversible", false)).toBe(false);
+    expect(asksFirst("irreversible", true)).toBe(true);
+    expect(asksFirst("irreversible", undefined)).toBe(true);
+    expect(asksFirst("never", true)).toBe(false);
   });
 
   it("treats non-idempotent or approval-marked tools as changing data", () => {
