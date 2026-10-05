@@ -3,6 +3,7 @@ import type { HumanTask } from "~/api/types";
 import { ApiError } from "~/api/client";
 import {
   alreadyAnswered,
+  assigneeName,
   closedTaskNote,
   externalToApproval,
   humanizeId,
@@ -78,6 +79,13 @@ describe("closed tasks", () => {
       false,
     );
     expect(alreadyAnswered(new ApiError(500, "INTERNAL", "responded"))).toBe(false);
+  });
+
+  it("names assignees: roles in words, people by name", () => {
+    const members = [{ userId: "u1", name: "Rohn", email: "r@example.com" }] as never;
+    expect(assigneeName("role:admin")).toBe("Admins");
+    expect(assigneeName("u1", members)).toBe("Rohn");
+    expect(assigneeName("u2", members)).toBe("u2");
   });
 
   it("says why a task closed from how its run ended", () => {

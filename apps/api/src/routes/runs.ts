@@ -1211,7 +1211,16 @@ export function runRoutes(app: FastifyInstance, ctx: ApiContext): void {
           runId: out.runId,
           reason: "human",
         });
-      req.audit.details = { runId: out.runId, action: req.body.response.action };
+      const response = req.body.response;
+      // an escalation's reason is kept with it (the dialog says so); the task keeps no comment
+      req.audit.details = {
+        runId: out.runId,
+        action: response.action,
+        ...(response.action === "escalate" ? { to: response.to } : {}),
+        ...(response.action === "escalate" && response.comment
+          ? { comment: response.comment }
+          : {}),
+      };
       return reply.code(202).send({ run_id: out.runId, status: out.status });
     },
   );

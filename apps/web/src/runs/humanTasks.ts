@@ -12,13 +12,31 @@ export function humanizeId(id: string): string {
   return words ? words.charAt(0).toUpperCase() + words.slice(1) : id;
 }
 
+/** "role:admin" → "Admins"; a user id → the member's name or email. */
+export function assigneeName(id: string, members: readonly Member[] = []): string {
+  if (id.startsWith("role:")) {
+    const role = id.slice("role:".length);
+    return role ? `${role.charAt(0).toUpperCase()}${role.slice(1)}s` : id;
+  }
+  const member = members.find((m) => m.userId === id);
+  return member?.name || member?.email || id;
+}
+
+export function assigneeNames(ids: readonly string[], members: readonly Member[] = []): string[] {
+  return ids.map((id) => assigneeName(id, members));
+}
+
+/** The card's request with who holds the task now (the task row, not the original request). */
+export function withAssignees(view: ApprovalRequestView, names: string[]): ApprovalRequestView {
+  return { ...view, request: { ...view.request, assignees: names } };
+}
+
 export function taskToPending(
   task: HumanTask,
   workflowName: string,
   members: readonly Member[] = [],
 ): PendingApprovalView {
   const assignee = task.assignees[0];
-  const member = assignee ? members.find((m) => m.userId === assignee) : undefined;
   const view: PendingApprovalView = {
     id: task.id,
     runId: task.runId,
@@ -29,7 +47,7 @@ export function taskToPending(
     workflowId: task.workflowId,
     workflowName,
   };
-  if (assignee) view.assigneeName = member?.name || member?.email || assignee;
+  if (assignee) view.assigneeName = assigneeName(assignee, members);
   return view;
 }
 

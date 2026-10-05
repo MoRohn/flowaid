@@ -191,7 +191,7 @@ function Inbox() {
             loading={tasks.isPending}
             onReview={(a) => open(a.id)}
             rowHref={(a) => `/${s.ws}/human-tasks/${a.id}`}
-            {...(s.can("runs:approve") && s.me.user
+            {...(s.can("runs:approve") && s.me.user && !s.local
               ? { onAssignToMe: (a) => assignToMe.mutate(a.id) }
               : {})}
             emptyState={empty}

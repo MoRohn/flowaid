@@ -13,7 +13,14 @@ import { useSession } from "~/session";
 import { AppFrame } from "~/shell/AppFrame";
 import { ErrorPanel, errorMessage } from "~/shell/states";
 import { useCatalog, useMembers, useWorkflowNames } from "~/runs/api";
-import { alreadyAnswered, closedTaskNote, humanizeId, respondedRecord } from "~/runs/humanTasks";
+import {
+  alreadyAnswered,
+  assigneeNames,
+  closedTaskNote,
+  humanizeId,
+  respondedRecord,
+  withAssignees,
+} from "~/runs/humanTasks";
 import { ReviewLinks } from "~/runs/ReviewLinks";
 import { TaskGuidancePanel } from "~/runs/TaskGuidancePanel";
 import type { HumanTask, Page } from "~/api/types";
@@ -181,7 +188,10 @@ export default function HumanTaskPage({ params }: { params: Promise<{ taskId: st
         <TaskGuidancePanel task={task} node={node} className="mx-auto mt-6 w-full max-w-[640px]" />
         <ReviewPage
           card={{
-            request: taskToApproval(task, nodeName, nodeRuns),
+            request: withAssignees(
+              taskToApproval(task, nodeName, nodeRuns),
+              assigneeNames(task.assignees, members.data ?? []),
+            ),
             workflowName,
             onRespond: (r) => {
               if (!canAnswer) return;
@@ -190,7 +200,8 @@ export default function HumanTaskPage({ params }: { params: Promise<{ taskId: st
             submitting: respond.isPending,
             ...(responded ? { responded } : {}),
             ...(closed && !responded ? { closed } : {}),
-            escalationTargets: targets,
+            // on your own computer (local mode) you are the only person: nobody to escalate to
+            ...(s.local ? {} : { escalationTargets: targets }),
             hotkeys: canAnswer,
           }}
           nodeRuns={nodeRuns}

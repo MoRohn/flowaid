@@ -121,6 +121,24 @@ describeDb("runs, streams and human tasks (Postgres)", () => {
     expect(worker.jobs.some((j) => j.type === "run.resume" && j.runId === runId)).toBe(true);
   });
 
+  it("keeps an escalation's reason on the audit trail", async () => {
+    const res = await run({ input: { message: "human" }, mode: "sync", waitTimeoutMs: 20_000 });
+    const taskId = res.json().human_task.id as string;
+    const me = (await call(t.app, jar, "GET", "/v1/me")).json().user.id as string;
+    const escalated = await call(t.app, jar, "POST", `/v1/human-tasks/${taskId}/respond`, {
+      response: { action: "escalate", to: [me], comment: "Needs the finance lead" },
+    });
+    expect(escalated.statusCode).toBe(202);
+    const [row] = await t.db.admin`
+      select details from audit_events
+      where action = 'human_task.respond' and resource_id = ${taskId}`;
+    expect(row?.details).toMatchObject({
+      action: "escalate",
+      to: [me],
+      comment: "Needs the finance lead",
+    });
+  });
+
   it("lists closed tasks of several statuses at once (the inbox's Resolved)", async () => {
     const res = await run({ input: { message: "human" }, mode: "sync", waitTimeoutMs: 20_000 });
     const expired = res.json().human_task.id as string;

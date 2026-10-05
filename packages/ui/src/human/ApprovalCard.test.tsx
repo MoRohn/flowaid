@@ -151,7 +151,7 @@ describe("ApprovalCard", () => {
     cleanup();
     const { onRespond } = setup(EDIT_OUTPUT_REQUEST, { hotkeys: false });
     await user.click(screen.getByRole("button", { name: "Edit" }));
-    const box = screen.getByRole("textbox", { name: "Proposed by the model" });
+    const box = screen.getByRole("textbox", { name: "Proposed by the workflow" });
     await user.clear(box);
     await user.type(box, "Hi Amara, refund issued.");
     const primary = screen.getByRole("button", { name: /Approve with edits/ });
@@ -175,6 +175,32 @@ describe("ApprovalCard", () => {
     expect(primary).toBeEnabled();
     await user.click(primary);
     expect(lastResponse(onRespond)).toEqual({ action: "choose", option: "billing" });
+  });
+
+  it("claims no model's pick or proposal when no model decided", () => {
+    const { decision: _decision, ...noDecision } = SELECT_REQUEST;
+    setup(noDecision, { hotkeys: false });
+    expect(screen.queryByText("Model pick")).toBeNull();
+    for (const radio of screen.getAllByRole("radio"))
+      expect(radio).not.toHaveAttribute("data-model-pick");
+    cleanup();
+    setup(EDIT_OUTPUT_REQUEST, { hotkeys: false });
+    expect(screen.getByText("Proposed by the workflow")).toBeInTheDocument();
+    expect(screen.queryByText(/Proposed by the model/)).toBeNull();
+    cleanup();
+    setup(
+      {
+        ...EDIT_OUTPUT_REQUEST,
+        request: { ...EDIT_OUTPUT_REQUEST.request, origin: "task_suspend" },
+      },
+      { hotkeys: false },
+    );
+    expect(screen.getByText("Proposed by the step")).toBeInTheDocument();
+  });
+
+  it("offers no Escalate without anyone to escalate to (local mode)", () => {
+    setup(undefined, { escalationTargets: undefined, hotkeys: false });
+    expect(screen.queryByRole("button", { name: /Escalate/ })).toBeNull();
   });
 
   it("form mode submits the schema values seeded with defaults and has no comment field", async () => {

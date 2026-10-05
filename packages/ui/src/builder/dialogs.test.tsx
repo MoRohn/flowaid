@@ -168,7 +168,7 @@ describe("SideBySideDiff", () => {
 });
 
 describe("EscalationDialog", () => {
-  it("escalates to the chosen target with a comment and the notify flag", async () => {
+  it("escalates to the chosen target with a comment", async () => {
     const user = userEvent.setup();
     const onEscalate = vi.fn();
     render(
@@ -187,16 +187,16 @@ describe("EscalationDialog", () => {
     await user.type(within(dialog).getByRole("textbox"), "Needs a refund decision");
     await user.click(within(dialog).getByRole("button", { name: /^Escalate/ }));
     await waitFor(() => expect(onEscalate).toHaveBeenCalled());
-    const [response, options] = onEscalate.mock.calls[0] as [
+    const [response] = onEscalate.mock.calls[0] as [
       { action: string; to: string[]; comment?: string },
-      { notify: boolean },
     ];
     expect(response).toEqual({
       action: "escalate",
       to: ["team:billing"],
       comment: "Needs a refund decision",
     });
-    expect(options.notify).toBe(true);
+    // nothing notifies anyone yet, so the dialog no longer offers to
+    expect(within(dialog).queryByRole("checkbox")).toBeNull();
   });
 });
 

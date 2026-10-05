@@ -40,3 +40,11 @@ the card stays locked after the API accepts it, so a double click or a second A 
 (answered, expired, cancelled) with an outcome filter and a workflow filter; `GET /v1/human-tasks`
 takes several statuses (`status=responded,expired,cancelled`). A closed task's guidance reads
 "About this task" and no longer gives a due time for a cancelled task.
+
+Answer controls no longer claim a model decided when none did: a choice nobody ranked shows no
+"Model pick", and a value to review reads "Proposed by the workflow" (or "by the step" for a paused
+step) instead of "by the model", in the app and on external review links. On your own computer
+(local mode) the task page drops Escalate and the inbox drops "Assign to me", since there is nobody
+else to hand a task to. The escalation dialog's "Notify now" box, which sent nothing, is gone, and
+the escalation reason is now kept on the audit trail as the dialog says. Assignees read as names
+("Admins", a member's name) instead of ids.

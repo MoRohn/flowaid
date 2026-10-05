@@ -77,6 +77,13 @@ type PrimaryAction = "approve" | "reject" | "escalate";
 
 const MESSAGE_KEYS = ["message", "text", "body", "content", "prompt", "query"] as const;
 
+/** Who proposed a review's value, by `HumanRequest.origin`: no model unless one decided. */
+export const PROPOSED_BY: Record<HumanRequest["origin"], string> = {
+  human_node: "Proposed by the workflow",
+  task_suspend: "Proposed by the step",
+  decision_failover: "Proposed by the workflow",
+};
+
 /** Why the task exists (`HumanRequest.origin`), as a short badge. */
 export const ORIGIN_LABEL: Record<HumanRequest["origin"], string> = {
   human_node: "Human step",
@@ -593,6 +600,7 @@ export const ApprovalCard = forwardRef<HTMLDivElement, ApprovalCardProps>(functi
                   Proposed output
                 </SectionLabel>
                 <ProposedOutputEditor
+                  label={PROPOSED_BY[task.origin]}
                   original={originalText}
                   value={output}
                   onChange={setOutput}
