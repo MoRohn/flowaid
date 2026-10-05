@@ -110,6 +110,7 @@ export function WorkspaceCommandMenu({
     const view = (g: (typeof built.leading)[number]) => ({
       id: g.id,
       heading: g.heading,
+      ...(g.fallback ? { fallback: true } : {}),
       items: g.items.map((t) => ({
         id: t.id,
         label: t.label,
@@ -139,7 +140,7 @@ export function WorkspaceCommandMenu({
       extraGroups={groups.trailing}
       search={query}
       onSearchChange={setQuery}
-      placeholder="Search workflows, runs, templates, settings, paste a run id, or type a command…"
+      placeholder="Search pages, workflows, runs or settings…"
     />
   );
 }

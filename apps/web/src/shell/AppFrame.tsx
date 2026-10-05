@@ -7,9 +7,16 @@
  */
 import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
-import { Compass, MessageSquareText, Plus } from "lucide-react";
-import { AppShell, SideNav, TopBar, UserMenu, type TopBarProps } from "@flowaid/ui/shell";
-import { Button, IconButton } from "@flowaid/ui/primitives";
+import { Compass, MessageSquareText, Plus, Search } from "lucide-react";
+import {
+  AppShell,
+  SideNav,
+  TopBar,
+  UserMenu,
+  useAppShellOptional,
+  type TopBarProps,
+} from "@flowaid/ui/shell";
+import { Button, IconButton, Shortcut } from "@flowaid/ui/primitives";
 import { useAssistant } from "~/assistant/AssistantProvider";
 import { GUIDE_PANEL_ID, GUIDE_ROOM, GUIDE_TOGGLE_ATTRIBUTE, guideDock } from "~/guide/GuidePanel";
 import { useGuide } from "~/guide/GuideProvider";
@@ -94,6 +101,7 @@ export function AppFrame({
           layoutToggles={Boolean(inspector || bottomPanel)}
           trailing={
             <span className="flex items-center gap-1">
+              <SearchButton />
               {guide ? (
                 <Button
                   variant="ghost"
@@ -208,6 +216,40 @@ export function AppFrame({
       {desktop.overlay}
       <NavShortcuts entries={[...items, ...secondary]} go={go} />
     </AppShell>
+  );
+}
+
+/**
+ * Opens the ⌘K menu: before, only the keyboard could, so phones and tablets never saw it. A
+ * labelled button with the shortcut from `md` up, an icon below. Inside the shell's top bar.
+ */
+function SearchButton() {
+  const shell = useAppShellOptional();
+  if (!shell) return null;
+  const open = () => shell.setCommandOpen(true);
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="hidden text-ink-3 md:inline-flex"
+        leadingIcon={<Search strokeWidth={1.75} />}
+        trailingIcon={<Shortcut shortcut="mod+k" size="sm" className="ml-1" />}
+        aria-haspopup="dialog"
+        onClick={open}
+      >
+        Search
+      </Button>
+      <IconButton
+        label="Search and commands"
+        shortcut="mod+k"
+        className="md:hidden"
+        aria-haspopup="dialog"
+        onClick={open}
+      >
+        <Search strokeWidth={1.75} />
+      </IconButton>
+    </>
   );
 }
 

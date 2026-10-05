@@ -81,7 +81,11 @@ export default function AgentsPage() {
         ]),
   ];
   const newButton = canWrite ? (
-    <Button leadingIcon={<Plus strokeWidth={1.75} />} onClick={() => setEditing(null)}>
+    <Button
+      variant="primary"
+      leadingIcon={<Plus strokeWidth={1.75} />}
+      onClick={() => setEditing(null)}
+    >
       New agent
     </Button>
   ) : null;
