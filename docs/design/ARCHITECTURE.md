@@ -1162,7 +1162,7 @@ export const ExpectationSchema = z.object({
     .default([]),
   decisions: z
     .record(
-      NodeIdSchema,
+      DecisionKeySchema, // a decision step id, or `<step>.<question>` for one answer of a batch step (read from its per-question DECISION_COMPLETED events, batchId `<nodeRunId>:batch`); a step id alone on a batch step means its only question, or the one whose answers can take `value`/`valueIn`
       z.object({
         value: JsonValueSchema.optional(),
         valueIn: z.array(JsonValueSchema).optional(),

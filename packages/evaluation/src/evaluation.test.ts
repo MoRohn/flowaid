@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { booleanDecision, choiceDecision, scoreDecision } from "@flowaid/providers";
 import type { DecisionProvider, JsonValue } from "@flowaid/workflow-core";
 import { compare, flips, mcnemarExactP, regressionWarnings } from "./compare.js";
+import { answersByNodeRun, batchIdOf } from "./decisions.js";
 import {
   ExpectationSchema,
   parseCase,
@@ -307,6 +308,119 @@ describe("calibration and summary", () => {
     expect(s.costUsd.total).toBeCloseTo(0.04);
     // The wrong answer chose "bug" at 0.7 confidence; the right ones "billing" at 0.9.
     expect(s.calibration.intent?.ece).toBeCloseTo(0.25 * 0.7 + 0.75 * 0.1);
+  });
+});
+
+describe("batch decision steps", () => {
+  // Message triage's `triage` step: three questions about one message, answered in one request
+  const topic = choiceDecision({ billing: 0.1, feedback: 0.85, other: 0.05 }, meta);
+  const urgency = scoreDecision([0.7, 0.2, 0.1], ["low", "normal", "high"], meta);
+  const needsPerson = booleanDecision(0.2, meta);
+  const triage = (over: Partial<RunRecord["nodes"][number]> = {}) =>
+    run({
+      nodes: [
+        {
+          nodeId: "triage",
+          status: "completed",
+          // what node_runs.decision holds for a batch step: one of the answers
+          decision: needsPerson,
+          answers: { topic, urgency, needs_person: needsPerson },
+          ...over,
+        },
+      ],
+    });
+
+  it("scores each question, and a case naming only the step against the question it fits", async () => {
+    const r = await scoreCase(
+      kase({
+        decisions: {
+          // written before answers were recorded per question: "feedback" is a topic option
+          triage: { value: "feedback" },
+          "triage.urgency": { value: "low", minConfidence: 0.6 },
+          "triage.needs_person": { value: false },
+        },
+      }),
+      triage(),
+    );
+    expect(r.failures).toEqual([]);
+    expect(r.checks.filter((c) => c.kind === "decision").map((c) => c.id)).toEqual([
+      "decision:triage.topic",
+      "decision:triage.urgency",
+      "decision:triage.needs_person",
+    ]);
+    expect(r.checks[0]).toMatchObject({
+      expected: { value: "feedback" },
+      actual: { value: "feedback", confidence: 0.85 },
+    });
+    expect(r.metrics.decisions).toEqual({
+      "triage.topic": { value: "feedback", confidence: 0.85 },
+      "triage.urgency": { value: urgency.value, confidence: 0.7 },
+      "triage.needs_person": { value: false, confidence: 0.8 },
+    });
+  });
+
+  it("explains a question it can't find or can't tell apart", async () => {
+    const r = await scoreCase(
+      kase({
+        decisions: {
+          "triage.nope": { value: "x" },
+          triage: { minConfidence: 0.5 },
+          "route.label": { value: "x" },
+        },
+      }),
+      triage(),
+    );
+    expect(r.failures).toEqual([
+      "decision:triage.nope: triage has no question nope (it asks topic, urgency, needs_person)",
+      'decision:triage: triage answers 3 questions (topic, urgency, needs_person): name one, as "triage.topic"',
+      "decision:route.label: route made no decision",
+    ]);
+  });
+
+  it("keeps a single-question step's meaning, and refuses a question on it", async () => {
+    const single = run({
+      nodes: [{ nodeId: "intent", status: "completed", decision: topic }],
+    });
+    expect(
+      (await scoreCase(kase({ decisions: { intent: { value: "feedback" } } }), single)).passed,
+    ).toBe(true);
+    expect(
+      (await scoreCase(kase({ decisions: { "intent.topic": { value: "feedback" } } }), single))
+        .failures,
+    ).toEqual([
+      'decision:intent.topic: intent is not a batch step: expect "intent" without a question',
+    ]);
+  });
+
+  it("summarises accuracy and calibration per question", async () => {
+    const r = await scoreCase(
+      kase({ decisions: { "triage.topic": { value: "feedback" }, triage: { value: "high" } } }),
+      triage(),
+    );
+    const s = summarize([r]);
+    expect(Object.keys(s.accuracy).sort()).toEqual(["triage.topic", "triage.urgency"]);
+    expect(s.accuracy["triage.urgency"]).toBe(0);
+    expect(s.calibration["triage.topic"]?.bins.some((b) => b.count === 1)).toBe(true);
+  });
+
+  it("reads a batch step's answers from its per-question events", () => {
+    const events = [
+      { nodeRunId: "n1", batchId: "n1:batch", question: "topic", decision: topic },
+      { nodeRunId: "n1", batchId: "n1:batch", question: "urgency", decision: urgency },
+      // a single decision step's event: not a batch answer
+      { nodeRunId: "n2", batchId: "n2:3f2a1b0c", question: "Is it urgent?", decision: needsPerson },
+    ];
+    expect(answersByNodeRun(events)).toEqual(new Map([["n1", { topic, urgency }]]));
+    expect(batchIdOf("n1")).toBe("n1:batch");
+  });
+
+  it("accepts <step>.<question> keys and nothing deeper", () => {
+    expect(
+      ExpectationSchema.safeParse({ decisions: { "triage.topic": { value: "x" } } }).success,
+    ).toBe(true);
+    expect(ExpectationSchema.safeParse({ decisions: { "a.b.c": { value: "x" } } }).success).toBe(
+      false,
+    );
   });
 });
 

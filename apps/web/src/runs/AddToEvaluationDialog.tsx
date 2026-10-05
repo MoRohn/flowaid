@@ -72,8 +72,9 @@ export function AddToEvaluationDialog({
         <DialogHeader>
           <DialogTitle>Add to evaluation</DialogTitle>
           <DialogDescription>
-            The run&apos;s input becomes a case of the set, with its decisions, branches and outcome
-            as the expectation, so every future version is checked against it.
+            The run&apos;s input becomes a case of the set, with its decisions (each question of a
+            step that asks several), branches and outcome as the expectation, so every future
+            version is checked against it.
           </DialogDescription>
         </DialogHeader>
         <DialogBody className="flex flex-col gap-4">

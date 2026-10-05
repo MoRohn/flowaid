@@ -87,11 +87,21 @@ export const batchNode = defineNode({
     const provider = ctx.providers.decision([]);
     try {
       let answers: Record<string, DecisionResult>;
-      if (
-        provider.capabilities.batch &&
-        Object.keys(questions).length <= provider.capabilities.maxQuestions
-      ) {
-        answers = (await provider.batch(input.state as never, questions, callCtx(ctx))).answers;
+      if (provider.capabilities.batch) {
+        // more questions than one request takes go in several batches, so every answer is still
+        // recorded under its question id
+        answers = {};
+        const ids = Object.keys(questions);
+        const size = Math.max(1, provider.capabilities.maxQuestions);
+        for (let i = 0; i < ids.length; i += size) {
+          const part = Object.fromEntries(
+            ids.slice(i, i + size).map((id) => [id, questions[id] as DecisionQuestion]),
+          );
+          Object.assign(
+            answers,
+            (await provider.batch(input.state as never, part, callCtx(ctx))).answers,
+          );
+        }
       } else {
         answers = {};
         for (const [id, q] of Object.entries(questions)) {

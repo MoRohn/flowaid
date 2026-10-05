@@ -1,5 +1,8 @@
 import { afterAll, beforeAll, expect, it } from "vitest";
-import { describeDb } from "@flowaid/database/testing";
+import { PgRunStore } from "@flowaid/database";
+import { describeDb, fixture } from "@flowaid/database/testing";
+import { booleanDecision, choiceDecision, scoreDecision } from "@flowaid/providers";
+import { uuidv7 } from "@flowaid/shared";
 import { FakeWorker } from "./test/fakeWorker.js";
 import { call, createTestApp, login, type Jar, type TestApp } from "./test/app.js";
 
@@ -11,7 +14,10 @@ describeDb("evaluations (Postgres)", () => {
   beforeAll(async () => {
     t = await createTestApp();
     jar = await login(t.app);
-    worker = new FakeWorker(t.db.app, () => "complete");
+    // a run whose input says `hang` is left to the test to record
+    worker = new FakeWorker(t.db.app, (input) =>
+      (input as { hang?: unknown } | null)?.hang ? "hang" : "complete",
+    );
     await worker.start();
     const w = (await call(t.app, jar, "POST", "/v1/workflows", { name: "Evaluated" })).json();
     workflowId = w.id as string;
@@ -215,4 +221,81 @@ describeDb("evaluations (Postgres)", () => {
       expected: { maxLatencyMs: 5000 },
     });
   });
+
+  it("captures every answer of a batch decision step, one per question", async () => {
+    const v = (await call(t.app, jar, "GET", `/v1/workflows/${workflowId}/versions`)).json()
+      .items[0];
+    const envs = (await call(t.app, jar, "GET", "/v1/environments")).json() as {
+      id: string;
+      name: string;
+    }[];
+    await call(
+      t.app,
+      jar,
+      "PUT",
+      `/v1/workflows/${workflowId}/deployments/${envs.find((e) => e.name === "dev")?.id as string}`,
+      { versionId: v.id },
+    );
+    // the fake worker leaves this run to the test, which records a batch step's three answers
+    const runId = (
+      await call(t.app, jar, "POST", `/v1/workflows/${workflowId}/run`, {
+        input: { message: "Love the new dashboard", hang: true },
+      })
+    ).json().run_id as string;
+    const m = { provider: "typesafe", model: "jev", latencyMs: 5, costUsd: 0.0001 };
+    const answers = {
+      topic: choiceDecision({ billing: 0.1, feedback: 0.9 }, m),
+      urgency: scoreDecision([0.8, 0.2], ["low", "high"], m),
+      needs_person: booleanDecision(0.1, m),
+    };
+    const nodeRunId = uuidv7();
+    const at = { nodeRunId, nodeId: "triage", scope: "", attempt: 1 };
+    await appendAs(t.db.app, runId, [
+      {
+        ...fixture("RUN_STARTED"),
+        workerId: "test",
+        leaseUntil: new Date(Date.now() + 30_000).toISOString(),
+        deadlineAt: new Date(Date.now() + 600_000).toISOString(),
+      },
+      { ...fixture("NODE_SCHEDULED"), ...at, kind: "task", nodeType: "flowaid.decision.batch" },
+      { ...fixture("NODE_STARTED"), ...at },
+      ...Object.entries(answers).map(([question, decision]) => ({
+        ...fixture("DECISION_COMPLETED"),
+        ...at,
+        batchId: `${nodeRunId}:batch`,
+        question,
+        decision,
+      })),
+      {
+        ...fixture("NODE_COMPLETED"),
+        ...at,
+        output: { answers },
+        firedPorts: ["done"],
+      },
+      { ...fixture("RUN_COMPLETED"), output: { ok: true }, outcome: null, durationMs: 5 },
+    ] as never);
+    const setId = (
+      await call(t.app, jar, "POST", "/v1/evaluations/sets", { name: "Batch answers", workflowId })
+    ).json().id as string;
+    const created = await call(t.app, jar, "POST", `/v1/runs/${runId}/add-to-evaluation`, {
+      setId,
+    });
+    expect(created.statusCode).toBe(201);
+    // before, only `triage: { value: false }` (the last answer) was captured
+    expect(created.json().expected.decisions).toEqual({
+      "triage.topic": { value: "feedback" },
+      "triage.urgency": { value: answers.urgency.value },
+      "triage.needs_person": { value: false },
+    });
+  });
 });
+
+/** Appends events to a run as its worker would (lease, fenced append, release). */
+async function appendAs(db: TestApp["db"]["app"], runId: string, events: never[]): Promise<void> {
+  const store = new PgRunStore(db);
+  await store.acquireLease(runId, "test", 30_000);
+  const run = await store.getRun(runId);
+  if (!run) throw new Error(`no run ${runId}`);
+  await store.appendEvents(runId, events, { leaseOwner: "test", expectedSeq: run.lastSeq });
+  await store.releaseLease(runId, "test");
+}

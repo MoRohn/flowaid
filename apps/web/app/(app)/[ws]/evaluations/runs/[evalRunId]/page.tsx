@@ -16,7 +16,6 @@ import type { Page, VersionSummary } from "~/api/types";
 import {
   calibrationNote,
   caseResultViews,
-  confusionPairs,
   gateOf,
   runTone,
   summaryMetrics,
@@ -32,6 +31,7 @@ import type {
 } from "~/admin/types";
 import { Notice, QueryView, Section, useMutate } from "~/admin/ui";
 import { checksOnlyCompletion, reportReading } from "~/evaluations/logic";
+import { confusionByDecision } from "~/evaluations/report";
 import { GuidePanel, Tips, toChecks } from "~/evaluations/SetGuide";
 import { CheckList } from "~/guide/Readiness";
 import { useSession } from "~/session";
@@ -119,7 +119,7 @@ export default function EvaluationRunPage({ params }: { params: Promise<{ evalRu
     return v ? versionView(v, [], 0) : undefined;
   };
   const confusion = useMemo(
-    () => confusionPairs(results.data ?? [], caseRows),
+    () => confusionByDecision(results.data ?? [], caseRows),
     [results.data, caseRows],
   );
   const baselineRun = siblings.data?.items.find((x) => x.id === chosenBaseline);
@@ -329,7 +329,7 @@ export default function EvaluationRunPage({ params }: { params: Promise<{ evalRu
                     {Object.keys(summary.calibration).length > 0 ? (
                       <Section
                         title="Calibration"
-                        description="Predicted confidence against observed accuracy, per decision node. Points on the diagonal are well calibrated; ECE is the average gap (lower is better), and bins with few decisions move a lot between runs."
+                        description="Predicted confidence against observed accuracy, per Decision step, and per question for a step that asks several (triage.topic). Points on the diagonal are well calibrated; ECE is the average gap (lower is better), and bins with few decisions move a lot between runs."
                       >
                         <div className="grid gap-4 lg:grid-cols-2">
                           {Object.entries(summary.calibration).map(([node, c]) => (
@@ -346,7 +346,7 @@ export default function EvaluationRunPage({ params }: { params: Promise<{ evalRu
                     {Object.keys(confusion).length > 0 ? (
                       <Section
                         title="Confusion"
-                        description="Expected against actual decision values."
+                        description="Expected against actual decision values, per Decision step and per question of a step that asks several."
                       >
                         <div className="grid gap-4 lg:grid-cols-2">
                           {Object.entries(confusion).map(([node, pairs]) => (

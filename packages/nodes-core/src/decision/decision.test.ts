@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { runNode } from "@flowaid/node-sdk/testing";
 import type { DecisionResult, JsonValue } from "@flowaid/workflow-core";
 import { batchNode } from "./batch.js";
@@ -164,6 +164,23 @@ describe("flowaid.decision.batch", () => {
     expect(Object.keys(answers)).toEqual(["refund", "topic", "urgency"]);
     expect(answers.refund).toMatchObject({ kind: "boolean", value: true });
     expect(res.costUsd).toBeCloseTo(0.003);
+  });
+
+  it("asks more questions than one request takes in several batches", async () => {
+    const many = Object.fromEntries(
+      Array.from({ length: 20 }, (_, i) => [`q${i}`, { kind: "boolean", instructions: `Q${i}?` }]),
+    );
+    const decider = fakeDecider({ pYes: 0.8 });
+    const batch = vi.spyOn(decider([]), "batch");
+    const r = await runNode(batchNode, {
+      config: { questions: many },
+      input: { state: "text" },
+      providers: { decision: decider },
+    });
+    const answers = (okOf(r).output as { answers: Record<string, DecisionResult> }).answers;
+    expect(Object.keys(answers)).toHaveLength(20);
+    // 16 a request: each answer is still recorded under its question id, not one by one
+    expect(batch.mock.calls.map((c) => Object.keys(c[1]).length)).toEqual([16, 4]);
   });
 
   it("suspends with a form on failover and maps the person's answers", async () => {

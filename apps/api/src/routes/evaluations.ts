@@ -5,6 +5,7 @@ import { z } from "zod";
 import { and, asc, desc, eq, gt, lt, max, or } from "drizzle-orm";
 import {
   ExpectationSchema,
+  answersByNodeRun,
   compare,
   reportToMarkdown,
   summarize,
@@ -699,10 +700,20 @@ export function evaluationRoutes(app: FastifyInstance, ctx: ApiContext): void {
       const run = await store.getRun(req.params.id);
       if (!run || !canSeeWorkflow(p, run.workflowId)) throw new NotFoundError("run not found");
       const nodes = await store.listNodeRuns(run.id);
+      // a batch step's answers, one per question (its `decision` column holds only one of them)
+      const answers = answersByNodeRun(
+        (await store.listEvents(run.id, 0, 10_000, ["DECISION_COMPLETED"])).flatMap((e) =>
+          e.type === "DECISION_COMPLETED" ? [e] : [],
+        ),
+      );
       const decisions: JsonObject = {};
       const branches: JsonObject = {};
       for (const n of nodes) {
-        if (n.decision) decisions[n.nodeId] = { value: n.decision.value as JsonValue };
+        const batch = answers.get(n.id);
+        if (batch)
+          for (const [question, d] of Object.entries(batch))
+            decisions[`${n.nodeId}.${question}`] = { value: d.value as JsonValue };
+        else if (n.decision) decisions[n.nodeId] = { value: n.decision.value as JsonValue };
         const port = n.firedPorts.find((x) => x !== "done");
         if (port) branches[n.nodeId] = port;
       }
