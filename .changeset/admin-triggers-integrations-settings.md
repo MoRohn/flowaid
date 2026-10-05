@@ -54,3 +54,8 @@ all time.
 
 Saving a shorter run, artifact or audit retention asks first and says what the next nightly
 clean-up will clear; a monthly budget of $0 says that it means no budget.
+
+Deleting an environment lists what goes with it (deployments, webhooks, schedules, MCP tools,
+secret bindings, credentials limited to it, keys pinned to it; `GET /v1/environments/:id/usage`),
+and one with runs on record says why it can't be deleted before you try. Renaming one warns that
+webhook URLs move with the name, and that renaming dev stops Run draft.

@@ -635,6 +635,18 @@ export const OPERATIONS: readonly CliOperation[] = [
     },
   },
   {
+    noun: "environment",
+    verb: "usage",
+    method: "GET",
+    path: "/v1/environments/{id}/usage",
+    summary:
+      "What depends on an environment, for the delete and rename confirmations: runs on record (which block a delete), active deployments, triggers, secret bindings, credentials limited to it and keys pinned to it",
+    auth: "session_or_api_key",
+    positional: ["id"],
+    query: [],
+    body: null,
+  },
+  {
     noun: "evaluation",
     verb: "cancel",
     method: "POST",

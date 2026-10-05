@@ -62,6 +62,7 @@ environment create {--name --variables --protected --body --out}
 environment delete <id> {--out}
 environment list {--out}
 environment update <id> {--name --variables --protected --body --out}
+environment usage <id> {--out}
 evaluation
 evaluation cancel <id> {--out}
 evaluation compare <id> <otherId> {--format --out}

@@ -511,6 +511,49 @@ describeDb("admin roadmap (Postgres)", () => {
     });
   });
 
+  describe("E-12: what depends on an environment", () => {
+    it("counts deployments, triggers, bindings, credentials, keys and runs", async () => {
+      const env = (
+        await call(t.app, jar, "POST", "/v1/environments", { name: "usage-env" })
+      ).json() as { id: string };
+      envs["usage-env"] = env.id;
+      const w = await create("Usage counted", [
+        { type: "webhook", path: "usage-hook", signature: "none" },
+        { type: "schedule", cron: "0 3 1 1 *", input: { message: "yearly" } },
+      ]);
+      expect((await deploy(w.id, await publish(w.id), "usage-env")).statusCode).toBe(200);
+      await call(t.app, jar, "POST", "/v1/credentials", {
+        name: "Only in usage-env",
+        type: "http.bearer",
+        values: { token: "test-not-a-real-key" },
+        environmentId: env.id,
+      });
+      await call(t.app, jar, "POST", "/v1/api-keys", {
+        name: "usage-env key",
+        scopes: ["runs:read"],
+        environmentId: env.id,
+      });
+      const usage = await call(t.app, jar, "GET", `/v1/environments/${env.id}/usage`);
+      expect(usage.statusCode).toBe(200);
+      expect(usage.json()).toEqual({
+        runs: 0,
+        evaluationRuns: 0,
+        deployments: 1,
+        webhooks: 1,
+        schedules: 1,
+        mcpExposures: 0,
+        secretBindings: 0,
+        credentials: 1,
+        apiKeys: 1,
+      });
+      // what the confirmation listed is what the delete removes
+      expect((await call(t.app, jar, "DELETE", `/v1/environments/${env.id}`)).statusCode).toBe(204);
+      expect((await call(t.app, jar, "GET", `/v1/environments/${env.id}/usage`)).statusCode).toBe(
+        404,
+      );
+    });
+  });
+
   describe("E-06, E-07: private-address refusals say how to allow them", () => {
     let strict: TestApp;
     let strictJar: Jar;

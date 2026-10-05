@@ -37,6 +37,8 @@ const { ApiKeysTab } = await import("./ApiKeysTab");
 const { NotificationsTab } = await import("./NotificationsTab");
 const { AuditTab, auditFilters } = await import("./AuditTab");
 const { WorkspaceTab, retentionCuts } = await import("./WorkspaceTab");
+const { EnvironmentsTab, deleteConsequences, renameConsequences } =
+  await import("./EnvironmentsTab");
 
 function memoryStorage(): Storage {
   const data = new Map<string, string>();
@@ -287,6 +289,76 @@ describe("Workspace settings", () => {
       "Audit log: 400 → 200 days. Entries older than 200 days are deleted.",
     ]);
     expect(retentionCuts({ ...d, runsDays: 30 }, d)).toEqual([]);
+  });
+});
+
+describe("Environments", () => {
+  const none = {
+    runs: 0,
+    evaluationRuns: 0,
+    deployments: 0,
+    webhooks: 0,
+    schedules: 0,
+    mcpExposures: 0,
+    secretBindings: 0,
+    credentials: 0,
+    apiKeys: 0,
+  };
+
+  it("names what a delete removes, and refuses one with runs on record", async () => {
+    const fetchMock = stubApi({
+      "GET /v1/environments/env-dev/usage": () => ({ ...none, runs: 3 }),
+      "GET /v1/environments/env-prod/usage": () => ({
+        ...none,
+        deployments: 2,
+        webhooks: 1,
+        schedules: 2,
+        credentials: 1,
+        apiKeys: 1,
+      }),
+      "DELETE /v1/environments/env-prod": () => new Response(null, { status: 204 }),
+    });
+    render(withClient(<EnvironmentsTab />));
+    click(screen.getByRole("button", { name: "Delete dev" }));
+    expect(await screen.findByText(/3 runs on record keep their environment/)).toBeTruthy();
+    expect(screen.getByRole<HTMLButtonElement>("button", { name: "Delete" }).disabled).toBe(true);
+    click(screen.getByRole("button", { name: "Cancel" }));
+
+    click(screen.getByRole("button", { name: "Delete prod" }));
+    expect(await screen.findByText(/2 deployments end/)).toBeTruthy();
+    expect(
+      screen.getByText(/1 webhook and 2 schedules are removed; webhook URLs stop working/),
+    ).toBeTruthy();
+    expect(screen.getByText(/1 credential limited to prod is deleted for good/)).toBeTruthy();
+    expect(screen.getByText(/1 API key or MCP token pinned to prod is revoked/)).toBeTruthy();
+    click(screen.getByRole("button", { name: "Delete" }));
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.some(
+          ([url, init]) => init?.method === "DELETE" && url === "/v1/environments/env-prod",
+        ),
+      ).toBe(true),
+    );
+  });
+
+  it("warns that a rename moves webhook URLs and, for dev, stops Run draft", async () => {
+    stubApi({ "GET /v1/environments/env-dev/usage": () => ({ ...none, webhooks: 2 }) });
+    render(withClient(<EnvironmentsTab />));
+    click(screen.getByRole("button", { name: "Edit dev" }));
+    act(() => {
+      fireEvent.change(screen.getByLabelText(/^Name/), { target: { value: "development" } });
+    });
+    expect(await screen.findByText(/2 webhooks here keep the …\/dev\/… URL/)).toBeTruthy();
+    expect(
+      screen.getByText(/draft runs fail until an environment is called dev again/),
+    ).toBeTruthy();
+  });
+
+  it("says so when nothing depends on it", () => {
+    expect(deleteConsequences("scratch", none)).toEqual([]);
+    expect(renameConsequences("qa", "test", 0)).toEqual([
+      "Webhook URLs carry the environment's name: webhooks deployed here later use …/test/….",
+    ]);
   });
 });
 

@@ -1770,6 +1770,54 @@ export interface paths {
     };
     trace?: never;
   };
+  "/v1/environments/{id}/usage": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** What depends on an environment, for the delete and rename confirmations: runs on record (which block a delete), active deployments, triggers, secret bindings, credentials limited to it and keys pinned to it */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              apiKeys: number;
+              credentials: number;
+              deployments: number;
+              evaluationRuns: number;
+              mcpExposures: number;
+              runs: number;
+              schedules: number;
+              secretBindings: number;
+              webhooks: number;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/evaluations/cases/{id}": {
     parameters: {
       query?: never;

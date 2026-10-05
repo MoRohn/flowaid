@@ -1,6 +1,11 @@
 "use client";
-/** Environments: create, edit variables and protection, delete. */
-import { useQueryClient } from "@tanstack/react-query";
+/**
+ * Environments: create, edit variables and protection, rename, delete. Renaming and deleting say
+ * what they change first (`GET /v1/environments/:id/usage`): webhook URLs carry the name, Run
+ * draft uses the one named dev, and a delete removes triggers, bindings, credentials and keys (one
+ * with runs on record can't be deleted).
+ */
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Lock, Pencil, Plus, Trash2 } from "lucide-react";
 import {
@@ -20,11 +25,83 @@ import {
   Switch,
 } from "@flowaid/ui/primitives";
 import { KeyValueEditor } from "@flowaid/ui/forms";
-import { del, patch, post } from "~/api/client";
+import { del, get, patch, post } from "~/api/client";
 import type { Environment } from "~/api/types";
 import { useSession } from "~/session";
 import { ENVIRONMENT_NAME, VARIABLE_NAME, rowsToVariables, variablesToRows } from "../logic";
-import { Section, useConfirm, useMutate } from "../ui";
+import { Notice, Section, useConfirm, useMutate } from "../ui";
+
+/** What depends on an environment (`GET /v1/environments/:id/usage`). */
+export interface EnvironmentUsage {
+  runs: number;
+  evaluationRuns: number;
+  deployments: number;
+  webhooks: number;
+  schedules: number;
+  mcpExposures: number;
+  secretBindings: number;
+  credentials: number;
+  apiKeys: number;
+}
+
+function useEnvironmentUsage(id: string | null) {
+  const s = useSession();
+  return useQuery({
+    queryKey: ["environment-usage", s.ws, id],
+    queryFn: () => get<EnvironmentUsage>(`/v1/environments/${id ?? ""}/usage`),
+    enabled: id !== null,
+  });
+}
+
+const n = (count: number, one: string, many = `${one}s`) => `${count} ${count === 1 ? one : many}`;
+
+/** Run draft resolves the environment by this name (services/runs.ts). */
+const DRAFT_ENVIRONMENT = "dev";
+
+/** What deleting the environment does, one line per thing that depends on it. */
+export function deleteConsequences(name: string, u: EnvironmentUsage): string[] {
+  const lines: string[] = [];
+  if (u.deployments)
+    lines.push(`${n(u.deployments, "deployment")} end: those workflows stop running in ${name}.`);
+  const is = (count: number) => (count === 1 ? "is" : "are");
+  const triggers = [
+    u.webhooks ? n(u.webhooks, "webhook") : "",
+    u.schedules ? n(u.schedules, "schedule") : "",
+    u.mcpExposures ? n(u.mcpExposures, "MCP tool") : "",
+  ].filter(Boolean);
+  const triggerCount = u.webhooks + u.schedules + u.mcpExposures;
+  if (triggers.length)
+    lines.push(
+      `${triggers.slice(0, -1).join(", ")}${triggers.length > 1 ? " and " : ""}${triggers.at(-1) ?? ""} ${is(triggerCount)} removed${u.webhooks ? "; webhook URLs stop working" : ""}.`,
+    );
+  if (u.secretBindings)
+    lines.push(`${n(u.secretBindings, "secret binding")} ${is(u.secretBindings)} removed.`);
+  if (u.credentials)
+    lines.push(
+      `${n(u.credentials, "credential")} limited to ${name} ${is(u.credentials)} deleted for good.`,
+    );
+  if (u.apiKeys)
+    lines.push(
+      `${n(u.apiKeys, "API key or MCP token", "API keys and MCP tokens")} pinned to ${name} ${is(u.apiKeys)} revoked.`,
+    );
+  if (name === DRAFT_ENVIRONMENT)
+    lines.push("Run draft uses dev: draft runs fail until there is a dev environment again.");
+  return lines;
+}
+
+/** What renaming the environment changes. */
+export function renameConsequences(from: string, to: string, webhooks: number): string[] {
+  const lines = [
+    webhooks
+      ? `Webhook URLs carry the environment's name: ${n(webhooks, "webhook")} here keep${webhooks === 1 ? "s" : ""} the …/${from}/… URL until its workflow is next deployed, then move${webhooks === 1 ? "s" : ""} to …/${to}/… and the old URL stops working.`
+      : `Webhook URLs carry the environment's name: webhooks deployed here later use …/${to}/….`,
+  ];
+  if (from === DRAFT_ENVIRONMENT)
+    lines.push(
+      "Run draft uses the environment named dev: after renaming it, draft runs fail until an environment is called dev again.",
+    );
+  return lines;
+}
 
 function EnvironmentDialog({
   env,
@@ -57,6 +134,8 @@ function EnvironmentDialog({
     },
   );
   const nameOk = ENVIRONMENT_NAME.test(name.trim());
+  const renaming = env !== null && nameOk && name.trim() !== env.name;
+  const usage = useEnvironmentUsage(renaming && env ? env.id : null);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="md">
@@ -92,6 +171,11 @@ function EnvironmentDialog({
                 placeholder="staging"
               />
             </FieldRow>
+            {renaming && env ? (
+              <Notice>
+                {renameConsequences(env.name, name.trim(), usage.data?.webhooks ?? 0).join(" ")}
+              </Notice>
+            ) : null}
             <FieldRow
               label="Protected"
               htmlFor="env-protected"
@@ -152,6 +236,8 @@ export function EnvironmentsTab() {
     },
     errorTitle: "Could not delete the environment",
   });
+  const usage = useEnvironmentUsage(confirm.target?.id ?? null);
+  const runsOnRecord = (usage.data?.runs ?? 0) + (usage.data?.evaluationRuns ?? 0);
   return (
     <Section
       title="Environments"
@@ -221,14 +307,42 @@ export function EnvironmentsTab() {
         open={confirm.target !== null}
         onOpenChange={(o) => (o ? undefined : confirm.close())}
         title={`Delete ${confirm.target?.name ?? "environment"}?`}
-        description="Its deployments, secret bindings, webhooks and schedules are removed. Runs keep their history."
+        description={
+          usage.isPending
+            ? "Checking what depends on it…"
+            : runsOnRecord > 0
+              ? undefined
+              : "This can't be undone."
+        }
         variant="danger"
         confirmLabel="Delete"
         loading={remove.isPending}
+        confirmDisabled={!usage.isSuccess || runsOnRecord > 0}
         onConfirm={() => {
           if (confirm.target) remove.mutate(confirm.target);
         }}
-      />
+      >
+        {usage.isError ? (
+          <Notice tone="danger">Could not check what depends on it; try again.</Notice>
+        ) : usage.data && confirm.target ? (
+          runsOnRecord > 0 ? (
+            <Notice tone="danger">
+              {confirm.target.name} can&apos;t be deleted: {n(runsOnRecord, "run")} on record keep
+              {runsOnRecord === 1 ? "s" : ""} their environment. Undeploy its workflows from their
+              Deployments tab instead.
+            </Notice>
+          ) : (
+            <ul className="m-0 flex list-disc flex-col gap-1 pl-5 text-xs text-ink-2">
+              {(deleteConsequences(confirm.target.name, usage.data).length
+                ? deleteConsequences(confirm.target.name, usage.data)
+                : ["Nothing depends on it."]
+              ).map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+          )
+        ) : null}
+      </ConfirmDialog>
     </Section>
   );
 }
