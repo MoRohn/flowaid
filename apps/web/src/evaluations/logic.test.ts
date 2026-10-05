@@ -5,6 +5,7 @@ import {
   NO_JUDGE,
   caseCoverage,
   checksOnlyCompletion,
+  deleteSetText,
   emptySetDraft,
   reportReading,
   setBody,
@@ -113,6 +114,15 @@ const result = (over: Partial<CaseResultRow>): CaseResultRow => ({
   metrics: null,
   status: "completed",
   ...over,
+});
+
+describe("deleting a set", () => {
+  it("names the workflows it gates", () => {
+    expect(deleteSetText([])).not.toMatch(/publish gate/);
+    expect(deleteSetText([{ name: "Audit eval triage" }])).toMatch(
+      /It is the publish gate of Audit eval triage: that workflow publishes without an evaluation check/,
+    );
+  });
 });
 
 describe("reportReading", () => {

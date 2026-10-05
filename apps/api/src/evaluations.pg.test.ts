@@ -167,6 +167,29 @@ describeDb("evaluations (Postgres)", () => {
     ).toBe(201);
   });
 
+  it("names the workflows a set gates, and unlinks them when it is deleted", async () => {
+    const setId = (
+      await call(t.app, jar, "POST", "/v1/evaluations/sets", { name: "Gate link", workflowId })
+    ).json().id as string;
+    expect(
+      (await call(t.app, jar, "PATCH", `/v1/workflows/${workflowId}`, { evaluationSetId: setId }))
+        .statusCode,
+    ).toBe(200);
+    expect((await call(t.app, jar, "GET", `/v1/evaluations/sets/${setId}`)).json().gateOf).toEqual([
+      { id: workflowId, name: "Evaluated" },
+    ]);
+    expect((await call(t.app, jar, "DELETE", `/v1/evaluations/sets/${setId}`)).statusCode).toBe(
+      204,
+    );
+    // before, the workflow kept the id of a set that no longer existed
+    expect(
+      (await call(t.app, jar, "GET", `/v1/workflows/${workflowId}`)).json().evaluationSetId,
+    ).toBeNull();
+    const [audit] = await t.db
+      .admin`select details from audit_events where action = 'evaluation_set.delete' and resource_id = ${setId}`;
+    expect(audit?.details).toMatchObject({ unlinkedWorkflowIds: [workflowId] });
+  });
+
   it("pages the sets by name with a cursor", async () => {
     for (const name of ["Pager C", "Pager A", "Pager B"])
       await call(t.app, jar, "POST", "/v1/evaluations/sets", { name });

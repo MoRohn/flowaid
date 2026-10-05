@@ -73,6 +73,15 @@ export function setReviewNotes(
   return notes;
 }
 
+/** What deleting a set does, naming the workflows that use it as their publish gate. */
+export function deleteSetText(gateOf: readonly { name: string }[]): string {
+  const base =
+    "Its cases and evaluation reports are deleted. Workflow runs made by evaluations are kept.";
+  if (!gateOf.length) return base;
+  const names = gateOf.map((w) => w.name).join(", ");
+  return `${base} It is the publish gate of ${names}: ${gateOf.length === 1 ? "that workflow publishes" : "those workflows publish"} without an evaluation check until another set is linked under Settings → Evaluation.`;
+}
+
 // ── cases ─────────────────────────────────────────────────────────────────────────────────────
 
 const has = (v: unknown): boolean =>

@@ -265,7 +265,21 @@ export function evaluationRoutes(app: FastifyInstance, ctx: ApiContext): void {
     },
     async (req) => {
       const p = need(req.principal);
-      return setDto(await ctx.db.tenant(p.workspaceId, (tx) => loadSet(tx, p, req.params.id)));
+      return ctx.db.tenant(p.workspaceId, async (tx) => {
+        const set = await loadSet(tx, p, req.params.id);
+        // the workflows that use the set as their publish gate (named when it is deleted)
+        const gated = await tx
+          .select({ id: workflows.id, name: workflows.name })
+          .from(workflows)
+          .where(
+            and(eq(workflows.workspaceId, p.workspaceId), eq(workflows.evaluationSetId, set.id)),
+          )
+          .orderBy(asc(workflows.name));
+        return {
+          ...setDto(set),
+          gateOf: gated.filter((w) => canSeeWorkflow(p, w.id)),
+        };
+      });
     },
   );
 
@@ -282,10 +296,24 @@ export function evaluationRoutes(app: FastifyInstance, ctx: ApiContext): void {
     },
     async (req, reply) => {
       const p = need(req.principal);
-      await ctx.db.tenant(p.workspaceId, async (tx) => {
+      const unlinked = await ctx.db.tenant(p.workspaceId, async (tx) => {
         await loadSet(tx, p, req.params.id);
+        // workflows gated on the set lose the link with it (the column has no foreign key), so
+        // none points at a set that no longer exists
+        const gated = await tx
+          .update(workflows)
+          .set({ evaluationSetId: null })
+          .where(
+            and(
+              eq(workflows.workspaceId, p.workspaceId),
+              eq(workflows.evaluationSetId, req.params.id),
+            ),
+          )
+          .returning({ id: workflows.id });
         await tx.delete(evaluationSets).where(eq(evaluationSets.id, req.params.id));
+        return gated.map((w) => w.id);
       });
+      if (unlinked.length) req.audit.details = { unlinkedWorkflowIds: unlinked };
       return reply.code(204).send(null);
     },
   );

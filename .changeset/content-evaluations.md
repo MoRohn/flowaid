@@ -22,3 +22,7 @@ with warnings") and offers Publish as a secondary action; the Block publish butt
 nothing, is gone. Each failed case lists the checks it failed and why. A cancelled or failed
 evaluation says how many of the set's cases ran and that every figure covers only those, and a
 baseline that scored other cases is no longer shown as differences.
+
+Deleting an evaluation set clears the publish-gate link of the workflows that used it (they kept
+the id of a set that no longer existed), and the confirmation names those workflows.
+`GET /v1/evaluations/sets/:id` lists them as `gateOf`.

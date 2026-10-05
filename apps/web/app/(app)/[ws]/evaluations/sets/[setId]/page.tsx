@@ -49,13 +49,16 @@ import {
 } from "~/admin/logic";
 import type { EvaluationCase, EvaluationRun, EvaluationSet } from "~/admin/types";
 import { JsonField, Notice, QueryView, Section, useConfirm, useMutate } from "~/admin/ui";
-import { caseCoverage } from "~/evaluations/logic";
+import { caseCoverage, deleteSetText } from "~/evaluations/logic";
 import { CaseGuide, EXAMPLE_EXPECTATION, ExpectationHelp } from "~/evaluations/SetGuide";
 import { useSession } from "~/session";
 import { AppFrame, PageBody } from "~/shell/AppFrame";
 import { errorMessage } from "~/shell/states";
 
 const DRAFT = "__draft";
+
+/** The set, with the workflows that use it as their publish gate. */
+type GatedSet = EvaluationSet & { gateOf?: { id: string; name: string }[] };
 const NONE = "__none";
 
 /** Required top-level input fields the value leaves out (or leaves as empty text). */
@@ -460,7 +463,7 @@ export default function SetPage({ params }: { params: Promise<{ setId: string }>
   const [deleting, setDeleting] = useState(false);
   const set = useQuery({
     queryKey: ["evaluation-set", s.ws, setId],
-    queryFn: () => get<EvaluationSet>(`/v1/evaluations/sets/${setId}`),
+    queryFn: () => get<GatedSet>(`/v1/evaluations/sets/${setId}`),
   });
   const cases = useQuery({
     queryKey: ["evaluation-cases", s.ws, setId],
@@ -758,7 +761,7 @@ export default function SetPage({ params }: { params: Promise<{ setId: string }>
         open={deleting}
         onOpenChange={setDeleting}
         title={`Delete ${set.data?.name ?? "this set"}?`}
-        description="Its cases and evaluation reports are deleted. Workflow runs made by evaluations are kept."
+        description={deleteSetText(set.data?.gateOf ?? [])}
         variant="danger"
         confirmLabel="Delete set"
         loading={removeSet.isPending}
