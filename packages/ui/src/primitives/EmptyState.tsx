@@ -9,6 +9,8 @@ export interface EmptyStateProps extends Omit<HTMLAttributes<HTMLDivElement>, "t
   primaryAction?: ReactNode;
   secondaryAction?: ReactNode;
   size?: "sm" | "md";
+  /** The title's element: a heading when the empty state is the whole page (default `p`). */
+  titleAs?: "p" | "h1" | "h2" | "h3";
 }
 
 /**
@@ -16,7 +18,17 @@ export interface EmptyStateProps extends Omit<HTMLAttributes<HTMLDivElement>, "t
  * offer the next action, so `primaryAction` is expected in most uses.
  */
 export const EmptyState = forwardRef<HTMLDivElement, EmptyStateProps>(function EmptyState(
-  { icon, title, description, primaryAction, secondaryAction, size = "md", className, ...rest },
+  {
+    icon,
+    title,
+    description,
+    primaryAction,
+    secondaryAction,
+    size = "md",
+    titleAs: Title = "p",
+    className,
+    ...rest
+  },
   ref,
 ) {
   return (
@@ -40,14 +52,14 @@ export const EmptyState = forwardRef<HTMLDivElement, EmptyStateProps>(function E
         </span>
       ) : null}
       <div className="flex max-w-xs flex-col gap-1">
-        <p
+        <Title
           className={cn(
-            "font-medium text-ink",
+            "m-0 font-medium text-ink",
             size === "sm" ? "text-sm" : "text-base tracking-tight",
           )}
         >
           {title}
-        </p>
+        </Title>
         {description ? (
           <p className={cn("text-ink-3", size === "sm" ? "text-xs" : "text-sm")}>{description}</p>
         ) : null}
