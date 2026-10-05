@@ -18,6 +18,7 @@ import { useDesktop } from "./desktop";
 import { documentTitle, useDocumentTitle, usePendingTasks } from "./frame";
 import { HelpMenu } from "./HelpMenu";
 import { NAV, NAV_SECONDARY, visibleNav } from "./nav";
+import { NavShortcuts } from "./NavShortcuts";
 import { WorkspaceCommandMenu } from "./WorkspaceCommandMenu";
 
 export interface AppFrameProps extends Partial<Omit<TopBarProps, "breadcrumbs">> {
@@ -205,6 +206,7 @@ export function AppFrame({
     >
       {children}
       {desktop.overlay}
+      <NavShortcuts entries={[...items, ...secondary]} go={go} />
     </AppShell>
   );
 }

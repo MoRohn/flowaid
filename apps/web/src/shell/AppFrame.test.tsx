@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { installDomStubs } from "@/primitives/testStubs";
 import { ThemeProvider } from "@flowaid/ui/theme";
@@ -148,5 +148,50 @@ describe("workspace frame", () => {
       expect.stringContaining("/v1/human-tasks"),
       expect.anything(),
     );
+  });
+});
+
+// F-01: "g w", "g r" … were shown in tooltips and ⌘K but registered only in the gallery
+describe("navigation shortcuts", () => {
+  const press = (key: string, target: Element = document.body) =>
+    act(() => {
+      fireEvent.keyDown(target, { key });
+    });
+
+  it("goes to a page with g and its letter", () => {
+    frame();
+    press("g");
+    press("r");
+    expect(push).toHaveBeenCalledWith("/acme/runs");
+    press("g");
+    press("s");
+    expect(push).toHaveBeenLastCalledWith("/acme/settings");
+  });
+
+  it("registers nothing for a page the workspace does not have", () => {
+    // the Overview needs features.dashboard, which is off here
+    frame();
+    press("g");
+    press("o");
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("stays quiet while typing in a field", () => {
+    frame();
+    const field = document.createElement("input");
+    document.body.appendChild(field);
+    press("g", field);
+    press("r", field);
+    expect(push).not.toHaveBeenCalled();
+    field.remove();
+  });
+
+  it("lists them under Navigate in the shortcuts dialog", async () => {
+    frame();
+    press("?");
+    const dialog = await screen.findByRole("dialog", { name: /Keyboard shortcuts/i });
+    expect(within(dialog).getByText("Navigate")).toBeTruthy();
+    expect(within(dialog).getByText("Go to Runs")).toBeTruthy();
+    expect(within(dialog).queryByText("Go to Overview")).toBeNull();
   });
 });
