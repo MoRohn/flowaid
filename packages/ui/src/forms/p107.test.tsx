@@ -7,12 +7,8 @@ import { installDomStubs } from "@/primitives/testStubs";
 import { CronEditor, checkCron, describeCron } from "./CronEditor";
 import { JsonSchemaEditor, parseSchemaText, treeUnsupportedReason } from "./JsonSchemaEditor";
 import { LevelsList, validateLevels } from "./LevelsList";
-import {
-  TemplateEditor,
-  rangedDiagnostics,
-  templateCompletions,
-  type TemplateRef,
-} from "./TemplateEditor";
+import { TemplateEditor, type TemplateRef } from "./TemplateEditor";
+import { rangedDiagnostics, templateCompletions } from "./TemplateEditorView";
 
 installDomStubs();
 afterEach(cleanup);

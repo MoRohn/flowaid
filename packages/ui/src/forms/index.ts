@@ -226,13 +226,12 @@ export { ReorderableList, moveItem, moveOrder, type ReorderableListProps } from 
 export {
   TemplateEditor,
   TemplateInput,
-  templateCompletions,
-  rangedDiagnostics,
-  useTemplateAssist,
   type TemplateEditorProps,
   type TemplateInputProps,
   type TemplateRef,
 } from "./TemplateEditor";
+export { templateCompletions, rangedDiagnostics, useTemplateAssist } from "./TemplateEditorView";
+export { preloadCodeEditors } from "./preload";
 export { checkTemplate, templateRefsFromScope, type TemplateCheck } from "./templateCheck";
 export {
   LevelsList,

@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { Button, EmptyState, buttonVariants } from "@flowaid/ui/primitives";
 import { ApiError } from "~/api/client";
+import { errorMessage } from "./errorMessage";
 import { NAV, NAV_SECONDARY } from "./nav";
 
 const sentence = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
@@ -31,14 +32,7 @@ export function listFor(pathname: string | null): { href: string; label: string 
   return entry ? { href: `/${ws}/${section}`, label: `Back to ${entry.label}` } : undefined;
 }
 
-export function errorMessage(error: unknown): string {
-  if (error instanceof ApiError)
-    return error.status === 403 ? "You do not have access to this." : error.message;
-  // fetch rejects with a TypeError when the API cannot be reached at all
-  if (error instanceof TypeError && /fetch|network|load failed/i.test(error.message))
-    return "Could not reach FlowAId's API. Check that FlowAId is still running, then try again.";
-  return error instanceof Error ? error.message : "Something went wrong.";
-}
+export { errorMessage };
 
 /**
  * A page that could not load. A missing item (or a link whose id is malformed) says so and links

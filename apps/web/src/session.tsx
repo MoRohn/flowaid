@@ -7,13 +7,12 @@
  * not ask again.
  */
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useEffectEvent, type ReactNode } from "react";
 import { Button, LogoMark } from "@flowaid/ui/primitives";
 import { ApiError, get, post, setWorkspace } from "~/api/client";
 import type { Environment, Me } from "~/api/types";
-import { errorMessage } from "~/shell/states";
+import { errorMessage } from "~/shell/errorMessage";
 
 export interface Session {
   me: Me;
@@ -229,7 +228,8 @@ export function UnknownWorkspace({
             <ul className="m-0 flex w-full list-none flex-col gap-1.5 p-0">
               {workspaces.map((w) => (
                 <li key={w.slug}>
-                  <Link
+                  {/* a plain link: next/link would add its router code to every page's session */}
+                  <a
                     href={`/${w.slug}${rest ? `/${rest}` : ""}`}
                     className="flex items-center justify-between gap-3 rounded-sm border border-border bg-surface px-3 py-2 text-left text-sm text-ink hover:bg-surface-3 focus-visible:shadow-(--focus) focus-visible:outline-none"
                   >
@@ -238,7 +238,7 @@ export function UnknownWorkspace({
                       /{w.slug}
                       {rest ? `/${rest}` : ""}
                     </span>
-                  </Link>
+                  </a>
                 </li>
               ))}
             </ul>

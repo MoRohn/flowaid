@@ -45,7 +45,7 @@ import { QuestionsEditor, type BatchQuestions } from "./QuestionsEditor";
 import { RetryPolicyEditor, type RetryPolicy, DEFAULT_RETRY_POLICY } from "./RetryPolicyEditor";
 import { ThresholdField, DEFAULT_THRESHOLDS } from "./ThresholdField";
 import { enumKey, enumOptions, inputModeFor, isRecord, primaryType } from "./schema";
-import { EMPTY_SCOPE } from "./expressionExtensions";
+import { EMPTY_SCOPE } from "./expression";
 
 export interface SchemaWidgetProps {
   /** Dotted path of the field in the form values. */
