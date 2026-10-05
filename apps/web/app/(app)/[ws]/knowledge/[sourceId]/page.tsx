@@ -654,7 +654,7 @@ export default function KnowledgeSourcePage({ params }: { params: Promise<{ sour
                     <Notice tone={src.status === "error" ? "danger" : "warn"}>
                       <p>{indexingErrorText(src.lastError)}</p>
                       {indexingErrorText(src.lastError) !== src.lastError ? (
-                        <p className="mt-1 font-mono text-2xs opacity-80">{src.lastError}</p>
+                        <p className="mt-1 font-mono text-2xs">{src.lastError}</p>
                       ) : null}
                       <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
                         {indexingErrorFix(src.lastError) === "credentials" ? (
