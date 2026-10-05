@@ -603,7 +603,14 @@ export function workspaceRoutes(app: FastifyInstance, ctx: ApiContext): void {
             tx
               .select({ n: count() })
               .from(credentials)
-              .where(eq(credentials.environmentId, env.id)),
+              // a webhook's own signing secret goes with the webhook, counted there
+              .where(
+                and(
+                  eq(credentials.environmentId, env.id),
+                  isNull(credentials.ownerWebhookId),
+                  isNull(credentials.ownerNotificationId),
+                ),
+              ),
           ),
           n(
             tx

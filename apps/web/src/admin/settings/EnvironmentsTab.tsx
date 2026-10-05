@@ -62,7 +62,9 @@ const DRAFT_ENVIRONMENT = "dev";
 export function deleteConsequences(name: string, u: EnvironmentUsage): string[] {
   const lines: string[] = [];
   if (u.deployments)
-    lines.push(`${n(u.deployments, "deployment")} end: those workflows stop running in ${name}.`);
+    lines.push(
+      `${n(u.deployments, "deployment")} end${u.deployments === 1 ? "s" : ""}: ${u.deployments === 1 ? "its workflow stops" : "those workflows stop"} running in ${name}.`,
+    );
   const is = (count: number) => (count === 1 ? "is" : "are");
   const triggers = [
     u.webhooks ? n(u.webhooks, "webhook") : "",

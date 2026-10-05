@@ -518,10 +518,18 @@ describeDb("admin roadmap (Postgres)", () => {
       ).json() as { id: string };
       envs["usage-env"] = env.id;
       const w = await create("Usage counted", [
-        { type: "webhook", path: "usage-hook", signature: "none" },
+        { type: "webhook", path: "usage-hook", signature: "hmac_sha256" },
         { type: "schedule", cron: "0 3 1 1 *", input: { message: "yearly" } },
       ]);
-      expect((await deploy(w.id, await publish(w.id), "usage-env")).statusCode).toBe(200);
+      const dep = await deploy(w.id, await publish(w.id), "usage-env");
+      expect(dep.statusCode).toBe(200);
+      // the webhook's own secret goes with the webhook: not counted as a credential
+      await call(
+        t.app,
+        jar,
+        "POST",
+        `/v1/webhooks/${dep.json().triggers.webhooks[0].id as string}/rotate-secret`,
+      );
       await call(t.app, jar, "POST", "/v1/credentials", {
         name: "Only in usage-env",
         type: "http.bearer",

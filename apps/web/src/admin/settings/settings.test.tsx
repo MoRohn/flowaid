@@ -356,6 +356,9 @@ describe("Environments", () => {
 
   it("says so when nothing depends on it", () => {
     expect(deleteConsequences("scratch", none)).toEqual([]);
+    expect(deleteConsequences("qa", { ...none, deployments: 1 })).toEqual([
+      "1 deployment ends: its workflow stops running in qa.",
+    ]);
     expect(renameConsequences("qa", "test", 0)).toEqual([
       "Webhook URLs carry the environment's name: webhooks deployed here later use …/test/….",
     ]);
