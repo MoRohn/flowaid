@@ -77,7 +77,9 @@ describe("trigger guidance", () => {
       ctx,
     );
     expect(notes.find((n) => n.id === "path-taken")).toBeUndefined();
-    expect(notes.find((n) => n.id === "unsigned")?.message).toContain("prod is protected");
+    expect(notes.find((n) => n.id === "unsigned")?.message).toContain(
+      "prod is protected and refuses unsigned calls",
+    );
     expect(notes.find((n) => n.id === "sync")?.message).toContain("30 seconds");
   });
 

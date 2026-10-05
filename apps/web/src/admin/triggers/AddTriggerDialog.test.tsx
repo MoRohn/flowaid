@@ -128,6 +128,28 @@ describe("adding a webhook, step by step", () => {
   });
 });
 
+describe("adding an unsigned webhook", () => {
+  it("ends with next steps for an unsigned webhook, not a secret to generate", async () => {
+    window.localStorage.setItem("flowaid:guided-mode", "all");
+    stubApi({
+      "GET /v1/workflows/wf-1": () => detail,
+      "GET /v1/webhooks": () => ({ items: [], next_cursor: null }),
+      "PUT /v1/workflows/wf-1/draft": () => ({ ok: true }),
+    });
+    render(
+      withClient(
+        <AddTriggerDialog kind="webhook" workflowId="wf-1" open onOpenChange={() => undefined} />,
+      ),
+    );
+    fireEvent.click(await screen.findByRole("radio", { name: /Nothing \(unsigned\)/ }));
+    await waitFor(() => expect(button("Add to the draft").disabled).toBe(false));
+    fireEvent.click(button("Add to the draft"));
+    expect(await screen.findByText(/Added to Refund desk's draft/)).toBeTruthy();
+    expect(screen.queryByText(/Generate secret/)).toBeNull();
+    expect(screen.getByText(/Give the URL to the sender/)).toBeTruthy();
+  });
+});
+
 describe("adding a schedule, all fields at once", () => {
   it("blocks a bad time zone, and keeps the draft when saving fails", async () => {
     window.localStorage.setItem("flowaid:guided-mode", "all");

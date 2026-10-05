@@ -133,20 +133,21 @@ export function WebhookList({
                         />
                         Enabled
                       </label>
-                      <label className="flex items-center gap-2">
-                        <Switch
-                          size="sm"
-                          checked={h.requireTimestamp}
-                          disabled={
-                            h.signature !== "hmac_sha256" || pending(h.id, "requireTimestamp")
-                          }
-                          aria-busy={pending(h.id, "requireTimestamp")}
-                          onCheckedChange={(c) =>
-                            patchHook.mutate({ id: h.id, body: { requireTimestamp: c } })
-                          }
-                        />
-                        Require signed timestamp
-                      </label>
+                      {/* only an HMAC signature covers a timestamp */}
+                      {h.signature === "hmac_sha256" ? (
+                        <label className="flex items-center gap-2">
+                          <Switch
+                            size="sm"
+                            checked={h.requireTimestamp}
+                            disabled={pending(h.id, "requireTimestamp")}
+                            aria-busy={pending(h.id, "requireTimestamp")}
+                            onCheckedChange={(c) =>
+                              patchHook.mutate({ id: h.id, body: { requireTimestamp: c } })
+                            }
+                          />
+                          Require signed timestamp
+                        </label>
+                      ) : null}
                       <label className="flex items-center gap-2">
                         Idempotency header
                         <Input

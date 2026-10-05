@@ -131,7 +131,7 @@ export function triggerNotes(trigger: NewTrigger, ctx: TriggerContext): TriggerN
       notes.push({
         id: "unsigned",
         state: "warning",
-        message: `Unsigned: anyone who learns the URL can start runs.${guarded.length ? ` ${list(guarded)} ${guarded.length === 1 ? "is" : "are"} protected and refuse unsigned calls.` : ""}`,
+        message: `Unsigned: anyone who learns the URL can start runs.${guarded.length ? ` ${list(guarded)} ${guarded.length === 1 ? "is" : "are"} protected and refuse${guarded.length === 1 ? "s" : ""} unsigned calls.` : ""}`,
       });
     } else
       notes.push({

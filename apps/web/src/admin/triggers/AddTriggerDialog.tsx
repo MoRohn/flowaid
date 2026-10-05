@@ -147,7 +147,11 @@ export function AddTriggerDialog({
   const set = <K extends keyof TriggerDraft>(k: K, v: TriggerDraft[K]) =>
     setDraft((d) => ({ ...d, [k]: v }));
   const workflowId = fixedWorkflow ?? draft.workflowId;
-  const [done, setDone] = useState<{ id: string; name: string } | null>(null);
+  const [done, setDone] = useState<{
+    id: string;
+    name: string;
+    signature: TriggerDraft["signature"];
+  } | null>(null);
 
   const workflows = useQuery({
     queryKey: ["workflow-names", s.ws],
@@ -228,8 +232,9 @@ export function AddTriggerDialog({
     {
       errorTitle: "Could not add the trigger",
       onSuccess: (d) => {
+        // read before the draft is discarded: the next steps depend on how calls are signed
+        setDone({ id: d.id, name: d.name, signature: draft.signature });
         kept.discard();
-        setDone({ id: d.id, name: d.name });
         void qc.invalidateQueries({ queryKey: ["workflow", s.ws, d.id] });
       },
     },
@@ -268,12 +273,12 @@ export function AddTriggerDialog({
                 <>
                   <li>
                     Back on the Webhooks tab, the webhook appears once per environment with its URL.
-                    {draft.signature === "none"
-                      ? ""
+                    {done.signature === "none"
+                      ? " It is unsigned: anyone who has the URL can start runs, and protected environments refuse its calls."
                       : " Press Generate secret there: it is shown once, and calls are refused until it exists."}
                   </li>
                   <li>
-                    Give the URL{draft.signature === "none" ? "" : " and secret"} to the sender, and
+                    Give the URL{done.signature === "none" ? "" : " and secret"} to the sender, and
                     try the example request listed under the webhook. Each call shows under
                     Deliveries.
                   </li>
@@ -599,9 +604,12 @@ export function AddTriggerDialog({
         ? [
             {
               id: "valid",
-              label: notes.some((n) => n.state === "warning")
-                ? "Nothing blocks adding it; check the warnings below"
-                : "Every setting is filled in",
+              // adding to the draft can go ahead, but say when a warning will stop a deploy
+              label: notes.some((n) => n.id === "input")
+                ? "It can be added to the draft, but deploying it is refused until the warning below is fixed"
+                : notes.some((n) => n.state === "warning")
+                  ? "Nothing blocks adding it; check the warnings below"
+                  : "Every setting is filled in",
               state: "ok",
             } satisfies Check,
           ]

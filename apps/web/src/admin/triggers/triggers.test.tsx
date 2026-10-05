@@ -204,6 +204,19 @@ describe("webhook list", () => {
     expect((await screen.findByTestId("one-time-secret")).textContent).toBe("whsec_first");
   });
 
+  it("offers the signed-timestamp switch only to HMAC webhooks", async () => {
+    stubApi({
+      "GET /v1/webhooks": () => ({
+        items: [{ ...hook, id: "wh-3", signature: "none", secretBound: false }],
+        next_cursor: null,
+      }),
+    });
+    render(withClient(<WebhookList />));
+    expect(await screen.findByText("Unsigned")).toBeTruthy();
+    expect(screen.queryByRole("switch", { name: /signed timestamp/ })).toBeNull();
+    expect(screen.getAllByRole("switch")).toHaveLength(1);
+  });
+
   it("keeps a switch busy until its change is saved", async () => {
     let finish: (r: Response) => void = () => undefined;
     vi.stubGlobal(

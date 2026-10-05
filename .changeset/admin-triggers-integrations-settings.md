@@ -59,3 +59,7 @@ Deleting an environment lists what goes with it (deployments, webhooks, schedule
 secret bindings, credentials limited to it, keys pinned to it; `GET /v1/environments/:id/usage`),
 and one with runs on record says why it can't be deleted before you try. Renaming one warns that
 webhook URLs move with the name, and that renaming dev stops Run draft.
+
+After adding an unsigned webhook, the next steps no longer ask for a signing secret; the review
+says when a schedule's input will stop it deploying, reads "prod is protected and refuses unsigned
+calls", and unsigned webhooks no longer show a switched-off "Require signed timestamp".
