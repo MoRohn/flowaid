@@ -5,6 +5,7 @@ import type { NodeManifest, ToolDefinition } from "@flowaid/workflow-core";
 import { get } from "~/api/client";
 import type { WorkflowDetail } from "~/api/types";
 import { Builder } from "~/builder/Builder";
+import { draftSaved } from "~/builder/useDraftSave";
 import { FullPageSpinner } from "~/session";
 import { AppFrame, PageBody } from "~/shell/AppFrame";
 import { ErrorPanel } from "~/shell/states";
@@ -13,7 +14,8 @@ export default function BuilderPage({ params }: { params: Promise<{ ws: string; 
   const { ws, id } = use(params);
   const workflow = useQuery({
     queryKey: ["workflow", id],
-    queryFn: () => get<WorkflowDetail>(`/v1/workflows/${id}`),
+    // an edit sent as the builder closed lands before the draft is read again
+    queryFn: () => draftSaved(id).then(() => get<WorkflowDetail>(`/v1/workflows/${id}`)),
     staleTime: Infinity,
     refetchOnMount: "always",
   });

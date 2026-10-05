@@ -50,7 +50,7 @@ import {
   EmptyState,
   toast,
 } from "@flowaid/ui/primitives";
-import { ApiError, del, get, getAll, patch, post, put } from "~/api/client";
+import { del, get, getAll, patch, post } from "~/api/client";
 import type { WorkflowDetail } from "~/api/types";
 import { useSession } from "~/session";
 import { AppFrame } from "~/shell/AppFrame";
@@ -77,6 +77,7 @@ import {
   suggestNext,
 } from "./quickAdd";
 import { useCompiler } from "./useCompiler";
+import { useDraftSave } from "./useDraftSave";
 import { useLiveRun } from "./useLiveRun";
 import { describeInputIssue, describeRunError, type RunStartError } from "./errors";
 import { diagnosticNodeId, presentDiagnostic } from "./diagnostics";
@@ -93,8 +94,6 @@ import type { AgentPreset } from "~/agents/logic";
 import { PublishDialog } from "./PublishDialog";
 import { RunTab, missingRequired } from "./RunTab";
 import { CostTab, ReviewTab, advisorAvailability, costDiagnostics, useAdvisor } from "./advisor";
-
-const AUTOSAVE_MS = 1000;
 
 export interface BuilderProps {
   workflow: WorkflowDetail;
@@ -521,40 +520,8 @@ function BuilderView({
     [store, catalog, keySources, activeAgents.data],
   );
 
-  // --- save (autosave, ⌘S, before run/publish) ---
-  const saveNow = useCallback(async (): Promise<void> => {
-    const st = store.getState();
-    if (st.version === st.savedVersion || st.conflict) return;
-    const sent = st.version;
-    st.setSaving(true);
-    try {
-      const res = await put<{ draftRevision: number }>(
-        `/v1/workflows/${workflow.id}/draft`,
-        { definition: st.definition },
-        { headers: { "if-match": `"${st.draftRevision}"` } },
-      );
-      store.getState().markSaved(res.draftRevision, sent);
-    } catch (e) {
-      if (e instanceof ApiError && e.status === 412) {
-        const theirs = await get<WorkflowDetail>(`/v1/workflows/${workflow.id}`);
-        store.getState().setConflict({ theirs: theirs.draft, revision: theirs.draftRevision });
-      } else store.getState().setSaving(false, e instanceof Error ? e.message : "save failed");
-      throw e;
-    }
-  }, [store, workflow.id]);
-  useEffect(() => {
-    if (readOnly || version === savedVersion || saving || conflict) return;
-    const t = setTimeout(() => void saveNow().catch(() => undefined), AUTOSAVE_MS);
-    return () => clearTimeout(t);
-  }, [version, savedVersion, saving, conflict, readOnly, saveNow]);
-  useEffect(() => {
-    const guard = (e: BeforeUnloadEvent) => {
-      const st = store.getState();
-      if (st.version !== st.savedVersion) e.preventDefault();
-    };
-    window.addEventListener("beforeunload", guard);
-    return () => window.removeEventListener("beforeunload", guard);
-  }, [store]);
+  // --- save (autosave, ⌘S, before run/publish, and on the way out) ---
+  const saveNow = useDraftSave({ store, workflowId: workflow.id, ws: s.ws, enabled: !readOnly });
   useEffect(() => {
     if (notice) toast(notice.message);
   }, [notice]);
