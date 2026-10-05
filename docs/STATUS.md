@@ -1,4 +1,4 @@
-# FlowAId status — 2026-10-01
+# FlowAId status — 2026-10-05
 
 This file records where everything stands so work can restart from a known state. **0.9.0** is
 released: built-in agent tools, the agents' Active switch and the production-readiness pass below.
@@ -6,6 +6,38 @@ V2's audit, with what was verified and what is open, is
 [project/FLOWAID_V2_FINAL_AUDIT.md](project/FLOWAID_V2_FINAL_AUDIT.md). The repository is
 published at [github.com/MoRohn/flowaid](https://github.com/MoRohn/flowaid); CI, E2E and the
 desktop checks run on every push to `main`.
+
+## Product roadmap pass (2026-10-05, branch `roadmap/2026-10`)
+
+A capability audit of the running app (five lenses, every navigation entry) produced
+[project/PRODUCT_ROADMAP_2026-10.md](project/PRODUCT_ROADMAP_2026-10.md): 75 items, all verified,
+with the deferred remainder listed there. Highlights:
+
+- **Data safety:** `?purge=false`/`?force=false` no longer purge or force; rotating a credential
+  keeps its non-secret fields; archiving stops a workflow's triggers, runs and deploys; refused
+  webhook deliveries can be retried; deleting an environment revokes keys pinned to it; tall form
+  dialogs (New credential, Use template) can be submitted; builder edits survive quick navigation;
+  agent edits keep settings the form doesn't show; a recorded replay re-runs steps whose output was
+  not stored. Migrations 0016 (signing secrets owned by their webhook or channel) and 0017 (gate
+  links cleared with their evaluation set).
+- **Capabilities completed:** Download code from the builder and Versions; workflow execution
+  settings; knowledge source settings; MCP server editing; OpenAPI toolset details; notification
+  delivery history; audit export; runs search, date range and versions across every run;
+  evaluations scored per question for batch decision steps.
+- **Truthful states:** run explanations for cancelled, expired and timed-out runs; closed human
+  tasks are read-only; evaluation reports without a gate say so; live run pages no longer hold a
+  stream while a run waits (six open pages used to freeze the app).
+- **Shell and accessibility:** focus returns to what opened a dialog; danger confirmations open
+  on Cancel; the Guide no longer traps focus; `g` shortcuts work; branded not-found and
+  API-unreachable pages; the a11y spec covers every page and open overlays.
+- **Performance:** layout shift 0 on every nav page (Overview was 0.268); 137–157 KB gzip less
+  JavaScript on 21 routes (code editors load on demand); the Runs page makes 10 requests instead
+  of 15.
+
+Gates on the branch: `pnpm check` green (6,255 tests without PostgreSQL), every PostgreSQL suite
+green (database 70, runtime 92, nodes-core 228, api 240, worker 101), the acceptance suite green
+against the production builds with replayed providers. `@flowaid/workflow-core` gains a diagnostic
+(`W_HUMAN_EXPIRY_EXCEEDS_RUN_TIMEOUT`, RFC-0023), so the next release is a minor one.
 
 ## Production-readiness pass (2026-10-01)
 
@@ -60,7 +92,7 @@ Fixed, each with tests:
 | `workflow-core`                                                      | contracts, FlowExpr, templates, schema checker (0.3.8, RFC-0021)                                             | 2,665 |
 | `workflow-compiler`                                                  | 8 passes, 94 diagnostics, diff, migrate                                                                      | 177   |
 | `workflow-runtime`                                                   | scheduler, orchestrator, replay, run actions, drivers                                                        | 89    |
-| `database`                                                           | 50 tables, migrations 0000–0012 with RLS (bypass gated on `flowaid_rls_bypass`), run store, queue, event bus | 56    |
+| `database`                                                           | 50 tables, migrations 0000–0017 with RLS (bypass gated on `flowaid_rls_bypass`), run store, queue, event bus | 70    |
 | `nodes-core`                                                         | 60 nodes and the templates                                                                                   | 153   |
 | `providers`, `provider-typesafe`, `-openai`, `-anthropic`, `-ollama` | registry, pricing, failover, routing, rerank, record/replay; TypeSafe Jev and generation providers           | 163   |
 | `advisor`                                                            | cost optimiser, AI builder, AI critic, Ask FlowAId loop and its evaluation set                               | 40    |

@@ -9,6 +9,22 @@ the scope, its acceptance check and its status. Status is one of **pending**, **
 Baseline: `main` at `cd266b1` (0.9.0 plus the launcher fix). Work lands on the local branch
 `roadmap/2026-10`.
 
+## Status at a glance (2026-10-05)
+
+| Increment                                         | Items | Verified | Deferred parts                                |
+| ------------------------------------------------- | ----: | -------: | --------------------------------------------- |
+| A — data safety and correctness                   |    15 |       15 | —                                             |
+| B — builder and workflows                         |    12 |       12 | compiler "did you mean" fix (B-09)            |
+| C — runs, human tasks and the Overview            |    10 |       10 | R19, R20 polish                               |
+| D — agents, templates, knowledge, evaluations     |     9 |        9 | knowledge table at phone width                |
+| E — triggers, integrations, credentials, settings |    14 |       14 | OpenAPI re-import (E-08), cron wording (E-14) |
+| F — shell, accessibility and performance          |    12 |       12 | API-unreachable banner, lazy create dialogs   |
+| G — documentation and the final pass              |     3 |        3 | —                                             |
+
+Every capability in the inventory below was assessed; every planned item is verified with the
+evidence in the [verification log](#verification-log); what was not done is in
+[Deferred, with reasons](#deferred-with-reasons).
+
 ## How the evidence was gathered
 
 - **Baseline checks (before any edit):** `pnpm check` green in 42 s (152 turbo tasks); 5,895 tests
@@ -185,11 +201,11 @@ increments in dependency order; shared fixes come before the screens that use th
 
 ### Increment G — documentation and the final pass
 
-| ID   | Item                                                                                                                                                                | Status  |
-| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| G-01 | GUIDANCE.md known gaps corrected (retention is in Settings; the replay conflict can't occur; the TypeSafe slot works as documented); API.md routes that don't exist | pending |
-| G-02 | STATUS.md, changesets, this file's verification log                                                                                                                 | pending |
-| G-03 | Final pass: `pnpm check`, PostgreSQL suites, e2e acceptance, every nav page in the browser, performance re-measured                                                 | pending |
+| ID   | Item                                                                                                                                                                | Status   |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| G-01 | GUIDANCE.md known gaps corrected (retention is in Settings; the replay conflict can't occur; the TypeSafe slot works as documented); API.md routes that don't exist | verified |
+| G-02 | STATUS.md, changesets, this file's verification log                                                                                                                 | verified |
+| G-03 | Final pass: `pnpm check`, PostgreSQL suites, e2e acceptance, every nav page in the browser, performance re-measured                                                 | verified |
 
 ## Deferred, with reasons
 
@@ -280,3 +296,31 @@ Filled in as items are verified: the check that ran, where, and what it showed.
 | F-10       | Live: a top-bar search button opens ⌘K; typing "runs" selects Runs, "dark" Theme: Dark, and only a question selects Ask (groups ordered by best match; Ask last). One filled button per list page.                                                                                                                                                                                                                                |
 | F-11       | Live: theme radios are one Tab stop with arrow keys; Start here Hide/About keeps focus; error toasts stay until dismissed.                                                                                                                                                                                                                                                                                                        |
 | F-12       | a11y.spec adds Overview, Agents, Triggers, Knowledge, axe with ⌘K / Guide / collapsed nav / a dialog open, and keyboard checks; axe probe: 0 WCAG violations on the other 12 pages in both themes (the dimmed inactive agent card's contrast was fixed in the content lane).                                                                                                                                                      |
+
+## Final verification (2026-10-05, branch `roadmap/2026-10`)
+
+| Check                                                                                             | Before (`cd266b1`)                                                                                                | After                                                                                                                                       |
+| ------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm check`                                                                                      | green, 152 tasks; 5,895 tests                                                                                     | green, 152 tasks; 6,255 tests (web 474 → 765, ui 957 → 1,002)                                                                               |
+| PostgreSQL suites                                                                                 | not run locally before the edits; CI (with its `integration` PostgreSQL job), E2E and Desktop passed on `cd266b1` | database 70, runtime 92 (+3 skipped), nodes-core 228, api 240 (+8 skipped), worker 101 (+1 skipped): all pass                               |
+| Acceptance (production builds, replayed providers, fresh database)                                | passed in CI on `cd266b1`                                                                                         | 15 passed, 2 skipped (the sign-in page, absent in local mode); no secret canary in the stack log                                            |
+| Browser sweep (every nav page and tab, detail pages with real ids; 1440 and 390; four workspaces) | —                                                                                                                 | no page error, console error, failure text or horizontal overflow; every page has an h1 (the builder and task page gained one in this pass) |
+
+Performance, dev server, same machine and method as the baseline (`perf-run.sh`, 1 warm-up + 3 full
+loads, medians):
+
+| page          | LCP ms before → after | API settled ms |  layout shift | API requests |
+| ------------- | --------------------: | -------------: | ------------: | -----------: |
+| Overview      |             272 → 200 |      190 → 183 | 0.268 → **0** |      16 → 15 |
+| Workflows     |             272 → 256 |      154 → 139 | 0.154 → **0** |        9 → 9 |
+| Runs          |             224 → 200 |      283 → 184 |   0.01 → 0.01 |  15 → **10** |
+| Templates     |             264 → 264 |      158 → 147 |  0.17 → **0** |      13 → 13 |
+| Knowledge     |             248 → 236 |      152 → 138 |  0.08 → **0** |      10 → 10 |
+| Credentials   |             240 → 168 |      148 → 142 | 0.106 → **0** |        9 → 9 |
+| other 7 pages |         within ±20 ms |  within ±15 ms |         0 → 0 |    unchanged |
+
+Production first-load JavaScript (`next build`, gzip): 21 routes are 137–157 KB smaller (Agents
+654 → 507, Credentials 690 → 544, Triggers 725 → 578, Settings 711 → 568, `/review` 700 → 543, the
+builder 1,650 → 1,505, every workflow sub-page and evaluation page alike); routes that never loaded
+the code editors grew 1–7 KB (Overview 564 → 571, Runs 628 → 634) with the new shell code and
+features.
