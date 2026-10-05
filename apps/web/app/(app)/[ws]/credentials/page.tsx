@@ -1,5 +1,6 @@
 "use client";
 import { useQuery } from "@tanstack/react-query";
+import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { KeyRound, Plus } from "lucide-react";
 import { Button, EmptyState, SearchInput } from "@flowaid/ui/primitives";
@@ -26,8 +27,12 @@ export default function CredentialsPage() {
   const s = useSession();
   const canWrite = s.can("credentials:write");
   const [creating, setCreating] = useOpenFromQuery();
-  // a "What you need" line opens the form on the service it names
-  const [createType, setCreateType] = useState<string | undefined>(undefined);
+  // a "What you need" line, or a link with `?new=1&type=` (Providers), opens the form on the
+  // service it names
+  const params = useSearchParams();
+  const [createType, setCreateType] = useState<string | undefined>(
+    () => params.get("type") ?? undefined,
+  );
   const [openId, setOpenId] = useState<string | null>(null);
   const [rotating, setRotating] = useState<Credential | null>(null);
   // the delete confirmation lists where the credential is used first
@@ -195,7 +200,9 @@ export default function CredentialsPage() {
           onOpenChange={setCreating}
           types={types.data}
           environments={s.environments}
-          {...(createType ? { defaultType: createType } : {})}
+          {...(createType && types.data.some((t) => t.id === createType)
+            ? { defaultType: createType }
+            : {})}
         />
       ) : null}
       <RotateCredentialDialog

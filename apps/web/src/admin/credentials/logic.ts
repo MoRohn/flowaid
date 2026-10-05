@@ -73,6 +73,11 @@ export function serverKeyProvider(typeId: string): string | undefined {
     : undefined;
 }
 
+/** The credential type that holds a model provider's key (Providers → "Add … credential"). */
+export function providerCredentialType(provider: string): string {
+  return provider === "ollama" ? "ollama.host" : `${provider}.api_key`;
+}
+
 const REF_SCHEMES = ["env:", "vault:", "aws-sm:", "azure-kv:", "gcp-sm:"];
 
 /**

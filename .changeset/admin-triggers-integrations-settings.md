@@ -63,3 +63,7 @@ webhook URLs move with the name, and that renaming dev stops Run draft.
 After adding an unsigned webhook, the next steps no longer ask for a signing secret; the review
 says when a schedule's input will stop it deploying, reads "prod is protected and refuses unsigned
 calls", and unsigned webhooks no longer show a switched-off "Require signed timestamp".
+
+Smaller fixes: Providers' "Add … credential" opens New credential on that provider's key; an MCP
+client calling a tool with arguments that don't fit gets each problem named, so its model can
+correct the call; an MCP token pinned to a workflow id that doesn't exist is refused.

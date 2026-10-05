@@ -554,6 +554,55 @@ describeDb("admin roadmap (Postgres)", () => {
     });
   });
 
+  describe("E-14: MCP tokens and tool calls", () => {
+    it("refuses a token pinned to an unknown workflow, and names bad tool arguments", async () => {
+      const w = await create("Echo for MCP");
+      expect((await deploy(w.id, await publish(w.id))).statusCode).toBe(200);
+      const missing = "00000000-0000-4000-8000-000000000000";
+      const refused = await call(t.app, jar, "POST", "/v1/mcp/tokens", {
+        name: "typo",
+        workflowIds: [w.id, missing],
+        environmentId: envs.dev,
+      });
+      expect(refused.statusCode).toBe(400);
+      expect(refused.json().error.details.unknownWorkflowIds).toEqual([missing]);
+
+      const key = (
+        await call(t.app, jar, "POST", "/v1/mcp/tokens", {
+          name: "echo client",
+          workflowIds: [w.id],
+          environmentId: envs.dev,
+        })
+      ).json().key as string;
+      await call(t.app, jar, "POST", "/v1/mcp/exposures", {
+        workflowId: w.id,
+        environmentId: envs.dev,
+        toolName: "echo_e14",
+        description: "Echoes the message",
+      });
+      const rpc = (method: string, params: unknown) =>
+        t.app.inject({
+          method: "POST",
+          url: "/mcp/default",
+          headers: {
+            authorization: `Bearer ${key}`,
+            accept: "application/json, text/event-stream",
+            "content-type": "application/json",
+          },
+          payload: { jsonrpc: "2.0", id: 1, method, params },
+        });
+      await rpc("initialize", {
+        protocolVersion: "2025-06-18",
+        capabilities: {},
+        clientInfo: { name: "test", version: "1" },
+      });
+      // the blank workflow requires `message`: the error says so
+      const bad = (await rpc("tools/call", { name: "echo_e14", arguments: {} })).json().result;
+      expect(bad.isError).toBe(true);
+      expect(JSON.stringify(bad.content)).toContain("must have required property 'message'");
+    });
+  });
+
   describe("E-06, E-07: private-address refusals say how to allow them", () => {
     let strict: TestApp;
     let strictJar: Jar;

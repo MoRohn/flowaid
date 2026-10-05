@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import {
   connectSession,
   discoverSession,
@@ -1281,6 +1281,18 @@ export function toolRoutes(app: FastifyInstance, ctx: ApiContext): void {
             ),
           );
         if (!env) throw new BadRequestError("environment not found");
+        // a mistyped id would mint a token that lists nothing
+        const wanted = [...new Set(req.body.workflowIds)];
+        const found = await tx
+          .select({ id: workflows.id })
+          .from(workflows)
+          .where(and(eq(workflows.workspaceId, p.workspaceId), inArray(workflows.id, wanted)));
+        const unknown = wanted.filter((id) => !found.some((w) => w.id === id));
+        if (unknown.length)
+          throw new BadRequestError(
+            `no workflow ${unknown.join(", ")} in this workspace; pin the token to existing workflows`,
+            { unknownWorkflowIds: unknown },
+          );
         return createApiKey(tx, {
           workspaceId: p.workspaceId,
           name: `mcp: ${req.body.name}`,
