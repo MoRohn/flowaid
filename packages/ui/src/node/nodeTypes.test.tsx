@@ -89,6 +89,9 @@ describe("cardVariantFor", () => {
       }),
     ).toBe("decision");
     expect(cardVariantFor(task("@acme/dev.echo", "developer"))).toBe("code");
+    // FlowAId's own developer steps hold no code: an Assert is not "js · No code yet"
+    expect(cardVariantFor(task("flowaid.dev.assert", "developer"))).toBe("default");
+    expect(cardVariantFor(task("flowaid.tools.code", "developer"))).toBe("code");
     expect(cardVariantFor({ kind: "task", category: "data" })).toBe("default");
   });
 
