@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, render } from "@testing-library/react";
 import type { JsonSchema } from "@/types";
 import { installDomStubs } from "@/primitives/testStubs";
-import { flowExprCompletions } from "./FlowExprEditor";
+import { flowExprCompletions } from "./FlowExprEditorView";
 import { SchemaForm } from "./SchemaForm";
 import { hintsOf } from "./schema";
 import { checkExpression } from "./templateCheck";

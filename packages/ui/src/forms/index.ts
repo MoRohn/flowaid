@@ -240,12 +240,8 @@ export {
   templateRefsFromScope,
   type TemplateCheck,
 } from "./templateCheck";
-export {
-  FlowExprEditor,
-  FlowExprWidget,
-  flowExprCompletions,
-  type FlowExprEditorProps,
-} from "./FlowExprEditor";
+export { FlowExprEditor, FlowExprWidget, type FlowExprEditorProps } from "./FlowExprEditor";
+export { flowExprCompletions } from "./FlowExprEditorView";
 export {
   LevelsList,
   validateLevels,
