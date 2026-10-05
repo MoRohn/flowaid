@@ -1,5 +1,12 @@
-import { forwardRef, useMemo, type HTMLAttributes, type ReactNode } from "react";
-import { CircleAlert, CircleCheck, FlaskConical, ShieldBan, TriangleAlert } from "lucide-react";
+import { Fragment, forwardRef, useMemo, type HTMLAttributes, type ReactNode } from "react";
+import {
+  CircleAlert,
+  CircleCheck,
+  CircleDashed,
+  FlaskConical,
+  ShieldBan,
+  TriangleAlert,
+} from "lucide-react";
 import { cn } from "@/lib/cn";
 import { formatCost, formatMs } from "@/lib/format";
 import { Badge, Button, Panel } from "@/primitives";
@@ -7,18 +14,34 @@ import type { EvaluationCaseResultView, EvaluationMetricView, WorkflowVersionVie
 import { MetricsDeltaStrip } from "./MetricsDeltaStrip";
 import { VersionBadge } from "./VersionCompare";
 
-export type EvaluationGate = "pass" | "warn" | "fail";
+/** `none`: the run was not held to a pass rate, so there is no gate to pass or fail. */
+export type EvaluationGate = "pass" | "warn" | "fail" | "none";
+
+/** A check a case failed, in words: what was checked and why it failed. */
+export interface EvaluationFailedCheck {
+  label: string;
+  message?: string;
+}
+
+export type EvaluationCaseRow = EvaluationCaseResultView & {
+  /** shown under a failed case, so the report says why it failed */
+  failedChecks?: readonly EvaluationFailedCheck[];
+};
 
 export interface EvaluationReportProps extends HTMLAttributes<HTMLDivElement> {
   datasetName: string;
   base?: WorkflowVersionView;
   candidate: WorkflowVersionView;
   metrics: EvaluationMetricView[];
-  cases: EvaluationCaseResultView[];
+  cases: EvaluationCaseRow[];
   gate: EvaluationGate;
+  /** cases of the set that never ran (a cancelled or failed evaluation) */
+  notRun?: number;
   /** One line about calibration, e.g. "ECE 0.031 (was 0.052): confidence tracks accuracy within 3 points." */
   calibrationNote?: string;
+  /** without it there is no Publish button */
   onPublish?: () => void;
+  /** without it there is no Block publish button */
   onBlock?: () => void;
   onFocusCase?: (caseId: string) => void;
   /** Cap on rows in the per-case table; the rest is summarised. */
@@ -48,14 +71,24 @@ const GATE: Record<EvaluationGate, { tone: string; icon: ReactNode; title: strin
     icon: <CircleAlert className="size-4 text-danger-text" strokeWidth={1.75} aria-hidden="true" />,
     title: "Gate failed",
   },
+  none: {
+    tone: "border-border bg-surface-2",
+    icon: <CircleDashed className="size-4 text-ink-3" strokeWidth={1.75} aria-hidden="true" />,
+    title: "No gate set",
+  },
 };
+
+/** Failed checks listed under a case before the rest is summarised. */
+const MAX_CHECKS = 3;
 
 /**
  * Dataset evaluation report: metric deltas against the baseline, the
- * regressions with expected vs actual, a per-case table and the publish
- * gate. `gate` decides which actions are offered: pass publishes normally,
- * warn with regressions and fail offer "Publish anyway" (danger) next to
- * "Block publish"; warn without regressions (warnings only) publishes normally.
+ * regressions with expected vs actual, a per-case table (with each failed
+ * case's failed checks) and the publish gate. `gate` decides which actions are
+ * offered: pass publishes normally, warn with regressions and fail offer
+ * "Publish anyway" (danger) next to "Block publish"; warn without regressions
+ * (warnings only) publishes normally; none (no gate was set) offers Publish as
+ * a secondary action. An action shows only when its handler is given.
  */
 export const EvaluationReport = forwardRef<HTMLDivElement, EvaluationReportProps>(
   function EvaluationReport(
@@ -66,6 +99,7 @@ export const EvaluationReport = forwardRef<HTMLDivElement, EvaluationReportProps
       metrics,
       cases,
       gate,
+      notRun = 0,
       calibrationNote,
       onPublish,
       onBlock,
@@ -117,18 +151,21 @@ export const EvaluationReport = forwardRef<HTMLDivElement, EvaluationReportProps
               <span className="whitespace-nowrap font-mono text-2xs tabular">
                 {passed}/{cases.length} passed · {regressions.length}{" "}
                 {regressions.length === 1 ? "regression" : "regressions"}
+                {notRun > 0 ? ` · ${notRun} not run` : ""}
               </span>
             </span>
-            <span className="ml-auto flex items-center gap-1.5">
-              {gate === "pass" ? (
-                <Button size="sm" variant="primary" onClick={onPublish}>
-                  Publish
-                </Button>
-              ) : (
-                <>
-                  <Button size="sm" variant={risky ? "danger" : "primary"} onClick={onPublish}>
+            {onPublish || onBlock ? (
+              <span className="ml-auto flex items-center gap-1.5">
+                {onPublish ? (
+                  <Button
+                    size="sm"
+                    variant={gate === "none" ? "secondary" : risky ? "danger" : "primary"}
+                    onClick={onPublish}
+                  >
                     {risky ? "Publish anyway" : "Publish"}
                   </Button>
+                ) : null}
+                {onBlock && (gate === "warn" || gate === "fail") ? (
                   <Button
                     size="sm"
                     variant={gate === "fail" ? "primary" : "secondary"}
@@ -137,9 +174,9 @@ export const EvaluationReport = forwardRef<HTMLDivElement, EvaluationReportProps
                   >
                     Block publish
                   </Button>
-                </>
-              )}
-            </span>
+                ) : null}
+              </span>
+            ) : null}
           </>
         }
         {...rest}
@@ -252,46 +289,74 @@ export const EvaluationReport = forwardRef<HTMLDivElement, EvaluationReportProps
                 </thead>
                 <tbody className="divide-y divide-border">
                   {rows.map((c) => (
-                    <tr key={c.id} data-passed={c.passed} className="h-7">
-                      <td className="w-full max-w-0 pl-3 pr-3">
-                        <button
-                          type="button"
-                          onClick={() => onFocusCase?.(c.id)}
-                          className="block max-w-full truncate text-left text-ink hover:underline"
-                        >
-                          {c.name}
-                        </button>
-                      </td>
-                      <td className="whitespace-nowrap pr-3">
-                        <Badge tone={c.passed ? "ok" : "danger"} size="sm" dot>
-                          {c.passed ? "pass" : "fail"}
-                        </Badge>
-                        {c.regression ? (
-                          <span className="ml-1.5 font-mono text-2xs text-danger-text">
-                            regression
-                          </span>
-                        ) : null}
-                      </td>
-                      <td className="hidden whitespace-nowrap pr-3 font-mono text-2xs text-ink-2 sm:table-cell">
-                        {c.branch ? (
-                          <>
-                            {c.branch.actual ?? "—"}
-                            {c.branch.expected !== undefined &&
-                            c.branch.expected !== c.branch.actual ? (
-                              <span className="text-ink-3"> (expected {c.branch.expected})</span>
-                            ) : null}
-                          </>
-                        ) : (
-                          "—"
-                        )}
-                      </td>
-                      <td className="whitespace-nowrap pr-3 text-right font-mono text-2xs tabular text-ink-2">
-                        {c.durationMs !== undefined ? formatMs(c.durationMs) : "—"}
-                      </td>
-                      <td className="hidden whitespace-nowrap pr-3 text-right font-mono text-2xs tabular text-ink-2 sm:table-cell">
-                        {c.costUsd !== undefined ? formatCost(c.costUsd) : "—"}
-                      </td>
-                    </tr>
+                    <Fragment key={c.id}>
+                      <tr data-passed={c.passed} className="h-7">
+                        <td className="w-full max-w-0 pl-3 pr-3">
+                          <button
+                            type="button"
+                            onClick={() => onFocusCase?.(c.id)}
+                            className="block max-w-full truncate text-left text-ink hover:underline"
+                          >
+                            {c.name}
+                          </button>
+                        </td>
+                        <td className="whitespace-nowrap pr-3">
+                          <Badge tone={c.passed ? "ok" : "danger"} size="sm" dot>
+                            {c.passed ? "pass" : "fail"}
+                          </Badge>
+                          {c.regression ? (
+                            <span className="ml-1.5 font-mono text-2xs text-danger-text">
+                              regression
+                            </span>
+                          ) : null}
+                        </td>
+                        <td className="hidden whitespace-nowrap pr-3 font-mono text-2xs text-ink-2 sm:table-cell">
+                          {c.branch ? (
+                            <>
+                              {c.branch.actual ?? "—"}
+                              {c.branch.expected !== undefined &&
+                              c.branch.expected !== c.branch.actual ? (
+                                <span className="text-ink-3"> (expected {c.branch.expected})</span>
+                              ) : null}
+                            </>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                        <td className="whitespace-nowrap pr-3 text-right font-mono text-2xs tabular text-ink-2">
+                          {c.durationMs !== undefined ? formatMs(c.durationMs) : "—"}
+                        </td>
+                        <td className="hidden whitespace-nowrap pr-3 text-right font-mono text-2xs tabular text-ink-2 sm:table-cell">
+                          {c.costUsd !== undefined ? formatCost(c.costUsd) : "—"}
+                        </td>
+                      </tr>
+                      {!c.passed && c.failedChecks?.length ? (
+                        <tr data-failed-checks={c.id}>
+                          <td colSpan={5} className="max-w-0 px-3 pb-2 pt-0">
+                            <ul
+                              className="m-0 flex list-none flex-col gap-0.5 p-0 pl-2 text-2xs"
+                              aria-label={`Why ${c.name} failed`}
+                            >
+                              {c.failedChecks.slice(0, MAX_CHECKS).map((k, i) => (
+                                <li key={i} className="min-w-0 break-words text-ink-2">
+                                  <span className="font-medium text-danger-text">{k.label}</span>
+                                  {k.message ? (
+                                    <span className="font-mono text-ink-2">: {k.message}</span>
+                                  ) : null}
+                                </li>
+                              ))}
+                              {c.failedChecks.length > MAX_CHECKS ? (
+                                <li className="text-ink-3">
+                                  {c.failedChecks.length - MAX_CHECKS} more failed{" "}
+                                  {c.failedChecks.length - MAX_CHECKS === 1 ? "check" : "checks"}:
+                                  open the case to see them
+                                </li>
+                              ) : null}
+                            </ul>
+                          </td>
+                        </tr>
+                      ) : null}
+                    </Fragment>
                   ))}
                 </tbody>
               </table>

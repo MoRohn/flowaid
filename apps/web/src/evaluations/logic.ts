@@ -194,25 +194,50 @@ export function caseCoverage(cases: readonly EvaluationCase[]): Note[] {
 /**
  * How to read a finished report: runs that finished against cases that passed, and what else
  * limits what the pass rate says. `weakCases` are the ids of cases that only check completion.
+ * `run` is the evaluation run (a cancelled or failed one scored only some of the set's cases);
+ * `baseline` the run compared with, when its cases differ from this run's.
  */
 export function reportReading(
   summary: EvaluationSummary,
   results: readonly CaseResultRow[],
   weakCases: ReadonlySet<string>,
+  ctx: {
+    run?: { status: string; total: number };
+    baseline?: { sameCases: boolean; cases: number } | null;
+  } = {},
 ): Note[] {
   const n = summary.cases;
-  if (n === 0) return [];
+  const total = Math.max(n, ctx.run?.total ?? n);
+  if (n === 0 && total === 0) return [];
   const notes: Note[] = [];
+  if (n < total)
+    notes.push({
+      id: "partial",
+      state: "warning",
+      message: `Only ${n} of ${total} cases ran: the evaluation ${ctx.run?.status === "failed" ? "failed" : ctx.run?.status === "cancelled" ? "was cancelled" : "stopped"} first. Every figure here covers those ${n} only, so it says nothing about the other ${total - n}.`,
+    });
+  if (n === 0) return notes;
   const finished = Math.round(summary.completionRate * n);
   notes.push(
     finished === n
-      ? { id: "finished", state: "ok", message: `All ${n} runs finished.` }
+      ? {
+          id: "finished",
+          state: "ok",
+          message:
+            n < total ? `The ${n} runs that started all finished.` : `All ${n} runs finished.`,
+        }
       : {
           id: "finished",
           state: "warning",
           message: `${finished} of ${n} runs finished; the others failed, timed out, were cancelled or could not start, and fail their status check. Open one to see its error before reading anything else.`,
         },
   );
+  if (ctx.baseline && !ctx.baseline.sameCases)
+    notes.push({
+      id: "baseline-cases",
+      state: "warning",
+      message: `The baseline scored different cases (${ctx.baseline.cases} there, ${n} here), so its rates are not shown as differences: they would not compare like with like. Regressions are still listed per case.`,
+    });
   notes.push({
     id: "passed",
     state: summary.passed === n ? "ok" : "info",

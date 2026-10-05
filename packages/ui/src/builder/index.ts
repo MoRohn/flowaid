@@ -69,6 +69,8 @@ export {
   EvaluationReport,
   type EvaluationReportProps,
   type EvaluationGate,
+  type EvaluationCaseRow,
+  type EvaluationFailedCheck,
 } from "./EvaluationReport";
 export {
   ImportDialog,

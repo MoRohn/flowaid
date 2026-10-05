@@ -1,4 +1,5 @@
 ---
+"@flowaid/ui": patch
 "@flowaid/evaluation": patch
 "@flowaid/workflow-runtime": patch
 "@flowaid/nodes-core": patch
@@ -15,3 +16,9 @@ question that can give the expected value, so existing cases keep their meaning.
 captures every answer, and accuracy, calibration and confusion are shown per question. A batch step
 with more questions than one request takes now asks them in several batches rather than one by
 one, and answers a person gave are recorded per question too.
+
+Evaluation reports say what happened. A run with no gate reads "No gate set" (it read "Gate passed
+with warnings") and offers Publish as a secondary action; the Block publish button, which did
+nothing, is gone. Each failed case lists the checks it failed and why. A cancelled or failed
+evaluation says how many of the set's cases ran and that every figure covers only those, and a
+baseline that scored other cases is no longer shown as differences.

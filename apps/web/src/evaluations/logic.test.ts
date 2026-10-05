@@ -174,4 +174,28 @@ describe("reportReading", () => {
     expect(notes[2]?.message).toMatch(/^2 cases have judge checks that could not run/);
     expect(notes[3]?.message).toContain("$0.0100");
   });
+
+  it("says a cancelled run covers only the cases that ran, and when a baseline ran others", () => {
+    // cancelled at 2 of 4: it used to read "All 2 runs finished"
+    const notes = reportReading(summary({ cases: 2, passed: 1, passRate: 0.5 }), [], new Set(), {
+      run: { status: "cancelled", total: 4 },
+      baseline: { sameCases: false, cases: 3 },
+    });
+    expect(ids(notes)).toEqual([
+      "partial:warning",
+      "finished:ok",
+      "baseline-cases:warning",
+      "passed:info",
+    ]);
+    expect(notes[0]?.message).toMatch(/^Only 2 of 4 cases ran: the evaluation was cancelled/);
+    expect(notes[1]?.message).toBe("The 2 runs that started all finished.");
+    expect(notes[2]?.message).toMatch(/\(3 there, 2 here\)/);
+  });
+
+  it("reads a run cancelled before any case finished", () => {
+    const notes = reportReading(summary({ cases: 0, passed: 0, passRate: 0 }), [], new Set(), {
+      run: { status: "cancelled", total: 3 },
+    });
+    expect(ids(notes)).toEqual(["partial:warning"]);
+  });
 });
