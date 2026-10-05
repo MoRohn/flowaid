@@ -66,7 +66,7 @@ export const SETTINGS_NOTIFICATIONS: CapabilityGuide = {
   start:
     "Press Add channel. Steps cover where to send, which events, and a review; you can send a test once it is added.",
   result:
-    "A channel that receives the chosen events from now on. Nothing is sent while you set it up; a test goes out only when you press Send a test.",
+    "A channel that receives the chosen events from now on. Nothing is sent while you set it up; a test goes out only when you press Send a test. Its History lists what was sent and why a send failed.",
 };
 
 export const SETTINGS_AUDIT: CapabilityGuide = {
@@ -86,6 +86,7 @@ export const SETTINGS_AUDIT: CapabilityGuide = {
       "Red actions remove or revoke something; amber ones rotate keys or change access; blue ones publish or deploy.",
       "The actor is a person, an API key or the system; the request id ties an event to the server's logs.",
       "Load more fetches older events within the chosen period.",
+      "Export CSV or JSON downloads every event that matches the filters, newest first.",
     ],
   },
 };
