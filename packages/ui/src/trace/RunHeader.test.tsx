@@ -82,6 +82,30 @@ describe("RunHeader failure banner", () => {
   });
 });
 
+describe("RunHeader time limit banner", () => {
+  it("says a timed-out run stopped at its limit, and where to change it", async () => {
+    const onOpenSettings = vi.fn();
+    render(
+      <RunHeader
+        run={{ ...failedRun, status: "timed_out", error: undefined }}
+        timeoutMs={20_000}
+        onOpenSettings={onOpenSettings}
+      />,
+    );
+    const banner = screen
+      .getByText(/Stopped at the run's time limit of 20/)
+      .closest("[role=status]");
+    expect(banner?.textContent).toContain("No step failed");
+    await userEvent.click(screen.getByRole("button", { name: "Workflow settings" }));
+    expect(onOpenSettings).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows no time limit banner for other runs", () => {
+    render(<RunHeader run={failedRun} timeoutMs={20_000} onOpenSettings={vi.fn()} />);
+    expect(screen.queryByText(/time limit/)).toBeNull();
+  });
+});
+
 describe("RunHeader clock", () => {
   it("keeps the relative times of a finished run current", () => {
     vi.useFakeTimers({

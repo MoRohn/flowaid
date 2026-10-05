@@ -126,6 +126,15 @@ export function toLiveRunView(i: LiveRunInput) {
   return { view, folded };
 }
 
+/** The time limit a timed-out run reached, from its RUN_TIMED_OUT event. */
+export function runTimeoutMs(events: readonly unknown[]): number | undefined {
+  for (let i = events.length - 1; i >= 0; i--) {
+    const e = events[i] as { type?: unknown; timeoutMs?: unknown };
+    if (e.type === "RUN_TIMED_OUT" && typeof e.timeoutMs === "number") return e.timeoutMs;
+  }
+  return undefined;
+}
+
 /**
  * Whether a retry-node reopened the run after it failed (ARCHITECTURE.md §5.9): its events go on
  * after RUN_FAILED with NODE_RETRIED. The fold keeps the last RUN_* status, so without this the

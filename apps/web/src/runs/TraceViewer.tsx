@@ -49,6 +49,7 @@ import {
   lastDurableSeq,
   mergeEvents,
   nodeIndex,
+  runTimeoutMs,
   taskToApproval,
   toLiveRunView,
 } from "./views";
@@ -185,6 +186,7 @@ export function TraceViewer({ runId }: { runId: string }) {
     );
   }
   const isLive = isActiveRun(run.status);
+  const timeoutMs = run.status === "timed_out" ? runTimeoutMs(allEvents) : undefined;
   const byId = new Map(run.nodeRuns.map((n) => [n.id, n]));
   const current = selected ? byId.get(selected) : undefined;
   const attempts = current
@@ -276,6 +278,8 @@ export function TraceViewer({ runId }: { runId: string }) {
             ? { onOpenReview: () => router.push(`/${s.ws}/human-tasks/${openTaskId}`) }
             : {})}
           cancelling={cancel.isPending}
+          {...(timeoutMs !== undefined ? { timeoutMs } : {})}
+          onOpenSettings={() => router.push(`/${s.ws}/workflows/${run.workflowId}`)}
           actions={
             s.features.evaluations && s.can("evaluations:write") && !isLive ? (
               <Button
@@ -289,7 +293,11 @@ export function TraceViewer({ runId }: { runId: string }) {
             ) : undefined
           }
         />
-        <RunStory run={run} {...(definition ? { definition } : {})} />
+        <RunStory
+          run={run}
+          {...(definition ? { definition } : {})}
+          {...(timeoutMs !== undefined ? { timeoutMs } : {})}
+        />
         <PageIntro guide={RUN_DETAIL} defaultCollapsed className="" />
         {isLive && (stream.fallback || stream.pollError) ? (
           <p className="flex flex-wrap items-center gap-2 text-xs text-warn-text" role="status">
@@ -430,14 +438,22 @@ export function TraceSkeleton() {
 }
 
 /** What happened, in plain words, under the header; the Guide shows the same story. */
-function RunStory({ run, definition }: { run: RunView; definition?: WorkflowDefinition }) {
+function RunStory({
+  run,
+  definition,
+  timeoutMs,
+}: {
+  run: RunView;
+  definition?: WorkflowDefinition;
+  timeoutMs?: number;
+}) {
   useGuideContext(
     useMemo(
       () => ({ kind: "run" as const, run, ...(definition ? { definition } : {}) }),
       [run, definition],
     ),
   );
-  const story = explainRun(run, definition);
+  const story = explainRun(run, definition, timeoutMs !== undefined ? { timeoutMs } : {});
   if (!story.length) return null;
   return (
     <details open className="rounded-sm border border-border bg-surface-2 px-3 py-2">

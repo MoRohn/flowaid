@@ -24,3 +24,10 @@ While older runs exist the count reads "50 runs loaded", an empty result says so
 come with the runs (`include=version`, combinable as `include=decisions,version`), so the list no
 longer asks for every workflow's versions, and it refreshes every 15 s instead of 3 s while its runs
 only wait for a person.
+
+"What happened, in plain words" no longer says a person answered when nobody did: a person's step
+closed by a cancelled, timed-out or failed run reads "Nobody answered … before the run was
+cancelled" (or reached its time limit, or failed), and "after 1 minute" is the time the person took,
+not the step's own run time. A step retried in place reads once. A timed-out run gets a banner with
+the limit it reached and a "Workflow settings" button, and its Guide steps no longer send you to a
+failed step and Retry that don't exist.

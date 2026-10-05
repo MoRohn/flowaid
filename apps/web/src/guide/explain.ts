@@ -426,17 +426,50 @@ interface Answer {
   confidence?: number;
 }
 
+/** How long a person took: from when the step started waiting to when it went on. */
+function waitedMs(r: NodeRunView): number | undefined {
+  if (r.startedAt && r.endedAt) {
+    const ms = Date.parse(r.endedAt) - Date.parse(r.startedAt);
+    if (Number.isFinite(ms) && ms >= 0) return ms;
+  }
+  // without both times, the step's own duration (for a human step it is the resume, not the wait)
+  return r.durationMs;
+}
+
+/** "before the run was cancelled": why a person's step closed unanswered. */
+function closedBefore(status: RunView["status"]): string {
+  if (status === "cancelled") return "before the run was cancelled";
+  if (status === "timed_out") return "before the run reached its time limit";
+  if (status === "failed") return "before the run failed";
+  return "and the step was cancelled";
+}
+
+/** A step retried in place reads once, as its latest attempt. */
+function latestAttempts(nodeRuns: readonly NodeRunView[]): NodeRunView[] {
+  const latest = new Map<string, NodeRunView>();
+  for (const r of nodeRuns) {
+    const key = `${r.scope ?? ""}|${r.nodeId}`;
+    const seen = latest.get(key);
+    if (!seen || r.attempt >= seen.attempt) latest.set(key, r);
+  }
+  return [...latest.values()];
+}
+
+const RUN_ENDED = new Set<RunView["status"]>(["completed", "failed", "cancelled", "timed_out"]);
+
 /**
  * What happened in a run, in plain sentences, from its node runs: what came in, what each
- * decision answered and how sure it was, which way each rule sent it, what a person did, and how
- * it ended. Steps that did not run are left out.
+ * decision answered and how sure it was, which way each rule sent it, what a person did (or that
+ * nobody did), and how it ended. Steps that did not run are left out. `timeoutMs` is the limit a
+ * timed-out run reached (its RUN_TIMED_OUT event), else the definition's.
  */
 export function explainRun(
   run: Pick<RunView, "status" | "nodeRuns" | "error">,
   def?: WorkflowDefinition,
+  o: { timeoutMs?: number } = {},
 ): string[] {
   const lines: string[] = [];
-  const runs = [...run.nodeRuns].sort((a, b) =>
+  const runs = latestAttempts(run.nodeRuns).sort((a, b) =>
     (a.startedAt ?? "").localeCompare(b.startedAt ?? ""),
   );
   const node = (r: NodeRunView) => (def ? byId(def, r.nodeId) : undefined);
@@ -475,17 +508,23 @@ export function explainRun(
     }
     if (n?.kind === "human" || r.category === "human") {
       const fired = r.firedPorts ?? [];
-      const after = typeof r.durationMs === "number" ? ` after ${waited(r.durationMs)}` : "";
+      const ms = waitedMs(r);
+      const after = typeof ms === "number" ? ` after ${waited(ms)}` : "";
+      const unanswered =
+        r.status === "cancelled" ||
+        ((r.status === "waiting" || r.status === "running") && RUN_ENDED.has(run.status));
       lines.push(
-        r.status === "waiting"
-          ? `It is waiting for a person to answer ${quote(r.nodeName)} under Human tasks.`
-          : fired.includes("approved")
-            ? `A person approved ${quote(r.nodeName)}${after}.`
-            : fired.includes("rejected")
-              ? `A person rejected ${quote(r.nodeName)}${after}.`
-              : fired.includes("expired")
-                ? `Nobody answered ${quote(r.nodeName)} in time.`
-                : `A person answered ${quote(r.nodeName)}${after}.`,
+        unanswered
+          ? `Nobody answered ${quote(r.nodeName)} ${closedBefore(run.status)}.`
+          : r.status === "waiting"
+            ? `It is waiting for a person to answer ${quote(r.nodeName)} under Human tasks.`
+            : fired.includes("approved")
+              ? `A person approved ${quote(r.nodeName)}${after}.`
+              : fired.includes("rejected")
+                ? `A person rejected ${quote(r.nodeName)}${after}.`
+                : fired.includes("expired")
+                  ? `Nobody answered ${quote(r.nodeName)} in time.`
+                  : `A person answered ${quote(r.nodeName)}${after}.`,
       );
       continue;
     }
@@ -506,7 +545,14 @@ export function explainRun(
   if (run.status === "failed" && !lines.some((l) => l.startsWith("It stopped")))
     lines.push(`It failed${run.error ? `: ${run.error.message}` : ""}.`);
   if (run.status === "cancelled") lines.push("It was cancelled.");
-  if (run.status === "timed_out") lines.push("It ran out of time.");
+  if (run.status === "timed_out") {
+    const limit = o.timeoutMs ?? def?.execution?.timeoutMs;
+    lines.push(
+      typeof limit === "number"
+        ? `It stopped at the run's time limit of ${waited(limit)}.`
+        : "It stopped at the run's time limit.",
+    );
+  }
   return lines;
 }
 
@@ -524,10 +570,14 @@ export function nextForRun(run: Pick<RunView, "status" | "nodeRuns">): string[] 
         ? forPerson
         : ["It is paused on a wait step and carries on by itself at the set time or event."];
     case "failed":
-    case "timed_out":
       return [
         "In the Timeline, open the step marked failed to see its input and the error.",
         "Fix the cause (often a missing key or a changed field), then choose Retry.",
+      ];
+    case "timed_out":
+      return [
+        "No step failed: the run reached its time limit, and time spent waiting for a person counts toward it.",
+        "To give it longer, raise the time limit in the workflow's settings (Open in builder), then choose Replay; Fork lets you change the input first.",
       ];
     case "completed":
       return [

@@ -1,5 +1,15 @@
 import { forwardRef, type HTMLAttributes, type ReactNode } from "react";
-import { Crosshair, ExternalLink, GitFork, Play, RotateCw, Square, UserCheck } from "lucide-react";
+import {
+  Crosshair,
+  ExternalLink,
+  GitFork,
+  Play,
+  RotateCw,
+  Settings2,
+  Square,
+  TimerOff,
+  UserCheck,
+} from "lucide-react";
 import { cn } from "@/lib/cn";
 import { ORIGIN_LABEL } from "@/lib/categories";
 import { formatCost, formatMs, formatTokens } from "@/lib/format";
@@ -26,6 +36,10 @@ export interface RunHeaderProps extends HTMLAttributes<HTMLDivElement> {
   actions?: ReactNode;
   /** Pending cancel (spinner on the Cancel button). */
   cancelling?: boolean;
+  /** The time limit a timed-out run reached (its RUN_TIMED_OUT event), for the banner. */
+  timeoutMs?: number;
+  /** Opens where the run's time limit is set; shown in the timed-out banner. */
+  onOpenSettings?: (run: RunView) => void;
 }
 
 function isActive(status: RunView["status"]): boolean {
@@ -92,6 +106,8 @@ export const RunHeader = forwardRef<HTMLDivElement, RunHeaderProps>(function Run
     onRetryFailedNode,
     actions,
     cancelling = false,
+    timeoutMs,
+    onOpenSettings,
     className,
     ...rest
   },
@@ -275,6 +291,42 @@ export const RunHeader = forwardRef<HTMLDivElement, RunHeaderProps>(function Run
                 </Tooltip>
               ) : null}
             </span>
+          ) : null}
+        </div>
+      ) : null}
+
+      {run.status === "timed_out" ? (
+        <div
+          role="status"
+          className="flex flex-col gap-2 rounded-sm border border-warn/30 bg-warn-soft px-3 py-2 text-xs text-ink sm:flex-row sm:items-center sm:gap-3"
+        >
+          <span className="flex min-w-0 flex-1 items-start gap-2">
+            <TimerOff
+              className="mt-px size-4 shrink-0 text-warn-text"
+              strokeWidth={1.75}
+              aria-hidden="true"
+            />
+            <span className="min-w-0">
+              <span className="font-medium">
+                Stopped at the run&apos;s time limit
+                {timeoutMs !== undefined ? ` of ${formatMs(timeoutMs)}` : ""}.
+              </span>{" "}
+              <span className="text-ink-2">
+                No step failed; time spent waiting for a person counts toward the limit. Raise it in
+                the workflow&apos;s settings, then replay or fork the run.
+              </span>
+            </span>
+          </span>
+          {onOpenSettings ? (
+            <Button
+              size="sm"
+              variant="secondary"
+              leadingIcon={<Settings2 />}
+              className="shrink-0"
+              onClick={() => onOpenSettings(run)}
+            >
+              Workflow settings
+            </Button>
           ) : null}
         </div>
       ) : null}
