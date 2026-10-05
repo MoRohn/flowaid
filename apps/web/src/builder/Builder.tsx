@@ -10,7 +10,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useStore } from "zustand";
-import { useReactFlow, type Connection, type EdgeChange, type NodeChange } from "@xyflow/react";
+import {
+  useReactFlow,
+  useStore as useXyStore,
+  type Connection,
+  type EdgeChange,
+  type NodeChange,
+} from "@xyflow/react";
 import {
   CircleDollarSign,
   Copy,
@@ -38,7 +44,7 @@ import {
   type CanvasNode,
   type NodeDefinitionView,
 } from "@flowaid/ui/canvas";
-import { toFlowNode } from "@flowaid/ui/node";
+import { NODE_WIDTH, toFlowNode } from "@flowaid/ui/node";
 import { Inspector, DiagnosticList } from "@flowaid/ui/inspector";
 import { BottomPanel } from "@flowaid/ui/builder";
 import { TraceTimeline } from "@flowaid/ui/trace";
@@ -79,7 +85,8 @@ import { createBuilderStore, type BuilderStore } from "./store";
 import {
   freeControlPort,
   lastStep,
-  placeNewStep,
+  centreToShow,
+  quickAddPlan,
   readRecentKinds,
   rememberRecentKind,
   suggestNext,
@@ -487,16 +494,20 @@ function BuilderView({
     ],
     [catalog, activeAgents.data],
   );
-  // Quick add: a new step follows the selected one (placed beside it and connected from its
-  // first free port); otherwise it goes where asked, moved clear of other steps.
+  // Quick add: a new step follows the selected one, or with nothing selected the step the
+  // palette's suggestions were for (placed beside it, unless the palette opened at a right-click,
+  // and connected from its first free port); the view then pans to it if it is out of sight.
   const [recentKinds, setRecentKinds] = useState<string[]>(readRecentKinds);
+  const [keepInView, setKeepInView] = useState<{
+    rect: { x: number; y: number; w: number; h: number };
+    n: number;
+  } | null>(null);
   const keySources = useKeySources();
   const addNode = useCallback(
-    (def: NodeDefinitionView, position: { x: number; y: number }) => {
+    (def: NodeDefinitionView, wanted: { x: number; y: number }, origin: "pointer" | "view") => {
       const st = store.getState();
       const d = st.definition;
-      const sel = st.selection.nodes.length === 1 ? st.selection.nodes[0] : undefined;
-      const after = sel ? d.nodes.find((n) => n.id === sel) : undefined;
+      const { after, position } = quickAddPlan(d, st.selection.nodes, wanted, origin);
       const presetId = presetIdOf(def.kind);
       const preset = presetId ? activeAgents.data?.find((a) => a.id === presetId) : undefined;
       const node = preset
@@ -515,11 +526,17 @@ function BuilderView({
         node.credentials = { ...bound.credentials, ...node.credentials };
       st.addNode(
         node,
-        placeNewStep(d, position, after),
+        position,
         after && port ? { node: after.id, port } : undefined,
         bound?.declare,
       );
       setRecentKinds((prev) => rememberRecentKind(prev, def.kind));
+      // a step inside a container sits relative to its frame: leave the view alone there
+      if (!node.parent)
+        setKeepInView((cur) => ({
+          rect: { ...position, w: NODE_WIDTH, h: 96 },
+          n: (cur?.n ?? 0) + 1,
+        }));
     },
     [store, catalog, keySources, activeAgents.data],
   );
@@ -1023,6 +1040,7 @@ function BuilderView({
             fitViewOnInit
           >
             <FocusNode request={reveal} />
+            <KeepInView request={keepInView} />
           </FlowCanvas>
         </div>
       </div>
@@ -1132,6 +1150,30 @@ function OpenInspectorOnSelect({ nodeId, reveal }: { nodeId: string | undefined;
   useEffect(() => {
     if (reveal > 0) open?.(true);
   }, [reveal, open]);
+  return null;
+}
+
+/**
+ * Pans, at the same zoom, to a step just added when it landed out of sight (beside a step at the
+ * edge of the view, or under a panel); a step already in view leaves the canvas where it is.
+ */
+function KeepInView({
+  request,
+}: {
+  request: { rect: { x: number; y: number; w: number; h: number }; n: number } | null;
+}) {
+  const flow = useReactFlow();
+  const width = useXyStore((s) => s.width);
+  const height = useXyStore((s) => s.height);
+  useEffect(() => {
+    if (!request) return;
+    const view = flow.getViewport();
+    const centre = centreToShow(request.rect, view, { width, height });
+    if (!centre) return;
+    const still = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+    void flow.setCenter(centre.x, centre.y, { zoom: view.zoom, duration: still ? 0 : 240 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per added step, not per resize
+  }, [request, flow]);
   return null;
 }
 

@@ -132,7 +132,12 @@ export interface FlowCanvasProps {
   suggestions?: { kind: string; reason: string }[];
   /** The name of the step the suggestions follow. */
   suggestionsFor?: string;
-  onAddNode?: (def: NodeDefinitionView, position: CanvasPoint) => void;
+  /**
+   * A step picked in the palette, at `position` (flow coordinates). `origin` says where that came
+   * from: "pointer" when the palette opened at a right-click, so the step belongs there; "view"
+   * when it opened from the keyboard or the Add node button, at the middle of the view.
+   */
+  onAddNode?: (def: NodeDefinitionView, position: CanvasPoint, origin: "pointer" | "view") => void;
   onAskBuilder?: (query: string, position: CanvasPoint) => void;
   onStartFromTemplate?: () => void;
   /** ⌘D on a selection. */
@@ -173,6 +178,8 @@ export interface FlowCanvasProps {
 interface PaletteState {
   screen: { x: number; y: number } | null;
   flow: CanvasPoint;
+  /** opened at a right-click: the new step belongs where the pointer was */
+  pointer: boolean;
 }
 
 export { isCanvasShortcutTarget };
@@ -638,7 +645,11 @@ function FlowCanvasInner({
         point = { x: r.left + r.width / 2, y: r.top + r.height * 0.4 };
       }
       const flowPos = point ? flow.screenToFlowPosition(point) : { x: 0, y: 0 };
-      setPalette({ screen, flow: { x: snap(flowPos.x), y: snap(flowPos.y) } });
+      setPalette({
+        screen,
+        flow: { x: snap(flowPos.x), y: snap(flowPos.y) },
+        pointer: screen !== null,
+      });
     },
     [catalog, flow],
   );
@@ -664,6 +675,7 @@ function FlowCanvasInner({
     setPalette({
       screen: { x: r.left, y: r.bottom },
       flow: { x: snap(centre.x - 116), y: snap(centre.y - 40) },
+      pointer: false,
     });
   }, [flow, openPaletteAt]);
 
@@ -1069,7 +1081,7 @@ function FlowCanvasInner({
             {...(suggestions ? { suggestions } : {})}
             {...(suggestionsFor ? { suggestionsFor } : {})}
             onPick={(def) => {
-              if (palette) onAddNode?.(def, palette.flow);
+              if (palette) onAddNode?.(def, palette.flow, palette.pointer ? "pointer" : "view");
             }}
             onAskBuilder={
               onAskBuilder
