@@ -14,7 +14,8 @@ import type { Catalog } from "./types";
 
 export interface RunJoinsLookup {
   workflowNames: ReadonlyMap<string, string>;
-  versions: ReadonlyMap<string, number | "draft">;
+  /** Version numbers by version id, for runs listed without `include=version`. */
+  versions?: ReadonlyMap<string, number | "draft">;
   environments: readonly Environment[];
 }
 
@@ -31,7 +32,10 @@ export function toRunRow(run: Run, j: RunJoinsLookup): RunView {
   const env = environmentView(j.environments, run.environmentId);
   const view = toRunView(run as Parameters<typeof toRunView>[0], {
     workflowName: j.workflowNames.get(run.workflowId) ?? "Untitled workflow",
-    version: j.versions.get(run.workflowVersionId) ?? "draft",
+    version:
+      run.version !== undefined
+        ? (run.version ?? "draft")
+        : (j.versions?.get(run.workflowVersionId) ?? "draft"),
     ...(env ? { environment: env } : {}),
   });
   if (run.decisions)

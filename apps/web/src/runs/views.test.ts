@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { NodeManifest, NodeRun, WorkflowDefinition } from "@flowaid/workflow-core";
 import type { HumanTask, Run } from "~/api/types";
-import { serverRunQuery } from "./RunsList";
+import { clientRunFilters, listRefreshMs, rangeParams, serverRunQuery } from "./RunsList";
 import { nodeCostRows } from "./CostPanel";
 import {
   durableEvents,
@@ -330,6 +330,40 @@ describe("list rows", () => {
       origin: "api",
     });
     expect(serverRunQuery({ workflow: ["w1"] }, "fixed").workflowId).toBe("fixed");
+  });
+
+  it("searches and limits the created time on the server, across every run", () => {
+    const week = { preset: "7d" } as const;
+    expect(serverRunQuery({ search: " 01a10cfc ", range: week })).toMatchObject({
+      q: "01a10cfc",
+      range: week,
+    });
+    const now = new Date("2026-10-05T12:00:00.000Z");
+    // a preset runs up to now: runs created after the page loaded still match
+    expect(rangeParams(week, now)).toEqual({ from: "2026-09-28T12:00:00.000Z" });
+    expect(
+      rangeParams(
+        { preset: "custom", from: "2026-09-01T00:00:00.000Z", to: "2026-09-02T23:59:59.999Z" },
+        now,
+      ),
+    ).toEqual({ from: "2026-09-01T00:00:00.000Z", to: "2026-09-02T23:59:59.999Z" });
+    expect(rangeParams(undefined)).toEqual({});
+    // the loaded runs are not narrowed again by what the server already applied
+    expect(clientRunFilters({ search: "x", range: week, origin: ["api", "ui"] })).toEqual({
+      origin: ["api", "ui"],
+    });
+  });
+
+  it("refreshes fast while a run moves, slowly while runs only wait, never when all ended", () => {
+    expect(listRefreshMs([{ status: "completed" }, { status: "running" }])).toBe(3000);
+    expect(listRefreshMs([{ status: "waiting_for_human" }, { status: "waiting" }])).toBe(15_000);
+    expect(listRefreshMs([{ status: "failed" }])).toBe(false);
+  });
+
+  it("reads the version number the list sends with each run", () => {
+    const j = { workflowNames: new Map(), environments: [] };
+    expect(toRunRow({ ...run, version: 7 }, j).version).toBe(7);
+    expect(toRunRow({ ...run, version: null }, j).version).toBe("draft");
   });
 
   it("orders node costs, most expensive first", () => {

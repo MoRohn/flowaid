@@ -1,8 +1,10 @@
 "use client";
 /**
  * The runs list (all runs, or one workflow's): FilterBar state in the URL, server-side filters
- * where the API has them (single status list, origin, environment, workflow), the rest applied
- * client-side, cursor pagination, and a 3 s refresh while any listed run is still active.
+ * where the API has them (search, created range, statuses, one origin, environment or workflow),
+ * the rest applied to the loaded runs, cursor pagination, and a 3 s refresh while any listed run is
+ * still active. While older runs exist the count says "loaded", and a sort other than newest
+ * first says it orders the loaded runs.
  */
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -15,7 +17,9 @@ import {
   applyRunFilters,
   normalizeFilters,
   parseFilters,
+  resolveDateRange,
   serializeFilters,
+  type DateRangeValue,
   type RunFilterFacet,
   type RunFilters,
 } from "@flowaid/ui/data";
@@ -24,14 +28,20 @@ import type { Page, Run } from "~/api/types";
 import { useSession } from "~/session";
 import { ErrorPanel, errorMessage } from "~/shell/states";
 import { toEnvironmentViews } from "~/views";
-import { useVersionNumbers, useWorkflowNames } from "./api";
+import { useWorkflowNames } from "./api";
 import { RunActionDialog, type RunActionRequest } from "./RunActionDialog";
 import { SavedViewsMenu } from "./SavedViewsMenu";
 import { isActiveRun, toRunRow } from "./views";
 
 const PAGE = 50;
+/** The table's sorting (TanStack `SortingState`). */
+type Sorting = { id: string; desc: boolean }[];
 
-/** API query for the filters the server can apply; the rest run client-side. */
+/**
+ * API query for the filters the server can apply (they cover every run, not one page); the rest
+ * narrow the loaded runs. `range` stays a value here, so a "last 24 hours" key does not change
+ * every second: {@link rangeParams} turns it into `from`/`to` when a page is fetched.
+ */
 export function serverRunQuery(f: RunFilters, workflowId?: string) {
   const n = normalizeFilters(f);
   const one = <T,>(xs: readonly T[] | undefined) => (xs?.length === 1 ? xs[0] : undefined);
@@ -40,7 +50,36 @@ export function serverRunQuery(f: RunFilters, workflowId?: string) {
     environmentId: one(n.environment),
     status: n.status?.length ? n.status.join(",") : undefined,
     origin: one(n.origin),
+    q: n.search,
+    range: n.range,
   };
+}
+
+/** `from`/`to` for a created range: a preset runs up to now, so it leaves `to` open. */
+export function rangeParams(range: DateRangeValue | undefined, now = new Date()) {
+  if (!range) return {};
+  const { from, to } = resolveDateRange(range, now);
+  return range.preset === "custom"
+    ? { from: from.toISOString(), to: to.toISOString() }
+    : { from: from.toISOString() };
+}
+
+/**
+ * How often the list refreshes: every 3 s while a listed run moves, every 15 s while runs only wait
+ * (for a person or a timer, possibly for days), not at all once every listed run has ended.
+ */
+export function listRefreshMs(runs: readonly Pick<Run, "status">[]): number | false {
+  const active = runs.filter((r) => isActiveRun(r.status));
+  if (active.length === 0) return false;
+  return active.some((r) => r.status !== "waiting" && r.status !== "waiting_for_human")
+    ? 3000
+    : 15_000;
+}
+
+/** The filters the server already applied are not applied again to the loaded runs. */
+export function clientRunFilters(f: RunFilters, workflowId?: string): RunFilters {
+  const { search: _search, range: _range, ...rest } = f;
+  return workflowId ? { ...rest, workflow: [] } : rest;
 }
 
 export function RunsList({ workflowId }: { workflowId?: string }) {
@@ -55,31 +94,30 @@ export function RunsList({ workflowId }: { workflowId?: string }) {
   const runs = useInfiniteQuery({
     queryKey: ["runs", s.ws, server],
     initialPageParam: null as string | null,
-    queryFn: ({ pageParam, signal }) =>
-      get<Page<Run>>(
-        `/v1/runs${qs({ ...server, include: "decisions", limit: PAGE, cursor: pageParam })}`,
+    queryFn: ({ pageParam, signal }) => {
+      const { range, ...query } = server;
+      return get<Page<Run>>(
+        `/v1/runs${qs({ ...query, ...rangeParams(range), include: "decisions,version", limit: PAGE, cursor: pageParam })}`,
         { signal },
-      ),
+      );
+    },
     getNextPageParam: (last) => last.next_cursor,
-    refetchInterval: (q) =>
-      q.state.data?.pages.some((p) => p.items.some((r) => isActiveRun(r.status))) ? 3000 : false,
+    refetchInterval: (q) => listRefreshMs(q.state.data?.pages.flatMap((p) => p.items) ?? []),
   });
   const names = useWorkflowNames(s.ws);
   const items = useMemo(() => runs.data?.pages.flatMap((p) => p.items) ?? [], [runs.data]);
-  const versions = useVersionNumbers(
-    s.ws,
-    items.map((r) => r.workflowId),
-  );
   const rows = useMemo(() => {
     const views = items.map((r) =>
       toRunRow(r, {
         workflowNames: names.data ?? new Map(),
-        versions,
         environments: s.environments,
       }),
     );
-    return applyRunFilters(views, workflowId ? { ...filters, workflow: [] } : filters);
-  }, [items, names.data, versions, s.environments, filters, workflowId]);
+    return applyRunFilters(views, clientRunFilters(filters, workflowId));
+  }, [items, names.data, s.environments, filters, workflowId]);
+  const [sorting, setSorting] = useState<Sorting>([{ id: "createdAt", desc: true }]);
+  const more = Boolean(runs.hasNextPage);
+  const newestFirst = sorting.length === 0 || (sorting[0]?.id === "createdAt" && sorting[0].desc);
 
   const setFilters = (f: RunFilters) => {
     const q = serializeFilters(f);
@@ -120,7 +158,19 @@ export function RunsList({ workflowId }: { workflowId?: string }) {
     <div className="flex flex-col gap-3">
       <RunsTable
         runs={rows}
+        partial={more}
         loading={runs.isPending}
+        defaultSorting={sorting}
+        onSortingChange={setSorting}
+        {...(more && !newestFirst
+          ? {
+              footer: (
+                <span className="truncate text-xs text-ink-3">
+                  Sorted within the loaded runs; load older runs to include them.
+                </span>
+              ),
+            }
+          : {})}
         onOpen={(r) => router.push(`/${s.ws}/runs/${r.id}`)}
         rowHref={(r) => `/${s.ws}/runs/${r.id}`}
         {...(workflowId ? { defaultColumnVisibility: { workflowName: false } } : {})}
@@ -147,10 +197,18 @@ export function RunsList({ workflowId }: { workflowId?: string }) {
           <EmptyState
             size="sm"
             icon={<Play strokeWidth={1.5} />}
-            title={filtered ? "No runs match these filters" : "No runs yet"}
+            title={
+              filtered
+                ? more
+                  ? "No loaded runs match these filters"
+                  : "No runs match these filters"
+                : "No runs yet"
+            }
             description={
               filtered
-                ? "Clear a filter or widen the time range."
+                ? more
+                  ? "Older runs are not loaded yet: load them below, or clear a filter."
+                  : "Clear a filter or widen the time range."
                 : "Runs appear here when a workflow runs from the builder, the API, a webhook or a schedule."
             }
             {...(filtered

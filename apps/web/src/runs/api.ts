@@ -1,12 +1,12 @@
 "use client";
 /**
- * Queries shared by the run surfaces: the node catalog, workflow names and version numbers (runs
- * carry ids only, the views show names and `v3`), and paged event loading.
+ * Queries shared by the run surfaces: the node catalog, workflow names (runs carry ids only, the
+ * views show names), and paged event loading.
  */
-import { useQueries, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import type { NodeManifest } from "@flowaid/workflow-core";
 import { get, getAll, qs } from "~/api/client";
-import type { Member, Page, VersionSummary, WorkflowSummary } from "~/api/types";
+import type { Member, Page, WorkflowSummary } from "~/api/types";
 import type { Catalog, EventPage } from "./types";
 
 /** `GET /v1/nodes` as a map by type id (changes only with a deploy, so it is cached for long). */
@@ -35,23 +35,6 @@ export function useWorkflowNames(ws: string) {
     },
     staleTime: 60_000,
   });
-}
-
-/** Version id → version number (or "draft") for the given workflows. */
-export function useVersionNumbers(ws: string, workflowIds: readonly string[]) {
-  const unique = [...new Set(workflowIds)].sort();
-  const results = useQueries({
-    queries: unique.map((id) => ({
-      queryKey: ["versions", ws, id],
-      queryFn: () => getAll<VersionSummary>(`/v1/workflows/${id}/versions`),
-      staleTime: 60_000,
-    })),
-  });
-  const map = new Map<string, number | "draft">();
-  for (const r of results)
-    for (const v of r.data ?? [])
-      map.set(v.id, v.kind === "draft" || v.version === null ? "draft" : v.version);
-  return map;
 }
 
 /** Every durable event of a run, in `seq` order (the API pages at ≤ 1000). */

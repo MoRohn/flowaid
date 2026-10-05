@@ -52,6 +52,7 @@ import {
   HumanTaskSchema,
   RunAcceptedSchema,
   RunCompletedSchema,
+  RunListIncludeSchema,
   RunListItemSchema,
   RunRequestSchema,
   type RunDecisionSummarySchema,
@@ -368,8 +369,17 @@ export function runRoutes(app: FastifyInstance, ctx: ApiContext): void {
           status: z.union([z.string(), z.array(z.string())]).optional(),
           origin: z.string().optional(),
           sessionId: z.string().optional(),
-          /** `decisions`: each run's decisions (node, kind, confidence) for the list's column */
-          include: z.enum(["decisions"]).optional(),
+          /** the start of a run id, part of the workflow's name or of the error message */
+          q: z.string().trim().max(200).optional(),
+          /** created at or after */
+          from: z.iso.datetime({ offset: true }).optional(),
+          /** created at or before */
+          to: z.iso.datetime({ offset: true }).optional(),
+          /**
+           * `decisions`: each run's decisions (node, kind, confidence) for the list's column;
+           * `version`: the version number each run ran (null for a draft); both: `decisions,version`
+           */
+          include: RunListIncludeSchema,
         }),
         response: { 200: page(RunListItemSchema) },
       },
@@ -394,14 +404,31 @@ export function runRoutes(app: FastifyInstance, ctx: ApiContext): void {
           ...(statuses ? { status: statuses } : {}),
           ...(req.query.origin ? { origin: req.query.origin as Run["origin"] } : {}),
           ...(req.query.sessionId ? { sessionId: req.query.sessionId } : {}),
+          ...(req.query.q ? { q: req.query.q } : {}),
+          ...(req.query.from ? { from: new Date(req.query.from) } : {}),
+          ...(req.query.to ? { to: new Date(req.query.to) } : {}),
           cursor: req.query.cursor ?? null,
           limit: req.query.limit,
         }),
       );
-      const items = p.workflowIds
+      const visible = p.workflowIds
         ? out.items.filter((x) => canSeeWorkflow(p, x.workflowId))
         : out.items;
-      if (req.query.include !== "decisions" || items.length === 0)
+      const include = new Set(req.query.include?.split(",") ?? []);
+      let items: (Run & { version?: number | null })[] = visible;
+      if (include.has("version") && visible.length > 0) {
+        const versions = await ctx.db.tenant(p.workspaceId, (tx) =>
+          tx
+            .select({ id: workflowVersions.id, version: workflowVersions.version })
+            .from(workflowVersions)
+            .where(
+              inArray(workflowVersions.id, [...new Set(visible.map((x) => x.workflowVersionId))]),
+            ),
+        );
+        const byId = new Map(versions.map((v) => [v.id, v.version]));
+        items = visible.map((x) => ({ ...x, version: byId.get(x.workflowVersionId) ?? null }));
+      }
+      if (!include.has("decisions") || items.length === 0)
         return { items, next_cursor: out.nextCursor };
       const rows = await ctx.db.tenant(p.workspaceId, (tx) =>
         tx
