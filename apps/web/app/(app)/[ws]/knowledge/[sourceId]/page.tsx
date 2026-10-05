@@ -2,7 +2,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { use, useMemo, useState } from "react";
-import { FileText, Layers, RefreshCw, Search, Trash2, Upload } from "lucide-react";
+import { FileText, Layers, RefreshCw, Search, Settings2, Trash2, Upload } from "lucide-react";
 import {
   Badge,
   Hint,
@@ -50,6 +50,7 @@ import {
   type SearchMode,
 } from "~/knowledge/model";
 import { scoreReading, sourceStatusHelp } from "~/knowledge/guidance";
+import { NewSourceDialog } from "~/knowledge/NewSourceDialog";
 import { readConfig, OPTIMIZE_LABEL } from "~/knowledge/pageindex/model";
 import { PageIndexSource } from "~/knowledge/pageindex/PageIndexSource";
 import { SourceGuide } from "~/knowledge/SourceGuide";
@@ -373,6 +374,7 @@ export default function KnowledgeSourcePage({ params }: { params: Promise<{ sour
   const canWrite = s.can("knowledge:write");
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [viewing, setViewing] = useState<KnowledgeDocument | null>(null);
   const confirmDoc = useConfirm<KnowledgeDocument>();
   const busy = (x?: KnowledgeSource) =>
@@ -506,13 +508,21 @@ export default function KnowledgeSourcePage({ params }: { params: Promise<{ sour
                   description={pageIndexLine(src)}
                   actions={
                     canWrite ? (
-                      <Button
-                        variant="ghost"
-                        leadingIcon={<Trash2 strokeWidth={1.75} />}
-                        onClick={() => setDeleting(true)}
-                      >
-                        Delete
-                      </Button>
+                      <>
+                        <Button
+                          variant="ghost"
+                          leadingIcon={<Trash2 strokeWidth={1.75} />}
+                          onClick={() => setDeleting(true)}
+                        >
+                          Delete
+                        </Button>
+                        <Button
+                          leadingIcon={<Settings2 strokeWidth={1.75} />}
+                          onClick={() => setEditing(true)}
+                        >
+                          Settings
+                        </Button>
+                      </>
                     ) : null
                   }
                 />
@@ -539,6 +549,12 @@ export default function KnowledgeSourcePage({ params }: { params: Promise<{ sour
                           onClick={() => setDeleting(true)}
                         >
                           Delete
+                        </Button>
+                        <Button
+                          leadingIcon={<Settings2 strokeWidth={1.75} />}
+                          onClick={() => setEditing(true)}
+                        >
+                          Settings
                         </Button>
                         {/* uploads and pasted text have nothing to fetch again */}
                         {!isUploadKind(src.kind) ? (
@@ -656,6 +672,16 @@ export default function KnowledgeSourcePage({ params }: { params: Promise<{ sour
         </QueryView>
       </PageBody>
       {viewing ? <ChunksDialog doc={viewing} onClose={() => setViewing(null)} /> : null}
+      {editing && x ? (
+        <NewSourceDialog
+          key={x.id}
+          open
+          editing={x}
+          onOpenChange={(o) => {
+            if (!o) setEditing(false);
+          }}
+        />
+      ) : null}
       <ConfirmDialog
         open={confirmDoc.target !== null}
         onOpenChange={(o) => (o ? undefined : confirmDoc.close())}

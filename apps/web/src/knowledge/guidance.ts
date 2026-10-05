@@ -62,9 +62,27 @@ export function sourceReviewNotes(
   ctx: {
     embedding: { provider: string; model: string; ready: boolean } | null;
     indexReady: boolean;
+    /** a saved source's Settings: what saving the changes does to its documents */
+    editing?: { documents: number; reindex: boolean; refetch: boolean; changed: boolean };
   },
 ): SourceNote[] {
   const notes: SourceNote[] = [];
+  const next = (createMessage: string): SourceNote => {
+    const e = ctx.editing;
+    if (!e) return { id: "next", state: "info", message: createMessage };
+    const n = `${e.documents} document${e.documents === 1 ? "" : "s"}`;
+    return {
+      id: "next",
+      state: "info",
+      message: !e.changed
+        ? "Nothing changed yet."
+        : e.reindex
+          ? `Saving indexes its ${n} again with the new settings, in the background.`
+          : e.refetch
+            ? "Saving fetches its documents again from the new addresses."
+            : "Saving changes nothing in its index.",
+    };
+  };
   const origin = originError(f);
   if (!f.name.trim())
     notes.push({ id: "name", state: "blocker", message: "Give the source a name" });
@@ -77,7 +95,7 @@ export function sourceReviewNotes(
       notes.push({
         id: "index-key",
         state: "warning",
-        message: `${providerName(f.indexProvider)} has no key on the server and no credential is chosen: the source can be created, but every PDF fails to index until one is added.`,
+        message: `${providerName(f.indexProvider)} has no key on the server and no credential is chosen: the source can be ${ctx.editing ? "saved" : "created"}, but every PDF fails to index until one is added.`,
       });
     notes.push({
       id: "pageindex-settings",
@@ -85,11 +103,17 @@ export function sourceReviewNotes(
       message:
         "PageIndex builds a section tree for each PDF, so the search and chunking settings are not used and are not saved.",
     });
-    notes.push({
-      id: "next",
-      state: "info",
-      message: "PDFs are uploaded on the source's page after it is created.",
-    });
+    notes.push(
+      ctx.editing
+        ? {
+            id: "next",
+            state: "info",
+            message: ctx.editing.changed
+              ? "New indexing settings apply to the PDFs uploaded from now on; the ones indexed already keep their index."
+              : "Nothing changed yet.",
+          }
+        : next("PDFs are uploaded on the source's page after it is created."),
+    );
     return notes;
   }
 
@@ -106,7 +130,7 @@ export function sourceReviewNotes(
     notes.push({
       id: "embedding-key",
       state: "warning",
-      message: `${providerName(ctx.embedding.provider)} has no key in this workspace: the source can be created, but every document fails to index until a key is added under Credentials.`,
+      message: `${providerName(ctx.embedding.provider)} has no key in this workspace: the source can be ${ctx.editing ? "saved" : "created"}, but every document fails to index until a key is added under Credentials.`,
     });
   else
     notes.push({
@@ -114,19 +138,13 @@ export function sourceReviewNotes(
       state: "ok",
       message: `Meaning search with ${providerName(ctx.embedding.provider)} · ${ctx.embedding.model}. Every chunk is embedded when it is indexed, and every search query too; the provider bills those calls.`,
     });
-  if (isUploadKind(f.kind))
-    notes.push({
-      id: "next",
-      state: "info",
-      message: "Documents are added on the source's page after it is created.",
-    });
-  else
-    notes.push({
-      id: "next",
-      state: "info",
-      message:
-        "Creating it starts the first sync: pages are fetched, chunked and indexed in the background.",
-    });
+  notes.push(
+    next(
+      isUploadKind(f.kind)
+        ? "Documents are added on the source's page after it is created."
+        : "Creating it starts the first sync: pages are fetched, chunked and indexed in the background.",
+    ),
+  );
   if (f.kind === "sitemap" && parseUrls(f.include).length === 0)
     notes.push({
       id: "sitemap-all",

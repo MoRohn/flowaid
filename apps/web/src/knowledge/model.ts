@@ -1,6 +1,7 @@
 /** Knowledge sources in the web app (API.md §3, `/v1/knowledge/*`): response shapes and form logic. */
 import {
   DEFAULT_INDEX_MODEL,
+  readConfig,
   type IndexMode,
   type IndexOptimize,
   type IndexProvider,
@@ -235,6 +236,138 @@ export function sourceBody(f: SourceForm): Record<string, unknown> {
         : null,
     },
     ...(f.credentialId ? { credentialId: f.credentialId } : {}),
+  };
+}
+
+const strOf = (v: unknown): string => (typeof v === "string" ? v : "");
+const linesOf = (v: unknown): string =>
+  Array.isArray(v) ? v.filter((x): x is string => typeof x === "string").join("\n") : "";
+
+/** A saved source as the form (the inverse of `sourceBody`), for its Settings. */
+export function formOf(src: KnowledgeSource): SourceForm {
+  const c = src.config;
+  const chunker = src.pipeline.chunker ?? {};
+  const embedding = src.pipeline.embedding ?? null;
+  const pi = src.kind === "pageindex" ? readConfig(c) : null;
+  return {
+    ...EMPTY_SOURCE,
+    name: src.name,
+    kind: src.kind,
+    urls:
+      src.kind === "url"
+        ? linesOf(c.urls) || strOf(c.url)
+        : src.kind === "sitemap"
+          ? strOf(c.url)
+          : "",
+    include: src.kind === "sitemap" ? linesOf(c.include) : "",
+    repo: src.kind === "github" ? strOf(c.repo) : "",
+    ref: src.kind === "github" ? strOf(c.ref) : "",
+    path: src.kind === "github" ? strOf(c.path) : "",
+    embeddingProvider: embedding?.provider ?? "",
+    embeddingModel: embedding?.model ?? "",
+    strategy:
+      chunker.strategy === "markdown" || chunker.strategy === "fixed"
+        ? chunker.strategy
+        : "recursive",
+    chunkTokens: chunker.chunkTokens ?? EMPTY_SOURCE.chunkTokens,
+    overlapTokens: chunker.overlapTokens ?? EMPTY_SOURCE.overlapTokens,
+    credentialId: src.credentialId,
+    ...(pi
+      ? {
+          indexProvider: pi.indexModel.provider,
+          indexModel: pi.indexModel.model,
+          indexCredentialId: pi.credentialId,
+          indexMode: pi.mode,
+          indexOptimize: pi.optimize,
+        }
+      : {}),
+  };
+}
+
+/** The config keys the form edits, per kind (`loaderConfig`). */
+const CONFIG_KEYS: Record<SourceKind, readonly string[]> = {
+  url: ["urls", "url"],
+  sitemap: ["url", "include"],
+  github: ["repo", "ref", "path"],
+  pageindex: ["indexModel", "credentialId", "mode", "optimize"],
+  files: [],
+  text: [],
+};
+
+/** Key order and missing fields do not make two values differ. */
+const same = (a: unknown, b: unknown): boolean =>
+  JSON.stringify(sorted(a)) === JSON.stringify(sorted(b));
+function sorted(v: unknown): unknown {
+  if (Array.isArray(v)) return v.map(sorted);
+  if (v && typeof v === "object")
+    return Object.fromEntries(
+      Object.entries(v)
+        .filter(([, x]) => x !== undefined)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([k, x]) => [k, sorted(x)]),
+    );
+  return v;
+}
+
+export interface SourcePatch {
+  /** the `PATCH /v1/knowledge/sources/:id` body: only what changed */
+  body: Record<string, unknown>;
+  /** chunking or the embedding changed: every document is indexed again */
+  reindex: boolean;
+  /** where documents come from changed (a fetched kind): they are fetched again */
+  refetch: boolean;
+}
+
+/**
+ * What saving a source's Settings sends. The pipeline goes whole (the API replaces it), keeping
+ * what the form doesn't show (a remote index); the embedding's own credential is dropped when the
+ * provider changes, since it belongs to the old one.
+ */
+export function sourcePatch(src: KnowledgeSource, f: SourceForm): SourcePatch {
+  const body: Record<string, unknown> = {};
+  if (f.name.trim() !== src.name) body.name = f.name.trim();
+  // the config keys the form edits are replaced; any other (set through the API) is kept
+  const kept = Object.fromEntries(
+    Object.entries(src.config).filter(([k]) => !CONFIG_KEYS[src.kind].includes(k)),
+  );
+  const config = { ...kept, ...loaderConfig(f) };
+  if (!isUploadKind(src.kind) && !same(config, src.config)) body.config = config;
+  if (src.kind === "github" && (f.credentialId ?? null) !== (src.credentialId ?? null))
+    body.credentialId = f.credentialId;
+  let reindex = false;
+  if (src.kind !== "pageindex") {
+    const before = formOf(src);
+    const chunker = {
+      strategy: f.strategy,
+      chunkTokens: f.chunkTokens,
+      overlapTokens: f.overlapTokens,
+    };
+    const embedding = f.embeddingProvider.trim()
+      ? { provider: f.embeddingProvider.trim(), model: f.embeddingModel.trim() }
+      : null;
+    const chunkerChanged =
+      chunker.strategy !== before.strategy ||
+      chunker.chunkTokens !== before.chunkTokens ||
+      chunker.overlapTokens !== before.overlapTokens;
+    const embeddingChanged = !same(embedding, src.pipeline.embedding ?? null);
+    if (chunkerChanged || embeddingChanged) {
+      const { embeddingCredentialId, ...rest } = src.pipeline as Record<string, unknown>;
+      const keepCredential =
+        embeddingCredentialId !== undefined &&
+        embedding?.provider === (src.pipeline.embedding?.provider ?? null);
+      body.pipeline = {
+        ...rest,
+        chunker,
+        embedding,
+        ...(keepCredential ? { embeddingCredentialId } : {}),
+      };
+      reindex = true;
+    }
+  }
+  return {
+    body,
+    reindex,
+    refetch: body.config !== undefined && !isUploadKind(src.kind) && src.kind !== "pageindex",
   };
 }
 

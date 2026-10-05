@@ -42,6 +42,19 @@ describe("chunking", () => {
 });
 
 describe("sourceReviewNotes", () => {
+  it("says what saving a saved source's settings does to its documents", () => {
+    const next = (editing: { reindex: boolean; refetch: boolean; changed: boolean }) =>
+      sourceReviewNotes(form(), {
+        embedding: ready,
+        indexReady: true,
+        editing: { documents: 3, ...editing },
+      }).find((n) => n.id === "next")?.message;
+    expect(next({ reindex: true, refetch: false, changed: true })).toBe(
+      "Saving indexes its 3 documents again with the new settings, in the background.",
+    );
+    expect(next({ reindex: false, refetch: false, changed: false })).toBe("Nothing changed yet.");
+  });
+
   it("says what a keyword-only source cannot do", () => {
     const notes = sourceReviewNotes(form(), { embedding: null, indexReady: true });
     expect(ids(notes)).toEqual(["keyword-only:info", "next:info"]);

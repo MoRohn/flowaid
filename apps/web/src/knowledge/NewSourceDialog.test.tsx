@@ -263,3 +263,68 @@ describe("new knowledge source, step by step", () => {
     expect(screen.getByRole<HTMLInputElement>("textbox", { name: /^Name/ }).value).toBe("Docs");
   });
 });
+
+describe("a source's settings", () => {
+  const saved = {
+    id: "src-1",
+    name: "Audit meaning source",
+    kind: "text",
+    config: {},
+    pipeline: {
+      chunker: { strategy: "recursive", chunkTokens: 400, overlapTokens: 60 },
+      embedding: { provider: "openai", model: "text-embedding-3-small" },
+    },
+    credentialId: null,
+    status: "error",
+    stats: {},
+    documents: 3,
+    chunks: 0,
+    lastSyncAt: null,
+    lastError: "No openai.api_key credential is bound for openai",
+    createdAt: "",
+    updatedAt: "",
+  } as const;
+
+  it("changes a saved source, asking before it indexes every document again", async () => {
+    allFields();
+    const fetchMock = stubApi({
+      "GET /v1/credentials": () => ({ items: [], next_cursor: null }),
+      "GET /v1/providers": () => [{ id: "openai", models: 3, configuredOnServer: false }],
+      "GET /v1/models": () => [
+        { provider: "openai", model: "text-embedding-3-small", kind: "embedding" },
+      ],
+      "PATCH /v1/knowledge/sources/src-1": (init) => ({ ...saved, ...(bodyOf(init) as object) }),
+    });
+    const onOpenChange = vi.fn();
+    render(
+      withClient(<NewSourceDialog open onOpenChange={onOpenChange} editing={saved as never} />),
+    );
+    expect(screen.getByRole("heading", { name: "Settings of Audit meaning source" })).toBeTruthy();
+    // nothing changed yet, and the kind stays
+    expect(screen.getByRole<HTMLButtonElement>("button", { name: "Save" }).disabled).toBe(true);
+    expect(
+      screen.getByRole<HTMLButtonElement>("combobox", { name: /Documents come from/ }).disabled,
+    ).toBe(true);
+    // its model has no key, so every document failed: switch it to keywords only
+    act(() => {
+      fireEvent.click(screen.getByRole("radio", { name: /Keywords only/ }));
+    });
+    act(() => {
+      fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    });
+    expect(screen.getByRole("alert").textContent).toMatch(
+      /Saving indexes its 3 documents again with the new settings/,
+    );
+    expect(callsTo(fetchMock, "PATCH /v1/knowledge/sources/src-1")).toHaveLength(0);
+    act(() => {
+      fireEvent.click(screen.getByRole("button", { name: "Save and index again" }));
+    });
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+    expect(bodyOf(callsTo(fetchMock, "PATCH /v1/knowledge/sources/src-1")[0]?.[1])).toEqual({
+      pipeline: {
+        chunker: { strategy: "recursive", chunkTokens: 400, overlapTokens: 60 },
+        embedding: null,
+      },
+    });
+  });
+});

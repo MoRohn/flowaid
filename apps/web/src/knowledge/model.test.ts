@@ -8,7 +8,10 @@ import {
   sourceFormError,
   sourceTone,
   embeddingOptions,
+  formOf,
   indexingErrorFix,
+  sourcePatch,
+  type KnowledgeSource,
 } from "./model";
 
 describe("knowledge source form", () => {
@@ -93,6 +96,75 @@ describe("embeddingOptions", () => {
 
   it("marks nothing ready without a key", () => {
     expect(embeddingOptions(models, [], new Set()).every((o) => !o.ready)).toBe(true);
+  });
+});
+
+describe("a source's settings", () => {
+  const saved: KnowledgeSource = {
+    id: "s1",
+    name: "Docs",
+    kind: "github",
+    config: { repo: "acme/docs", path: "docs", maxFiles: 50 },
+    pipeline: {
+      chunker: { strategy: "markdown", chunkTokens: 300, overlapTokens: 40 },
+      embedding: { provider: "google", model: "gemini-embedding-001" },
+      index: { adapter: "pgvector" },
+      embeddingCredentialId: "cred-g",
+    } as KnowledgeSource["pipeline"],
+    credentialId: null,
+    status: "ready",
+    stats: {},
+    documents: 3,
+    chunks: 12,
+    lastSyncAt: null,
+    lastError: null,
+    createdAt: "",
+    updatedAt: "",
+  };
+
+  it("opens on the saved values and sends nothing when nothing changed", () => {
+    const f = formOf(saved);
+    expect(f).toMatchObject({
+      name: "Docs",
+      repo: "acme/docs",
+      path: "docs",
+      strategy: "markdown",
+      chunkTokens: 300,
+      embeddingProvider: "google",
+    });
+    expect(sourcePatch(saved, f)).toEqual({ body: {}, reindex: false, refetch: false });
+    // a rename alone indexes nothing again
+    expect(sourcePatch(saved, { ...f, name: " Handbook " })).toEqual({
+      body: { name: "Handbook" },
+      reindex: false,
+      refetch: false,
+    });
+  });
+
+  it("re-indexes for new chunking or search, keeping what the form doesn't show", () => {
+    const f = formOf(saved);
+    const keyword = sourcePatch(saved, { ...f, embeddingProvider: "", embeddingModel: "" });
+    expect(keyword.reindex).toBe(true);
+    // the old provider's credential goes; the index adapter stays
+    expect(keyword.body.pipeline).toEqual({
+      chunker: { strategy: "markdown", chunkTokens: 300, overlapTokens: 40 },
+      embedding: null,
+      index: { adapter: "pgvector" },
+    });
+    const bigger = sourcePatch(saved, { ...f, chunkTokens: 600 });
+    expect(bigger.body.pipeline).toMatchObject({
+      chunker: { chunkTokens: 600 },
+      embeddingCredentialId: "cred-g",
+    });
+  });
+
+  it("fetches again for new addresses, keeping config the form doesn't show", () => {
+    const moved = sourcePatch(saved, { ...formOf(saved), path: "" });
+    expect(moved).toEqual({
+      body: { config: { repo: "acme/docs", maxFiles: 50 } },
+      reindex: false,
+      refetch: true,
+    });
   });
 });
 
