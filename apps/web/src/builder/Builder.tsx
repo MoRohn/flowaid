@@ -98,7 +98,7 @@ import { useLiveRun } from "./useLiveRun";
 import { describeInputIssue, describeRunError, type RunStartError } from "./errors";
 import { diagnosticNodeId, presentDiagnostic } from "./diagnostics";
 import { RunResult } from "./RunResult";
-import { WorkflowPanel } from "./WorkflowPanel";
+import { WorkflowPanel, type ExecutionField } from "./WorkflowPanel";
 import { useGuideContext } from "~/guide/GuideProvider";
 import { explainRun } from "~/guide/explain";
 import { NodeInspector } from "./NodeInspector";
@@ -247,6 +247,15 @@ function BuilderView({
   const clearSelection = useCallback(
     () => store.getState().select({ nodes: [], edges: [] }),
     [store],
+  );
+  // "Set a cost limit" on a problem: the workflow panel, opened at that Execution field
+  const [panelFocus, setPanelFocus] = useState<{ field: ExecutionField; n: number } | null>(null);
+  const openExecution = useCallback(
+    (field: ExecutionField) => {
+      clearSelection();
+      setPanelFocus((cur) => ({ field, n: (cur?.n ?? 0) + 1 }));
+    },
+    [clearSelection],
   );
   const advisorOn = advisorAvailability(s.features, !readOnly).advisor;
   const advisor = useAdvisor({ workflowId: workflow.id, store, enabled: advisorOn });
@@ -701,6 +710,7 @@ function BuilderView({
         readOnly={readOnly}
         name={title}
         {...(!readOnly ? { onRename: renameWorkflow } : {})}
+        {...(panelFocus ? { focus: panelFocus } : {})}
         onDescribe={(description) =>
           void patch(`/v1/workflows/${workflow.id}`, { description })
             .then(() => qc.invalidateQueries({ queryKey: ["workflows", s.ws] }))
@@ -726,6 +736,17 @@ function BuilderView({
           ) : shown.remedy === "knowledge" ? (
             <Button size="sm" variant="ghost" asChild>
               <Link href={`/${s.ws}/knowledge`}>Knowledge</Link>
+            </Button>
+          ) : (shown.remedy === "cost-limit" || shown.remedy === "time-limit") && !readOnly ? (
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                beforeShow?.();
+                openExecution(shown.remedy === "cost-limit" ? "max-cost" : "timeout");
+              }}
+            >
+              {shown.remedy === "cost-limit" ? "Set a cost limit" : "Set the run time limit"}
             </Button>
           ) : null}
           {nodeId ? (
@@ -1005,7 +1026,7 @@ function BuilderView({
       <div className="flex h-full flex-col">
         <OpenInspectorOnSelect
           nodeId={selection.nodes.length === 1 ? selection.nodes[0] : undefined}
-          reveal={reveal?.n ?? 0}
+          reveal={(reveal?.n ?? 0) + (panelFocus?.n ?? 0)}
         />
         <WorkflowTabs workflowId={workflow.id} active="builder" />
         <div className="min-h-0 flex-1">
@@ -1146,7 +1167,7 @@ function OpenInspectorOnSelect({ nodeId, reveal }: { nodeId: string | undefined;
   useEffect(() => {
     if (compact && nodeId) open?.(true);
   }, [compact, nodeId, open]);
-  // "Show node" opens the inspector even where the person had closed it
+  // "Show node" (and "Set a cost limit") opens the inspector even where the person had closed it
   useEffect(() => {
     if (reveal > 0) open?.(true);
   }, [reveal, open]);

@@ -34,6 +34,26 @@ describe("presentDiagnostic", () => {
     expect(diagnosticNodeId(d, def())).toBe("generate_1");
   });
 
+  it("leads a run limit problem to the Execution settings", () => {
+    const cost: Diagnostic = {
+      code: "W_COST_ESTIMATE",
+      severity: "warning",
+      message: "No cost bound: set execution.maxCostUsd, or maxCostUsd on 'generate_1'",
+      location: { path: "/execution" },
+    };
+    expect(presentDiagnostic(cost, def())).toMatchObject({
+      remedy: "cost-limit",
+      hint: expect.stringContaining("cost limit per run under Execution") as unknown,
+    });
+    const expiry: Diagnostic = {
+      code: "W_HUMAN_EXPIRY_EXCEEDS_RUN_TIMEOUT",
+      severity: "warning",
+      message: "'generate_1' waits up to 2 h for a person, but the run stops after 3 min",
+      location: { nodeId: "generate_1" },
+    };
+    expect(presentDiagnostic(expiry, def()).remedy).toBe("time-limit");
+  });
+
   it("says what to do about a missing key", () => {
     const d: Diagnostic = {
       code: "E_CREDENTIAL_SLOT_UNBOUND",
