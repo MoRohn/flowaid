@@ -52,3 +52,9 @@ the escalation reason is now kept on the audit trail as the dialog says. Assigne
 Cancelling a run asks first, in the trace header and the runs list's row menu: the confirmation
 says it can't be undone and names the task that will close unanswered, takes an optional reason
 (kept with the run), and offers "Keep running". The run's story ends with the reason.
+
+The Overview keeps its time range, workflow and environment in the URL (`?range=7d&workflow=…&env=…`),
+so a reload or a shared link shows the same view (7d used to come back as 24h). Open approvals follow
+the environment filter like everything else on the page, the success-rate hint counts timed-out runs
+with the failures, the page and its getting-started checklist share one workflow list, and "Publish
+and deploy" ticks off only once a version is deployed, not just published.

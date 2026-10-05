@@ -143,6 +143,13 @@ export async function insightsReport(tx: Tx, f: InsightsFilter): Promise<Insight
       where h.workspace_id = ${f.workspaceId} and h.status = 'open'
         ${f.workflowId ? sql`and h.workflow_id = ${f.workflowId}` : sql``}
         ${
+          // the environment filter covers approvals too: a task belongs to its run's environment
+          f.environmentId
+            ? sql`and exists (select 1 from runs hr where hr.id = h.run_id
+                                and hr.environment_id = ${f.environmentId})`
+            : sql``
+        }
+        ${
           f.workflowIds
             ? f.workflowIds.length
               ? sql`and h.workflow_id in (${sql.join(
