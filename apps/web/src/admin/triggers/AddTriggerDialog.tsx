@@ -202,7 +202,8 @@ export function AddTriggerDialog({
           version: d.version,
         })),
         environments: s.environments,
-        liveWebhooks: hooks.data ?? [],
+        // a switched-off webhook hands its path to the next workflow deployed with it
+        liveWebhooks: (hooks.data ?? []).filter((h) => h.enabled),
         inputs: detail.data.draft.inputs,
       })
     : [];

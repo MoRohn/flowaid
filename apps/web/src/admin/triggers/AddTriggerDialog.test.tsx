@@ -69,7 +69,11 @@ describe("adding a webhook, step by step", () => {
       "GET /v1/workflows": () => ({ items: [{ id: "wf-1", name: "Refund desk" }] }),
       "GET /v1/workflows/wf-1": () => detail,
       "GET /v1/webhooks": () => ({
-        items: [{ workflowId: "wf-2", path: "dev/refund-desk" }],
+        items: [
+          { workflowId: "wf-2", path: "dev/refund-desk", enabled: true },
+          // switched off: its path passes to the next workflow deployed with it, so no warning
+          { workflowId: "wf-3", path: "prod/refund-desk", enabled: false },
+        ],
         next_cursor: null,
       }),
       "PUT /v1/workflows/wf-1/draft": () => ({ ok: true }),
@@ -90,7 +94,9 @@ describe("adding a webhook, step by step", () => {
     const rail = screen.getByRole("navigation", { name: "Steps" });
     fireEvent.click(within(rail).getByRole("button", { name: /Review and add/ }));
     await waitFor(() =>
-      expect(screen.getByText(/Another workflow already uses \/refund-desk in dev/)).toBeTruthy(),
+      expect(
+        screen.getByText(/Another workflow already uses \/refund-desk in dev: deploying/),
+      ).toBeTruthy(),
     );
     expect(screen.getByText(/Callers must send a JSON body with email/)).toBeTruthy();
     expect(screen.getByText(/Live now in dev \(v2\)/)).toBeTruthy();

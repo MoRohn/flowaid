@@ -1110,7 +1110,7 @@ export function toolRoutes(app: FastifyInstance, ctx: ApiContext): void {
           );
         if (!env) throw new BadRequestError("environment not found");
         const [dup] = await tx
-          .select({ id: mcpExposures.id })
+          .select({ id: mcpExposures.id, enabled: mcpExposures.enabled })
           .from(mcpExposures)
           .where(
             and(
@@ -1118,7 +1118,12 @@ export function toolRoutes(app: FastifyInstance, ctx: ApiContext): void {
               eq(mcpExposures.toolName, req.body.toolName),
             ),
           );
-        if (dup) throw new ConflictError(`the tool name ${req.body.toolName} is taken`);
+        if (dup?.enabled)
+          throw new ConflictError(
+            `the tool name ${req.body.toolName} is taken; switch that tool off to reuse its name`,
+          );
+        // a switched-off exposure doesn't keep its name: this one takes it over
+        if (dup) await tx.delete(mcpExposures).where(eq(mcpExposures.id, dup.id));
         const [created] = await tx
           .insert(mcpExposures)
           .values({ id: uuidv7(), workspaceId: p.workspaceId, ...req.body, source: "manual" })

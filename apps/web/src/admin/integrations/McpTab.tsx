@@ -445,7 +445,8 @@ function ExposeDialog({
   const env = s.environments.find((e) => e.id === draft.environmentId);
   const deployed = detail.data?.deployments.find((d) => d.environmentId === draft.environmentId);
   const nameOk = TOOL_NAME.test(draft.toolName);
-  const taken = exposures.some((e) => e.toolName === draft.toolName);
+  // a switched-off tool hands its name over: only one that is on blocks it
+  const taken = exposures.some((e) => e.enabled && e.toolName === draft.toolName);
   const fields = inputFields(detail.data?.draft.inputs);
 
   if (created)

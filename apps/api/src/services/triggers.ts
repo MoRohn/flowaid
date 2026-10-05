@@ -1,8 +1,10 @@
 /**
  * Trigger materialisation (ARCHITECTURE.md §8): deploying a version to an environment upserts one
  * row per trigger — `webhooks` (path `<environment>/<path>`), `schedules` (next run from croner),
- * `mcp_exposures` — disables rows whose trigger disappeared (never deletes them), and refuses paths,
- * tool names or event names another workflow of the workspace already uses (`E_TRIGGER_CONFLICT`).
+ * `mcp_exposures` — disables rows whose trigger disappeared (never deletes them), and refuses paths
+ * or tool names another workflow of the workspace has switched on (`E_TRIGGER_CONFLICT`). A name
+ * whose row is switched off passes to the new owner: the old row (with its deliveries) is deleted,
+ * so a path or tool name is never reserved for good by something that is off.
  * A schedule's stored input must match the deployed version's inputs schema (`E_SCHEMA` at
  * `/triggers/<i>/input`): the scheduler checks it again at every fire.
  *
@@ -106,11 +108,12 @@ export async function materialiseTriggers(
           ne(webhooks.workflowId, i.workflowId),
         ),
       );
-    if (taken)
+    if (taken?.enabled)
       conflict(
-        `webhook path '${t.path}' is used by another workflow in ${env.name}`,
+        `webhook path '${t.path}' is used by another workflow in ${env.name}; switch its webhook off there to hand the path over`,
         `/triggers/${idx}/path`,
       );
+    if (taken) await releaseWebhook(tx, taken.id);
     const existing = ownHooks.find((h) => h.path === path);
     const switchedOff =
       existing !== undefined &&
@@ -235,11 +238,12 @@ export async function materialiseTriggers(
           ne(mcpExposures.workflowId, i.workflowId),
         ),
       );
-    if (taken)
+    if (taken?.enabled)
       conflict(
-        `MCP tool name '${t.toolName}' is used by another workflow`,
+        `MCP tool name '${t.toolName}' is used by another workflow; switch its tool off to hand the name over`,
         `/triggers/${idx}/toolName`,
       );
+    if (taken) await tx.delete(mcpExposures).where(eq(mcpExposures.id, taken.id));
     const [sameName] = await tx
       .select()
       .from(mcpExposures)
@@ -282,6 +286,11 @@ export async function materialiseTriggers(
       out.disabled.push({ kind: "mcp", id: e.id });
     }
   return out;
+}
+
+/** Deletes a switched-off webhook whose path another workflow takes over (deliveries cascade). */
+export async function releaseWebhook(tx: Tx, webhookId: string): Promise<void> {
+  await tx.delete(webhooks).where(eq(webhooks.id, webhookId));
 }
 
 /** Switches off every webhook, schedule and MCP exposure of a workflow (archiving it). */
