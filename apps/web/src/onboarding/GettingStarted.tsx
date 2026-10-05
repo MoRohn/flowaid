@@ -6,7 +6,7 @@
  */
 import { useQuery } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useSyncExternalStore, type ReactNode } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Check, ExternalLink, X } from "lucide-react";
 import { Badge, Button, IconButton, ProgressBar } from "@flowaid/ui/primitives";
 import { get, getAll } from "~/api/client";
@@ -190,7 +190,13 @@ export function GettingStarted() {
   });
 
   const loading = [providers, workflows].some((q) => q.isPending);
-  if (hidden || loading) return null;
+  const [heldHeight, measure] = useRememberedHeight(`flowaid:getting-started:height:${s.ws}`);
+  if (hidden) return null;
+  // while the steps load, hold the panel's last height so the dashboard below does not jump
+  if (loading)
+    return heldHeight ? (
+      <div aria-hidden="true" className="mb-6" style={{ height: heldHeight }} />
+    ) : null;
 
   const wfs = workflows.data?.items ?? [];
   const steps = onboardingSteps({
@@ -213,6 +219,7 @@ export function GettingStarted() {
 
   return (
     <section
+      ref={measure}
       aria-labelledby="getting-started-title"
       className="mb-6 overflow-hidden rounded-lg border border-border bg-surface shadow-1"
     >
@@ -332,4 +339,36 @@ function StepRow({
       )}
     </li>
   );
+}
+
+/**
+ * The panel's height the last time it showed in this workspace (kept per browser), and a ref that
+ * keeps it current. The placeholder that holds its place while the steps load uses it.
+ */
+function useRememberedHeight(key: string) {
+  const [height] = useState(() => {
+    try {
+      return Number(window.localStorage.getItem(key)) || 0;
+    } catch {
+      return 0; // storage blocked: no placeholder, as before
+    }
+  });
+  const measure = useCallback(
+    (node: HTMLElement | null) => {
+      if (!node || typeof ResizeObserver === "undefined") return;
+      const save = () => {
+        try {
+          window.localStorage.setItem(key, String(Math.round(node.getBoundingClientRect().height)));
+        } catch {
+          // storage blocked: the next load simply has no placeholder
+        }
+      };
+      save();
+      const observer = new ResizeObserver(save);
+      observer.observe(node);
+      return () => observer.disconnect();
+    },
+    [key],
+  );
+  return [height, measure] as const;
 }

@@ -227,9 +227,6 @@ export { ReorderableList, moveItem, moveOrder, type ReorderableListProps } from 
 export {
   TemplateEditor,
   TemplateInput,
-  templateCompletions,
-  rangedDiagnostics,
-  useTemplateAssist,
   type TemplateEditorProps,
   type TemplateInputProps,
   type TemplateRef,
@@ -242,6 +239,8 @@ export {
 } from "./templateCheck";
 export { FlowExprEditor, FlowExprWidget, type FlowExprEditorProps } from "./FlowExprEditor";
 export { flowExprCompletions } from "./FlowExprEditorView";
+export { templateCompletions, rangedDiagnostics, useTemplateAssist } from "./TemplateEditorView";
+export { preloadCodeEditors } from "./preload";
 export {
   LevelsList,
   validateLevels,

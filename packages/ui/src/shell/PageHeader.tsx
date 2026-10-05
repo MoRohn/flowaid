@@ -2,6 +2,7 @@ import { forwardRef, type HTMLAttributes, type ReactNode } from "react";
 import { ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { IconButton, Tabs, TabsList, TabsTrigger, UnsavedMark } from "@/primitives";
+import { hasPrimaryButton, useHeaderPrimaryAction } from "@/primitives/primaryAction";
 
 export interface PageHeaderTab {
   id: string;
@@ -18,7 +19,10 @@ export interface PageHeaderProps extends Omit<HTMLAttributes<HTMLElement>, "titl
   description?: ReactNode;
   /** Mono eyebrow above the title (a section, an id). */
   eyebrow?: ReactNode;
-  /** Right-aligned actions; the primary button should be the last one. */
+  /**
+   * Right-aligned actions; the primary button should be the last one. A primary button here is
+   * the screen's one filled button: an EmptyState below repeats it as secondary.
+   */
   actions?: ReactNode;
   /** A SearchInput or filter controls, rendered on the tabs row (or alone). */
   search?: ReactNode;
@@ -52,6 +56,7 @@ export const PageHeader = forwardRef<HTMLElement, PageHeaderProps>(function Page
   },
   ref,
 ) {
+  useHeaderPrimaryAction(hasPrimaryButton(actions));
   const hasSecondRow = (tabs && tabs.length > 0) || search;
   return (
     <header

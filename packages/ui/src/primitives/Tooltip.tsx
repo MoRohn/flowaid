@@ -1,16 +1,21 @@
 import {
   forwardRef,
+  isValidElement,
   type ComponentPropsWithoutRef,
   type ComponentRef,
   type ReactNode,
 } from "react";
+import { Slot } from "@radix-ui/react-slot";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import { cn } from "@/lib/cn";
 import { Shortcut } from "./Kbd";
 
 export const TooltipProvider = TooltipPrimitive.Provider;
 
-export interface TooltipProps {
+export interface TooltipProps extends Omit<
+  ComponentPropsWithoutRef<typeof TooltipPrimitive.Trigger>,
+  "children" | "content" | "className" | "disabled" | "asChild"
+> {
   /** The trigger. Must be a single element that accepts a ref and event handlers. */
   children: ReactNode;
   content: ReactNode;
@@ -26,15 +31,18 @@ export interface TooltipProps {
   onOpenChange?: (open: boolean) => void;
   /** Renders the trigger without a tooltip (e.g. while a menu is open). */
   disabled?: boolean;
+  /** Classes for the tooltip bubble (not the trigger). */
   className?: string;
 }
 
 /**
  * Inverted ink tooltip with a 200ms delay. Wraps its own provider so it works
  * anywhere; wrap a subtree in `TooltipProvider` to share the skip-delay window
- * between neighbouring triggers (toolbars).
+ * between neighbouring triggers (toolbars). Any other props and the ref go to the
+ * trigger, so a Tooltip can sit inside another `asChild` trigger (a menu's) and the
+ * menu's handlers, ARIA state and ref still reach the button.
  */
-export const Tooltip = forwardRef<ComponentRef<typeof TooltipPrimitive.Content>, TooltipProps>(
+export const Tooltip = forwardRef<ComponentRef<typeof TooltipPrimitive.Trigger>, TooltipProps>(
   function Tooltip(
     {
       children,
@@ -49,23 +57,26 @@ export const Tooltip = forwardRef<ComponentRef<typeof TooltipPrimitive.Content>,
       onOpenChange,
       disabled,
       className,
+      ...triggerProps
     },
     ref,
   ) {
     if (disabled || content === null || content === undefined || content === false)
-      return <>{children}</>;
+      return isValidElement(children) ? (
+        <Slot {...triggerProps} ref={ref}>
+          {children}
+        </Slot>
+      ) : (
+        <>{children}</>
+      );
     return (
       <TooltipPrimitive.Provider delayDuration={delayDuration} skipDelayDuration={300}>
         <TooltipPrimitive.Root open={open} defaultOpen={defaultOpen} onOpenChange={onOpenChange}>
-          <TooltipPrimitive.Trigger asChild>{children}</TooltipPrimitive.Trigger>
+          <TooltipPrimitive.Trigger asChild {...triggerProps} ref={ref}>
+            {children}
+          </TooltipPrimitive.Trigger>
           <TooltipPrimitive.Portal>
-            <TooltipContent
-              ref={ref}
-              side={side}
-              align={align}
-              sideOffset={sideOffset}
-              className={className}
-            >
+            <TooltipContent side={side} align={align} sideOffset={sideOffset} className={className}>
               {content}
               {shortcut ? (
                 <Shortcut

@@ -14,8 +14,10 @@ export default function WorkspaceError({
   retry: () => void;
 }) {
   return (
-    <div className="grid h-dvh place-items-center p-6" role="alert">
-      <ErrorPanel error={error} onRetry={retry} />
-    </div>
+    <main className="grid h-dvh place-items-center p-6">
+      <div role="alert">
+        <ErrorPanel error={error} onRetry={retry} page />
+      </div>
+    </main>
   );
 }

@@ -138,7 +138,7 @@ describe("the document list", () => {
       "DELETE /v1/pageindex/documents/doc-1": () => new Response(null, { status: 202 }),
     });
     fireEvent.click(await screen.findByRole("button", { name: "Delete Handbook.pdf" }));
-    const dialog = await screen.findByRole("dialog", { name: /Delete Handbook\.pdf/ });
+    const dialog = await screen.findByRole("alertdialog", { name: /Delete Handbook\.pdf/ });
     expect(within(dialog).getByText(/Access is revoked at once/)).toBeTruthy();
     fireEvent.click(within(dialog).getByRole("button", { name: "Delete document" }));
     await waitFor(() =>

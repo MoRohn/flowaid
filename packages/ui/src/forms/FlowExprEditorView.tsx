@@ -9,12 +9,12 @@ import { forwardRef, useCallback, useMemo, useState } from "react";
 import type { CompletionContext, CompletionResult } from "@codemirror/autocomplete";
 import type { Extension } from "@codemirror/state";
 import type { Diagnostic } from "@flowaid/workflow-core";
-import {
-  ExpressionTextarea,
-  type ExpressionEditorHandle,
-  type ExpressionTextareaProps,
-  type TemplateStatus,
+import type {
+  ExpressionEditorHandle,
+  ExpressionTextareaProps,
+  TemplateStatus,
 } from "./ExpressionInput";
+import { ExpressionTextareaView as ExpressionTextarea } from "./ExpressionInputView";
 import {
   EMPTY_SCOPE,
   externalDiagnostics,
@@ -22,7 +22,8 @@ import {
   scopeReferences,
 } from "./expressionExtensions";
 import { checkExpression } from "./templateCheck";
-import { rangedDiagnostics, templateCompletions, type TemplateRef } from "./TemplateEditor";
+import type { TemplateRef } from "./TemplateEditor";
+import { rangedDiagnostics, templateCompletions } from "./TemplateEditorView";
 
 const NO_VARIABLES: readonly string[] = [];
 

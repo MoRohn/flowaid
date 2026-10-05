@@ -61,6 +61,7 @@ const THEME_LABEL: Record<ThemeSetting, string> = {
 
 function ThemeToggle({ collapsed }: { collapsed: boolean }) {
   const { setting, setTheme } = useTheme();
+  const radios = useRef<(HTMLButtonElement | null)[]>([]);
   if (collapsed) {
     const next = THEME_ORDER[(THEME_ORDER.indexOf(setting) + 1) % THEME_ORDER.length] ?? "system";
     return (
@@ -74,19 +75,34 @@ function ThemeToggle({ collapsed }: { collapsed: boolean }) {
       </IconButton>
     );
   }
+  // a radio group (WAI-ARIA): one Tab stop on the chosen theme, arrow keys move and choose
+  const onKeyDown = (e: KeyboardEvent<HTMLButtonElement>) => {
+    const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+    if (step === undefined) return;
+    e.preventDefault();
+    const index = (THEME_ORDER.indexOf(setting) + step + THEME_ORDER.length) % THEME_ORDER.length;
+    const next = THEME_ORDER[index] ?? "system";
+    setTheme(next);
+    radios.current[index]?.focus();
+  };
   return (
     <div
       role="radiogroup"
       aria-label="Theme"
       className="flex h-7 items-center gap-0.5 rounded-sm border border-border bg-surface-2 p-0.5"
     >
-      {THEME_ORDER.map((t) => (
+      {THEME_ORDER.map((t, i) => (
         <Tooltip key={t} content={THEME_LABEL[t]}>
           <button
+            ref={(el) => {
+              radios.current[i] = el;
+            }}
             type="button"
             role="radio"
             aria-checked={setting === t}
             aria-label={THEME_LABEL[t]}
+            tabIndex={setting === t ? 0 : -1}
+            onKeyDown={onKeyDown}
             onClick={() => setTheme(t)}
             className={cn(
               "flex h-full flex-1 cursor-pointer items-center justify-center rounded-xs px-1.5 text-ink-3 transition-colors duration-(--dur-fast) hover:text-ink [&_svg]:size-3.5",

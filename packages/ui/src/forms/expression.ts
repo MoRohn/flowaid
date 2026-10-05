@@ -12,6 +12,9 @@
  */
 import type { ExpressionScope, PortView } from "@/types";
 
+/** A scope with nothing in it: no inputs, variables or upstream nodes. */
+export const EMPTY_SCOPE: ExpressionScope = { inputs: [], variables: [], nodes: [] };
+
 export type ExpressionRoot = "input" | "variables" | "nodes";
 
 export const EXPRESSION_ROOTS: ExpressionRoot[] = ["input", "variables", "nodes"];

@@ -40,4 +40,44 @@ describe("ConfirmDialog", () => {
     // the action can be tried again
     expect(screen.getByRole("button", { name: "Delete" })).toBeEnabled();
   });
+
+  // F-04: "Quit FlowAId" opened on its destructive button, one Enter from stopping everything
+  it("opens a danger confirmation on Cancel, as an alert dialog, so Enter cancels", async () => {
+    const onOpenChange = vi.fn();
+    const onConfirm = vi.fn();
+    render(
+      <ConfirmDialog
+        open
+        variant="danger"
+        onOpenChange={onOpenChange}
+        title="Quit FlowAId?"
+        confirmLabel="Quit FlowAId"
+        onConfirm={onConfirm}
+      />,
+    );
+    const dialog = await screen.findByRole("alertdialog", { name: "Quit FlowAId?" });
+    expect(dialog).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cancel" })).toHaveFocus();
+    await userEvent.keyboard("{Enter}");
+    expect(onConfirm).not.toHaveBeenCalled();
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it("opens an ordinary confirmation on its confirm button, as a dialog", async () => {
+    const onConfirm = vi.fn();
+    render(
+      <ConfirmDialog
+        open
+        onOpenChange={vi.fn()}
+        title="Switch to production?"
+        confirmLabel="Switch"
+        onConfirm={onConfirm}
+      />,
+    );
+    await screen.findByRole("dialog", { name: "Switch to production?" });
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Switch" })).toHaveFocus();
+    await userEvent.keyboard("{Enter}");
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+  });
 });

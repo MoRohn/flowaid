@@ -48,6 +48,7 @@ export default function WorkflowsPage() {
   ];
   const newButton = canWrite ? (
     <Button
+      variant="primary"
       leadingIcon={<Plus strokeWidth={1.75} />}
       onClick={() => router.push(`/${s.ws}/workflows/new`)}
     >

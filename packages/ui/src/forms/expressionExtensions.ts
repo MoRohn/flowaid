@@ -30,8 +30,9 @@ import {
   validateExpression,
   type ExpressionValidation,
 } from "./expression";
+import { EMPTY_SCOPE } from "./expression";
 
-export const EMPTY_SCOPE: ExpressionScope = { inputs: [], variables: [], nodes: [] };
+export { EMPTY_SCOPE };
 
 /** The scope available to the editor. Reconfigure it through a Compartment when upstream nodes change. */
 export const expressionScope = Facet.define<ExpressionScope, ExpressionScope>({

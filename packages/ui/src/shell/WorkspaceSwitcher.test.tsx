@@ -41,4 +41,37 @@ describe("WorkspaceSwitcher", () => {
     await userEvent.click(await screen.findByRole("menuitem", { name: /Lab/ }));
     expect(onChange).toHaveBeenCalledWith("lab");
   });
+
+  // F-02: in the icon rail the Tooltip around the button swallowed the menu trigger's handlers
+  it("opens the menu from the collapsed rail by click, Enter and Space", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(
+      <WorkspaceSwitcher
+        collapsed
+        workspaces={[
+          { id: "default", name: "Default" },
+          { id: "lab", name: "Lab" },
+        ]}
+        currentId="default"
+        onChange={onChange}
+        onSettings={vi.fn()}
+      />,
+    );
+    const button = screen.getByRole("button", { name: "Workspace: Default" });
+    expect(button).toHaveAttribute("aria-expanded", "false");
+    await user.click(button);
+    expect(button).toHaveAttribute("aria-expanded", "true");
+    await user.click(await screen.findByRole("menuitem", { name: /Lab/ }));
+    expect(onChange).toHaveBeenCalledWith("lab");
+
+    for (const key of ["{Enter}", " "]) {
+      button.focus();
+      await user.keyboard(key);
+      expect(await screen.findByRole("menu")).toBeInTheDocument();
+      expect(button).toHaveAttribute("aria-expanded", "true");
+      await user.keyboard("{Escape}");
+      expect(button).toHaveAttribute("aria-expanded", "false");
+    }
+  });
 });
