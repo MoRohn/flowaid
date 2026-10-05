@@ -21,7 +21,7 @@ vi.mock("~/session", () => ({
   }),
 }));
 
-const { CreateCredentialDialog } = await import("./CredentialDialogs");
+const { CreateCredentialDialog, RotateCredentialDialog } = await import("./CredentialDialogs");
 
 const KEY = "flowaid:draft:acme:credential";
 
@@ -264,5 +264,40 @@ describe("New credential", () => {
     expect(
       screen.getByRole<HTMLButtonElement>("button", { name: "Create credential" }).disabled,
     ).toBe(false);
+  });
+});
+
+describe("Rotate a credential", () => {
+  const other = { ...saved, id: "cred-2", name: "OpenAI (dev)", environmentId: "env-dev" };
+  const harness = (credential: typeof saved | null) =>
+    withClient(
+      <RotateCredentialDialog
+        credential={credential as never}
+        type={TYPES[0]}
+        onClose={() => {}}
+      />,
+    );
+
+  it("forgets typed secrets on cancel and when another credential is rotated", () => {
+    api(() => saved);
+    const view = render(harness(saved));
+    act(() => {
+      fireEvent.change(screen.getByLabelText(/^API key/), { target: { value: "sk-typed-1234" } });
+    });
+    // Cancel: the page closes the dialog, then opens it again for the same credential
+    act(() => {
+      fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    });
+    view.rerender(harness(null));
+    view.rerender(harness(saved));
+    expect(screen.getByLabelText<HTMLInputElement>(/^API key/).value).toBe("");
+
+    act(() => {
+      fireEvent.change(screen.getByLabelText(/^API key/), { target: { value: "sk-typed-5678" } });
+    });
+    // the page swaps the credential without closing first
+    view.rerender(harness(other));
+    expect(screen.getByText("Rotate OpenAI (dev)")).toBeTruthy();
+    expect(screen.getByLabelText<HTMLInputElement>(/^API key/).value).toBe("");
   });
 });

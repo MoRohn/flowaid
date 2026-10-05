@@ -630,22 +630,30 @@ export function RotateCredentialDialog({
 }) {
   const s = useSession();
   const [values, setValues] = useState<Record<string, string>>({});
+  // typed secrets belong to one opening for one credential: a new target starts empty
+  const [forId, setForId] = useState(credential?.id ?? null);
+  if ((credential?.id ?? null) !== forId) {
+    setForId(credential?.id ?? null);
+    setValues({});
+  }
+  const close = () => {
+    setValues({});
+    onClose();
+  };
   const rotate = useMutate(
     (v: { id: string; values: Record<string, string> }) =>
       post<Credential>(`/v1/credentials/${v.id}/rotate`, { values: v.values }),
     {
       success: (c) => `Rotated ${c.name}; runs use the new value from now on`,
       invalidate: [["credentials", s.ws]],
-      onSuccess: () => {
-        setValues({});
-        onClose();
-      },
+      onSuccess: close,
+      errorTitle: "Could not rotate the credential",
     },
   );
   const secretFields = type?.fields.filter((f) => f.secret) ?? [];
   const complete = secretFields.filter((f) => f.required).every((f) => values[f.name]?.trim());
   return (
-    <Dialog open={credential !== null} onOpenChange={(o) => (o ? undefined : onClose())}>
+    <Dialog open={credential !== null} onOpenChange={(o) => (o ? undefined : close())}>
       <DialogContent size="sm">
         <form
           onSubmit={(e) => {
@@ -679,7 +687,7 @@ export function RotateCredentialDialog({
             )}
           </DialogBody>
           <DialogFooter>
-            <Button type="button" variant="ghost" onClick={onClose}>
+            <Button type="button" variant="ghost" onClick={close}>
               Cancel
             </Button>
             <Button
