@@ -392,6 +392,48 @@ describeDb("admin roadmap (Postgres)", () => {
     });
   });
 
+  describe("E-08: an OpenAPI toolset can be renamed and given another credential", () => {
+    it("renames, refuses a taken name, and changes the credential", async () => {
+      const { readFileSync } = await import("node:fs");
+      const document = readFileSync(
+        new URL("../../../packages/openapi-tools/fixtures/petstore-3.0.yaml", import.meta.url),
+        "utf8",
+      );
+      const imported = async (name: string) => {
+        const res = await call(t.app, jar, "POST", "/v1/tools/openapi/import", {
+          name,
+          document,
+          serverUrl: "https://petstore.example.com/v1",
+        });
+        expect(res.statusCode, res.body).toBe(201);
+        return res.json() as { id: string; definitions: { name: string }[] };
+      };
+      const shop = await imported("shop-a");
+      await imported("shop-b");
+      const key = (
+        await call(t.app, jar, "POST", "/v1/credentials", {
+          name: "Shop key (toolset)",
+          type: "http.bearer",
+          values: { token: "test-not-a-real-key" },
+        })
+      ).json() as { id: string };
+      expect(
+        (await call(t.app, jar, "PATCH", `/v1/tools/${shop.id}`, { name: "shop-b" })).statusCode,
+      ).toBe(409);
+      const renamed = await call(t.app, jar, "PATCH", `/v1/tools/${shop.id}`, {
+        name: "shop-renamed",
+        credentialId: key.id,
+      });
+      expect(renamed.statusCode).toBe(200);
+      // operations keep the names they were imported with
+      expect(renamed.json()).toMatchObject({
+        name: "shop-renamed",
+        credentialId: key.id,
+        definitions: shop.definitions,
+      });
+    });
+  });
+
   describe("E-06, E-07: private-address refusals say how to allow them", () => {
     let strict: TestApp;
     let strictJar: Jar;

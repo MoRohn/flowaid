@@ -218,6 +218,59 @@ describe("importing an OpenAPI document", () => {
   });
 });
 
+describe("an imported OpenAPI toolset", () => {
+  it("shows its operations and saves a new name and credential", async () => {
+    const toolset = {
+      id: "t-1",
+      name: "acme-shop",
+      kind: "openapi",
+      definitions: [
+        { name: "acme_shop_list_orders", description: "List the orders" },
+        { name: "acme_shop_cancel_order", description: "Cancel one order" },
+      ],
+      source: {
+        url: "https://shop.example.com/openapi.json",
+        serverUrl: "https://shop.example.com/api",
+        title: "Acme Shop",
+        operations: {
+          acme_shop_list_orders: { method: "get", path: "/orders" },
+          acme_shop_cancel_order: { method: "post", path: "/orders/{id}/cancel" },
+        },
+      },
+      credentialId: null,
+      version: 1,
+      createdAt: "2026-09-29T00:00:00.000Z",
+      updatedAt: "2026-09-29T00:00:00.000Z",
+    };
+    const fetchMock = stubApi({
+      "GET /v1/tools": () => ({ items: [toolset], next_cursor: null }),
+      "GET /v1/credentials": () => ({
+        items: [{ id: "cred-9", name: "Shop key", type: "http.api_key" }],
+        next_cursor: null,
+      }),
+      "PATCH /v1/tools/t-1": () => ({ ...toolset, name: "shop", credentialId: "cred-9" }),
+    });
+    render(withClient(<OpenApiTab />));
+    fireEvent.click(await screen.findByRole("button", { name: "Details of acme-shop" }));
+    const ops = screen.getByRole("list", { name: "Operations" });
+    expect(within(ops).getByText("POST")).toBeTruthy();
+    expect(within(ops).getByText("/orders/{id}/cancel")).toBeTruthy();
+    expect(within(ops).getByText("Cancel one order")).toBeTruthy();
+    expect(screen.getByText("https://shop.example.com/openapi.json")).toBeTruthy();
+    expect(button("Save changes").disabled).toBe(true);
+
+    fireEvent.change(screen.getByLabelText(/^Name/), { target: { value: "shop" } });
+    fireEvent.keyDown(screen.getByRole("combobox", { name: /Credential/ }), { key: "Enter" });
+    fireEvent.keyDown(await screen.findByRole("option", { name: /Shop key/ }), { key: "Enter" });
+    fireEvent.click(button("Save changes"));
+    await waitFor(() => expect(callsTo(fetchMock, "PATCH /v1/tools/t-1")).toHaveLength(1));
+    expect(bodyOf(callsTo(fetchMock, "PATCH /v1/tools/t-1")[0]?.[1])).toEqual({
+      name: "shop",
+      credentialId: "cred-9",
+    });
+  });
+});
+
 describe("exposing a workflow as an MCP tool", () => {
   it("warns when nothing is deployed, exposes it, then offers a token pinned to it", async () => {
     const { ExposuresSection } = await import("./McpTab");

@@ -1,7 +1,8 @@
 "use client";
 /**
  * OpenAPI toolsets: read a document (URL or pasted), pick operations, point at the server and
- * credential, review, import (step by step or all at once); list and delete.
+ * credential, review, import (step by step or all at once); list, inspect (operations, source),
+ * rename, change the credential, and delete.
  */
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
@@ -30,7 +31,7 @@ import {
 } from "@flowaid/ui/primitives";
 import { CodeEditor } from "@flowaid/ui/forms";
 import { RelativeTime } from "@flowaid/ui/data";
-import { del, getAll, post } from "~/api/client";
+import { del, getAll, patch, post } from "~/api/client";
 import { DraftStatus, GuidedFlow, type FlowStep } from "~/guide/GuidedFlow";
 import { CheckList, QualityNote, type Check } from "~/guide/Readiness";
 import { useKeptDraft } from "~/guide/useKeptDraft";
@@ -554,10 +555,173 @@ function ImportDialog({
   );
 }
 
+/** What an imported toolset keeps about where it came from (`tools.source`). */
+interface ToolsetSource {
+  url?: string;
+  serverUrl?: string | null;
+  title?: string;
+  operations?: Record<string, { method?: string; path?: string }>;
+}
+
+/**
+ * One toolset: its operations (method, path, what each does), where it came from, and the two
+ * things that can change after import, its name and its credential.
+ */
+function ToolsetDialog({ tool, onClose }: { tool: Tool | null; onClose: () => void }) {
+  const s = useSession();
+  const canWrite = s.can("tools:write");
+  const [name, setName] = useState(tool?.name ?? "");
+  const [credentialId, setCredentialId] = useState(tool?.credentialId ?? NO_CREDENTIAL);
+  // another toolset opened: start from its saved values
+  const [forId, setForId] = useState(tool?.id ?? null);
+  if ((tool?.id ?? null) !== forId) {
+    setForId(tool?.id ?? null);
+    setName(tool?.name ?? "");
+    setCredentialId(tool?.credentialId ?? NO_CREDENTIAL);
+  }
+  const creds = useQuery({
+    queryKey: ["credentials", s.ws],
+    queryFn: () => getAll<Credential>("/v1/credentials"),
+    enabled: tool !== null && canWrite && s.can("credentials:read"),
+  });
+  const save = useMutate(
+    (v: { id: string; body: Record<string, unknown> }) => patch<Tool>(`/v1/tools/${v.id}`, v.body),
+    {
+      success: (t) => `Saved ${t.name}`,
+      invalidate: [
+        ["tools", s.ws],
+        ["catalog", "tools"],
+      ],
+      onSuccess: onClose,
+      errorTitle: "Could not save the toolset",
+    },
+  );
+  if (!tool) return null;
+  const source = (tool.source ?? {}) as ToolsetSource;
+  const body: Record<string, unknown> = {
+    ...(name.trim() && name.trim() !== tool.name ? { name: name.trim() } : {}),
+    ...((credentialId === NO_CREDENTIAL ? null : credentialId) !== tool.credentialId
+      ? { credentialId: credentialId === NO_CREDENTIAL ? null : credentialId }
+      : {}),
+  };
+  const changed = Object.keys(body).length > 0;
+  return (
+    <Dialog
+      open
+      onOpenChange={(o) => {
+        if (!o && !save.isPending) onClose();
+      }}
+    >
+      <DialogContent size="lg">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (changed && name.trim()) save.mutate({ id: tool.id, body });
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle>{tool.name}</DialogTitle>
+            <DialogDescription>
+              {tool.definitions.length} operation{tool.definitions.length === 1 ? "" : "s"} imported
+              {source.title ? ` from ${source.title}` : ""}, version {tool.version}.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogBody className="flex flex-col gap-4">
+            {canWrite ? (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <FieldRow
+                  label="Name"
+                  htmlFor="toolset-name"
+                  required
+                  hint="Its operations keep their tool names, so workflows and agents keep working."
+                  error={name.trim() ? undefined : "Give the toolset a name"}
+                >
+                  <Input
+                    id="toolset-name"
+                    value={name}
+                    maxLength={100}
+                    onChange={(e) => setName(e.target.value)}
+                  />
+                </FieldRow>
+                <FieldRow
+                  label="Credential"
+                  htmlFor="toolset-cred"
+                  hint="Sent with every call to the API; runs use the new one from now on."
+                >
+                  <Select id="toolset-cred" value={credentialId} onValueChange={setCredentialId}>
+                    <SelectItem value={NO_CREDENTIAL}>No credential</SelectItem>
+                    {(creds.data ?? []).map((c) => (
+                      <SelectItem key={c.id} value={c.id} meta={c.type}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </Select>
+                </FieldRow>
+              </div>
+            ) : null}
+            <dl className="m-0 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 rounded-sm border border-border px-3 py-2 text-xs">
+              <dt className="text-ink-3">Document</dt>
+              <dd className="m-0 truncate font-mono text-ink">{source.url ?? "pasted text"}</dd>
+              <dt className="text-ink-3">Server</dt>
+              <dd className="m-0 truncate font-mono text-ink">{source.serverUrl ?? "—"}</dd>
+            </dl>
+            <ul
+              className="m-0 flex max-h-80 list-none flex-col divide-y divide-border overflow-auto rounded-md border border-border p-0"
+              aria-label="Operations"
+            >
+              {tool.definitions.map((d) => {
+                const op = source.operations?.[d.name];
+                return (
+                  <li key={d.name} className="flex flex-col gap-0.5 px-3 py-2">
+                    <span className="flex min-w-0 items-center gap-2">
+                      {op?.method ? (
+                        <Badge
+                          mono
+                          size="sm"
+                          tone={METHOD_TONE[op.method.toLowerCase()] ?? "neutral"}
+                        >
+                          {op.method.toUpperCase()}
+                        </Badge>
+                      ) : null}
+                      <span className="truncate font-mono text-xs text-ink">{d.name}</span>
+                      {op?.path ? (
+                        <span className="truncate font-mono text-2xs text-ink-3">{op.path}</span>
+                      ) : null}
+                    </span>
+                    {d.description ? (
+                      <span className="line-clamp-2 text-xs text-ink-3">{d.description}</span>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
+          </DialogBody>
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={onClose} disabled={save.isPending}>
+              {canWrite ? "Cancel" : "Close"}
+            </Button>
+            {canWrite ? (
+              <Button
+                type="submit"
+                variant="primary"
+                loading={save.isPending}
+                disabled={!changed || !name.trim()}
+              >
+                Save changes
+              </Button>
+            ) : null}
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function OpenApiTab() {
   const s = useSession();
   const canWrite = s.can("tools:write");
   const [importing, setImporting] = useState(false);
+  const [open, setOpen] = useState<Tool | null>(null);
   const confirm = useConfirm<Tool>();
   const tools = useQuery({ queryKey: ["tools", s.ws], queryFn: () => getAll<Tool>("/v1/tools") });
   const remove = useMutate((t: Tool) => del(`/v1/tools/${t.id}`), {
@@ -615,6 +779,14 @@ export function OpenApiTab() {
                   <span className="text-2xs text-ink-3">
                     v{t.version} · <RelativeTime date={t.updatedAt} />
                   </span>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    aria-label={`Details of ${t.name}`}
+                    onClick={() => setOpen(t)}
+                  >
+                    Details
+                  </Button>
                   {canWrite ? (
                     <IconButton
                       size="sm"
@@ -638,11 +810,12 @@ export function OpenApiTab() {
           taken={(tools.data ?? []).map((t) => t.name)}
         />
       ) : null}
+      <ToolsetDialog tool={open} onClose={() => setOpen(null)} />
       <ConfirmDialog
         open={confirm.target !== null}
         onOpenChange={(o) => (o ? undefined : confirm.close())}
         title={`Delete ${confirm.target?.name ?? "toolset"}?`}
-        description="Workflows that call its operations fail validation until they are re-imported."
+        description="Workflows and agents that call its operations fail validation until the document is imported again under the same name."
         variant="danger"
         confirmLabel="Delete"
         loading={remove.isPending}

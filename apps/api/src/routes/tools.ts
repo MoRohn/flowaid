@@ -215,6 +215,14 @@ export function toolRoutes(app: FastifyInstance, ctx: ApiContext): void {
       const p = need(req.principal);
       const t = await ctx.db.tenant(p.workspaceId, async (tx) => {
         await credentialOf(tx, p, req.body.credentialId);
+        if (req.body.name) {
+          const [dup] = await tx
+            .select({ id: tools.id })
+            .from(tools)
+            .where(and(eq(tools.workspaceId, p.workspaceId), eq(tools.name, req.body.name)));
+          if (dup && dup.id !== req.params.id)
+            throw new ConflictError(`a tool named ${req.body.name} exists`);
+        }
         const [u] = await tx
           .update(tools)
           .set({

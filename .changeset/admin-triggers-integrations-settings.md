@@ -39,3 +39,7 @@ signs in sets it back to Pending. Test and Discover show that they are running, 
 outcome on the row at once, and name the real cause of a failure. Every refusal of a private or
 local address (MCP servers, OpenAPI documents and tools, notification sends) now says to set
 FLOWAID_ALLOW_PRIVATE_NETWORK=true, instead of "You do not have access".
+
+OpenAPI toolsets have a Details view: their operations (method, path, what each does), the
+document and server they came from, and a form to rename them or change their credential
+(a taken name is refused with 409 instead of failing).
