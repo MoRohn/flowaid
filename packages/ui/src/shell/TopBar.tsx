@@ -302,12 +302,9 @@ export const TopBar = forwardRef<HTMLElement, TopBarProps>(function TopBar(
                   </>
                 ) : null}
                 {onDuplicate ? (
-                  <DropdownMenuItem
-                    icon={<Copy strokeWidth={1.75} />}
-                    onSelect={onDuplicate}
-                    shortcut="mod+d"
-                  >
-                    Duplicate
+                  // ⌘D on the canvas duplicates the selected steps, not the workflow
+                  <DropdownMenuItem icon={<Copy strokeWidth={1.75} />} onSelect={onDuplicate}>
+                    Duplicate workflow
                   </DropdownMenuItem>
                 ) : null}
                 {onExportJson ? (

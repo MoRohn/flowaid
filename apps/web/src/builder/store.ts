@@ -24,7 +24,12 @@ export interface HistoryEntry {
   label: string;
   patches: Patch[];
   inverse: Patch[];
+  /** Edits with the same key in quick succession (typing in one field) are one undo step. */
+  coalesce?: { key: string; at: number };
 }
+
+/** How long after an edit another edit of the same field still joins its undo step. */
+export const COALESCE_MS = 1000;
 
 export type SaveState = "saved" | "unsaved" | "saving" | "error";
 
@@ -59,7 +64,13 @@ export interface BuilderState {
     secrets?: readonly { name: string; credentialType: string; required: boolean }[],
   ): string;
   removeNodes(ids: string[]): void;
-  updateNode(id: string, recipe: (n: Draft<WorkflowNode>) => void, label?: string): void;
+  /** `coalesce` joins quick successive edits with the same key into one undo step (typing). */
+  updateNode(
+    id: string,
+    recipe: (n: Draft<WorkflowNode>) => void,
+    label?: string,
+    coalesce?: string,
+  ): void;
   setNodeConfig(id: string, config: Record<string, unknown>): void;
   setBinding(id: string, port: string, binding: Binding | undefined): void;
   setNodePolicy(id: string, policy: NodePolicy | undefined): void;
@@ -108,22 +119,44 @@ export function createBuilderStore(init: {
   return createStore<BuilderState>()((set, get) => {
     const notify = (message: string) => set({ notice: { id: ++noticeId, message } });
 
-    /** Applies a recipe to the definition; records history unless `record` is false. */
+    /**
+     * Applies a recipe to the definition; records history unless `record` is false. With
+     * `coalesce`, an edit that follows one with the same key within `COALESCE_MS` joins its undo
+     * step, so typing in a field undoes as one change and does not push structural edits out of
+     * the history.
+     */
     const mutate = (
       label: string,
       recipe: (d: Draft<WorkflowDefinition>) => void | WorkflowDefinition,
-      record = true,
+      record: boolean | { coalesce: string } = true,
     ) => {
       const [next, patches, inverse] = produceWithPatches(get().definition, recipe);
       if (patches.length === 0) return;
-      const { past } = get().history;
+      const { past, future } = get().history;
+      const key = typeof record === "object" ? record.coalesce : undefined;
+      const now = Date.now();
+      const last = past.at(-1);
+      const joins =
+        key !== undefined &&
+        future.length === 0 &&
+        last?.coalesce?.key === key &&
+        now - last.coalesce.at <= COALESCE_MS;
+      const entry: HistoryEntry = joins
+        ? {
+            label: last.label,
+            patches: [...last.patches, ...patches],
+            // undoing the joined step undoes the newest edit first
+            inverse: [...inverse, ...last.inverse],
+            coalesce: { key, at: now },
+          }
+        : { label, patches, inverse, ...(key !== undefined ? { coalesce: { key, at: now } } : {}) };
       set((s) => ({
         definition: next,
         version: s.version + 1,
         ...(record
           ? {
               history: {
-                past: [...past, { label, patches, inverse }].slice(-HISTORY_LIMIT),
+                past: [...(joins ? past.slice(0, -1) : past), entry].slice(-HISTORY_LIMIT),
                 future: [],
               },
             }
@@ -204,32 +237,45 @@ export function createBuilderStore(init: {
           notify(`Cleared bindings that used the deleted nodes: ${cleared.join(", ")}`);
       },
 
-      updateNode(id, recipe, label = "Edit node") {
-        mutate(label, (d) => {
-          const n = findNode(d, id);
-          if (n) recipe(n);
-        });
+      updateNode(id, recipe, label = "Edit node", coalesce) {
+        mutate(
+          label,
+          (d) => {
+            const n = findNode(d, id);
+            if (n) recipe(n);
+          },
+          coalesce !== undefined ? { coalesce } : true,
+        );
       },
 
       setNodeConfig(id, config) {
         const cur = findNode(get().definition, id);
         if (cur?.kind === "task" && JSON.stringify(cur.config) === JSON.stringify(config)) return;
-        mutate("Edit configuration", (d) => {
-          const n = findNode(d, id);
-          if (n?.kind === "task") n.config = config as Draft<typeof n.config>;
-        });
+        mutate(
+          "Edit configuration",
+          (d) => {
+            const n = findNode(d, id);
+            if (n?.kind === "task") n.config = config as Draft<typeof n.config>;
+          },
+          { coalesce: `config:${id}` },
+        );
       },
 
       setBinding(id, port, binding) {
-        mutate(binding ? `Bind ${port}` : `Unbind ${port}`, (d) => {
-          const n = findNode(d, id);
-          if (!n) return;
-          if (!binding) return clearBinding(n, port);
-          const b = binding as Draft<Binding>;
-          if (n.kind === "task" || n.kind === "join" || n.kind === "subflow") n.inputs[port] = b;
-          else if (n.kind === "output" && port === "value") n.value = b;
-          else if (n.kind === "foreach" && port === "items") n.items = b;
-        });
+        mutate(
+          binding ? `Bind ${port}` : `Unbind ${port}`,
+          (d) => {
+            const n = findNode(d, id);
+            if (!n) return;
+            if (!binding) return clearBinding(n, port);
+            const b = binding as Draft<Binding>;
+            if (n.kind === "task" || n.kind === "join" || n.kind === "subflow") n.inputs[port] = b;
+            else if (n.kind === "output" && port === "value") n.value = b;
+            else if (n.kind === "foreach" && port === "items") n.items = b;
+          },
+          // typing a value or a template edits the binding on every key
+          { coalesce: `binding:${id}:${port}` },
+        );
       },
 
       setNodePolicy(id, policy) {

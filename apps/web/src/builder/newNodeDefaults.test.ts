@@ -11,6 +11,7 @@ import type { NodeManifest } from "@flowaid/workflow-core";
 import { withDefaults } from "@flowaid/ui/forms";
 import { Catalog, blankDefinition, newNode } from "./model";
 import { compileLocal } from "./compileLocal";
+import { branchConditionAfter } from "./quickAdd";
 import { newStepConfig, savedStepConfig } from "./stepConfig";
 
 const root = join(import.meta.dirname, "../../../..");
@@ -92,6 +93,37 @@ describe("a step added from the palette", () => {
       expect(savedStepConfig(m.configSchema, form)).toEqual(config);
     },
   );
+});
+
+describe("a Branch added after a Boolean", () => {
+  it("routes on the decision's answer, which compiles as a yes/no condition", () => {
+    const d = blankDefinition(ID, "Route");
+    const boolean = newNode(d, "flowaid.decision.boolean", catalog, newStepConfig);
+    if (!boolean) throw new Error("no boolean");
+    d.nodes.push(boolean);
+    const branch = newNode(d, "branch", catalog, newStepConfig);
+    if (branch?.kind !== "branch") throw new Error("no branch");
+    const when = branchConditionAfter(boolean, "boolean");
+    expect(when).toBe("boolean_1.decision.value");
+    branch.cases = [{ port: "yes", when: when ?? "true" }];
+    d.nodes.push(branch);
+    d.edges.push({
+      id: "c_bool",
+      from: { node: "boolean_1", port: "done" },
+      to: { node: branch.id },
+    });
+    const r = compileLocal({
+      definition: d,
+      manifests: MANIFESTS,
+      tools: [],
+      subflows: {},
+      level: "draft",
+    });
+    expect(
+      r.diagnostics.filter((x) => x.code.startsWith("E_EXPR") || x.code.startsWith("E_REF")),
+    ).toEqual([]);
+    expect(branchConditionAfter(boolean, "choice")).toBeUndefined();
+  });
 });
 
 describe("the local compile", () => {

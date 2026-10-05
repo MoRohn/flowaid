@@ -279,6 +279,18 @@ export function quickAddPlan(
 }
 
 /**
+ * The condition of the first case of a Branch added after a yes/no decision: its answer, so "yes"
+ * means yes. The new Branch's own default ("true") would always take the first path.
+ */
+export function branchConditionAfter(
+  after: WorkflowNode | undefined,
+  decisionKind: string | undefined,
+): string | undefined {
+  if (after?.kind !== "task" || decisionKind !== "boolean") return undefined;
+  return `${after.id}.decision.value`;
+}
+
+/**
  * Where to centre the view so a step at `rect` (flow coordinates) is fully visible, keeping the
  * zoom; null when it already is. `margin` is the room kept from the edges, in screen pixels
  * (panels such as the minimap and the controls sit there).

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { NodeManifest, WorkflowDefinition, WorkflowNode } from "@flowaid/workflow-core";
 import {
   Catalog,
@@ -8,7 +8,7 @@ import {
   project,
   uniqueNodeId,
 } from "./model";
-import { createBuilderStore } from "./store";
+import { COALESCE_MS, createBuilderStore } from "./store";
 
 const ID = "3e7a1c9b-8d2f-4b6e-9a0c-5f4d3e2b1a09";
 
@@ -83,6 +83,49 @@ describe("builder store", () => {
     s.getState().redo();
     expect(s.getState().definition.nodes.find((n) => n.id === "t_1")?.name).toBe("Render");
     expect(s.getState().definition.layout?.nodes.t_1).toEqual({ x: 10, y: 20 });
+  });
+
+  it("undoes typing in one field as one step, and keeps the steps before it", () => {
+    vi.useFakeTimers();
+    try {
+      const s = createBuilderStore({ workflowId: ID, definition: fresh(), draftRevision: 1 });
+      s.getState().addNode(task("t_1"), { x: 10, y: 20 });
+      // "100" typed one key at a time, then a pause, then another field
+      for (const text of ["1", "10", "100"]) {
+        s.getState().setNodeConfig("t_1", { template: text });
+        vi.advanceTimersByTime(200);
+      }
+      vi.advanceTimersByTime(COALESCE_MS + 1);
+      s.getState().setNodeConfig("t_1", { template: "100!" });
+      expect(s.getState().history.past.map((h) => h.label)).toEqual([
+        "Add t_1",
+        "Edit configuration",
+        "Edit configuration",
+      ]);
+      const config = () => {
+        const n = s.getState().definition.nodes.find((x) => x.id === "t_1");
+        return n?.kind === "task" ? n.config : undefined;
+      };
+      s.getState().undo();
+      expect(config()).toEqual({ template: "100" });
+      s.getState().undo();
+      expect(config()).toEqual({});
+      s.getState().redo();
+      expect(config()).toEqual({ template: "100" });
+      // another node's field is a step of its own
+      s.getState().undo();
+      s.getState().addNode(task("t_2"), { x: 300, y: 20 });
+      s.getState().setNodeConfig("t_2", { template: "a" });
+      s.getState().setNodeConfig("t_1", { template: "b" });
+      expect(
+        s
+          .getState()
+          .history.past.slice(-2)
+          .map((h) => h.label),
+      ).toEqual(["Edit configuration", "Edit configuration"]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("does not record layout-only moves", () => {

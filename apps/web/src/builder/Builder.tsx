@@ -85,6 +85,7 @@ import { createBuilderStore, type BuilderStore } from "./store";
 import {
   freeControlPort,
   lastStep,
+  branchConditionAfter,
   centreToShow,
   quickAddPlan,
   readRecentKinds,
@@ -126,6 +127,19 @@ export function Builder({ workflow, manifests, tools }: BuilderProps) {
       draftRevision: workflow.draftRevision,
     }),
   );
+  // A newer draft on the server (restored from a version, saved in another tab) replaces this one
+  // while nothing here is unsaved. The builder's own saves are already at the server's revision,
+  // so a publish or a refetch leaves the canvas, the run view and the run input as they are.
+  useEffect(() => {
+    const st = store.getState();
+    if (
+      workflow.draftRevision > st.draftRevision &&
+      st.version === st.savedVersion &&
+      !st.saving &&
+      !st.conflict
+    )
+      st.replaceDefinition(workflow.draft, workflow.draftRevision);
+  }, [store, workflow.draft, workflow.draftRevision]);
   return <BuilderView store={store} workflow={workflow} manifests={manifests} tools={tools} />;
 }
 
@@ -523,6 +537,13 @@ function BuilderView({
         ? agentStepFor(d, preset, catalog, after?.parent)
         : newNode(d, def.kind, catalog, newStepConfig, after?.parent);
       if (!node) return;
+      // a Branch after a yes/no decision routes on its answer from the start
+      const when = branchConditionAfter(
+        after,
+        after?.kind === "task" ? catalog.get(after.type)?.decision?.kind : undefined,
+      );
+      if (node.kind === "branch" && when && node.cases[0])
+        node.cases[0] = { ...node.cases[0], when };
       const port = after
         ? freeControlPort(d, after, defaultControlOuts(after, catalog))
         : undefined;

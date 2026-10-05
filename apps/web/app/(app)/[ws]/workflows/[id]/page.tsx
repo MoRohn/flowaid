@@ -44,10 +44,11 @@ export default function BuilderPage({ params }: { params: Promise<{ ws: string; 
       </AppFrame>
     );
   if (!workflow.data || !nodes.data || !tools.data) return <FullPageSpinner />;
-  // keyed by id + revision so a restored draft (versions page) remounts with fresh state
+  // keyed by the workflow: a newer draft from elsewhere (a restored version) is adopted by the
+  // builder itself, so its own saves, a publish or a refetch never reset the canvas or a run view
   return (
     <Builder
-      key={`${workflow.data.id}:${workflow.data.draftRevision}`}
+      key={workflow.data.id}
       workflow={workflow.data}
       manifests={nodes.data}
       tools={tools.data}

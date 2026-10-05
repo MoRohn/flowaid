@@ -53,6 +53,7 @@ describe("edge type selection", () => {
       target: "approve",
       targetHandle: "ctl-in",
       data: { route: "review" },
+      ariaLabel: "Control edge from gate (review) to approve",
     });
     const weighted = toCanvasEdge({
       id: "c2",
@@ -78,7 +79,11 @@ describe("edge type selection", () => {
       target: "b",
       targetHandle: "in:y",
     });
-    expect(ref).toMatchObject({ type: "data", data: { via: "ref" } });
+    expect(ref).toMatchObject({
+      type: "data",
+      data: { via: "ref" },
+      ariaLabel: "Data from a.x to b.y",
+    });
     expect(ref.selectable).toBeUndefined();
     for (const via of ["template", "expr", "hoisted"] as const) {
       const implicit = toCanvasEdge({
