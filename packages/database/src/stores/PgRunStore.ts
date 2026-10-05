@@ -58,6 +58,17 @@ export const RUN_EVENTS_CHANNEL = "run_events";
 
 const TERMINAL = ["completed", "failed", "cancelled", "timed_out"] as const;
 
+/** The placeholder the runtime stores for a `doNotPersist` step's output (credentials `DROPPED`). */
+function isRedactedOutput(v: JsonValue | null | undefined): boolean {
+  return (
+    typeof v === "object" &&
+    v !== null &&
+    !Array.isArray(v) &&
+    Object.keys(v).length === 1 &&
+    (v as Record<string, JsonValue>)["$redacted"] === true
+  );
+}
+
 /** Key of `recordedOutputs()`: one recorded result per (node, scope, input hash). */
 export function recordedKey(nodeId: NodeId, scope: ScopePath, inputHash: string): string {
   return `${scope}|${nodeId}|${inputHash}`;
@@ -252,9 +263,15 @@ export class PgRunStore implements RunStore {
         decision: DecisionResult | null;
       }
     >();
-    // Later attempts win: the map keeps the last completed attempt for each key.
+    // Later attempts win: the map keeps the last completed attempt for each key. A `doNotPersist`
+    // step's output was stored as `{ $redacted: true }`: there is nothing to reuse, so it runs again.
     for (const row of rows) {
-      out.set(recordedKey(row.nodeId, row.scope, row.inputHash ?? ""), {
+      const key = recordedKey(row.nodeId, row.scope, row.inputHash ?? "");
+      if (isRedactedOutput(row.output)) {
+        out.delete(key);
+        continue;
+      }
+      out.set(key, {
         nodeRunId: row.reusedFromNodeRunId ?? row.id,
         output: row.output ?? null,
         firedPorts: row.firedPorts,

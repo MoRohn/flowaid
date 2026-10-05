@@ -1,6 +1,7 @@
 ---
 "@flowaid/api": patch
 "@flowaid/ui": patch
+"@flowaid/database": patch
 ---
 
 Data-safety fixes. `?purge=false`, `?force=false`, `?archived=false` and the other boolean query
@@ -13,4 +14,5 @@ environment, and a delete or rename that can't happen answers 409 with the reaso
 Redeploying keeps a trigger switched off by hand. Testing a credential type that has no connection
 test no longer records "OK". Tall form dialogs (New credential with all fields, Use template)
 scroll their body so the submit button stays on screen; before, a click there closed the dialog
-and nothing was saved.
+and nothing was saved. A recorded replay runs again a step whose output was not stored (privacy "do not persist")
+instead of handing later steps the stored placeholder.
