@@ -259,4 +259,77 @@ describeDb("admin roadmap (Postgres)", () => {
       expect(owned[0]?.n).toBe(2);
     });
   });
+
+  describe("E-02: where a credential is used", () => {
+    it("lists every use and refuses a delete until they are gone, unless forced by an admin", async () => {
+      const cred = (
+        await call(t.app, jar, "POST", "/v1/credentials", {
+          name: "CRM token (uses)",
+          type: "http.bearer",
+          values: { token: "test-not-a-real-key" },
+        })
+      ).json() as { id: string };
+      // a workflow binds it, and an MCP server authenticates with it
+      const w = (await call(t.app, jar, "POST", "/v1/workflows", { name: "Uses CRM" })).json();
+      await call(
+        t.app,
+        jar,
+        "PUT",
+        `/v1/workflows/${w.id as string}/draft`,
+        { definition: { ...w.draft, secrets: [{ name: "CRM", credentialType: "http.bearer" }] } },
+        { "if-match": String(w.draftRevision) },
+      );
+      expect(
+        (
+          await call(t.app, jar, "PUT", `/v1/workflows/${w.id as string}/secrets/${envs.dev}`, {
+            CRM: cred.id,
+          })
+        ).statusCode,
+      ).toBe(200);
+      const server = await call(t.app, jar, "POST", "/v1/mcp/servers", {
+        name: "CRM tools",
+        transport: "streamable_http",
+        url: "http://127.0.0.1:9/mcp",
+        authKind: "headers",
+        credentialId: cred.id,
+      });
+      expect(server.statusCode).toBe(201);
+
+      const uses = (await call(t.app, jar, "GET", `/v1/credentials/${cred.id}/uses`)).json();
+      expect(uses).toEqual([
+        expect.objectContaining({
+          kind: "workflow_secret",
+          id: w.id,
+          name: "Uses CRM",
+          environmentId: envs.dev,
+          secretName: "CRM",
+        }),
+        expect.objectContaining({ kind: "mcp_server", id: server.json().id, name: "CRM tools" }),
+      ]);
+
+      const refused = await call(t.app, jar, "DELETE", `/v1/credentials/${cred.id}`);
+      expect(refused.statusCode).toBe(409);
+      expect(refused.json().error.message).toContain(
+        "the secret CRM of the workflow Uses CRM and the MCP server CRM tools",
+      );
+      expect(refused.json().error.details.uses).toHaveLength(2);
+      // ?force=false is not force
+      expect(
+        (await call(t.app, jar, "DELETE", `/v1/credentials/${cred.id}?force=false`)).statusCode,
+      ).toBe(409);
+
+      // unbind and delete: the binding goes, the server keeps working without the credential
+      expect(
+        (await call(t.app, jar, "DELETE", `/v1/credentials/${cred.id}?force=true`)).statusCode,
+      ).toBe(204);
+      const after = (
+        await call(t.app, jar, "GET", `/v1/mcp/servers/${server.json().id as string}`)
+      ).json();
+      expect(after.credentialId).toBeNull();
+      const bindings = (
+        await call(t.app, jar, "GET", `/v1/workflows/${w.id as string}/secrets/${envs.dev}`)
+      ).json();
+      expect(bindings).toEqual({});
+    });
+  });
 });

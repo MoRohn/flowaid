@@ -11,9 +11,13 @@ import { assertExternalRef, secretFields } from "@flowaid/credentials";
 import {
   credentials,
   environments,
+  knowledgeSources,
+  mcpServers,
   notifications,
   secretReferences,
+  tools,
   webhooks,
+  workflows,
   type Tx,
 } from "@flowaid/database";
 import { uuidv7 } from "@flowaid/shared";
@@ -25,6 +29,7 @@ import {
 } from "@flowaid/workflow-core";
 import {
   assertEnvironmentAllowed,
+  canSeeWorkflow,
   canUseEnvironment,
   hasScope,
   type Principal,
@@ -161,6 +166,130 @@ function dto(
     createdAt: row.createdAt.toISOString(),
     owner: owner ? { kind: owner.kind, id: owner.id, name: owner.name } : null,
   };
+}
+
+export const CredentialUseSchema = z.object({
+  kind: z.enum([
+    "workflow_secret",
+    "toolset",
+    "mcp_server",
+    "knowledge_source",
+    "webhook",
+    "notification",
+  ]),
+  /** the workflow (workflow_secret) or the resource that uses the credential */
+  id: z.string(),
+  name: z.string(),
+  /** workflow_secret: the binding's environment; webhook: the webhook's */
+  environmentId: z.string().nullable(),
+  /** workflow_secret: the secret name the workflow binds */
+  secretName: z.string().nullable(),
+  /** webhook: the workflow it starts */
+  workflowId: z.string().nullable(),
+});
+export type CredentialUse = z.infer<typeof CredentialUseSchema>;
+
+/** Everything that refers to a credential: every foreign key to `credentials`, by kind. */
+export async function credentialUses(tx: Tx, credentialId: string): Promise<CredentialUse[]> {
+  const use = (u: Partial<CredentialUse> & Pick<CredentialUse, "kind" | "id" | "name">) => ({
+    environmentId: null,
+    secretName: null,
+    workflowId: null,
+    ...u,
+  });
+  const [bound, toolsets, servers, sources, hooks, channels] = await Promise.all([
+    tx
+      .select({
+        workflowId: secretReferences.workflowId,
+        environmentId: secretReferences.environmentId,
+        secretName: secretReferences.secretName,
+        name: workflows.name,
+      })
+      .from(secretReferences)
+      .innerJoin(workflows, eq(workflows.id, secretReferences.workflowId))
+      .where(eq(secretReferences.credentialId, credentialId)),
+    tx
+      .select({ id: tools.id, name: tools.name })
+      .from(tools)
+      .where(eq(tools.credentialId, credentialId)),
+    tx
+      .select({ id: mcpServers.id, name: mcpServers.name })
+      .from(mcpServers)
+      .where(eq(mcpServers.credentialId, credentialId)),
+    tx
+      .select({ id: knowledgeSources.id, name: knowledgeSources.name })
+      .from(knowledgeSources)
+      .where(eq(knowledgeSources.credentialId, credentialId)),
+    tx
+      .select({
+        id: webhooks.id,
+        path: webhooks.path,
+        environmentId: webhooks.environmentId,
+        workflowId: webhooks.workflowId,
+      })
+      .from(webhooks)
+      .where(
+        or(
+          eq(webhooks.secretCredentialId, credentialId),
+          eq(webhooks.callbackSecretCredentialId, credentialId),
+        ),
+      ),
+    tx
+      .select({ id: notifications.id, name: notifications.name })
+      .from(notifications)
+      .where(eq(notifications.credentialId, credentialId)),
+  ]);
+  return [
+    ...bound.map((b) =>
+      use({
+        kind: "workflow_secret",
+        id: b.workflowId,
+        name: b.name,
+        environmentId: b.environmentId,
+        secretName: b.secretName,
+      }),
+    ),
+    ...toolsets.map((x) => use({ kind: "toolset", ...x })),
+    ...servers.map((x) => use({ kind: "mcp_server", ...x })),
+    ...sources.map((x) => use({ kind: "knowledge_source", ...x })),
+    ...hooks.map((h) =>
+      use({
+        kind: "webhook",
+        id: h.id,
+        name: h.path,
+        environmentId: h.environmentId,
+        workflowId: h.workflowId,
+      }),
+    ),
+    ...channels.map((x) => use({ kind: "notification", ...x })),
+  ];
+}
+
+const USE_NOUN: Record<CredentialUse["kind"], [string, string]> = {
+  workflow_secret: ["workflow secret binding", "workflow secret bindings"],
+  toolset: ["OpenAPI toolset", "OpenAPI toolsets"],
+  mcp_server: ["MCP server", "MCP servers"],
+  knowledge_source: ["knowledge source", "knowledge sources"],
+  webhook: ["webhook", "webhooks"],
+  notification: ["notification channel", "notification channels"],
+};
+
+/** "2 workflow secret bindings and the MCP server GitHub" */
+export function describeUses(uses: readonly CredentialUse[]): string {
+  const parts = (Object.keys(USE_NOUN) as CredentialUse["kind"][]).flatMap((kind) => {
+    const of = uses.filter((u) => u.kind === kind);
+    const [first] = of;
+    if (!first) return [];
+    if (of.length > 1) return [`${of.length} ${USE_NOUN[kind][1]}`];
+    return [
+      kind === "workflow_secret"
+        ? `the secret ${first.secretName ?? ""} of the workflow ${first.name}`
+        : `the ${USE_NOUN[kind][0]} ${first.name}`,
+    ];
+  });
+  return parts.length <= 1
+    ? (parts[0] ?? "nothing")
+    : `${parts.slice(0, -1).join(", ")} and ${parts.at(-1) ?? ""}`;
 }
 
 export function credentialRoutes(app: FastifyInstance, ctx: ApiContext): void {
@@ -396,6 +525,39 @@ export function credentialRoutes(app: FastifyInstance, ctx: ApiContext): void {
     },
   );
 
+  r.get(
+    "/v1/credentials/:id/uses",
+    {
+      config: {
+        auth: "session_or_api_key",
+        scope: "credentials:read",
+        cli: { noun: "credential", verb: "uses", positional: ["id"] },
+      },
+      schema: {
+        tags: ["credentials"],
+        summary:
+          "Where the credential is used: workflow secret bindings, OpenAPI toolsets, MCP servers, knowledge sources, webhooks and notification channels",
+        params: IdParams,
+        response: { 200: z.array(CredentialUseSchema) },
+      },
+    },
+    async (req) => {
+      const p = need(req.principal);
+      const uses = await ctx.db.tenant(p.workspaceId, async (tx) => {
+        const row = await load(tx, p, req.params.id);
+        return credentialUses(tx, row.id);
+      });
+      // a key pinned to workflows or an environment sees only those bindings
+      return uses.filter((u) =>
+        u.kind === "workflow_secret"
+          ? canSeeWorkflow(p, u.id) && canUseEnvironment(p, u.environmentId)
+          : u.kind === "webhook"
+            ? canSeeWorkflow(p, u.workflowId ?? "")
+            : true,
+      );
+    },
+  );
+
   r.patch(
     "/v1/credentials/:id",
     {
@@ -581,31 +743,34 @@ export function credentialRoutes(app: FastifyInstance, ctx: ApiContext): void {
     },
     async (req, reply) => {
       const p = need(req.principal);
-      await ctx.db.tenant(p.workspaceId, async (tx) => {
+      const unbound = await ctx.db.tenant(p.workspaceId, async (tx) => {
         const row = await loadForWrite(tx, p, req.params.id);
         // not even with force: its webhook or channel would stop working
         await assertNotOwned(tx, row);
-        const bound = await tx
-          .select()
-          .from(secretReferences)
-          .where(eq(secretReferences.credentialId, row.id));
-        if (bound.length > 0) {
+        // every use, not only workflow bindings: toolsets, MCP servers, knowledge sources,
+        // webhooks and channels would otherwise lose it silently (their keys are set null)
+        const uses = await credentialUses(tx, row.id);
+        if (uses.length > 0) {
           if (!req.query.force || !hasScope(p, "admin"))
             throw new ConflictError(
-              `the credential is bound to ${bound.length} workflow secret(s); unbind it or delete with ?force=true (admin)`,
+              `the credential is used by ${describeUses(uses)}; give those another credential first, or (admin) delete it anyway with force=true, which unbinds them`,
               {
-                bindings: bound.map((b) => ({
-                  workflowId: b.workflowId,
-                  environmentId: b.environmentId,
-                  secretName: b.secretName,
-                })),
+                uses,
+                bindings: uses
+                  .filter((u) => u.kind === "workflow_secret")
+                  .map((u) => ({
+                    workflowId: u.id,
+                    environmentId: u.environmentId,
+                    secretName: u.secretName,
+                  })),
               },
             );
           await tx.delete(secretReferences).where(eq(secretReferences.credentialId, row.id));
         }
         await tx.delete(credentials).where(eq(credentials.id, row.id));
+        return uses.map((u) => `${u.kind}:${u.id}`);
       });
-      req.audit.details = { force: req.query.force };
+      req.audit.details = { force: req.query.force, unbound };
       return reply.code(204).send(null);
     },
   );

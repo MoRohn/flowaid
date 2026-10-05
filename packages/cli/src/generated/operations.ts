@@ -360,6 +360,18 @@ export const OPERATIONS: readonly CliOperation[] = [
     },
   },
   {
+    noun: "credential",
+    verb: "uses",
+    method: "GET",
+    path: "/v1/credentials/{id}/uses",
+    summary:
+      "Where the credential is used: workflow secret bindings, OpenAPI toolsets, MCP servers, knowledge sources, webhooks and notification channels",
+    auth: "session_or_api_key",
+    positional: ["id"],
+    query: [],
+    body: null,
+  },
+  {
     noun: "dataset",
     verb: "add-cases",
     method: "POST",

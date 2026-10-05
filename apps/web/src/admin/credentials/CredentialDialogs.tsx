@@ -7,7 +7,7 @@
  */
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { useMemo, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { CheckCircle2, ExternalLink, Plug, XCircle } from "lucide-react";
 import {
   Badge,
@@ -36,7 +36,7 @@ import {
 } from "@flowaid/ui/primitives";
 import { KeyValueList } from "@flowaid/ui/inspector";
 import { RelativeTime } from "@flowaid/ui/data";
-import { get, getAll, patch, post, qs } from "~/api/client";
+import { ApiError, del, get, getAll, patch, post } from "~/api/client";
 import type { Environment } from "~/api/types";
 import { suggestSecretName } from "~/builder/keySources";
 import { DraftStatus, GuidedFlow, type FlowStep } from "~/guide/GuidedFlow";
@@ -44,14 +44,23 @@ import { CheckList, type Check } from "~/guide/Readiness";
 import { useKeptDraft } from "~/guide/useKeptDraft";
 import { useSession } from "~/session";
 import { providerName } from "../providerNames";
-import type { Credential, CredentialField, CredentialType, Provider, SecretUse } from "../types";
+import { errorMessage } from "~/shell/states";
+import type {
+  Credential,
+  CredentialField,
+  CredentialType,
+  CredentialUse,
+  Provider,
+} from "../types";
 import { Notice, useMutate } from "../ui";
 import { credentialGuide } from "./guide";
 import {
   ALL_ENVIRONMENTS,
   SERVICE_GROUP_LABEL,
+  UNBIND_EFFECTS,
   credentialBody,
   credentialChecks,
+  describeUse,
   emptyCredentialDraft,
   externalRefProblem,
   keptDraft,
@@ -723,21 +732,7 @@ export function CredentialSheet({
   const canWrite = s.can("credentials:write");
   const [name, setName] = useState<string | null>(null);
   const [test, setTest] = useState<{ ok: boolean; message?: string } | null>(null);
-  const used = useQuery({
-    queryKey: ["where-used", s.ws, credential?.id],
-    queryFn: () =>
-      get<SecretUse[]>(`/v1/secrets/where-used${qs({ credentialId: credential?.id })}`),
-    enabled: credential !== null,
-  });
-  const workflows = useQuery({
-    queryKey: ["workflow-names", s.ws],
-    queryFn: () => get<{ items: { id: string; name: string }[] }>("/v1/workflows?limit=200"),
-    enabled: credential !== null && (used.data?.length ?? 0) > 0,
-  });
-  const names = useMemo(
-    () => new Map((workflows.data?.items ?? []).map((w) => [w.id, w.name])),
-    [workflows.data],
-  );
+  const used = useCredentialUses(credential?.id ?? null);
   const envName = (id: string | null) =>
     id ? (environments.find((e) => e.id === id)?.name ?? id) : "All environments";
   const runTest = useMutate(
@@ -896,32 +891,17 @@ export function CredentialSheet({
             <h3 className="mb-2 text-xs font-semibold text-ink">Where it is used</h3>
             {used.isPending ? (
               <p className="text-xs text-ink-3">Loading…</p>
+            ) : used.isError ? (
+              <p className="text-xs text-danger-text">
+                Could not load where it is used: {errorMessage(used.error)}
+              </p>
             ) : (used.data ?? []).length === 0 ? (
               <p className="text-xs text-ink-3">
-                No workflow uses it yet. Bind it in a workflow&apos;s Settings → Secrets.
+                Nothing uses it yet. Bind it in a workflow&apos;s Settings → Secrets, or choose it
+                for an MCP server, OpenAPI toolset or knowledge source.
               </p>
             ) : (
-              <ul className="flex flex-col gap-1" role="list">
-                {(used.data ?? []).map((u) => (
-                  <li
-                    key={`${u.workflowId}:${u.environmentId}:${u.secretName}`}
-                    className="flex items-center justify-between gap-2 rounded-md border border-border px-2.5 py-1.5 text-xs"
-                  >
-                    <a
-                      className="truncate text-accent-text hover:underline"
-                      href={`/${s.ws}/workflows/${u.workflowId}/settings`}
-                    >
-                      {names.get(u.workflowId) ?? u.workflowId}
-                    </a>
-                    <span className="flex shrink-0 items-center gap-1.5">
-                      <Badge tone="outline" mono size="sm">
-                        {u.secretName}
-                      </Badge>
-                      <Badge size="sm">{envName(u.environmentId)}</Badge>
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              <CredentialUseList uses={used.data ?? []} envName={envName} />
             )}
           </div>
         </SheetBody>
@@ -937,5 +917,153 @@ export function CredentialSheet({
         ) : null}
       </SheetContent>
     </Sheet>
+  );
+}
+
+/** Every use of a credential: workflow secret bindings, tools, MCP servers, sources, triggers. */
+export function useCredentialUses(credentialId: string | null) {
+  const s = useSession();
+  return useQuery({
+    queryKey: ["credential-uses", s.ws, credentialId],
+    queryFn: () => get<CredentialUse[]>(`/v1/credentials/${credentialId ?? ""}/uses`),
+    enabled: credentialId !== null,
+  });
+}
+
+/** The uses, each linking to where it can be changed. */
+export function CredentialUseList({
+  uses,
+  envName,
+}: {
+  uses: readonly CredentialUse[];
+  envName: (id: string | null) => string;
+}) {
+  const s = useSession();
+  return (
+    <ul className="m-0 flex list-none flex-col gap-1 p-0" aria-label="Where it is used">
+      {uses.map((u) => {
+        const d = describeUse(s.ws, u);
+        return (
+          <li
+            key={`${u.kind}:${u.id}:${u.environmentId ?? ""}:${u.secretName ?? ""}`}
+            className="flex items-center justify-between gap-2 rounded-md border border-border px-2.5 py-1.5 text-xs"
+          >
+            <span className="flex min-w-0 flex-col">
+              <Link className="truncate text-accent-text hover:underline" href={d.href}>
+                {u.name}
+              </Link>
+              <span className="text-2xs text-ink-3">{d.kind}</span>
+            </span>
+            {u.kind === "workflow_secret" ? (
+              <span className="flex shrink-0 items-center gap-1.5">
+                <Badge tone="outline" mono size="sm">
+                  {u.secretName}
+                </Badge>
+                <Badge size="sm">{envName(u.environmentId)}</Badge>
+              </span>
+            ) : null}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/**
+ * Deleting a credential: first where it is used. Nothing uses it: a plain confirmation. Something
+ * does: the uses are listed, and only an admin may unbind them and delete it anyway.
+ */
+export function DeleteCredentialDialog({
+  credential,
+  environments,
+  onClose,
+}: {
+  credential: { id: string; name: string } | null;
+  environments: Environment[];
+  onClose: () => void;
+}) {
+  const s = useSession();
+  const isAdmin = s.can("admin");
+  const uses = useCredentialUses(credential?.id ?? null);
+  const envName = (id: string | null) =>
+    id ? (environments.find((e) => e.id === id)?.name ?? id) : "All environments";
+  const remove = useMutate(
+    (v: { id: string; force: boolean }) =>
+      del(`/v1/credentials/${v.id}${v.force ? "?force=true" : ""}`).catch(async (e: unknown) => {
+        // something started using it since the list loaded: show the current uses
+        if (e instanceof ApiError && e.status === 409) await uses.refetch();
+        throw e;
+      }),
+    {
+      success: (_r, v) => (v.force ? "Credential deleted and unbound" : "Credential deleted"),
+      invalidate: [
+        ["credentials", s.ws],
+        ["credential-uses", s.ws],
+      ],
+      onSuccess: () => onClose(),
+      errorTitle: "Could not delete the credential",
+    },
+  );
+  const list = uses.data ?? [];
+  const inUse = list.length > 0;
+  return (
+    <Dialog
+      open={credential !== null}
+      onOpenChange={(o) => {
+        if (!o && !remove.isPending) onClose();
+      }}
+    >
+      <DialogContent size="md">
+        <DialogHeader>
+          <DialogTitle>Delete {credential?.name}?</DialogTitle>
+          <DialogDescription>
+            {uses.isPending
+              ? "Checking where it is used…"
+              : inUse
+                ? `It is used in ${list.length} place${list.length === 1 ? "" : "s"}.`
+                : "Nothing uses it. Deleting it can't be undone."}
+          </DialogDescription>
+        </DialogHeader>
+        <DialogBody className="flex flex-col gap-3">
+          {uses.isError ? (
+            <Notice tone="danger">
+              Could not check where it is used: {errorMessage(uses.error)}
+            </Notice>
+          ) : inUse ? (
+            <>
+              <CredentialUseList uses={list} envName={envName} />
+              {isAdmin ? (
+                <Notice>
+                  Give each of these another credential first, or unbind and delete it now.{" "}
+                  {UNBIND_EFFECTS}
+                </Notice>
+              ) : (
+                <Notice tone="info">
+                  Give each of these another credential first; only an admin can delete a credential
+                  that is still in use.
+                </Notice>
+              )}
+            </>
+          ) : null}
+        </DialogBody>
+        <DialogFooter>
+          <Button type="button" variant="ghost" onClick={onClose} disabled={remove.isPending}>
+            Cancel
+          </Button>
+          {uses.isSuccess && (!inUse || isAdmin) ? (
+            <Button
+              type="button"
+              variant="danger"
+              loading={remove.isPending}
+              onClick={() => {
+                if (credential) remove.mutate({ id: credential.id, force: inUse });
+              }}
+            >
+              {inUse ? "Unbind and delete" : "Delete credential"}
+            </Button>
+          ) : null}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

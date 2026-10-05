@@ -34,6 +34,7 @@ credential list {--limit --cursor --type --environment-id --out}
 credential rotate <id> {--values --body --out}
 credential test <id> {--out}
 credential update <id> {--name --values --scopes --environment-id --allowed-workflow-ids --body --out}
+credential uses <id> {--out}
 credential-type
 credential-type list {--out}
 dataset

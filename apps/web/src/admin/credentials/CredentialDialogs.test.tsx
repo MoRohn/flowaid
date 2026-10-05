@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { installDomStubs } from "@/primitives/testStubs";
@@ -21,7 +21,8 @@ vi.mock("~/session", () => ({
   }),
 }));
 
-const { CreateCredentialDialog, RotateCredentialDialog } = await import("./CredentialDialogs");
+const { CreateCredentialDialog, DeleteCredentialDialog, RotateCredentialDialog } =
+  await import("./CredentialDialogs");
 
 const KEY = "flowaid:draft:acme:credential";
 
@@ -299,5 +300,84 @@ describe("Rotate a credential", () => {
     view.rerender(harness(other));
     expect(screen.getByText("Rotate OpenAI (dev)")).toBeTruthy();
     expect(screen.getByLabelText<HTMLInputElement>(/^API key/).value).toBe("");
+  });
+});
+
+describe("Delete a credential", () => {
+  const uses = [
+    {
+      kind: "workflow_secret",
+      id: "wf-1",
+      name: "Refunds",
+      environmentId: "env-prod",
+      secretName: "OPENAI",
+      workflowId: null,
+    },
+    {
+      kind: "mcp_server",
+      id: "mcp-1",
+      name: "CRM tools",
+      environmentId: null,
+      secretName: null,
+      workflowId: null,
+    },
+  ];
+  const deletes = (f: ReturnType<typeof stubApi>) =>
+    f.mock.calls.filter(([, init]) => init?.method === "DELETE").map(([url]) => url);
+  const harness = (onClose = () => {}) =>
+    withClient(
+      <DeleteCredentialDialog
+        credential={{ id: "cred-1", name: "OpenAI (prod)" }}
+        environments={[{ id: "env-prod", name: "prod", protected: true, variables: {} }] as never}
+        onClose={onClose}
+      />,
+    );
+
+  it("lists every use and lets an admin unbind and delete", async () => {
+    const onClose = vi.fn();
+    const fetchMock = stubApi({
+      "GET /v1/credentials/cred-1/uses": () => uses,
+      "DELETE /v1/credentials/cred-1": () => new Response(null, { status: 204 }),
+    });
+    render(harness(onClose));
+    expect(await screen.findByText("It is used in 2 places.")).toBeTruthy();
+    const list = screen.getByRole("list", { name: "Where it is used" });
+    expect(within(list).getByRole("link", { name: "Refunds" }).getAttribute("href")).toBe(
+      "/acme/workflows/wf-1/settings",
+    );
+    expect(within(list).getByText("OPENAI")).toBeTruthy();
+    expect(within(list).getByRole("link", { name: "CRM tools" }).getAttribute("href")).toBe(
+      "/acme/integrations?tab=mcp",
+    );
+    expect(within(list).getByText("MCP server")).toBeTruthy();
+    act(() => {
+      fireEvent.click(screen.getByRole("button", { name: "Unbind and delete" }));
+    });
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(deletes(fetchMock)).toEqual(["/v1/credentials/cred-1?force=true"]);
+  });
+
+  it("deletes an unused credential without force, and won't let a non-admin delete a used one", async () => {
+    const fetchMock = stubApi({
+      "GET /v1/credentials/cred-1/uses": () => [],
+      "DELETE /v1/credentials/cred-1": () => new Response(null, { status: 204 }),
+    });
+    render(harness());
+    expect(await screen.findByText("Nothing uses it. Deleting it can't be undone.")).toBeTruthy();
+    act(() => {
+      fireEvent.click(screen.getByRole("button", { name: "Delete credential" }));
+    });
+    await waitFor(() => expect(deletes(fetchMock)).toEqual(["/v1/credentials/cred-1"]));
+    cleanup();
+
+    scopes.delete("admin");
+    try {
+      stubApi({ "GET /v1/credentials/cred-1/uses": () => uses });
+      render(harness());
+      expect(await screen.findByText(/only an admin can delete/)).toBeTruthy();
+      expect(screen.queryByRole("button", { name: /delete/i })).toBeNull();
+    } finally {
+      scopes.add("admin");
+    }
   });
 });

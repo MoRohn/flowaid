@@ -3,7 +3,7 @@
  * the draft only in memory: `keptDraft` strips them before anything is written to the browser's
  * storage, so a restored draft always asks for its secrets again.
  */
-import type { CredentialType } from "../types";
+import type { CredentialType, CredentialUse } from "../types";
 
 export const ALL_ENVIRONMENTS = "__all";
 
@@ -208,3 +208,33 @@ export function credentialBody(d: CredentialDraft): Record<string, unknown> {
     ...(d.allowedWorkflowIds !== null ? { allowedWorkflowIds: d.allowedWorkflowIds } : {}),
   };
 }
+
+const USE_KIND: Record<CredentialUse["kind"], string> = {
+  workflow_secret: "Workflow secret",
+  toolset: "OpenAPI toolset",
+  mcp_server: "MCP server",
+  knowledge_source: "Knowledge source",
+  webhook: "Webhook signing secret",
+  notification: "Notification channel",
+};
+
+/** What a use is, and where to change it. */
+export function describeUse(ws: string, u: CredentialUse): { kind: string; href: string } {
+  const href =
+    u.kind === "workflow_secret"
+      ? `/${ws}/workflows/${u.id}/settings`
+      : u.kind === "toolset"
+        ? `/${ws}/integrations?tab=openapi`
+        : u.kind === "mcp_server"
+          ? `/${ws}/integrations?tab=mcp`
+          : u.kind === "knowledge_source"
+            ? `/${ws}/knowledge/${u.id}`
+            : u.kind === "webhook"
+              ? `/${ws}/triggers?tab=webhooks`
+              : `/${ws}/settings?tab=notifications`;
+  return { kind: USE_KIND[u.kind], href };
+}
+
+/** What deleting a credential that is still used does to each kind of use. */
+export const UNBIND_EFFECTS =
+  "Workflow secrets are unbound (their runs fail with “secret not bound” until another credential is bound), MCP servers, OpenAPI toolsets and knowledge sources lose their authentication, and webhooks refuse calls until they get a new secret.";

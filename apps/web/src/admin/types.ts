@@ -38,10 +38,16 @@ export interface Credential {
   /** a webhook's or notification channel's generated secret (never listed; managed there) */
   owner?: { kind: "webhook" | "notification"; id: string; name: string } | null;
 }
-export interface SecretUse {
-  workflowId: string;
-  environmentId: string;
-  secretName: string;
+/** One thing that refers to a credential (`GET /v1/credentials/:id/uses`). */
+export interface CredentialUse {
+  kind:
+    "workflow_secret" | "toolset" | "mcp_server" | "knowledge_source" | "webhook" | "notification";
+  /** the workflow (workflow_secret) or the resource that uses it */
+  id: string;
+  name: string;
+  environmentId: string | null;
+  secretName: string | null;
+  workflowId: string | null;
 }
 
 export interface McpServer {

@@ -6099,6 +6099,62 @@
         "responses": { "204": { "description": "No content" } }
       }
     },
+    "/v1/credentials/{id}/uses": {
+      "get": {
+        "summary": "Where the credential is used: workflow secret bindings, OpenAPI toolsets, MCP servers, knowledge sources, webhooks and notification channels",
+        "tags": ["credentials"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "x-cli": { "noun": "credential", "verb": "uses", "positional": ["id"] },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["credentials:read"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "workflow_secret",
+                          "toolset",
+                          "mcp_server",
+                          "knowledge_source",
+                          "webhook",
+                          "notification"
+                        ]
+                      },
+                      "id": { "type": "string" },
+                      "name": { "type": "string" },
+                      "environmentId": { "type": ["string", "null"] },
+                      "secretName": { "type": ["string", "null"] },
+                      "workflowId": { "type": ["string", "null"] }
+                    },
+                    "required": ["kind", "id", "name", "environmentId", "secretName", "workflowId"],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/credentials/{id}/rotate": {
       "post": {
         "tags": ["credentials"],

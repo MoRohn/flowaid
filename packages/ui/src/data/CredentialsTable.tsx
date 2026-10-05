@@ -43,6 +43,11 @@ export interface CredentialsTableProps extends Omit<
   credentials: readonly CredentialListItemView[];
   onRotate?: (credential: CredentialListItemView) => void | Promise<void>;
   onDelete?: (credential: CredentialListItemView) => void | Promise<void>;
+  /**
+   * Replaces the built-in delete confirmation: Delete calls this and the page asks (for example
+   * listing where the credential is used). `onDelete` is then not needed.
+   */
+  onRequestDelete?: (credential: CredentialListItemView) => void;
   onOpen?: (credential: CredentialListItemView) => void;
   /** Icon for the provider column; falls back to a key icon. */
   renderProviderIcon?: (credential: CredentialListItemView) => ReactNode;
@@ -92,12 +97,13 @@ export function ScopeChips({
 /**
  * Credentials list: name, type with a provider icon slot, environment,
  * scope chips, last used, and rotate/delete actions. Delete asks for
- * confirmation before calling `onDelete`.
+ * confirmation before calling `onDelete`, or hands over to `onRequestDelete`.
  */
 export function CredentialsTable({
   credentials,
   onRotate,
   onDelete,
+  onRequestDelete,
   onOpen,
   renderProviderIcon,
   maxScopes = 2,
@@ -258,8 +264,8 @@ export function CredentialsTable({
                     <DropdownMenuItem
                       icon={<Trash2 strokeWidth={1.75} />}
                       destructive
-                      disabled={!onDelete}
-                      onSelect={() => setPendingDelete(c)}
+                      disabled={!onDelete && !onRequestDelete}
+                      onSelect={() => (onRequestDelete ? onRequestDelete(c) : setPendingDelete(c))}
                     >
                       Delete
                     </DropdownMenuItem>
@@ -270,7 +276,7 @@ export function CredentialsTable({
           },
         }),
       ]),
-    [renderProviderIcon, maxScopes, onRotate, onDelete, onOpen, rotating],
+    [renderProviderIcon, maxScopes, onRotate, onDelete, onRequestDelete, onOpen, rotating],
   );
 
   return (
@@ -291,7 +297,7 @@ export function CredentialsTable({
         }}
         variant="danger"
         title={pendingDelete ? `Delete ${pendingDelete.name}?` : "Delete credential?"}
-        description="Nodes that reference this credential will fail at their next run until they are reconfigured."
+        description="Whatever uses it (workflow secrets, tools, triggers) loses it and fails until it is given another credential. This can't be undone."
         confirmLabel="Delete credential"
         onConfirm={async () => {
           if (pendingDelete && onDelete) await onDelete(pendingDelete);

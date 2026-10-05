@@ -5,15 +5,16 @@ import { KeyRound, Plus } from "lucide-react";
 import { Button, EmptyState, SearchInput } from "@flowaid/ui/primitives";
 import { CredentialsTable, type CredentialListItemView } from "@flowaid/ui/data";
 import { PageHeader } from "@flowaid/ui/shell";
-import { ApiError, del, get, getAll } from "~/api/client";
+import { get, getAll } from "~/api/client";
 import {
   CreateCredentialDialog,
   CredentialSheet,
+  DeleteCredentialDialog,
   RotateCredentialDialog,
 } from "~/admin/credentials/CredentialDialogs";
 import { providerName } from "~/admin/providerNames";
 import type { Credential, CredentialType, Provider } from "~/admin/types";
-import { QueryView, useMutate, useOpenFromQuery } from "~/admin/ui";
+import { QueryView, useOpenFromQuery } from "~/admin/ui";
 import { CREDENTIALS } from "~/guide/capabilities/credentials";
 import { PageIntro } from "~/guide/PageIntro";
 import type { Check } from "~/guide/Readiness";
@@ -29,6 +30,8 @@ export default function CredentialsPage() {
   const [createType, setCreateType] = useState<string | undefined>(undefined);
   const [openId, setOpenId] = useState<string | null>(null);
   const [rotating, setRotating] = useState<Credential | null>(null);
+  // the delete confirmation lists where the credential is used first
+  const [deleting, setDeleting] = useState<{ id: string; name: string } | null>(null);
   const [q, setQ] = useState("");
   const list = useQuery({
     queryKey: ["credentials", s.ws],
@@ -40,11 +43,6 @@ export default function CredentialsPage() {
     staleTime: 5 * 60_000,
   });
   const typeOf = (id: string | undefined) => types.data?.find((t) => t.id === id);
-  const remove = useMutate((id: string) => del(`/v1/credentials/${id}`), {
-    success: "Credential deleted",
-    invalidate: [["credentials", s.ws]],
-    errorTitle: "Could not delete the credential",
-  });
   const connections = useConnections();
   const providers = useQuery({
     queryKey: ["providers", s.ws],
@@ -172,11 +170,8 @@ export default function CredentialsPage() {
                   {...(canWrite
                     ? {
                         onRotate: (c: CredentialListItemView) => setRotating(byId(c.id)),
-                        onDelete: async (c: CredentialListItemView) => {
-                          await remove.mutateAsync(c.id).catch((e: unknown) => {
-                            if (!(e instanceof ApiError)) throw e;
-                          });
-                        },
+                        onRequestDelete: (c: CredentialListItemView) =>
+                          setDeleting({ id: c.id, name: c.name }),
                       }
                     : {})}
                   toolbar={
@@ -207,6 +202,11 @@ export default function CredentialsPage() {
         credential={rotating}
         type={typeOf(rotating?.type)}
         onClose={() => setRotating(null)}
+      />
+      <DeleteCredentialDialog
+        credential={deleting}
+        environments={s.environments}
+        onClose={() => setDeleting(null)}
       />
       <CredentialSheet
         credential={openId ? byId(openId) : null}
