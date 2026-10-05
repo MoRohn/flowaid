@@ -7525,6 +7525,75 @@
         "responses": { "200": { "description": "Default Response" } }
       }
     },
+    "/v1/audit/resource-types": {
+      "get": {
+        "summary": "The resource types the workspace's audit log holds (for its filter)",
+        "tags": ["audit"],
+        "x-cli": { "noun": "audit", "verb": "resource-types" },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["audit:read"],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": { "schema": { "type": "array", "items": { "type": "string" } } }
+            }
+          }
+        }
+      }
+    },
+    "/v1/audit/export": {
+      "get": {
+        "summary": "The filtered audit log as a CSV or JSON file, newest first (at most 50000 events; x-flowaid-truncated says when more matched)",
+        "tags": ["audit"],
+        "parameters": [
+          { "schema": { "type": "string" }, "in": "query", "name": "actor", "required": false },
+          { "schema": { "type": "string" }, "in": "query", "name": "action", "required": false },
+          {
+            "schema": { "type": "string" },
+            "in": "query",
+            "name": "resourceType",
+            "required": false
+          },
+          {
+            "schema": { "type": "string" },
+            "in": "query",
+            "name": "resourceId",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+            },
+            "in": "query",
+            "name": "from",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+            },
+            "in": "query",
+            "name": "to",
+            "required": false
+          },
+          {
+            "schema": { "default": "csv", "type": "string", "enum": ["csv", "json"] },
+            "in": "query",
+            "name": "format",
+            "required": false
+          }
+        ],
+        "x-cli": { "noun": "audit", "verb": "export" },
+        "x-auth": "session_or_api_key",
+        "x-scopes": ["audit:read"],
+        "responses": { "200": { "description": "Default Response" } }
+      }
+    },
     "/v1/artifacts/{id}/download": {
       "get": {
         "tags": ["artifacts"],

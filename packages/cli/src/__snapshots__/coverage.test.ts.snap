@@ -19,7 +19,9 @@ artifact download <id> {--inline --out}
 assistant
 assistant ask {--question --history --body --out}
 audit
+audit export {--actor --action --resource-type --resource-id --from --to --format --out}
 audit list {--limit --cursor --order --actor --action --resource-type --resource-id --from --to --out}
+audit resource-types {--out}
 auth
 auth local {--out}
 auth login {--email --password --body --out}

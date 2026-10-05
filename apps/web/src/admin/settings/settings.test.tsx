@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { installDomStubs } from "@/primitives/testStubs";
 import { Toaster } from "@flowaid/ui/primitives";
 import type { NotificationChannel } from "../types";
@@ -35,6 +35,7 @@ vi.mock("next/navigation", () => ({
 
 const { ApiKeysTab } = await import("./ApiKeysTab");
 const { NotificationsTab } = await import("./NotificationsTab");
+const { AuditTab, auditFilters } = await import("./AuditTab");
 
 function memoryStorage(): Storage {
   const data = new Map<string, string>();
@@ -177,6 +178,53 @@ describe("New API key", () => {
     await waitFor(() =>
       expect(window.sessionStorage.getItem("flowaid:draft:acme:api-key")).toContain("smoke"),
     );
+  });
+});
+
+describe("Audit log", () => {
+  it("offers the resource types the log holds and exports the filtered range", async () => {
+    // the download goes through a blob URL; restored after the test
+    const createObjectURL = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:audit");
+    const revokeObjectURL = vi.spyOn(URL, "revokeObjectURL").mockReturnValue(undefined);
+    onTestFinished(() => {
+      createObjectURL.mockRestore();
+      revokeObjectURL.mockRestore();
+    });
+    const fetchMock = stubApi({
+      "GET /v1/audit": () => ({ items: [], next_cursor: null }),
+      "GET /v1/audit/resource-types": () => ["credential", "notification", "plugin"],
+      "GET /v1/audit/export": () =>
+        new Response("at,action\r\n", { headers: { "content-type": "text/csv" } }),
+    });
+    render(withClient(<AuditTab />));
+    click(await screen.findByRole("combobox", { name: "Resource type" }));
+    expect(await screen.findByRole("option", { name: "plugin" })).toBeTruthy();
+    click(screen.getByRole("option", { name: "notification" }));
+    click(screen.getByRole("combobox", { name: "Period" }));
+    click(screen.getByRole("option", { name: "All time" }));
+    click(screen.getByRole("button", { name: "Export CSV" }));
+    await waitFor(() => expect(createObjectURL).toHaveBeenCalled());
+    const url = fetchMock.mock.calls
+      .map(([u]) => u)
+      .find((u) => u.startsWith("/v1/audit/export")) as string;
+    const params = new URL(url, "http://x").searchParams;
+    expect(params.get("format")).toBe("csv");
+    expect(params.get("resourceType")).toBe("notification");
+    expect(params.has("from")).toBe(false);
+  });
+
+  it("filters by days back, or not at all for all time", () => {
+    const now = Date.parse("2026-10-05T00:00:00.000Z");
+    expect(auditFilters({ action: "", resource: "__any", range: "7d", now })).toEqual({
+      action: undefined,
+      resourceType: undefined,
+      from: "2026-09-28T00:00:00.000Z",
+    });
+    expect(auditFilters({ action: "x", resource: "tool", range: "all", now })).toEqual({
+      action: "x",
+      resourceType: "tool",
+      from: undefined,
+    });
   });
 });
 

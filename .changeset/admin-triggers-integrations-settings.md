@@ -46,3 +46,8 @@ document and server they came from, and a form to rename them or change their cr
 
 Each notification channel has a History (`GET /v1/notifications/:id/deliveries`): the alerts
 and tests sent to it, newest first, with why a send failed. Test sends are now recorded there too.
+
+The audit log exports the filtered range as CSV or JSON (`GET /v1/audit/export`; formula-like
+CSV fields are defused), offers the resource types it actually holds
+(`GET /v1/audit/resource-types`) instead of a fixed list, and its period now reaches a year or
+all time.

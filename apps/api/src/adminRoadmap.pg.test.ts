@@ -468,6 +468,49 @@ describeDb("admin roadmap (Postgres)", () => {
     });
   });
 
+  describe("E-10: the audit log exports and lists its resource types", () => {
+    it("exports the filtered range as CSV or JSON, and lists the types it holds", async () => {
+      await call(t.app, jar, "POST", "/v1/credentials", {
+        name: 'Audited, "quoted" key',
+        type: "http.bearer",
+        values: { token: "test-not-a-real-key" },
+      });
+      const types = (await call(t.app, jar, "GET", "/v1/audit/resource-types")).json() as string[];
+      expect(types).toContain("credential");
+      expect([...types].sort()).toEqual(types);
+
+      const csv = await call(
+        t.app,
+        jar,
+        "GET",
+        "/v1/audit/export?format=csv&resourceType=credential",
+      );
+      expect(csv.statusCode).toBe(200);
+      expect(csv.headers["content-type"]).toContain("text/csv");
+      expect(csv.headers["content-disposition"]).toMatch(/^attachment; filename="audit-default-/);
+      expect(csv.headers["x-flowaid-truncated"]).toBe("false");
+      const lines = csv.body.trimEnd().split("\r\n");
+      expect(lines[0]).toBe(
+        "at,action,actor_type,actor_id,resource_type,resource_id,ip,user_agent,request_id,details",
+      );
+      expect(lines.length).toBeGreaterThan(1);
+      expect(lines.slice(1).every((l) => l.includes(",credential,"))).toBe(true);
+      // never a secret: the values are not in the log
+      expect(csv.body).not.toContain("test-not-a-real-key");
+
+      const json = await call(
+        t.app,
+        jar,
+        "GET",
+        "/v1/audit/export?format=json&action=credential.create",
+      );
+      const events = JSON.parse(json.body) as { action: string; at: string }[];
+      expect(events.length).toBeGreaterThan(0);
+      expect(events.every((e) => e.action === "credential.create")).toBe(true);
+      expect(events.map((e) => e.at)).toEqual([...events.map((e) => e.at)].sort().reverse());
+    });
+  });
+
   describe("E-06, E-07: private-address refusals say how to allow them", () => {
     let strict: TestApp;
     let strictJar: Jar;
