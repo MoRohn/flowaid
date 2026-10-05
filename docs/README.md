@@ -64,6 +64,7 @@ The plans and reviews behind the code, kept for reference; code comments cite th
 | [FLOWAID_V2_PRODUCT_STRATEGY.md](project/FLOWAID_V2_PRODUCT_STRATEGY.md) | Vision, users, journeys, principles, and what V2 does not do                                                                          |
 | [FLOWAID_V2_ROADMAP.md](project/FLOWAID_V2_ROADMAP.md)                   | The phases, initiative by initiative                                                                                                  |
 | [FLOWAID_V2_FINAL_AUDIT.md](project/FLOWAID_V2_FINAL_AUDIT.md)           | What V2 delivered, what was verified, and what is deferred                                                                            |
+| [PRODUCT_ROADMAP_2026-10.md](project/PRODUCT_ROADMAP_2026-10.md)         | The October 2026 capability audit and roadmap: every capability assessed, items with evidence, acceptance and status                  |
 
 ## PageIndex document intelligence (`pageindex/`)
 

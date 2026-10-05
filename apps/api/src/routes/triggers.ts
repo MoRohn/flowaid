@@ -46,6 +46,7 @@ import {
   IdParams,
   ListQuery,
   PageQuery,
+  queryBool,
   afterCursor,
   decodeCursor,
   encodeCursor,
@@ -526,7 +527,7 @@ export function triggerRoutes(app: FastifyInstance, ctx: ApiContext): void {
       schema: {
         tags: ["artifacts"],
         params: IdParams,
-        querystring: z.object({ inline: z.coerce.boolean().default(false) }),
+        querystring: z.object({ inline: queryBool() }),
       },
     },
     async (req, reply) => {

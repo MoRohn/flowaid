@@ -44,7 +44,7 @@ import {
   WorkflowVersionSchema,
   WorkflowVersionSummarySchema,
 } from "../dto/workflows.js";
-import { materialiseTriggers } from "../services/triggers.js";
+import { materialiseTriggers, previousTriggers } from "../services/triggers.js";
 import { deploymentDto, deploymentsOf, visibleWorkflow } from "../services/workflows.js";
 import type { Tx } from "@flowaid/database";
 import { serverCredentialTypes, unboundRequiredSecrets } from "../services/serverKeys.js";
@@ -289,6 +289,7 @@ export function versionRoutes(app: FastifyInstance, ctx: ApiContext): void {
   ) => {
     assertEnvironmentAllowed(p, environmentId);
     const w = await visibleWorkflow(tx, p, workflowId);
+    if (w.archivedAt) throw new ConflictError("this workflow is archived, so it can't be deployed");
     const [env] = await tx
       .select()
       .from(environments)
@@ -329,6 +330,7 @@ export function versionRoutes(app: FastifyInstance, ctx: ApiContext): void {
       environmentId,
       triggers: v.definition.triggers,
       inputs: v.plan.inputs,
+      previous: await previousTriggers(tx, d.previousVersionId),
       baseUrl: ctx.config.baseUrl,
       now: new Date(ctx.clock.now()),
     });

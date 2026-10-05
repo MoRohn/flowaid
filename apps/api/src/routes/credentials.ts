@@ -19,7 +19,15 @@ import {
   type Principal,
 } from "../auth/principal.js";
 import type { ApiContext } from "../context.js";
-import { IdParams, NoContent, PageQuery, afterCursor, page, toPage } from "../dto/common.js";
+import {
+  IdParams,
+  NoContent,
+  PageQuery,
+  queryBool,
+  afterCursor,
+  page,
+  toPage,
+} from "../dto/common.js";
 
 type CredentialRow = typeof credentials.$inferSelect;
 
@@ -404,7 +412,9 @@ export function credentialRoutes(app: FastifyInstance, ctx: ApiContext): void {
       );
       if (current.storage === "external")
         throw new BadRequestError("rotate external credentials in their secret manager");
-      const s = await ctx.credentials.seal(current.id, current.type, req.body.values);
+      // fields left out keep their values (a username, a header name, a base URL), as with PATCH
+      const merged = { ...(await ctx.credentials.decrypt(current.id)), ...req.body.values };
+      const s = await ctx.credentials.seal(current.id, current.type, merged);
       const row = await ctx.db.tenant(p.workspaceId, async (tx) => {
         const [u] = await tx
           .update(credentials)
@@ -420,7 +430,7 @@ export function credentialRoutes(app: FastifyInstance, ctx: ApiContext): void {
           .returning();
         return u as CredentialRow;
       });
-      return dto(row, hintsOf(current.type, req.body.values));
+      return dto(row, hintsOf(current.type, merged));
     },
   );
 
@@ -463,12 +473,14 @@ export function credentialRoutes(app: FastifyInstance, ctx: ApiContext): void {
           };
         }
       }
-      await ctx.db.tenant(p.workspaceId, (tx) =>
-        tx
-          .update(credentials)
-          .set({ lastTestedAt: new Date(), lastTestOk: result.ok })
-          .where(eq(credentials.id, current.id)),
-      );
+      // a type without a probe tested nothing, so it records no result ("OK" would be untrue)
+      if (type?.test)
+        await ctx.db.tenant(p.workspaceId, (tx) =>
+          tx
+            .update(credentials)
+            .set({ lastTestedAt: new Date(), lastTestOk: result.ok })
+            .where(eq(credentials.id, current.id)),
+        );
       req.audit.details = { ok: result.ok };
       return result;
     },
@@ -486,7 +498,7 @@ export function credentialRoutes(app: FastifyInstance, ctx: ApiContext): void {
       schema: {
         tags: ["credentials"],
         params: IdParams,
-        querystring: z.object({ force: z.coerce.boolean().default(false) }),
+        querystring: z.object({ force: queryBool() }),
         response: { 204: NoContent },
       },
     },

@@ -12,10 +12,21 @@
  * same tool name updates its description and environment, as it does for its own
  * (`source='trigger'`) rows, which it switches on and a later version without the trigger switches
  * off.
+ *
+ * A webhook, schedule or exposure switched off by a person stays off across deploys: a row that is
+ * off while the version being replaced still declared its trigger was switched off by hand, not by a
+ * deploy. One a version dropped (and so switched off) comes back on when a version declares it again.
  */
 import { Cron } from "croner";
 import { and, eq, ne } from "drizzle-orm";
-import { environments, mcpExposures, schedules, webhooks, type Tx } from "@flowaid/database";
+import {
+  environments,
+  mcpExposures,
+  schedules,
+  webhooks,
+  workflowVersions,
+  type Tx,
+} from "@flowaid/database";
 import { uuidv7 } from "@flowaid/shared";
 import { describeInputIssues, inputIssues } from "@flowaid/workflow-compiler";
 import { WorkflowValidationError, type JsonSchema, type Trigger } from "@flowaid/workflow-core";
@@ -58,6 +69,8 @@ export async function materialiseTriggers(
     triggers: readonly Trigger[];
     /** the deployed version's inputs schema: schedule inputs are checked against it */
     inputs: JsonSchema;
+    /** the triggers of the version this deploy replaces in the environment (none on a first deploy) */
+    previous?: readonly Trigger[];
     baseUrl: string;
     now: Date;
   },
@@ -65,6 +78,14 @@ export async function materialiseTriggers(
   const [env] = await tx.select().from(environments).where(eq(environments.id, i.environmentId));
   if (!env) throw diagnosticError("E_SCHEMA", "unknown environment", "/environmentId");
   const out: MaterialisedTriggers = { webhooks: [], schedules: [], mcpExposures: [], disabled: [] };
+  const previous = i.previous ?? [];
+  const sameSchedule = (
+    a: { cron: string; timezone: string; input: unknown },
+    b: { cron: string; timezone: string; input: unknown },
+  ) =>
+    a.cron === b.cron &&
+    a.timezone === b.timezone &&
+    JSON.stringify(a.input) === JSON.stringify(b.input);
 
   // Webhooks
   const wantHooks = i.triggers.flatMap((t, idx) => (t.type === "webhook" ? [{ t, idx }] : []));
@@ -91,12 +112,16 @@ export async function materialiseTriggers(
         `/triggers/${idx}/path`,
       );
     const existing = ownHooks.find((h) => h.path === path);
+    const switchedOff =
+      existing !== undefined &&
+      !existing.enabled &&
+      previous.some((x) => x.type === "webhook" && x.path === t.path);
     const values = {
       signature: t.signature,
       responseMode: t.responseMode,
       inputPointer: t.inputPointer,
       allowedHeaders: t.allowedHeaders,
-      enabled: true,
+      enabled: !switchedOff,
     };
     let id: string;
     let secretBound: boolean;
@@ -155,17 +180,14 @@ export async function materialiseTriggers(
         `invalid cron expression '${t.cron}'`,
         `/triggers/${idx}/cron`,
       );
-    const existing = ownSchedules.find(
-      (s) =>
-        s.cron === t.cron &&
-        s.timezone === t.timezone &&
-        JSON.stringify(s.input) === JSON.stringify(t.input),
-    );
+    const existing = ownSchedules.find((s) => sameSchedule(s, t));
     let id: string;
     if (existing) {
+      const switchedOff =
+        !existing.enabled && previous.some((x) => x.type === "schedule" && sameSchedule(x, t));
       await tx
         .update(schedules)
-        .set({ enabled: true, nextRunAt: next })
+        .set({ enabled: !switchedOff, nextRunAt: next })
         .where(eq(schedules.id, existing.id));
       id = existing.id;
     } else {
@@ -227,13 +249,15 @@ export async function materialiseTriggers(
     let id: string;
     if (sameName) {
       // One exposure per tool name: it follows the latest environment deployed with it. A manual
-      // exposure keeps the switch its owner set.
+      // exposure keeps the switch its owner set, and so does one switched off by hand.
+      const switchedOff =
+        !sameName.enabled && previous.some((x) => x.type === "mcp" && x.toolName === t.toolName);
       await tx
         .update(mcpExposures)
         .set({
           description: t.description,
           environmentId: i.environmentId,
-          ...(sameName.source === "trigger" ? { enabled: true } : {}),
+          ...(sameName.source === "trigger" && !switchedOff ? { enabled: true } : {}),
         })
         .where(eq(mcpExposures.id, sameName.id));
       id = sameName.id;
@@ -258,4 +282,27 @@ export async function materialiseTriggers(
       out.disabled.push({ kind: "mcp", id: e.id });
     }
   return out;
+}
+
+/** Switches off every webhook, schedule and MCP exposure of a workflow (archiving it). */
+export async function disableWorkflowTriggers(tx: Tx, workflowId: string): Promise<void> {
+  await tx.update(webhooks).set({ enabled: false }).where(eq(webhooks.workflowId, workflowId));
+  await tx.update(schedules).set({ enabled: false }).where(eq(schedules.workflowId, workflowId));
+  await tx
+    .update(mcpExposures)
+    .set({ enabled: false })
+    .where(eq(mcpExposures.workflowId, workflowId));
+}
+
+/** The triggers of the version a deploy replaced (`previousVersionId`), for `materialiseTriggers`. */
+export async function previousTriggers(
+  tx: Tx,
+  previousVersionId: string | null,
+): Promise<readonly Trigger[]> {
+  if (!previousVersionId) return [];
+  const [v] = await tx
+    .select({ definition: workflowVersions.definition })
+    .from(workflowVersions)
+    .where(eq(workflowVersions.id, previousVersionId));
+  return (v?.definition.triggers as readonly Trigger[] | undefined) ?? [];
 }

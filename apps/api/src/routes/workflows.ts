@@ -35,7 +35,15 @@ import {
 } from "@flowaid/workflow-core";
 import type { ApiContext } from "../context.js";
 import { assertEnvironmentAllowed, hasScope } from "../auth/principal.js";
-import { IdParams, ListQuery, NoContent, decodeCursor, encodeCursor, page } from "../dto/common.js";
+import {
+  IdParams,
+  ListQuery,
+  NoContent,
+  queryBool,
+  decodeCursor,
+  encodeCursor,
+  page,
+} from "../dto/common.js";
 import {
   CompileResponseSchema,
   CreateWorkflowRequestSchema,
@@ -49,7 +57,11 @@ import {
   WorkflowVersionSchema,
 } from "../dto/workflows.js";
 import { catalogSnapshot, compileIn } from "../services/compile.js";
-import { materialiseTriggers } from "../services/triggers.js";
+import {
+  disableWorkflowTriggers,
+  materialiseTriggers,
+  previousTriggers,
+} from "../services/triggers.js";
 import {
   blankDefinition,
   deploymentDto,
@@ -283,7 +295,7 @@ export function workflowRoutes(app: FastifyInstance, ctx: ApiContext): void {
         querystring: ListQuery.extend({
           q: z.string().max(200).optional(),
           tag: z.string().max(40).optional(),
-          archived: z.coerce.boolean().default(false),
+          archived: queryBool(),
           include: z.enum(["activity"]).optional(),
         }),
         response: { 200: page(WorkflowSummarySchema) },
@@ -518,7 +530,7 @@ export function workflowRoutes(app: FastifyInstance, ctx: ApiContext): void {
         tags: ["workflows"],
         summary: "Archive (or purge with ?purge=true)",
         params: IdParams,
-        querystring: z.object({ purge: z.coerce.boolean().default(false) }),
+        querystring: z.object({ purge: queryBool() }),
         response: { 204: NoContent },
       },
     },
@@ -528,8 +540,11 @@ export function workflowRoutes(app: FastifyInstance, ctx: ApiContext): void {
       await ctx.db.tenant(p.workspaceId, async (tx) => {
         const w = await visibleWorkflow(tx, p, req.params.id);
         if (req.query.purge) await tx.delete(workflows).where(eq(workflows.id, w.id));
-        else
+        else {
+          // archived: hidden, and its webhooks, schedules and MCP tools stop (runs and versions stay)
           await tx.update(workflows).set({ archivedAt: new Date() }).where(eq(workflows.id, w.id));
+          await disableWorkflowTriggers(tx, w.id);
+        }
       });
       req.audit.details = { purge: req.query.purge };
       return reply.code(204).send(null);
@@ -717,6 +732,8 @@ export function workflowRoutes(app: FastifyInstance, ctx: ApiContext): void {
           label: req.body.label ?? null,
           publishedBy: p.userId,
         });
+        if (w.archivedAt && (req.body.deployTo ?? []).length > 0)
+          throw new ConflictError("this workflow is archived, so it can't be deployed");
         for (const envId of req.body.deployTo ?? []) {
           const [env] = await tx
             .select()
@@ -742,7 +759,7 @@ export function workflowRoutes(app: FastifyInstance, ctx: ApiContext): void {
                 location: { path: "/secrets" },
               })),
             );
-          await deploy(tx, {
+          const d = await deploy(tx, {
             workflowId: w.id,
             environmentId: envId,
             versionId: v.id,
@@ -755,6 +772,7 @@ export function workflowRoutes(app: FastifyInstance, ctx: ApiContext): void {
             environmentId: envId,
             triggers: w.draft.triggers,
             inputs: v.plan.inputs,
+            previous: await previousTriggers(tx, d.previousVersionId),
             baseUrl: ctx.config.baseUrl,
             now: new Date(ctx.clock.now()),
           });

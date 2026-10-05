@@ -39,7 +39,15 @@ import {
   type Principal,
 } from "../auth/principal.js";
 import type { ApiContext } from "../context.js";
-import { IdParams, ListQuery, NoContent, decodeCursor, encodeCursor, page } from "../dto/common.js";
+import {
+  IdParams,
+  ListQuery,
+  NoContent,
+  queryBool,
+  decodeCursor,
+  encodeCursor,
+  page,
+} from "../dto/common.js";
 import {
   HumanTaskSchema,
   RunAcceptedSchema,
@@ -1005,7 +1013,7 @@ export function runRoutes(app: FastifyInstance, ctx: ApiContext): void {
         querystring: ListQuery.extend({
           status: z.enum(["open", "responded", "expired", "cancelled"]).optional(),
           workflowId: z.uuid().optional(),
-          assignedToMe: z.coerce.boolean().default(false),
+          assignedToMe: queryBool(),
         }),
         response: { 200: page(HumanTaskSchema) },
       },

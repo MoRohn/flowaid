@@ -3,13 +3,16 @@ import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import {
+  apiKeys,
   createUser,
   createWorkspace,
   environments,
+  evaluationRuns,
   findUserByEmail,
   getWorkspaceBySlug,
   listUserWorkspaces,
   memberships,
+  runs,
   setMembership,
   updateWorkspaceSettings,
   users,
@@ -21,7 +24,7 @@ import {
 } from "@flowaid/database";
 import { uuidv7 } from "@flowaid/shared";
 import { ConflictError, ForbiddenError, NotFoundError } from "@flowaid/workflow-core";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, count, eq, isNull, ne } from "drizzle-orm";
 import { sessionUserId } from "../auth/principal.js";
 import { roleAtLeast } from "../auth/scopes.js";
 import type { ApiContext } from "../context.js";
@@ -480,6 +483,19 @@ export function workspaceRoutes(app: FastifyInstance, ctx: ApiContext): void {
     async (req) => {
       const ws = req.principal?.workspaceId ?? "";
       const row = await ctx.db.tenant(ws, async (tx) => {
+        if (req.body.name) {
+          const [taken] = await tx
+            .select({ id: environments.id })
+            .from(environments)
+            .where(
+              and(
+                eq(environments.workspaceId, ws),
+                eq(environments.name, req.body.name),
+                ne(environments.id, req.params.id),
+              ),
+            );
+          if (taken) throw new ConflictError(`an environment called ${req.body.name} exists`);
+        }
         const [u] = await tx
           .update(environments)
           .set({
@@ -510,13 +526,36 @@ export function workspaceRoutes(app: FastifyInstance, ctx: ApiContext): void {
     },
     async (req, reply) => {
       const ws = req.principal?.workspaceId ?? "";
-      const rows = await ctx.db.tenant(ws, (tx) =>
-        tx
-          .delete(environments)
-          .where(and(eq(environments.id, req.params.id), eq(environments.workspaceId, ws)))
-          .returning({ id: environments.id }),
-      );
-      if (rows.length === 0) throw new NotFoundError("environment not found");
+      const revoked = await ctx.db.tenant(ws, async (tx) => {
+        const [env] = await tx
+          .select({ id: environments.id, name: environments.name })
+          .from(environments)
+          .where(and(eq(environments.id, req.params.id), eq(environments.workspaceId, ws)));
+        if (!env) throw new NotFoundError("environment not found");
+        // runs and evaluation runs keep their environment: one with history can't go
+        const [{ n: runCount } = { n: 0 }] = await tx
+          .select({ n: count() })
+          .from(runs)
+          .where(eq(runs.environmentId, env.id));
+        const [{ n: evalCount } = { n: 0 }] = await tx
+          .select({ n: count() })
+          .from(evaluationRuns)
+          .where(eq(evaluationRuns.environmentId, env.id));
+        if (runCount + evalCount > 0)
+          throw new ConflictError(
+            `${env.name} has ${runCount + evalCount} run${runCount + evalCount === 1 ? "" : "s"} on record, and runs keep their environment, so it can't be deleted. Undeploy its workflows instead, or delete the runs first.`,
+            { runs: runCount, evaluationRuns: evalCount },
+          );
+        // a key or MCP token pinned here would otherwise reach every environment: revoke it
+        const keys = await tx
+          .update(apiKeys)
+          .set({ revokedAt: new Date() })
+          .where(and(eq(apiKeys.environmentId, env.id), isNull(apiKeys.revokedAt)))
+          .returning({ id: apiKeys.id });
+        await tx.delete(environments).where(eq(environments.id, env.id));
+        return keys.length;
+      });
+      req.audit.details = { revokedApiKeys: revoked };
       return reply.code(204).send(null);
     },
   );
