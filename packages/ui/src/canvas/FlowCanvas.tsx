@@ -7,6 +7,7 @@ import {
   useState,
   type CSSProperties,
   type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
 import {
@@ -821,9 +822,13 @@ function FlowCanvasInner({
     inspect: openInspector !== undefined,
   });
 
-  const focusWrapper = useCallback(() => {
+  // React bubbles pointer events through portals, so a click in the palette (or any other popover
+  // the canvas opens) reaches this handler too; only a press on the canvas's own DOM takes focus,
+  // or the popover would close on focus-outside before its option is chosen.
+  const focusWrapper = useCallback((e: ReactPointerEvent) => {
     const el = wrapperRef.current;
-    if (el && !el.contains(document.activeElement)) el.focus({ preventScroll: true });
+    if (!el || !(e.target instanceof Node) || !el.contains(e.target)) return;
+    if (!el.contains(document.activeElement)) el.focus({ preventScroll: true });
   }, []);
 
   // --- diagnostics ------------------------------------------------------
