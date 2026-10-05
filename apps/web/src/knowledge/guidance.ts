@@ -76,11 +76,13 @@ export function sourceReviewNotes(
       state: "info",
       message: !e.changed
         ? "Nothing changed yet."
-        : e.reindex
+        : e.reindex && e.documents > 0
           ? `Saving indexes its ${n} again with the new settings, in the background.`
           : e.refetch
             ? "Saving fetches its documents again from the new addresses."
-            : "Saving changes nothing in its index.",
+            : e.reindex
+              ? "Saving changes the settings; there is no document to index again yet."
+              : "Saving changes nothing in its index.",
     };
   };
   const origin = originError(f);

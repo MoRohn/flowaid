@@ -327,4 +327,29 @@ describe("a source's settings", () => {
       },
     });
   });
+
+  it("saves at once when there is no document to index again", async () => {
+    allFields();
+    const fetchMock = stubApi({
+      "GET /v1/credentials": () => ({ items: [], next_cursor: null }),
+      "GET /v1/providers": () => [],
+      "GET /v1/models": () => [],
+      "PATCH /v1/knowledge/sources/src-1": (init) => ({ ...saved, ...(bodyOf(init) as object) }),
+    });
+    const onOpenChange = vi.fn();
+    render(
+      withClient(
+        <NewSourceDialog open onOpenChange={onOpenChange} editing={{ ...saved, documents: 0 }} />,
+      ),
+    );
+    act(() => {
+      fireEvent.click(screen.getByRole("radio", { name: /Keywords only/ }));
+    });
+    act(() => {
+      fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    });
+    await waitFor(() =>
+      expect(callsTo(fetchMock, "PATCH /v1/knowledge/sources/src-1")).toHaveLength(1),
+    );
+  });
 });

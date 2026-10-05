@@ -196,9 +196,13 @@ export function NewSourceDialog({
       errorTitle: editing ? "Could not save the source" : "Could not create the source",
     },
   );
+  // asked only when documents are indexed or fetched again (a source with none has nothing to redo)
+  const asks =
+    editing !== null &&
+    change !== null &&
+    ((change.reindex && editing.documents > 0) || change.refetch);
   const submit = () => {
-    if (change && (change.reindex || change.refetch) && confirming !== "save")
-      return setConfirming("save");
+    if (asks && confirming !== "save") return setConfirming("save");
     setConfirming(null);
     save.mutate(undefined);
   };
