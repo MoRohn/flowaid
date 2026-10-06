@@ -47,7 +47,7 @@ describe("usePreservedDraft", () => {
         <Page />
       </DraftProvider>,
     );
-    fireEvent.change(name(), { target: { value: "Acme Ops" } });
+    fireEvent.change(name(), { target: { value: "Team Name" } });
     expect(screen.getByTestId("dirty").textContent).toBe("true");
     expect(screen.getByRole("button", { name: "Workspace •" })).toBeTruthy();
 
@@ -55,7 +55,7 @@ describe("usePreservedDraft", () => {
     expect(screen.getByText("API keys")).toBeTruthy();
     // still marked while the form is not on screen
     fireEvent.click(screen.getByRole("button", { name: "Workspace •" }));
-    expect(name().value).toBe("Acme Ops");
+    expect(name().value).toBe("Team Name");
   });
 
   it("discarding clears the draft and the mark", () => {
@@ -76,13 +76,13 @@ describe("usePreservedDraft", () => {
         <Page saved="Acme" />
       </DraftProvider>,
     );
-    fireEvent.change(name(), { target: { value: "Acme Ops" } });
+    fireEvent.change(name(), { target: { value: "Team Name" } });
     rerender(
       <DraftProvider>
-        <Page saved="Acme Ops" />
+        <Page saved="Team Name" />
       </DraftProvider>,
     );
-    expect(name().value).toBe("Acme Ops");
+    expect(name().value).toBe("Team Name");
     expect(screen.getByTestId("dirty").textContent).toBe("false");
   });
 
@@ -98,7 +98,7 @@ describe("usePreservedDraft", () => {
       return e.defaultPrevented;
     };
     expect(unload()).toBe(false);
-    fireEvent.change(name(), { target: { value: "Acme Ops" } });
+    fireEvent.change(name(), { target: { value: "Team Name" } });
     fireEvent.click(screen.getByRole("button", { name: "Keys" }));
     expect(unload()).toBe(true);
   });
@@ -109,10 +109,10 @@ describe("usePreservedDraft", () => {
     render(
       <DraftProvider>
         <Page />
-        <a href="/acme-ops/runs">Runs</a>
+        <a href="/team-name/runs">Runs</a>
       </DraftProvider>,
     );
-    fireEvent.change(name(), { target: { value: "Acme Ops" } });
+    fireEvent.change(name(), { target: { value: "Team Name" } });
     const click = new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 });
     screen.getByRole("link", { name: "Runs" }).dispatchEvent(click);
     expect(confirm).toHaveBeenCalledOnce();
