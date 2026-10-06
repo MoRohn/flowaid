@@ -25,9 +25,9 @@ async function restrictedSyntaxMessages(code: string): Promise<string[]> {
     .map((m) => m.message);
 }
 
-// The first lint builds the type-aware program for the whole package, which takes several
-// seconds on a cold CI runner.
-describe("ui lint: brand conformance", { timeout: 60_000 }, () => {
+// The first lint builds the type-aware program for the whole package. That takes a few seconds
+// alone, but on a CI runner busy with the other test workers it has taken 66 s (2026-10-06).
+describe("ui lint: brand conformance", { timeout: 180_000 }, () => {
   it("fails on a reintroduced arbitrary text size, in a string or a template", async () => {
     const messages = await restrictedSyntaxMessages(
       [
