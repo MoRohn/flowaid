@@ -1,5 +1,12 @@
 # @flowaid/storage
 
+## 0.10.0
+
+### Patch Changes
+
+- Updated dependencies [d568cf6]
+  - @flowaid/workflow-core@0.10.0
+
 ## 0.9.0
 
 ### Patch Changes
