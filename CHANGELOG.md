@@ -5,6 +5,302 @@ release publishes the `ghcr.io/morohn/flowaid-api`, `-worker` and `-web` images 
 Sections are added by `pnpm version-packages` from the changesets merged since the last release
 (see [docs/operations/RELEASING.md](docs/operations/RELEASING.md)); each package also keeps its own `CHANGELOG.md`.
 
+## 0.10.0 — 2026-10-06
+
+- Signing secrets FlowAId generates for webhooks and notification channels now belong to them
+  (migration 0016): they are no longer listed under Credentials, rotating replaces the previous
+  secret instead of leaving it behind, and deleting, rotating or editing one from Credentials is
+  refused with the webhook or channel named. Existing secrets are matched to their owner. Rotating a
+  notification channel's signing secret no longer fails with an internal error.
+  A webhook path or MCP tool name that is switched off no longer stays reserved: deploying another
+  workflow with it (or exposing another workflow under that tool name) takes it over, and only a
+  switched-on one is a conflict.
+  Secrets shown once (API keys, MCP tokens, webhook and notification signing secrets) can no longer
+  be dismissed by a stray click outside the dialog or by Escape; only "I have copied it" closes it.
+  The Rotate credential dialog forgets typed secrets when it is cancelled or opened for another
+  credential.
+  Deleting a credential now knows everything that uses it: workflow secret bindings, OpenAPI
+  toolsets, MCP servers, knowledge sources, webhooks and notification channels
+  (`GET /v1/credentials/:id/uses`, also shown in the credential's details). The delete
+  confirmation lists those uses with links; an admin can unbind and delete, anyone else is asked to
+  give them another credential first. The API refuses the delete (409, uses listed) unless forced.
+  A schedule's Run now asks first, naming the environment (and saying when it is protected), then
+  offers Open run; the schedule's last run shows the manual run. Rotating a webhook's or
+  notification channel's signing secret asks first, since the current secret stops working at once.
+  Switches, Send a test and rotation buttons show that they are working and can't be fired twice.
+  MCP servers can be edited (name, address or program, sign-in); changing where one runs or how it
+  signs in sets it back to Pending. Test and Discover show that they are running, record their
+  outcome on the row at once, and name the real cause of a failure. Every refusal of a private or
+  local address (MCP servers, OpenAPI documents and tools, notification sends) now says to set
+  FLOWAID_ALLOW_PRIVATE_NETWORK=true, instead of "You do not have access".
+  OpenAPI toolsets have a Details view: their operations (method, path, what each does), the
+  document and server they came from, and a form to rename them or change their credential
+  (a taken name is refused with 409 instead of failing).
+  Each notification channel has a History (`GET /v1/notifications/:id/deliveries`): the alerts
+  and tests sent to it, newest first, with why a send failed. Test sends are now recorded there too.
+  The audit log exports the filtered range as CSV or JSON (`GET /v1/audit/export`; formula-like
+  CSV fields are defused), offers the resource types it actually holds
+  (`GET /v1/audit/resource-types`) instead of a fixed list, and its period now reaches a year or
+  all time.
+  Saving a shorter run, artifact or audit retention asks first and says what the next nightly
+  clean-up will clear; a monthly budget of $0 says that it means no budget.
+  Deleting an environment lists what goes with it (deployments, webhooks, schedules, MCP tools,
+  secret bindings, credentials limited to it, keys pinned to it; `GET /v1/environments/:id/usage`),
+  and one with runs on record says why it can't be deleted before you try. Renaming one warns that
+  webhook URLs move with the name, and that renaming dev stops Run draft.
+  After adding an unsigned webhook, the next steps no longer ask for a signing secret; the review
+  says when a schedule's input will stop it deploying, reads "prod is protected and refuses unsigned
+  calls", and unsigned webhooks no longer show a switched-off "Require signed timestamp".
+  Smaller fixes: Providers' "Add … credential" opens New credential on that provider's key; an MCP
+  client calling a tool with arguments that don't fit gets each problem named, so its model can
+  correct the call; an MCP token pinned to a workflow id that doesn't exist is refused.
+- Builder details. The description you give a new workflow now shows in the builder too. Typing in a
+  step's setting undoes as one change instead of one character at a time. A Branch added after a
+  yes/no decision routes on its answer instead of always taking "yes", and a Branch condition offers
+  the earlier steps' outputs as you type. Publishing no longer clears the run you were looking at,
+  and its toast offers **Deploy** for the new version. The header menu says "Duplicate workflow"
+  (⌘D on the canvas duplicates steps), canvas edges have names that tell a control edge from a data
+  edge, and a workflow whose only key is optional (a TypeSafe step's) no longer reads "none of this
+  workflow's do yet".
+- Evaluations score a Decision batch step per question. Such a step (the Message triage starter and
+  every business template use one) answers several questions, but only one answer reached the
+  evaluation, so a case expecting the topic was compared with the yes/no answer. Expectations can now
+  name one question (`"triage.topic"`); a case that names only the step is checked against the one
+  question that can give the expected value, so existing cases keep their meaning. Add to evaluation
+  captures every answer, and accuracy, calibration and confusion are shown per question. A batch step
+  with more questions than one request takes now asks them in several batches rather than one by
+  one, and answers a person gave are recorded per question too.
+  Evaluation reports say what happened. A run with no gate reads "No gate set" (it read "Gate passed
+  with warnings") and offers Publish as a secondary action; the Block publish button, which did
+  nothing, is gone. Each failed case lists the checks it failed and why. A cancelled or failed
+  evaluation says how many of the set's cases ran and that every figure covers only those, and a
+  baseline that scored other cases is no longer shown as differences.
+  Deleting an evaluation set clears the publish-gate link of the workflows that used it (they kept
+  the id of a set that no longer existed), and the confirmation names those workflows.
+  `GET /v1/evaluations/sets/:id` lists them as `gateOf`.
+  Smaller evaluation fixes: Add to evaluation also offers sets tied to no workflow and will not add
+  a run the set already holds; the gate's minimum pass rate is entered in percent, as its text
+  speaks of it; a new case's form no longer shows "Fill in the required field" before anything is
+  typed; and a set's description ends its sentence in the header.
+- Knowledge sources can be changed after they are created. The source page has a Settings button
+  that opens the New source steps on the saved values: rename it, change its addresses, repository
+  or token, its search (switch to keywords only when the embedding model has no key) and its
+  chunking, or a PageIndex source's indexing model. Saving asks first when the change indexes every
+  document again or fetches them again, and keeps settings the form doesn't show.
+  A PageIndex source reads consistently when the PageIndex service is turned off: one notice says it
+  is off and how to turn it on, the documents it holds are listed (the list no longer needs the
+  service), and uploads, document actions and Try a question are not offered. Before, the banner
+  said the service was not answering, the table failed to load and Try a question said nothing was
+  indexed.
+  Knowledge details: removing the last failed document of an upload source takes it out of Error
+  (it stayed in Error over an empty table); keyword-only sources no longer mark every chunk "not
+  embedded"; a missing embedding key reads as what to do about it; Add documents names files it
+  could not read or that hold no text, and refuses an upload larger than one request takes, instead
+  of failing silently; and an empty upload source is no longer polled every few seconds.
+- Data-safety fixes. `?purge=false`, `?force=false`, `?archived=false` and the other boolean query
+  flags now mean false (they meant true). Rotating a credential keeps its fields that are not secret,
+  such as a username or base URL. Archiving a workflow switches off its webhooks, schedules and MCP
+  tools and refuses new runs and deploys, as the app promised. A webhook call retried after a refused
+  delivery now starts a run, and repeats are listed in Deliveries as duplicates. Deleting an
+  environment revokes the API keys and MCP tokens pinned to it instead of widening them to every
+  environment, and a delete or rename that can't happen answers 409 with the reason instead of 500.
+  Redeploying keeps a trigger switched off by hand. Testing a credential type that has no connection
+  test no longer records "OK". Tall form dialogs (New credential with all fields, Use template)
+  scroll their body so the submit button stays on screen; before, a click there closed the dialog
+  and nothing was saved. A recorded replay runs again a step whose output was not stored (privacy "do not persist")
+  instead of handing later steps the stored placeholder.
+  A workflow's evaluation gate link is cleared by the database when its set is deleted (migration
+  0017), and links left pointing at sets deleted earlier are cleared.
+- Runs, human tasks and the Overview. Many open run pages no longer freeze FlowAId: a run page holds
+  its live stream only while the run moves and the tab is visible, checks every 10 seconds while the
+  run waits for a person, and falls back to checking with a "Reconnect" button when the stream drops
+  or can't connect (six waiting-run tabs used to hold every connection the browser allows, and no
+  other page loaded).
+  "Retry node" reads as running while the retry runs (the header said Failed), the attempt it
+  replaced reads failed instead of staying active for good, and a finished run's "Started" and
+  "Ended" times keep counting.
+  Runs search and the created range cover every run, not the 50 loaded: `GET /v1/runs` takes `q` (the
+  start of a run id, the workflow's name or the error text), `from` and `to`, and the list sends them.
+  While older runs exist the count reads "50 runs loaded", an empty result says so and points at
+  "Load older runs", and a sort other than newest first says it orders the loaded runs. Version numbers
+  come with the runs (`include=version`, combinable as `include=decisions,version`), so the list no
+  longer asks for every workflow's versions, and it refreshes every 15 s instead of 3 s while its runs
+  only wait for a person.
+  "What happened, in plain words" no longer says a person answered when nobody did: a person's step
+  closed by a cancelled, timed-out or failed run reads "Nobody answered … before the run was
+  cancelled" (or reached its time limit, or failed), and "after 1 minute" is the time the person took,
+  not the step's own run time. A step retried in place reads once. A timed-out run gets a banner with
+  the limit it reached and a "Workflow settings" button, and its Guide steps no longer send you to a
+  failed step and Retry that don't exist.
+  Human tasks that closed without an answer are read-only: an expired or cancelled task shows its
+  status instead of a countdown, says why it closed (expired, or the run was cancelled, reached its
+  time limit or failed), and has no answer buttons, comment box or shortcuts. An answer is sent once:
+  the card stays locked after the API accepts it, so a double click or a second A sends nothing, and a
+  409 "already answered" reads as done instead of an error. Resolved lists every closed task
+  (answered, expired, cancelled) with an outcome filter and a workflow filter; `GET /v1/human-tasks`
+  takes several statuses (`status=responded,expired,cancelled`). A closed task's guidance reads
+  "About this task" and no longer gives a due time for a cancelled task.
+  Answer controls no longer claim a model decided when none did: a choice nobody ranked shows no
+  "Model pick", and a value to review reads "Proposed by the workflow" (or "by the step" for a paused
+  step) instead of "by the model", in the app and on external review links. On your own computer
+  (local mode) the task page drops Escalate and the inbox drops "Assign to me", since there is nobody
+  else to hand a task to. The escalation dialog's "Notify now" box, which sent nothing, is gone, and
+  the escalation reason is now kept on the audit trail as the dialog says. Assignees read as names
+  ("Admins", a member's name) instead of ids.
+  Cancelling a run asks first, in the trace header and the runs list's row menu: the confirmation
+  says it can't be undone and names the task that will close unanswered, takes an optional reason
+  (kept with the run), and offers "Keep running". The run's story ends with the reason.
+  The Overview keeps its time range, workflow and environment in the URL (`?range=7d&workflow=…&env=…`),
+  so a reload or a shared link shows the same view (7d used to come back as 24h). Open approvals follow
+  the environment filter like everything else on the page, the success-rate hint counts timed-out runs
+  with the failures, the page and its getting-started checklist share one workflow list, and "Publish
+  and deploy" ticks off only once a version is deployed, not just published.
+  "Ask someone outside the workspace" says who can open a review link before you send one: only this
+  computer when FlowAId runs locally (its web address is on this computer), or only people on your
+  network for a private address, with how to change that (FLOWAID_WEB_URL).
+- Download code from the app. The builder's ⋯ menu, the command menu (⌘K) and every row of the
+  Versions page now offer **Download code**: choose the version or the current draft, whether the
+  package carries the FlowAId runtime packages or lists them from npm, and whether the last successful
+  run supplies its sample input and a recorded run for its tests. The dialog follows the build and
+  saves the zip; a draft with problems lists them instead. The Versions row menu also downloads the
+  workflow as a single TypeScript file. `ExportDialog` is exported from `@flowaid/ui/builder`, and
+  `TopBar` takes `onDownloadCode`.
+- Compare's Promote, Rollback and Open keep the version you chose. Deployments now says which version
+  you chose, and every environment's button reads "Deploy v2" and starts on it; a deployed environment
+  also says when a newer version exists. Open on Compare marks that version's row on the Versions
+  page and scrolls to it.
+- Set a workflow's run limits without editing JSON. With no step selected, the builder's panel has an
+  **Execution** section: how long a run may take (waiting for a person counts), how much it may spend,
+  and how many steps run at once. The "No cost bound" warning has a **Set a cost limit** action and
+  the new "a human step can outlive its run" warning a **Set the run time limit** action, each opening
+  that field.
+- A failed draft run names the step and shows it failed. The builder stopped following a run as soon
+  as its record said it ended, sometimes before the events that say which step failed had been read:
+  the step kept showing Running and the Output tab could not name it or its message. The builder now
+  reads the run until its end is in, and settles any step still in progress against the run's error.
+  Developer steps such as Assert and Log draw as ordinary steps instead of an empty code card.
+- Expression fields offer references. A step setting written in FlowExpr (a Transform's expression,
+  an Assert's condition, a Filter's predicate) was a "JavaScript" code box with no help. It is now an
+  expression editor: typing a step's id and a dot offers its outputs, `$vars.` the workflow settings,
+  and every function with its arguments; a reference the step cannot read is underlined with what to
+  write instead, and a syntax error shows under the field. `FlowExprEditor`, `flowExprCompletions`
+  and `checkExpression` are exported from `@flowaid/ui/forms`.
+- New steps start without errors you did not cause. Adding a Boolean, Validator, Mock, Knowledge
+  base, Policy check, Text splitter or a LangChain step used to save empty stubs for its optional
+  settings (a Boolean's criteria, a Mock's failure, a reranker), which showed errors at once, came
+  back after every edit and could make a Mock fail every run. Optional settings are now saved only
+  once you fill them in, and clearing one removes it. The Problems list also matches the server's
+  after you clear an optional field, instead of showing a spurious "Invalid input".
+- Quick add connects the new step and keeps it in view. With nothing selected, the palette suggests
+  steps "after" the last one, but a pick used to land unconnected and often off-screen; it now follows
+  that step (beside it, or where you right-clicked) and the canvas pans to it when it is out of sight.
+  `FlowCanvas`'s `onAddNode` also says whether the palette opened at the pointer or in the view.
+- The builder no longer loses an edit made just before you leave it. Clicking a tab, the sidebar or
+  a breadcrumb within a second of an edit used to drop that edit silently; the builder now sends it
+  on the way out, opens on it when you come back, and tells you if the save was refused. Two quick
+  saves (⌘S twice) send one request after the other instead of colliding. Options in the Add node
+  palette can be clicked again: a click used to close the palette and add nothing.
+- The Workflows grid says when a search matches nothing, as the list does, and both offer **Clear the
+  search**. `WorkflowsBrowser` takes an `emptyState` shown in either view.
+- Editing an agent keeps the settings the form doesn't show: temperature, max output tokens, the
+  token cap and streaming set through the API or CLI were dropped by the first edit in the app. They
+  now have their own "Advanced" group under Limits, and any other stored setting is saved back
+  unchanged. A tool an agent lists that the workspace no longer offers (an MCP server removed, a tool
+  renamed) is shown under "No longer available" in Tools, where it can be unchecked; Review names it
+  and saving waits until it is removed, and the agent's card marks it, since every run would fail.
+  Smaller agent fixes: Review warns when Max cost is $0 or Max tool calls is 0 with tools chosen
+  (both stop the agent where it starts), and the hints say what 0 means. A chosen tool's approval
+  choice no longer squeezes the tool's name, Edit no longer promises to keep changes across pages
+  (its links open a new tab, with a way to refresh the tool list), the card shows "approval" only
+  for tools that really wait for a person, its buttons and switch are named after the agent, and
+  "ready to use" says the agent is in Add node under its own name.
+  An agent's Max steps reaches the steps that use it. Adding an agent from Add node copied its Max
+  steps onto the step (and the Agent step filled in 8 when it had none), so raising it on the agent
+  changed nothing. A step that uses an agent now leaves Max steps unset unless it sets its own, and
+  the compiler accepts that for a step with an agent. Steps added before keep the value they have;
+  clear it in the step's settings to use the agent's.
+- Use template picks the knowledge source a template reads. Document Q&A, the PageIndex agent and
+  compare templates, and GitHub issue triage with a knowledge base now offer the workspace's sources
+  of the kind they read (PageIndex PDFs, or chunked documents) and send the choice with the create,
+  so the copy no longer opens with an unresolved placeholder. A card counts only sources of the right
+  kind as ready and says when PageIndex is turned off. Template search covers the business flows too:
+  searching "expense" finds Expense approval instead of "No templates match". Pressing Enter in the
+  name field no longer creates the workflow before Review.
+- Starting FlowAId while it is already running finds it at once on every platform: the second start
+  asks the running launcher's control channel instead of a slow Windows process query, which could
+  take over a minute on a busy machine. A start that stops processes an earlier FlowAId left behind
+  now waits for their ports to be released before checking them.
+- The automated accessibility checks now cover every page in the navigation (Overview, Agents,
+  Triggers and Knowledge were missing), the command menu, the Guide, the collapsed navigation and an
+  open dialog, and check with the keyboard that focus comes back after a dialog closes, that the
+  Guide can be left with Tab and that the `g` shortcuts work.
+- Smaller accessibility fixes. The Light / Dark / System theme choice in the navigation is one Tab
+  stop and the arrow keys move between the options and choose. Hiding or reopening "Start here"
+  keeps keyboard focus on its button instead of dropping it to the top of the page. Error messages
+  in toasts stay on screen, with a close button, until you dismiss them; other toasts still go after
+  a few seconds.
+  The builder and the human task page have a page heading for screen readers.
+- ⌘K is easier to reach and does what you expect. A Search button in the top bar opens it (an icon
+  on phones), so it no longer needs a keyboard. Typed text picks the best match across all groups:
+  "runs" goes to the Runs page instead of the first loose match, and Ask FlowAId is always listed
+  last, so Enter only sends a question when nothing else matches. Pages come right after things to
+  create, the templates list shows five with a link to the rest, the actions group is called
+  Actions, and the placeholder fits. List pages show one filled button: the header's create button
+  (now filled on Workflows and Agents too), with the empty state below repeating it as an outlined
+  button.
+- On laptops the open Guide sits beside the page from 1280 px wide instead of floating over it, so it
+  no longer covers buttons such as New workflow or the right-hand table columns. On the builder's
+  canvas it still docks only from 1680 px, so the canvas keeps its width.
+- The Guide is a side panel you can Tab past: keyboard focus no longer cycles inside it, Shift+Tab
+  from its first control goes back to the page, and screen readers announce it as a complementary
+  region instead of a dialog. Escape or its close button closes it and puts focus back on the Guide
+  button in the top bar.
+- Pages load about 150 KB (gzip) less JavaScript: the code and template editors fetch CodeMirror
+  only when one appears, instead of every list page, every workflow page and the external review
+  page loading it up front (Agents 654 → 503 KB, Templates 650 → 498 KB, `/review` 700 → 541 KB, the
+  builder 1,650 → 1,491 KB). While it loads, a box of the editor's size holds its place.
+  `CodeEditor`, `ExpressionInput`, `ExpressionTextarea`, `TemplateEditor` and `TemplateInput` keep
+  their props and refs; `preloadCodeEditors()` fetches them ahead of time. `EMPTY_SCOPE` is also
+  exported from the CodeMirror-free expression helpers.
+- The navigation shortcuts shown in the collapsed nav's tooltips and in ⌘K work: `g o` Overview,
+  `g w` Workflows, `g a` Agents, `g r` Runs, `g h` Human tasks and `g s` Settings. They are listed
+  under Navigate in the keyboard shortcuts dialog (`?`), stay quiet while you type in a field, and a
+  page your workspace does not have registers none.
+- Wrong links and an unreachable API get real pages. A path no page answers shows "This page does
+  not exist" inside the usual frame, with links back into the workspace, instead of a bare 404. A
+  link whose id is malformed (`/runs/not-a-uuid`) says Not found and links back to its list instead
+  of "request params is invalid" with a Try again that could not help; missing knowledge sources and
+  evaluation sets link back too. A workspace that does not exist says so and offers the same page in
+  your workspaces instead of silently opening another one. When FlowAId's API cannot be reached, the
+  page says so, explains how to start FlowAId again, and opens by itself once the API answers.
+  Not-found and error pages have a heading. `EmptyState` takes `titleAs` to make its title a
+  heading.
+- Pages no longer jump while they load. "Start here" keeps the shape it had on your last visit until
+  the page's data arrives instead of opening and then folding away, and the Overview holds the
+  getting-started checklist's place while its steps load. On phones "Start here" starts as one line,
+  so the page's own content fills the first screen; opening it by hand is remembered as before.
+- A human step that can outlive its run is flagged. A run's time limit counts the time it waits for a
+  person, so an approval that may stay open longer than the run (or has no expiry at all) was
+  cancelled with the run while its card still promised the full time. The compiler now warns with
+  `W_HUMAN_EXPIRY_EXCEEDS_RUN_TIMEOUT` (RFC-0023) and names both durations. The Support triage
+  template's run limit is now 3 hours, so its 2-hour approval stays open as promised.
+- Data edges leave the Input step from its handles again. The start and end pills declared handle
+  positions that replaced the canvas's measurement on every update, so edges from Input started at the
+  pill's left edge; pills are now measured, and measured again when their ports change. Dragging a
+  connection over a pill no longer logs an unknown `handleReasons` prop, and a refused handle on a
+  pill says why, as it does on other steps.
+- Confirmations for destructive actions (delete, revoke, Quit FlowAId) open with Cancel focused and
+  are announced as alerts, so pressing Enter by habit cancels instead of deleting or stopping
+  FlowAId. Other confirmations still open on their confirm button.
+- Closing a dialog, side sheet or confirmation puts keyboard focus back on the control that opened
+  it, also when a menu item, a ⌘K command or a button that is not the dialog's own trigger opened
+  it. Before, focus fell to the top of the page after the navigation drawer, Quit FlowAId, Publish,
+  Add webhook and other dialogs opened from menus.
+- The workspace switcher opens from the collapsed navigation rail again, by mouse, Enter or Space.
+  `Tooltip` now passes any other props and its ref to the trigger, so it can sit inside another
+  `asChild` trigger such as a menu button; its ref now points at the trigger instead of the tooltip
+  bubble (nothing used the old target).
+
 ## 0.9.0 — 2026-10-01
 
 - Built-in agent tools, and agents you can switch on and off.

@@ -1,5 +1,16 @@
 # @flowaid/nodes-langchain
 
+## 0.10.0
+
+### Patch Changes
+
+- Updated dependencies [d568cf6]
+  - @flowaid/workflow-core@0.10.0
+  - @flowaid/langchain@0.10.0
+  - @flowaid/node-sdk@0.10.0
+  - @flowaid/providers@0.10.0
+  - @flowaid/shared@0.10.0
+
 ## 0.9.0
 
 ### Patch Changes

@@ -1,6 +1,6 @@
 {
   "name": "@flowaid/provider-anthropic",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "private": true,
   "description": "Anthropic Claude generation provider for flowaid: the Messages API with streaming (text, thinking, tool input), tools, structured output through a forced respond tool, prompt caching and cache-token accounting (ARCHITECTURE.md §6.6).",
   "license": "Apache-2.0",

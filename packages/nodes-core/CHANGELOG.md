@@ -1,5 +1,67 @@
 # @flowaid/nodes-core
 
+## 0.10.0
+
+### Patch Changes
+
+- d568cf6: A human step that can outlive its run is flagged. A run's time limit counts the time it waits for a
+  person, so an approval that may stay open longer than the run (or has no expiry at all) was
+  cancelled with the run while its card still promised the full time. The compiler now warns with
+  `W_HUMAN_EXPIRY_EXCEEDS_RUN_TIMEOUT` (RFC-0023) and names both durations. The Support triage
+  template's run limit is now 3 hours, so its 2-hour approval stays open as promised.
+- 08d7faf: Editing an agent keeps the settings the form doesn't show: temperature, max output tokens, the
+  token cap and streaming set through the API or CLI were dropped by the first edit in the app. They
+  now have their own "Advanced" group under Limits, and any other stored setting is saved back
+  unchanged. A tool an agent lists that the workspace no longer offers (an MCP server removed, a tool
+  renamed) is shown under "No longer available" in Tools, where it can be unchecked; Review names it
+  and saving waits until it is removed, and the agent's card marks it, since every run would fail.
+
+  Smaller agent fixes: Review warns when Max cost is $0 or Max tool calls is 0 with tools chosen
+  (both stop the agent where it starts), and the hints say what 0 means. A chosen tool's approval
+  choice no longer squeezes the tool's name, Edit no longer promises to keep changes across pages
+  (its links open a new tab, with a way to refresh the tool list), the card shows "approval" only
+  for tools that really wait for a person, its buttons and switch are named after the agent, and
+  "ready to use" says the agent is in Add node under its own name.
+
+  An agent's Max steps reaches the steps that use it. Adding an agent from Add node copied its Max
+  steps onto the step (and the Agent step filled in 8 when it had none), so raising it on the agent
+  changed nothing. A step that uses an agent now leaves Max steps unset unless it sets its own, and
+  the compiler accepts that for a step with an agent. Steps added before keep the value they have;
+  clear it in the step's settings to use the agent's.
+
+- bde0473: Evaluations score a Decision batch step per question. Such a step (the Message triage starter and
+  every business template use one) answers several questions, but only one answer reached the
+  evaluation, so a case expecting the topic was compared with the yes/no answer. Expectations can now
+  name one question (`"triage.topic"`); a case that names only the step is checked against the one
+  question that can give the expected value, so existing cases keep their meaning. Add to evaluation
+  captures every answer, and accuracy, calibration and confusion are shown per question. A batch step
+  with more questions than one request takes now asks them in several batches rather than one by
+  one, and answers a person gave are recorded per question too.
+
+  Evaluation reports say what happened. A run with no gate reads "No gate set" (it read "Gate passed
+  with warnings") and offers Publish as a secondary action; the Block publish button, which did
+  nothing, is gone. Each failed case lists the checks it failed and why. A cancelled or failed
+  evaluation says how many of the set's cases ran and that every figure covers only those, and a
+  baseline that scored other cases is no longer shown as differences.
+
+  Deleting an evaluation set clears the publish-gate link of the workflows that used it (they kept
+  the id of a set that no longer existed), and the confirmation names those workflows.
+  `GET /v1/evaluations/sets/:id` lists them as `gateOf`.
+
+  Smaller evaluation fixes: Add to evaluation also offers sets tied to no workflow and will not add
+  a run the set already holds; the gate's minimum pass rate is entered in percent, as its text
+  speaks of it; a new case's form no longer shows "Fill in the required field" before anything is
+  typed; and a set's description ends its sentence in the header.
+
+- Updated dependencies [d568cf6]
+  - @flowaid/workflow-core@0.10.0
+  - @flowaid/knowledge@0.10.0
+  - @flowaid/mcp@0.10.0
+  - @flowaid/node-sdk@0.10.0
+  - @flowaid/pageindex@0.10.0
+  - @flowaid/providers@0.10.0
+  - @flowaid/shared@0.10.0
+
 ## 0.9.0
 
 ### Minor Changes

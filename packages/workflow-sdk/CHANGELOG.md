@@ -1,5 +1,129 @@
 # @flowaid/workflow-sdk
 
+## 0.10.0
+
+### Patch Changes
+
+- e8b6267: Signing secrets FlowAId generates for webhooks and notification channels now belong to them
+  (migration 0016): they are no longer listed under Credentials, rotating replaces the previous
+  secret instead of leaving it behind, and deleting, rotating or editing one from Credentials is
+  refused with the webhook or channel named. Existing secrets are matched to their owner. Rotating a
+  notification channel's signing secret no longer fails with an internal error.
+
+  A webhook path or MCP tool name that is switched off no longer stays reserved: deploying another
+  workflow with it (or exposing another workflow under that tool name) takes it over, and only a
+  switched-on one is a conflict.
+
+  Secrets shown once (API keys, MCP tokens, webhook and notification signing secrets) can no longer
+  be dismissed by a stray click outside the dialog or by Escape; only "I have copied it" closes it.
+  The Rotate credential dialog forgets typed secrets when it is cancelled or opened for another
+  credential.
+
+  Deleting a credential now knows everything that uses it: workflow secret bindings, OpenAPI
+  toolsets, MCP servers, knowledge sources, webhooks and notification channels
+  (`GET /v1/credentials/:id/uses`, also shown in the credential's details). The delete
+  confirmation lists those uses with links; an admin can unbind and delete, anyone else is asked to
+  give them another credential first. The API refuses the delete (409, uses listed) unless forced.
+
+  A schedule's Run now asks first, naming the environment (and saying when it is protected), then
+  offers Open run; the schedule's last run shows the manual run. Rotating a webhook's or
+  notification channel's signing secret asks first, since the current secret stops working at once.
+  Switches, Send a test and rotation buttons show that they are working and can't be fired twice.
+
+  MCP servers can be edited (name, address or program, sign-in); changing where one runs or how it
+  signs in sets it back to Pending. Test and Discover show that they are running, record their
+  outcome on the row at once, and name the real cause of a failure. Every refusal of a private or
+  local address (MCP servers, OpenAPI documents and tools, notification sends) now says to set
+  FLOWAID_ALLOW_PRIVATE_NETWORK=true, instead of "You do not have access".
+
+  OpenAPI toolsets have a Details view: their operations (method, path, what each does), the
+  document and server they came from, and a form to rename them or change their credential
+  (a taken name is refused with 409 instead of failing).
+
+  Each notification channel has a History (`GET /v1/notifications/:id/deliveries`): the alerts
+  and tests sent to it, newest first, with why a send failed. Test sends are now recorded there too.
+
+  The audit log exports the filtered range as CSV or JSON (`GET /v1/audit/export`; formula-like
+  CSV fields are defused), offers the resource types it actually holds
+  (`GET /v1/audit/resource-types`) instead of a fixed list, and its period now reaches a year or
+  all time.
+
+  Saving a shorter run, artifact or audit retention asks first and says what the next nightly
+  clean-up will clear; a monthly budget of $0 says that it means no budget.
+
+  Deleting an environment lists what goes with it (deployments, webhooks, schedules, MCP tools,
+  secret bindings, credentials limited to it, keys pinned to it; `GET /v1/environments/:id/usage`),
+  and one with runs on record says why it can't be deleted before you try. Renaming one warns that
+  webhook URLs move with the name, and that renaming dev stops Run draft.
+
+  After adding an unsigned webhook, the next steps no longer ask for a signing secret; the review
+  says when a schedule's input will stop it deploying, reads "prod is protected and refuses unsigned
+  calls", and unsigned webhooks no longer show a switched-off "Require signed timestamp".
+
+  Smaller fixes: Providers' "Add … credential" opens New credential on that provider's key; an MCP
+  client calling a tool with arguments that don't fit gets each problem named, so its model can
+  correct the call; an MCP token pinned to a workflow id that doesn't exist is refused.
+
+- f1ca1b8: Runs, human tasks and the Overview. Many open run pages no longer freeze FlowAId: a run page holds
+  its live stream only while the run moves and the tab is visible, checks every 10 seconds while the
+  run waits for a person, and falls back to checking with a "Reconnect" button when the stream drops
+  or can't connect (six waiting-run tabs used to hold every connection the browser allows, and no
+  other page loaded).
+
+  "Retry node" reads as running while the retry runs (the header said Failed), the attempt it
+  replaced reads failed instead of staying active for good, and a finished run's "Started" and
+  "Ended" times keep counting.
+
+  Runs search and the created range cover every run, not the 50 loaded: `GET /v1/runs` takes `q` (the
+  start of a run id, the workflow's name or the error text), `from` and `to`, and the list sends them.
+  While older runs exist the count reads "50 runs loaded", an empty result says so and points at
+  "Load older runs", and a sort other than newest first says it orders the loaded runs. Version numbers
+  come with the runs (`include=version`, combinable as `include=decisions,version`), so the list no
+  longer asks for every workflow's versions, and it refreshes every 15 s instead of 3 s while its runs
+  only wait for a person.
+
+  "What happened, in plain words" no longer says a person answered when nobody did: a person's step
+  closed by a cancelled, timed-out or failed run reads "Nobody answered … before the run was
+  cancelled" (or reached its time limit, or failed), and "after 1 minute" is the time the person took,
+  not the step's own run time. A step retried in place reads once. A timed-out run gets a banner with
+  the limit it reached and a "Workflow settings" button, and its Guide steps no longer send you to a
+  failed step and Retry that don't exist.
+
+  Human tasks that closed without an answer are read-only: an expired or cancelled task shows its
+  status instead of a countdown, says why it closed (expired, or the run was cancelled, reached its
+  time limit or failed), and has no answer buttons, comment box or shortcuts. An answer is sent once:
+  the card stays locked after the API accepts it, so a double click or a second A sends nothing, and a
+  409 "already answered" reads as done instead of an error. Resolved lists every closed task
+  (answered, expired, cancelled) with an outcome filter and a workflow filter; `GET /v1/human-tasks`
+  takes several statuses (`status=responded,expired,cancelled`). A closed task's guidance reads
+  "About this task" and no longer gives a due time for a cancelled task.
+
+  Answer controls no longer claim a model decided when none did: a choice nobody ranked shows no
+  "Model pick", and a value to review reads "Proposed by the workflow" (or "by the step" for a paused
+  step) instead of "by the model", in the app and on external review links. On your own computer
+  (local mode) the task page drops Escalate and the inbox drops "Assign to me", since there is nobody
+  else to hand a task to. The escalation dialog's "Notify now" box, which sent nothing, is gone, and
+  the escalation reason is now kept on the audit trail as the dialog says. Assignees read as names
+  ("Admins", a member's name) instead of ids.
+
+  Cancelling a run asks first, in the trace header and the runs list's row menu: the confirmation
+  says it can't be undone and names the task that will close unanswered, takes an optional reason
+  (kept with the run), and offers "Keep running". The run's story ends with the reason.
+
+  The Overview keeps its time range, workflow and environment in the URL (`?range=7d&workflow=…&env=…`),
+  so a reload or a shared link shows the same view (7d used to come back as 24h). Open approvals follow
+  the environment filter like everything else on the page, the success-rate hint counts timed-out runs
+  with the failures, the page and its getting-started checklist share one workflow list, and "Publish
+  and deploy" ticks off only once a version is deployed, not just published.
+
+  "Ask someone outside the workspace" says who can open a review link before you send one: only this
+  computer when FlowAId runs locally (its web address is on this computer), or only people on your
+  network for a private address, with how to change that (FLOWAID_WEB_URL).
+
+- Updated dependencies [d568cf6]
+  - @flowaid/workflow-core@0.10.0
+  - @flowaid/shared@0.10.0
+
 ## 0.9.0
 
 ### Minor Changes

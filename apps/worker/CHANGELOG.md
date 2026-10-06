@@ -1,5 +1,65 @@
 # @flowaid/worker
 
+## 0.10.0
+
+### Patch Changes
+
+- bde0473: Evaluations score a Decision batch step per question. Such a step (the Message triage starter and
+  every business template use one) answers several questions, but only one answer reached the
+  evaluation, so a case expecting the topic was compared with the yes/no answer. Expectations can now
+  name one question (`"triage.topic"`); a case that names only the step is checked against the one
+  question that can give the expected value, so existing cases keep their meaning. Add to evaluation
+  captures every answer, and accuracy, calibration and confusion are shown per question. A batch step
+  with more questions than one request takes now asks them in several batches rather than one by
+  one, and answers a person gave are recorded per question too.
+
+  Evaluation reports say what happened. A run with no gate reads "No gate set" (it read "Gate passed
+  with warnings") and offers Publish as a secondary action; the Block publish button, which did
+  nothing, is gone. Each failed case lists the checks it failed and why. A cancelled or failed
+  evaluation says how many of the set's cases ran and that every figure covers only those, and a
+  baseline that scored other cases is no longer shown as differences.
+
+  Deleting an evaluation set clears the publish-gate link of the workflows that used it (they kept
+  the id of a set that no longer existed), and the confirmation names those workflows.
+  `GET /v1/evaluations/sets/:id` lists them as `gateOf`.
+
+  Smaller evaluation fixes: Add to evaluation also offers sets tied to no workflow and will not add
+  a run the set already holds; the gate's minimum pass rate is entered in percent, as its text
+  speaks of it; a new case's form no longer shows "Fill in the required field" before anything is
+  typed; and a set's description ends its sentence in the header.
+
+- Updated dependencies [e8b6267]
+- Updated dependencies [d568cf6]
+- Updated dependencies [08d7faf]
+- Updated dependencies [bde0473]
+- Updated dependencies [d569cf1]
+- Updated dependencies [f1ca1b8]
+  - @flowaid/database@0.10.0
+  - @flowaid/observability@0.10.0
+  - @flowaid/workflow-core@0.10.0
+  - @flowaid/workflow-compiler@0.10.0
+  - @flowaid/nodes-core@0.10.0
+  - @flowaid/evaluation@0.10.0
+  - @flowaid/workflow-runtime@0.10.0
+  - @flowaid/codegen@0.10.0
+  - @flowaid/credentials@0.10.0
+  - @flowaid/knowledge@0.10.0
+  - @flowaid/mcp@0.10.0
+  - @flowaid/node-sdk@0.10.0
+  - @flowaid/nodes-langchain@0.10.0
+  - @flowaid/openapi-tools@0.10.0
+  - @flowaid/pageindex@0.10.0
+  - @flowaid/plugins@0.10.0
+  - @flowaid/provider-anthropic@0.10.0
+  - @flowaid/provider-ollama@0.10.0
+  - @flowaid/provider-openai@0.10.0
+  - @flowaid/provider-typesafe@0.10.0
+  - @flowaid/providers@0.10.0
+  - @flowaid/sandbox@0.10.0
+  - @flowaid/storage@0.10.0
+  - @flowaid/env@0.10.0
+  - @flowaid/shared@0.10.0
+
 ## 0.9.0
 
 ### Minor Changes
