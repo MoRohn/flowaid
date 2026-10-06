@@ -1,5 +1,5 @@
-import type { ReactNode } from "react";
-import { Command as Cmdk } from "cmdk";
+import { useMemo, type ReactNode } from "react";
+import { Command as Cmdk, defaultFilter } from "cmdk";
 import { CornerDownLeft, Search } from "lucide-react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { cn } from "@/lib/cn";
@@ -24,6 +24,34 @@ export interface CommandGroupView {
   id: string;
   heading?: string;
   items: CommandItemView[];
+  /**
+   * A catch-all for whatever is typed (Ask): always listed, always last, so Enter picks it only
+   * when nothing else matches.
+   */
+  fallback?: boolean;
+}
+
+/** Above zero (still listed) and below any real match. */
+const FALLBACK_SCORE = 1e-6;
+
+/** What a person can match on: the label first, then the description and the keywords. */
+const termsOf = (item: CommandItemView): string[] => [
+  item.label,
+  ...(item.description ? [item.description] : []),
+  ...(item.keywords ?? []),
+];
+
+/**
+ * cmdk's value for an item. It carries the label because cmdk only re-reads an item's keywords
+ * when its value changes, and some labels follow what is typed ("Go to run …").
+ */
+const valueOf = (group: CommandGroupView, item: CommandItemView) =>
+  `${group.id}:${item.id}:${item.label}`;
+
+/** cmdk's own fuzzy score over the label, description and keywords (not the internal value). */
+function matchScore(search: string, terms: readonly string[]): number {
+  const [label = "", ...rest] = terms;
+  return defaultFilter(label, search, rest);
 }
 
 export interface CommandPaletteProps {
@@ -73,6 +101,27 @@ export function CommandPalette({
 }: CommandPaletteProps) {
   const [query, setQuery] = useControllableState(search, "", onSearchChange);
 
+  // cmdk sorts the items inside a group by score but leaves the groups in render order, so the
+  // first group with any loose match used to take Enter. Groups are ordered here by their best
+  // match (ties keep their order), and fallback groups (Ask) always come last.
+  const ordered = useMemo(() => {
+    const real = groups.filter((g) => !g.fallback);
+    const fallbacks = groups.filter((g) => g.fallback);
+    if (!shouldFilter || query.trim() === "") return [...real, ...fallbacks];
+    const best = new Map(
+      real.map((g) => [g.id, Math.max(0, ...g.items.map((i) => matchScore(query, termsOf(i))))]),
+    );
+    return [...real.sort((a, b) => (best.get(b.id) ?? 0) - (best.get(a.id) ?? 0)), ...fallbacks];
+  }, [groups, query, shouldFilter]);
+  const fallbackValues = useMemo(
+    () =>
+      new Set(groups.filter((g) => g.fallback).flatMap((g) => g.items.map((i) => valueOf(g, i)))),
+    [groups],
+  );
+  // a fallback item is always listed, always last, whatever is typed
+  const filter = (value: string, search: string, keywords: string[] = []) =>
+    fallbackValues.has(value) ? FALLBACK_SCORE : matchScore(search, keywords);
+
   const select = (item: CommandItemView) => {
     item.onSelect?.();
     onSelect?.(item);
@@ -94,7 +143,13 @@ export function CommandPalette({
         <DialogPrimitive.Description className="sr-only">
           Search commands and jump to items. Use arrow keys to navigate.
         </DialogPrimitive.Description>
-        <Cmdk label={label} shouldFilter={shouldFilter} loop className="flex min-h-0 flex-col">
+        <Cmdk
+          label={label}
+          shouldFilter={shouldFilter}
+          filter={filter}
+          loop
+          className="flex min-h-0 flex-col"
+        >
           <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-3">
             {loading ? (
               <Spinner size="sm" className="text-ink-3" label="Searching" />
@@ -123,7 +178,7 @@ export function CommandPalette({
               </Cmdk.Loading>
             ) : null}
             <Cmdk.Empty className="py-8 text-center text-xs text-ink-3">{emptyText}</Cmdk.Empty>
-            {groups.map((group) => (
+            {ordered.map((group) => (
               <Cmdk.Group
                 key={group.id}
                 heading={group.heading}
@@ -132,12 +187,8 @@ export function CommandPalette({
                 {group.items.map((item) => (
                   <Cmdk.Item
                     key={item.id}
-                    value={`${group.id}:${item.id}`}
-                    keywords={[
-                      item.label,
-                      ...(item.description ? [item.description] : []),
-                      ...(item.keywords ?? []),
-                    ]}
+                    value={valueOf(group, item)}
+                    keywords={termsOf(item)}
                     disabled={item.disabled}
                     onSelect={() => select(item)}
                     className={cn(

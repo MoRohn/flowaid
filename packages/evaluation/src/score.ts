@@ -5,7 +5,8 @@ import {
   type DecisionResult,
   type JsonValue,
 } from "@flowaid/workflow-core";
-import type { EvaluationCase } from "./expectation.js";
+import { resolveDecision } from "./decisions.js";
+import type { EvaluationCase, Expectation } from "./expectation.js";
 import { NO_JUDGE_MODEL, judge } from "./scorers/judge.js";
 import { jsonEquals, matchValue } from "./scorers/matchers.js";
 import type { CaseMetrics, CaseResult, CheckResult, NodeRecord, RunRecord } from "./types.js";
@@ -33,6 +34,16 @@ function numericOf(d: DecisionResult): number {
   return d.confidence;
 }
 
+/** What a decision check expected, as stored on the check (for reports and confusion). */
+function expectedOf(exp: Expectation["decisions"][string]): JsonValue {
+  const out: Record<string, JsonValue> = {};
+  if (exp.value !== undefined) out.value = exp.value;
+  if (exp.valueIn) out.valueIn = exp.valueIn;
+  if (exp.range) out.range = exp.range;
+  if (exp.minConfidence !== undefined) out.minConfidence = exp.minConfidence;
+  return out;
+}
+
 const EXECUTED = new Set(["completed", "failed", "reused"]);
 
 export function metricsOf(run: RunRecord): CaseMetrics {
@@ -40,7 +51,12 @@ export function metricsOf(run: RunRecord): CaseMetrics {
   const decisions: CaseMetrics["decisions"] = {};
   for (const n of run.nodes) {
     if (n.firedPort !== undefined) branches[n.nodeId] = n.firedPort;
-    if (n.decision)
+    const answers = n.answers && Object.keys(n.answers).length ? n.answers : null;
+    // a batch step's answers each under `<step>.<question>`; its `decision` is only one of them
+    if (answers)
+      for (const [q, d] of Object.entries(answers))
+        decisions[`${n.nodeId}.${q}`] = { value: d.value, confidence: d.confidence };
+    else if (n.decision)
       decisions[n.nodeId] = {
         value: n.decision.value,
         confidence: n.decision.confidence,
@@ -125,13 +141,24 @@ export async function scoreCase(
     });
   }
 
-  for (const [nodeId, exp] of Object.entries(e.decisions)) {
-    const d = byNode.get(nodeId)?.decision;
-    const id = `decision:${nodeId}`;
-    if (!d) {
-      add({ kind: "decision", id, passed: false, message: `${nodeId} made no decision` });
+  for (const [key, exp] of Object.entries(e.decisions)) {
+    const expected = expectedOf(exp);
+    const step = key.split(".")[0] as string;
+    const found = resolveDecision(key, exp, byNode.get(step));
+    if (!found.ok) {
+      add({
+        kind: "decision",
+        id: `decision:${key}`,
+        passed: false,
+        expected,
+        message: found.message,
+      });
       continue;
     }
+    // checks are named after the answer they read (`triage.topic`), so accuracy, calibration and
+    // confusion are per question even for a case that names only the step
+    const id = `decision:${found.key}`;
+    const d = found.decision;
     const problems: string[] = [];
     if (exp.value !== undefined && !decisionMatches(d, exp.value))
       problems.push(`value ${JSON.stringify(d.value)} ≠ ${JSON.stringify(exp.value)}`);
@@ -148,6 +175,7 @@ export async function scoreCase(
       kind: "decision",
       id,
       passed: problems.length === 0,
+      expected,
       actual: { value: d.value as JsonValue, confidence: d.confidence },
       ...(problems.length ? { message: problems.join("; ") } : {}),
     });

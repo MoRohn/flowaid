@@ -4,7 +4,8 @@
  * a review. The review can test the settings before anything is saved (`POST /v1/mcp/servers/test`
  * stores nothing; the worker starts a stdio program for it). Saving ends on explicit Test and
  * Discover buttons rather than calling the server on its own. The unsent draft is kept in this
- * browser tab (it holds a credential's id, never its value).
+ * browser tab (it holds a credential's id, never its value). A saved server is edited in place
+ * (`McpServerEditDialog`); changing where it runs or how it signs in sets it back to pending.
  */
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
@@ -27,7 +28,7 @@ import {
   SelectItem,
   Textarea,
 } from "@flowaid/ui/primitives";
-import { getAll, post } from "~/api/client";
+import { getAll, patch, post } from "~/api/client";
 import { DraftStatus, GuidedFlow, type FlowStep } from "~/guide/GuidedFlow";
 import { CheckList, QualityNote, type Check } from "~/guide/Readiness";
 import { useKeptDraft } from "~/guide/useKeptDraft";
@@ -101,10 +102,12 @@ interface TestAnswer {
   toolCount?: number;
 }
 
-/** What to try when a server did not answer. */
-function testFix(transport: McpServerDraft["transport"], url: string): string {
+/** What to try when a server did not answer (`message`: the server's own reason). */
+export function testFix(transport: McpServerDraft["transport"], url: string, message = ""): string {
   if (transport === "stdio")
     return "Check the command and its arguments against FLOWAID_MCP_STDIO_ALLOWED_COMMANDS, and that the worker is running: it starts the program.";
+  // the reason already says how to allow a private address
+  if (message.includes("FLOWAID_ALLOW_PRIVATE_NETWORK")) return "Then test again.";
   return isPrivateUrl(url)
     ? "If it runs on this computer, the api needs FLOWAID_ALLOW_PRIVATE_NETWORK=true."
     : "Check the address and the credential, then test again.";
@@ -243,7 +246,7 @@ export function McpServerDialog({
                       label: `${created.name} did not answer`,
                       state: "blocker",
                       detail: outcome.message,
-                      fix: `${testFix(created.transport, created.url ?? "")} The server stays saved.`,
+                      fix: `${testFix(created.transport, created.url ?? "", outcome.message)} The server stays saved.`,
                     },
                   ]}
                 />
@@ -507,7 +510,7 @@ export function McpServerDialog({
                       label: `${draft.name.trim() || "The server"} did not answer`,
                       state: "blocker",
                       detail: triedNow.message,
-                      fix: `${testFix(draft.transport, draft.url)} You can still save it and test it later.`,
+                      fix: `${testFix(draft.transport, draft.url, triedNow.message)} You can still save it and test it later.`,
                     },
               ]}
             />
@@ -568,6 +571,231 @@ export function McpServerDialog({
             Save server
           </Button>
         </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** A saved server as the form's draft. */
+export function draftOfServer(m: McpServer): McpServerDraft {
+  return {
+    name: m.name,
+    transport: m.transport,
+    url: m.url ?? "",
+    command: m.command ?? "",
+    args: (m.args ?? []).join("\n"),
+    authKind: m.authKind,
+    credentialId: m.credentialId ?? "",
+  };
+}
+
+/** Only what changed, for `PATCH /v1/mcp/servers/:id`; `reconnect` when the status no longer applies. */
+export function serverPatch(
+  m: McpServer,
+  d: McpServerDraft,
+): { body: Record<string, unknown>; reconnect: boolean } {
+  const next = serverBody(d);
+  const before = serverBody(draftOfServer(m));
+  const body = Object.fromEntries(
+    Object.entries(next).filter(([k, v]) => JSON.stringify(v) !== JSON.stringify(before[k])),
+  );
+  return { body, reconnect: Object.keys(body).some((k) => k !== "name") };
+}
+
+/** Change a saved server: its name, where it runs and how FlowAId signs in. */
+export function McpServerEditDialog({
+  server,
+  onClose,
+}: {
+  server: McpServer | null;
+  onClose: () => void;
+}) {
+  const s = useSession();
+  const [draft, setDraft] = useState<McpServerDraft | null>(server ? draftOfServer(server) : null);
+  // a different server opened: start from its saved settings
+  const [forId, setForId] = useState(server?.id ?? null);
+  if ((server?.id ?? null) !== forId) {
+    setForId(server?.id ?? null);
+    setDraft(server ? draftOfServer(server) : null);
+  }
+  const [shown, setShown] = useState(false);
+  const canReadCreds = s.can("credentials:read");
+  const creds = useQuery({
+    queryKey: ["credentials", s.ws],
+    queryFn: () => getAll<Credential>("/v1/credentials"),
+    enabled: server !== null && canReadCreds,
+  });
+  const save = useMutate(
+    (v: { id: string; body: Record<string, unknown>; reconnect: boolean }) =>
+      patch<McpServer>(`/v1/mcp/servers/${v.id}`, v.body),
+    {
+      success: (m, v) =>
+        v.reconnect ? `Saved ${m.name}: test it or discover its tools again` : `Saved ${m.name}`,
+      invalidate: [
+        ["mcp-servers", s.ws],
+        ["catalog", "tools"],
+      ],
+      onSuccess: () => {
+        setShown(false);
+        onClose();
+      },
+      errorTitle: "Could not save the server",
+    },
+  );
+  if (!server || !draft) return null;
+  const set = <K extends keyof McpServerDraft>(k: K, v: McpServerDraft[K]) =>
+    setDraft((d) => (d ? { ...d, [k]: v } : d));
+  const problems = serverProblems(draft);
+  const errors = shown ? problems : {};
+  const notes = serverNotes(draft, { admin: s.can("admin") });
+  const change = serverPatch(server, draft);
+  const unchanged = Object.keys(change.body).length === 0;
+  const auth = AUTH.find((a) => a.id === draft.authKind) ?? AUTH[0];
+  const fitting = (creds.data ?? []).filter((c) => auth?.types.includes(c.type));
+  const others = (creds.data ?? []).filter((c) => !auth?.types.includes(c.type));
+  return (
+    <Dialog
+      open
+      onOpenChange={(o) => {
+        if (!o && !save.isPending) onClose();
+      }}
+    >
+      <DialogContent size="md">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            setShown(true);
+            if (Object.keys(problems).length === 0 && !unchanged)
+              save.mutate({ id: server.id, ...change });
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle>Edit {server.name}</DialogTitle>
+            <DialogDescription>
+              Changing where it runs or how it signs in sets it back to Pending: test it or discover
+              its tools again afterwards.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogBody className="flex flex-col gap-4">
+            <FieldRow label="Name" htmlFor="mcp-edit-name" required error={errors.name}>
+              <Input
+                id="mcp-edit-name"
+                value={draft.name}
+                maxLength={100}
+                onChange={(e) => set("name", e.target.value)}
+              />
+            </FieldRow>
+            <FieldRow label="Transport" htmlFor="mcp-edit-transport">
+              <Select
+                id="mcp-edit-transport"
+                value={draft.transport}
+                onValueChange={(v) => set("transport", v as McpServerDraft["transport"])}
+              >
+                {TRANSPORTS.map((t) => (
+                  <SelectItem key={t.id} value={t.id}>
+                    {t.label}
+                  </SelectItem>
+                ))}
+              </Select>
+            </FieldRow>
+            {draft.transport !== "stdio" ? (
+              <FieldRow label="URL" htmlFor="mcp-edit-url" required error={errors.url}>
+                <Input
+                  id="mcp-edit-url"
+                  type="url"
+                  className="font-mono"
+                  value={draft.url}
+                  onChange={(e) => set("url", e.target.value)}
+                />
+              </FieldRow>
+            ) : (
+              <>
+                <FieldRow
+                  label="Command"
+                  htmlFor="mcp-edit-command"
+                  required
+                  error={errors.command}
+                >
+                  <Input
+                    id="mcp-edit-command"
+                    className="font-mono"
+                    value={draft.command}
+                    onChange={(e) => set("command", e.target.value)}
+                  />
+                </FieldRow>
+                <FieldRow label="Arguments" htmlFor="mcp-edit-args" hint="One per line">
+                  <Textarea
+                    id="mcp-edit-args"
+                    className="font-mono"
+                    rows={3}
+                    value={draft.args}
+                    onChange={(e) => set("args", e.target.value)}
+                  />
+                </FieldRow>
+              </>
+            )}
+            <FieldRow label="Sign-in" htmlFor="mcp-edit-auth">
+              <Select
+                id="mcp-edit-auth"
+                value={draft.authKind}
+                onValueChange={(v) => set("authKind", v as McpServerDraft["authKind"])}
+              >
+                {AUTH.map((a) => (
+                  <SelectItem key={a.id} value={a.id}>
+                    {a.label}
+                  </SelectItem>
+                ))}
+              </Select>
+            </FieldRow>
+            {draft.authKind !== "none" ? (
+              canReadCreds ? (
+                <FieldRow
+                  label="Credential"
+                  htmlFor="mcp-edit-cred"
+                  required
+                  error={errors.credentialId}
+                >
+                  <Select
+                    id="mcp-edit-cred"
+                    value={draft.credentialId}
+                    onValueChange={(v) => set("credentialId", v)}
+                    placeholder={creds.isPending ? "Loading…" : "Choose a credential"}
+                  >
+                    {[...fitting, ...others].map((c) => (
+                      <SelectItem key={c.id} value={c.id} meta={c.type}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </Select>
+                </FieldRow>
+              ) : (
+                <Notice tone="info">
+                  Your role cannot list credentials, so the credential can't be changed here.
+                </Notice>
+              )
+            ) : null}
+            {notes
+              .filter((n) => n.id === "private" || n.id === "stdio" || n.id === "plain-http")
+              .map((n) => (
+                <Notice key={n.id} tone={n.state === "blocker" ? "danger" : "info"}>
+                  {n.message}
+                </Notice>
+              ))}
+          </DialogBody>
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={onClose} disabled={save.isPending}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              loading={save.isPending}
+              disabled={unchanged || notes.some((n) => n.state === "blocker")}
+            >
+              Save changes
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );

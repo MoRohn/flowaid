@@ -23,7 +23,7 @@ export const WORKFLOWS: CapabilityGuide = {
 export const NEW_WORKFLOW: CapabilityGuide = {
   id: "workflows-new",
   title: "New workflow",
-  what: "Create a workflow four ways: describe it in words and let the AI builder draft it, start blank, start from a template, or import a definition you already have.",
+  what: "Create a workflow blank, from a template, or by importing a definition you already have; with a text model set up, you can also describe it in words and let the AI builder draft it.",
   when: "Describe it when you know the job but not the steps. Blank when you know the steps. A template when one matches the job closely. Import when the definition exists elsewhere.",
   needs:
     "A name. Describe it needs a text model with a key; the draft it produces may use decision steps, which need a TypeSafe key to run.",

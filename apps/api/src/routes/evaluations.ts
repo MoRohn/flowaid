@@ -5,6 +5,7 @@ import { z } from "zod";
 import { and, asc, desc, eq, gt, lt, max, or } from "drizzle-orm";
 import {
   ExpectationSchema,
+  answersByNodeRun,
   compare,
   reportToMarkdown,
   summarize,
@@ -264,7 +265,21 @@ export function evaluationRoutes(app: FastifyInstance, ctx: ApiContext): void {
     },
     async (req) => {
       const p = need(req.principal);
-      return setDto(await ctx.db.tenant(p.workspaceId, (tx) => loadSet(tx, p, req.params.id)));
+      return ctx.db.tenant(p.workspaceId, async (tx) => {
+        const set = await loadSet(tx, p, req.params.id);
+        // the workflows that use the set as their publish gate (named when it is deleted)
+        const gated = await tx
+          .select({ id: workflows.id, name: workflows.name })
+          .from(workflows)
+          .where(
+            and(eq(workflows.workspaceId, p.workspaceId), eq(workflows.evaluationSetId, set.id)),
+          )
+          .orderBy(asc(workflows.name));
+        return {
+          ...setDto(set),
+          gateOf: gated.filter((w) => canSeeWorkflow(p, w.id)),
+        };
+      });
     },
   );
 
@@ -281,10 +296,24 @@ export function evaluationRoutes(app: FastifyInstance, ctx: ApiContext): void {
     },
     async (req, reply) => {
       const p = need(req.principal);
-      await ctx.db.tenant(p.workspaceId, async (tx) => {
+      const unlinked = await ctx.db.tenant(p.workspaceId, async (tx) => {
         await loadSet(tx, p, req.params.id);
+        // workflows gated on the set lose the link with it (the column has no foreign key), so
+        // none points at a set that no longer exists
+        const gated = await tx
+          .update(workflows)
+          .set({ evaluationSetId: null })
+          .where(
+            and(
+              eq(workflows.workspaceId, p.workspaceId),
+              eq(workflows.evaluationSetId, req.params.id),
+            ),
+          )
+          .returning({ id: workflows.id });
         await tx.delete(evaluationSets).where(eq(evaluationSets.id, req.params.id));
+        return gated.map((w) => w.id);
       });
+      if (unlinked.length) req.audit.details = { unlinkedWorkflowIds: unlinked };
       return reply.code(204).send(null);
     },
   );
@@ -699,10 +728,20 @@ export function evaluationRoutes(app: FastifyInstance, ctx: ApiContext): void {
       const run = await store.getRun(req.params.id);
       if (!run || !canSeeWorkflow(p, run.workflowId)) throw new NotFoundError("run not found");
       const nodes = await store.listNodeRuns(run.id);
+      // a batch step's answers, one per question (its `decision` column holds only one of them)
+      const answers = answersByNodeRun(
+        (await store.listEvents(run.id, 0, 10_000, ["DECISION_COMPLETED"])).flatMap((e) =>
+          e.type === "DECISION_COMPLETED" ? [e] : [],
+        ),
+      );
       const decisions: JsonObject = {};
       const branches: JsonObject = {};
       for (const n of nodes) {
-        if (n.decision) decisions[n.nodeId] = { value: n.decision.value as JsonValue };
+        const batch = answers.get(n.id);
+        if (batch)
+          for (const [question, d] of Object.entries(batch))
+            decisions[`${n.nodeId}.${question}`] = { value: d.value as JsonValue };
+        else if (n.decision) decisions[n.nodeId] = { value: n.decision.value as JsonValue };
         const port = n.firedPorts.find((x) => x !== "done");
         if (port) branches[n.nodeId] = port;
       }

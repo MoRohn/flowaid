@@ -189,7 +189,11 @@ export async function startRun(
 ): Promise<StartedRun> {
   const hash = hashRequest(workflowId, r);
   const prepared = await ctx.db.tenant(p.workspaceId, async (tx) => {
-    await visibleWorkflow(tx, p, workflowId);
+    const workflow = await visibleWorkflow(tx, p, workflowId);
+    if (workflow.archivedAt)
+      throw new ConflictError(
+        "this workflow is archived, so it starts no new runs; its runs and versions stay readable",
+      );
     if (o.idempotencyKey) {
       const existing = await findRunByIdempotencyKey(tx, p.workspaceId, o.idempotencyKey);
       if (existing) {

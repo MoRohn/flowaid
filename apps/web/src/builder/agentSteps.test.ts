@@ -53,19 +53,10 @@ describe("agents in Add node", () => {
       kind: "task",
       type: "flowaid.ai.agent",
       name: "Order helper",
-      // only what the compiler needs on the step itself; model, tools and limits come from the agent
-      config: { agentId: preset.id, maxSteps: 5 },
+      config: { agentId: preset.id },
     });
-    expect(Object.keys((node as { config: object }).config).sort()).toEqual([
-      "agentId",
-      "maxSteps",
-    ]);
-    const noSteps = agentStepFor(
-      blankDefinition(preset.id, "W"),
-      { ...preset, config: { model: preset.config.model } },
-      catalog,
-    );
-    if (noSteps?.kind !== "task") throw new Error("expected a task step");
-    expect(noSteps.config.maxSteps).toBe(8);
+    // model, tools and limits, Max steps included, come from the agent: a later change to the
+    // agent's Max steps reaches the step (it used to be copied onto it once)
+    expect(Object.keys((node as { config: object }).config)).toEqual(["agentId"]);
   });
 });

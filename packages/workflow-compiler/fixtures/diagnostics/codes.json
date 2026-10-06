@@ -1097,6 +1097,17 @@
       "severity": "warning"
     }
   ],
+  "W_HUMAN_EXPIRY_EXCEEDS_RUN_TIMEOUT": [
+    {
+      "code": "W_HUMAN_EXPIRY_EXCEEDS_RUN_TIMEOUT",
+      "location": {
+        "nodeId": "approve",
+        "path": "/nodes/7/expiresInMs"
+      },
+      "message": "'approve' waits up to 1 day for a person, but the run stops after 1 min (execution.timeoutMs) and cancels the task; raise execution.timeoutMs above the expiry or shorten expiresInMs",
+      "severity": "warning"
+    }
+  ],
   "W_IMPOSSIBLE_BRANCH": [
     {
       "code": "W_IMPOSSIBLE_BRANCH",

@@ -1,5 +1,10 @@
 import { AlertTriangle, CheckCircle2, Info, XCircle } from "lucide-react";
-import { Toaster as SonnerToaster, type ToasterProps as SonnerToasterProps } from "sonner";
+import {
+  Toaster as SonnerToaster,
+  toast as sonnerToast,
+  type ExternalToast,
+  type ToasterProps as SonnerToasterProps,
+} from "sonner";
 import { cn } from "@/lib/cn";
 import { Spinner } from "./Spinner";
 
@@ -77,8 +82,20 @@ export function Toaster({
   );
 }
 
+/** An error stays until it is closed: it may say why something did not happen. */
+const ERROR_TOAST: ExternalToast = { duration: Number.POSITIVE_INFINITY, closeButton: true };
+
 /**
  * Toast helpers. `toast.promise` shows loading → success/error from a promise;
- * every helper returns the toast id for `toast.dismiss(id)`.
+ * every helper returns the toast id for `toast.dismiss(id)`. `toast.error` stays on screen with a
+ * close button until dismissed (others go after 4 s, paused while hovered or focused); a call's
+ * own `duration` still wins.
  */
-export { toast } from "sonner";
+export const toast: typeof sonnerToast = Object.assign(
+  (...args: Parameters<typeof sonnerToast>) => sonnerToast(...args),
+  sonnerToast,
+  {
+    error: (message: Parameters<typeof sonnerToast.error>[0], data?: ExternalToast) =>
+      sonnerToast.error(message, { ...ERROR_TOAST, ...data }),
+  },
+);

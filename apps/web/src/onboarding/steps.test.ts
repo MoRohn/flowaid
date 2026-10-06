@@ -49,4 +49,12 @@ describe("getting started", () => {
     );
     expect(done({ ...s, workflows: [{ id: "a", latestVersion: null }] }).publish).toBe(false);
   });
+
+  it("ticks off Publish and deploy only once a version is deployed", () => {
+    const published = { ...empty, workflows: [{ id: "a", latestVersion: 1, deployed: false }] };
+    expect(done(published).publish).toBe(false);
+    expect(
+      done({ ...empty, workflows: [{ id: "a", latestVersion: 1, deployed: true }] }).publish,
+    ).toBe(true);
+  });
 });

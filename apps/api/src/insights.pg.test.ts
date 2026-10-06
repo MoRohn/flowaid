@@ -129,6 +129,21 @@ describeDb("insights (Postgres)", () => {
     expect(r.insights.some((i: { workflowId: string }) => i.workflowId === quietId)).toBe(false);
   });
 
+  it("counts open approvals in the chosen environment only, like the runs", async () => {
+    const envs = (await call(t.app, jar, "GET", "/v1/environments")).json() as {
+      id: string;
+      name: string;
+    }[];
+    const id = (name: string) => envs.find((e) => e.name === name)?.id as string;
+    const approvals = async (env: string) =>
+      (await call(t.app, jar, "GET", `/v1/insights?window=24h&environmentId=${env}`)).json()
+        .attention.openApprovals.count as number;
+    expect(await approvals(id("dev"))).toBe(1);
+    const other = envs.find((e) => e.name !== "dev");
+    expect(other).toBeDefined();
+    expect(await approvals(other?.id as string)).toBe(0);
+  });
+
   it("scopes to a workflow and to API keys pinned to workflows", async () => {
     const one = await call(t.app, jar, "GET", `/v1/insights?window=24h&workflowId=${quietId}`);
     expect(one.json().insights).toEqual([]);

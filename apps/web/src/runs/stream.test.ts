@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   backoffDelay,
   createSseParser,
+  followMode,
   openRunStream,
   type RunStreamState,
   type SseMessage,
@@ -136,5 +137,27 @@ describe("openRunStream", () => {
     s.close();
     await new Promise((r) => setTimeout(r, 10));
     expect(states.some((st) => st.status === "failed" || st.status === "reconnecting")).toBe(false);
+  });
+});
+
+describe("followMode", () => {
+  const base = { status: "running", visible: true, streamDown: false };
+  it("streams a moving run in a visible tab", () => {
+    expect(followMode(base)).toBe("stream");
+    expect(followMode({ ...base, status: "queued" })).toBe("stream");
+    expect(followMode({ ...base, status: "retrying" })).toBe("stream");
+  });
+  it("polls instead of holding a connection while the run waits", () => {
+    expect(followMode({ ...base, status: "waiting_for_human" })).toBe("poll");
+    expect(followMode({ ...base, status: "waiting" })).toBe("poll");
+  });
+  it("polls while the stream is down", () => {
+    expect(followMode({ ...base, streamDown: true })).toBe("poll");
+  });
+  it("holds nothing in a hidden tab or for an ended run", () => {
+    expect(followMode({ ...base, visible: false })).toBe("paused");
+    expect(followMode({ ...base, status: "waiting_for_human", visible: false })).toBe("paused");
+    for (const status of ["completed", "failed", "cancelled", "timed_out"])
+      expect(followMode({ ...base, status })).toBe("idle");
   });
 });

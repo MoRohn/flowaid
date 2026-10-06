@@ -3,7 +3,6 @@ import { ArrowUpRight, User, Users } from "lucide-react";
 import {
   Avatar,
   Button,
-  Checkbox,
   Dialog,
   DialogBody,
   DialogContent,
@@ -30,23 +29,16 @@ export interface EscalationTarget {
 
 export type EscalateResponse = Extract<HumanResponse, { action: "escalate" }>;
 
-export interface EscalationOptions {
-  /** Whether the target should be notified immediately (Slack, email). */
-  notify: boolean;
-}
-
 export interface EscalationDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   targets: EscalationTarget[];
   /** Pre-selected target id. */
   defaultTo?: string;
-  /** Initial notify state. Default true. */
-  defaultNotify?: boolean;
   /** What is being escalated, for the description line. */
   subject?: ReactNode;
-  /** Returns the escalate response and whether to notify. */
-  onEscalate: (response: EscalateResponse, options: EscalationOptions) => void | Promise<void>;
+  /** Returns the escalate response. */
+  onEscalate: (response: EscalateResponse) => void | Promise<void>;
   /** Externally tracked busy state. */
   loading?: boolean;
   className?: string;
@@ -54,8 +46,8 @@ export interface EscalationDialogProps {
 
 /**
  * Hands a review to another team or person. Picks a target from `targets`
- * (grouped into teams and people), takes a reason and whether to notify, and
- * returns `{ action: "escalate", to: [target], comment }`. Escalate is disabled until a
+ * (grouped into teams and people), takes a reason, and returns
+ * `{ action: "escalate", to: [target], comment }`. Escalate is disabled until a
  * target is chosen; Escape closes without submitting.
  */
 export function EscalationDialog({
@@ -63,7 +55,6 @@ export function EscalationDialog({
   onOpenChange,
   targets,
   defaultTo,
-  defaultNotify = true,
   subject,
   onEscalate,
   loading,
@@ -71,20 +62,18 @@ export function EscalationDialog({
 }: EscalationDialogProps) {
   const [to, setTo] = useState<string | undefined>(defaultTo);
   const [comment, setComment] = useState("");
-  const [notify, setNotify] = useState(defaultNotify);
   const [pending, setPending] = useState(false);
   const busy = loading ?? pending;
 
   // Opening the dialog (or new defaults while open) starts from the defaults again. Adjusted
   // during render from the previous key, React's pattern for resetting state on a prop change.
-  const resetKey = open ? JSON.stringify([defaultTo ?? null, defaultNotify]) : null;
+  const resetKey = open ? JSON.stringify([defaultTo ?? null]) : null;
   const [resetFor, setResetFor] = useState(resetKey);
   if (resetFor !== resetKey) {
     setResetFor(resetKey);
     if (open) {
       setTo(defaultTo);
       setComment("");
-      setNotify(defaultNotify);
     }
   }
 
@@ -98,7 +87,7 @@ export function EscalationDialog({
     const response: EscalateResponse = trimmed
       ? { action: "escalate", to: [to], comment: trimmed }
       : { action: "escalate", to: [to] };
-    const result = onEscalate(response, { notify });
+    const result = onEscalate(response);
     if (result instanceof Promise) {
       setPending(true);
       try {
@@ -178,11 +167,7 @@ export function EscalationDialog({
               ) : null}
             </Select>
           </FieldRow>
-          <FieldRow
-            label="Reason"
-            optional
-            hint="Shown to the person picking this up, and kept on the run's audit trail."
-          >
+          <FieldRow label="Reason" optional hint="Kept on the audit trail with the escalation.">
             <Textarea
               autoGrow
               minRows={3}
@@ -193,13 +178,6 @@ export function EscalationDialog({
               disabled={busy}
             />
           </FieldRow>
-          <Checkbox
-            checked={notify}
-            onCheckedChange={(v) => setNotify(v === true)}
-            disabled={busy}
-            label="Notify now"
-            description="Send a message to the target's configured channel as soon as the review is handed over."
-          />
         </DialogBody>
         <DialogFooter>
           <Button variant="secondary" onClick={() => onOpenChange(false)} disabled={busy}>

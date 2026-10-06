@@ -13,7 +13,7 @@ import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
-import { and, eq, gte, isNull, or } from "drizzle-orm";
+import { and, eq, isNull, or } from "drizzle-orm";
 import {
   environments,
   eventSubscriptions,
@@ -192,38 +192,81 @@ export function ingressRoutes(app: FastifyInstance, ctx: ApiContext): void {
           typeof headerValue === "string" && headerValue
             ? `h:${headerValue.slice(0, 200)}`
             : `b:${createHash("sha256").update(raw).digest("hex")}`;
-        const deliveryId = uuidv7();
         const claimed = await ctx.db.system(async (tx) => {
-          // Body-hash dedupe is bounded to 24 h; header ids dedupe for as long as rows are kept.
-          const [dup] = await tx
-            .select({ runId: webhookDeliveries.runId })
+          const now = new Date(ctx.clock.now());
+          // One row per delivery id (unique index). Body-hash dedupe is bounded to 24 h; header ids
+          // dedupe for as long as rows are kept. A call that was refused (bad input, budget, …) never
+          // started a run, so its retry is a new attempt, not a duplicate.
+          const [prior] = await tx
+            .select({
+              id: webhookDeliveries.id,
+              runId: webhookDeliveries.runId,
+              status: webhookDeliveries.status,
+              attempt: webhookDeliveries.attempt,
+              createdAt: webhookDeliveries.createdAt,
+            })
             .from(webhookDeliveries)
             .where(
               and(
                 eq(webhookDeliveries.webhookId, w.id),
                 eq(webhookDeliveries.externalId, externalId),
                 eq(webhookDeliveries.direction, "inbound"),
-                externalId.startsWith("b:")
-                  ? gte(webhookDeliveries.createdAt, new Date(ctx.clock.now() - 86_400_000))
-                  : undefined,
               ),
             );
-          if (dup) return { duplicate: dup.runId };
-          await tx
+          if (prior) {
+            const expired =
+              externalId.startsWith("b:") && prior.createdAt.getTime() < now.getTime() - 86_400_000;
+            if (prior.status !== "rejected" && !expired) {
+              // recorded so the Deliveries list shows the repeat and the run it was answered with
+              await tx.insert(webhookDeliveries).values({
+                id: uuidv7(),
+                workspaceId: w.workspaceId,
+                webhookId: w.id,
+                runId: prior.runId,
+                direction: "inbound",
+                status: "duplicate",
+                httpStatus: 200,
+              });
+              return { duplicate: prior.runId };
+            }
+            const [taken] = await tx
+              .update(webhookDeliveries)
+              .set({
+                status: "accepted",
+                runId: null,
+                error: null,
+                httpStatus: null,
+                attempt: prior.attempt + 1,
+                createdAt: now,
+              })
+              .where(
+                and(
+                  eq(webhookDeliveries.id, prior.id),
+                  eq(webhookDeliveries.status, prior.status),
+                  eq(webhookDeliveries.attempt, prior.attempt),
+                ),
+              )
+              .returning({ id: webhookDeliveries.id });
+            // another request took it over at the same moment: that one runs
+            return taken ? { deliveryId: taken.id } : { duplicate: null };
+          }
+          const [inserted] = await tx
             .insert(webhookDeliveries)
             .values({
-              id: deliveryId,
+              id: uuidv7(),
               workspaceId: w.workspaceId,
               webhookId: w.id,
               direction: "inbound",
               status: "accepted",
               externalId,
             })
-            .onConflictDoNothing();
-          return { duplicate: undefined };
+            .onConflictDoNothing()
+            .returning({ id: webhookDeliveries.id });
+          return inserted ? { deliveryId: inserted.id } : { duplicate: null };
         });
-        if (claimed.duplicate !== undefined)
+        if ("duplicate" in claimed)
           return reply.code(200).send({ run_id: claimed.duplicate, duplicate: true });
+        const { deliveryId } = claimed;
 
         let body: JsonValue = null;
         const text = raw.toString("utf8");

@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  advancedLabel,
+  asksFirst,
   changesData,
   checkDraft,
   draftOf,
   emptyDraft,
+  hasAdvanced,
+  missingTools,
   modelLabel,
   modelProviders,
   reviewNotes,
@@ -47,6 +51,58 @@ describe("agent preset drafts", () => {
     expect(checkDraft(d).body?.config).toMatchObject({ system: "Be kind", maxSteps: 3 });
   });
 
+  it("keeps every stored setting through an edit of another field", () => {
+    const config = {
+      model,
+      system: "Be kind",
+      tools: [{ name: "lookup", approval: "always" }],
+      temperature: 0.2,
+      maxOutputTokens: 800,
+      maxTokens: 20000,
+      stream: true,
+      maxSteps: 4,
+      // a setting a newer server may add: carried through, not dropped
+      futureSetting: { on: true },
+    };
+    const d = draftOf({
+      id: "a",
+      name: "A",
+      description: "",
+      config,
+      createdAt: "",
+      updatedAt: "",
+    });
+    expect(d).toMatchObject({
+      temperature: "0.2",
+      maxOutputTokens: "800",
+      maxTokens: "20000",
+      stream: "on",
+    });
+    const saved = checkDraft({ ...d, description: "Answers order questions" }).body;
+    expect(saved?.description).toBe("Answers order questions");
+    expect(saved?.config).toEqual(config);
+    expect(advancedLabel(saved?.config ?? {})).toBe(
+      "temperature 0.2 · 800 output tokens a turn · 20000 tokens a run · streaming on",
+    );
+  });
+
+  it("checks the advanced settings and leaves unset ones out", () => {
+    const bad = checkDraft({
+      ...emptyDraft(),
+      name: "A",
+      model,
+      temperature: "3",
+      maxOutputTokens: "0",
+      maxTokens: "1.5",
+    });
+    expect(Object.keys(bad.errors).sort()).toEqual(["maxOutputTokens", "maxTokens", "temperature"]);
+    const off = checkDraft({ ...emptyDraft(), name: "A", model, stream: "off" }).body?.config;
+    expect(off).toMatchObject({ stream: false });
+    expect(off).not.toHaveProperty("temperature");
+    expect(hasAdvanced(emptyDraft())).toBe(false);
+    expect(hasAdvanced({ ...emptyDraft(), stream: "off" })).toBe(true);
+  });
+
   it("labels single models and failover policies", () => {
     expect(modelLabel(model)).toBe("gpt-test");
     expect(
@@ -80,6 +136,55 @@ describe("agent review notes", () => {
     expect(unguarded.map((n) => n.id)).toEqual(["unguarded"]);
     const bare = reviewNotes({ ...base, system: "" }, { providerReady: ready, changes: new Map() });
     expect(bare.map((n) => n.id)).toEqual(["no-tools", "no-instructions"]);
+  });
+
+  it("blocks saving while the agent lists a tool the catalog no longer has", () => {
+    const d = {
+      ...base,
+      tools: [
+        { name: "lookup_order", approval: "never" as const },
+        { name: "calculator", approval: "never" as const },
+      ],
+    };
+    // the catalog not loaded yet: nothing to say
+    expect(missingTools(d.tools, undefined)).toEqual([]);
+    const notes = reviewNotes(d, {
+      providerReady: ready,
+      changes: new Map(),
+      available: new Set(["calculator"]),
+    });
+    expect(notes[0]).toMatchObject({ id: "missing-tools", state: "blocker" });
+    expect(notes[0]?.message).toMatch(/^lookup_order is no longer available/);
+  });
+
+  it("warns about limits of 0 that stop the agent where it starts", () => {
+    const notes = reviewNotes(
+      {
+        ...base,
+        maxCostUsd: "0",
+        maxToolCalls: "0",
+        tools: [{ name: "calculator", approval: "never" }],
+      },
+      { providerReady: ready, changes: new Map() },
+    );
+    expect(notes.map((n) => `${n.id}:${n.state}`)).toEqual([
+      "no-spend:warning",
+      "no-tool-calls:warning",
+    ]);
+    // no tools: 0 tool calls is what was meant
+    expect(
+      reviewNotes({ ...base, maxToolCalls: "0" }, { providerReady: ready, changes: new Map() }).map(
+        (n) => n.id,
+      ),
+    ).toEqual(["no-tools"]);
+  });
+
+  it("knows when a call waits for a person", () => {
+    expect(asksFirst("always", false)).toBe(true);
+    expect(asksFirst("irreversible", false)).toBe(false);
+    expect(asksFirst("irreversible", true)).toBe(true);
+    expect(asksFirst("irreversible", undefined)).toBe(true);
+    expect(asksFirst("never", true)).toBe(false);
   });
 
   it("treats non-idempotent or approval-marked tools as changing data", () => {

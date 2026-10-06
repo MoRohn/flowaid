@@ -75,7 +75,7 @@
     }
   ],
   "execution": {
-    "timeoutMs": 180000,
+    "timeoutMs": 10800000,
     "maxCostUsd": 0.25,
     "decisions": {
       "primary": {

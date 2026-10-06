@@ -8,6 +8,8 @@ import { blankDefinition } from "./model";
 vi.mock("~/session", () => ({
   useSession: () => ({ ws: "acme", workspaceName: "Acme", features: {}, can: () => true }),
 }));
+const push = vi.fn();
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push, replace: vi.fn() }) }));
 
 const { PublishDialog } = await import("./PublishDialog");
 
@@ -64,6 +66,9 @@ describe("publish review", () => {
     await waitFor(() => expect(onPublished).toHaveBeenCalled());
     const [call] = callsTo(fetchMock, `POST /v1/workflows/${WF}/publish`);
     expect(bodyOf(call?.[1])).toEqual({});
+    // the toast offers the next step: deploying the new version
+    fireEvent.click(await screen.findByRole("button", { name: "Deploy" }));
+    expect(push).toHaveBeenCalledWith(`/acme/workflows/${WF}/deployments?version=v1`);
   });
 
   it("blocks deploying to an environment whose required secret is unbound", async () => {

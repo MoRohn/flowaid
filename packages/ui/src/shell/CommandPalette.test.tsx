@@ -164,4 +164,85 @@ describe("CommandMenu search", () => {
     await user.keyboard("{Enter}");
     expect(onGo).toHaveBeenCalledWith("01a0e530");
   });
+
+  // F-10: cmdk sorts inside a group only, so "runs" picked "New knowledge source" (a loose match
+  // in the first group) over the Runs page
+  it("puts the group with the best match first, so Enter takes the best match", async () => {
+    const user = userEvent.setup();
+    const onRuns = vi.fn();
+    render(
+      <CommandPalette
+        open
+        onOpenChange={() => undefined}
+        groups={[
+          {
+            id: "create",
+            heading: "Create",
+            items: [
+              { id: "knowledge", label: "New knowledge source", keywords: ["retrieval", "search"] },
+            ],
+          },
+          {
+            id: "runs",
+            heading: "Recent runs",
+            items: [{ id: "run-1", label: "Policy Q&A", description: "completed · 01a0e9ad" }],
+          },
+          {
+            id: "navigate",
+            heading: "Navigate",
+            items: [{ id: "runs", label: "Runs", keywords: ["go to"], onSelect: onRuns }],
+          },
+        ]}
+      />,
+    );
+    await user.type(screen.getByRole("combobox"), "runs");
+    expect(screen.getAllByRole("option")[0]).toHaveTextContent("Runs");
+    await user.keyboard("{Enter}");
+    expect(onRuns).toHaveBeenCalledTimes(1);
+  });
+
+  // F-10 / R12: "Ask" carried the typed text in its keywords, ranked first, and Enter on any
+  // text sent a paid question
+  it("lists a fallback group last and lets Enter pick it only when nothing else matches", async () => {
+    const user = userEvent.setup();
+    const onAsk = vi.fn();
+    const onRuns = vi.fn();
+    function Menu() {
+      const [query, setQuery] = useState("");
+      const ask: CommandGroupView = {
+        id: "ask",
+        heading: "Ask",
+        fallback: true,
+        items: [{ id: "ask", label: `Ask: “${query}”`, keywords: [query], onSelect: onAsk }],
+      };
+      const pages: CommandGroupView = {
+        id: "navigate",
+        heading: "Navigate",
+        items: [{ id: "runs", label: "Runs", keywords: ["go to"], onSelect: onRuns }],
+      };
+      return (
+        <CommandPalette
+          open
+          onOpenChange={() => undefined}
+          groups={[ask, pages]}
+          search={query}
+          onSearchChange={setQuery}
+        />
+      );
+    }
+    render(<Menu />);
+    const labels = () => screen.getAllByRole("option").map((o) => o.textContent);
+    expect(labels().at(-1)).toMatch(/^Ask/);
+    await user.type(screen.getByRole("combobox"), "runs");
+    expect(labels()).toEqual(["Runs", "Ask: “runs”"]);
+    await user.keyboard("{Enter}");
+    expect(onRuns).toHaveBeenCalledTimes(1);
+    expect(onAsk).not.toHaveBeenCalled();
+
+    await user.clear(screen.getByRole("combobox"));
+    await user.type(screen.getByRole("combobox"), "why did it fail");
+    expect(labels()).toEqual(["Ask: “why did it fail”"]);
+    await user.keyboard("{Enter}");
+    expect(onAsk).toHaveBeenCalledTimes(1);
+  });
 });

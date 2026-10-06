@@ -1,10 +1,17 @@
 import { forwardRef, type ComponentType } from "react";
-import { ArrowUpRight, Check, Pencil, TimerOff, X } from "lucide-react";
+import { ArrowUpRight, Ban, Check, Pencil, TimerOff, X } from "lucide-react";
 import { Badge, type BadgeProps } from "@/primitives";
 import type { HumanResponse } from "@/types";
 import { assertNever } from "@/types";
 
-export type ApprovalOutcome = "approved" | "rejected" | "edited" | "escalated" | "expired";
+export type ApprovalOutcome =
+  | "approved"
+  | "rejected"
+  | "edited"
+  | "escalated"
+  | "expired"
+  /** closed unanswered because its run ended (cancelled, timed out or failed) */
+  | "cancelled";
 
 interface OutcomeSpec {
   label: string;
@@ -22,6 +29,7 @@ const SPEC: Record<ApprovalOutcome, OutcomeSpec> = {
   edited: { label: "Approved with edits", tone: "accent", icon: Pencil },
   escalated: { label: "Escalated", tone: "warn", icon: ArrowUpRight },
   expired: { label: "Expired", tone: "neutral", icon: TimerOff },
+  cancelled: { label: "Cancelled", tone: "neutral", icon: Ban },
 };
 
 /** Human label for an outcome. */
@@ -61,7 +69,7 @@ export interface ApprovalOutcomeBadgeProps extends Omit<
   noIcon?: boolean;
 }
 
-/** Status badge for a finished review: approved, rejected, edited, escalated or expired. */
+/** Status badge for a finished review: approved, rejected, edited, escalated, expired or cancelled. */
 export const ApprovalOutcomeBadge = forwardRef<HTMLSpanElement, ApprovalOutcomeBadgeProps>(
   function ApprovalOutcomeBadge({ outcome, label, noIcon = false, ...rest }, ref) {
     const spec = SPEC[outcome];

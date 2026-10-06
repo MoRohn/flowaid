@@ -1,11 +1,11 @@
 "use client";
 /**
- * MCP servers (connect, test, discover, tool policy, delete), workflows exposed as MCP tools and
- * MCP tokens (service-account keys with `mcp:serve`, shown once).
+ * MCP servers (connect, edit, test, discover, tool policy, delete), workflows exposed as MCP tools
+ * and MCP tokens (service-account keys with `mcp:serve`, shown once).
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useId, useMemo, useState } from "react";
-import { CheckCircle2, Plus, Radar, Server, ShieldCheck, Trash2, Zap } from "lucide-react";
+import { CheckCircle2, Pencil, Plus, Radar, Server, ShieldCheck, Trash2, Zap } from "lucide-react";
 import {
   Badge,
   Button,
@@ -49,7 +49,7 @@ import { inputFields } from "../triggers/guide";
 import { ListHelp } from "../triggers/ListHelp";
 import { toolNamesFrom } from "../triggers/logic";
 import { McpPolicyDialog } from "./McpPolicyDialog";
-import { McpServerDialog } from "./McpServerDialog";
+import { McpServerDialog, McpServerEditDialog, testFix } from "./McpServerDialog";
 
 const TRANSPORT_LABEL: Record<McpServer["transport"], string> = {
   streamable_http: "Streamable HTTP",
@@ -169,6 +169,7 @@ function ServersSection() {
   const [creating, setCreating] = useState(false);
   const [discovery, setDiscovery] = useState<{ server: string; result: McpDiscovery } | null>(null);
   const [policy, setPolicy] = useState<McpServer | null>(null);
+  const [editing, setEditing] = useState<McpServer | null>(null);
   const confirm = useConfirm<McpServer>();
   const servers = useMcpServers();
   const test = useMutate(
@@ -176,9 +177,16 @@ function ServersSection() {
     {
       success: (r, m) => (r.ok ? `${m.name} answered the ping` : null),
       onSuccess: (r, m) => {
-        if (!r.ok) toast.error(`${m.name} is not reachable`, { description: r.message });
+        if (!r.ok)
+          toast.error(`${m.name} is not reachable`, {
+            description: [r.message, testFix(m.transport, m.url ?? "", r.message)]
+              .filter(Boolean)
+              .join(" "),
+          });
       },
       invalidate: [["mcp-servers", s.ws]],
+      errorTitle: "The test did not run",
+      refreshOnError: true,
     },
   );
   const discover = useMutate(
@@ -192,8 +200,13 @@ function ServersSection() {
         ["mcp-server-tools", s.ws],
       ],
       errorTitle: "Discovery failed",
+      // a failed discovery marks the row as errored: show it now, not after a reload
+      refreshOnError: true,
     },
   );
+  // Test and Discover can take seconds: the row shows it, and they can't be fired twice
+  const testing = test.isPending ? test.variables.id : null;
+  const discovering = discover.isPending ? discover.variables.id : null;
   const remove = useMutate((m: McpServer) => del(`/v1/mcp/servers/${m.id}`), {
     success: (_, m) => `Removed ${m.name}`,
     invalidate: [["mcp-servers", s.ws]],
@@ -251,7 +264,7 @@ function ServersSection() {
         col.display({
           id: "actions",
           header: "",
-          size: 150,
+          size: 180,
           cell: ({ row }) =>
             canWrite ? (
               <span className="flex justify-end gap-1">
@@ -260,6 +273,8 @@ function ServersSection() {
                   size="sm"
                   variant="ghost"
                   label={`Test connection to ${row.original.name}`}
+                  loading={testing === row.original.id}
+                  disabled={testing === row.original.id}
                   onClick={() => test.mutate(row.original)}
                 >
                   <Zap strokeWidth={1.75} />
@@ -268,9 +283,19 @@ function ServersSection() {
                   size="sm"
                   variant="ghost"
                   label={`Discover tools of ${row.original.name}`}
+                  loading={discovering === row.original.id}
+                  disabled={discovering === row.original.id}
                   onClick={() => discover.mutate(row.original)}
                 >
                   <Radar strokeWidth={1.75} />
+                </IconButton>
+                <IconButton
+                  size="sm"
+                  variant="ghost"
+                  label={`Edit ${row.original.name}`}
+                  onClick={() => setEditing(row.original)}
+                >
+                  <Pencil strokeWidth={1.75} />
                 </IconButton>
                 <IconButton
                   size="sm"
@@ -293,7 +318,7 @@ function ServersSection() {
         }),
       ]),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [canWrite],
+    [canWrite, testing, discovering],
   );
 
   return (
@@ -322,8 +347,9 @@ function ServersSection() {
               description="Connect a server to call its tools from MCP steps and agents. You need its address, and a key stored under Credentials if it asks for one."
               primaryAction={
                 canWrite ? (
+                  // the section's own Connect server is the screen's one filled button
                   <Button
-                    variant="primary"
+                    variant="secondary"
                     leadingIcon={<Plus strokeWidth={1.75} />}
                     onClick={() => setCreating(true)}
                   >
@@ -353,6 +379,7 @@ function ServersSection() {
           onDiscovered={(server, result) => setDiscovery({ server, result })}
         />
       ) : null}
+      <McpServerEditDialog server={editing} onClose={() => setEditing(null)} />
       {policy ? (
         <McpPolicyDialog
           server={policy}
@@ -445,7 +472,8 @@ function ExposeDialog({
   const env = s.environments.find((e) => e.id === draft.environmentId);
   const deployed = detail.data?.deployments.find((d) => d.environmentId === draft.environmentId);
   const nameOk = TOOL_NAME.test(draft.toolName);
-  const taken = exposures.some((e) => e.toolName === draft.toolName);
+  // a switched-off tool hands its name over: only one that is on blocks it
+  const taken = exposures.some((e) => e.enabled && e.toolName === draft.toolName);
   const fields = inputFields(detail.data?.draft.inputs);
 
   if (created)

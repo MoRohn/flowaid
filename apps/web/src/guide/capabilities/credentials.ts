@@ -18,6 +18,7 @@ export const CREDENTIALS: CapabilityGuide = {
       "Limit a production key to the prod environment and to the workflows that need it.",
       "Use the smallest permissions the service offers (a read-only or project-scoped key when it has one).",
       "A passed connection test means the service accepted the key, not that it has the quota or permissions every step needs.",
+      "Signing secrets FlowAId generates for webhooks and notification channels stay with them and are not listed here: rotate them in Triggers or Settings → Notifications.",
     ],
   },
 };

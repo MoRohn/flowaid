@@ -4,6 +4,14 @@ export * from "./types.js";
 export { jsonEquals, matchValue } from "./scorers/matchers.js";
 export { judge, NO_JUDGE_MODEL, type JudgeVerdict } from "./scorers/judge.js";
 export { scoreCase, metricsOf, type ScoreOptions } from "./score.js";
+export {
+  answersByNodeRun,
+  batchIdOf,
+  couldAnswer,
+  resolveDecision,
+  type DecisionEventLike,
+  type ResolvedDecision,
+} from "./decisions.js";
 export { summarize, calibration, percentile } from "./summarize.js";
 export {
   runEvaluation,

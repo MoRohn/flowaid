@@ -3,15 +3,75 @@
  * "Start here" at the top of every page in the navigation: what the page is for, when to use it,
  * what it needs (checked live against the workspace), how to start and what you end up with.
  * People who know the page collapse it to one line; it remembers that per browser and reopens
- * from the same line. A page with nothing in it yet starts expanded, one with content collapsed.
+ * from the same line. A page with nothing in it yet starts expanded, one with content collapsed,
+ * and on a phone it starts collapsed so the page itself comes first. Until the page's data has
+ * arrived it keeps the shape it settled on last time in this workspace (on a first visit, the
+ * page's `defaultCollapsed` as it stands), so the content below does not jump when it decides.
  */
-import type { ReactNode } from "react";
+import { QueryClientContext, type Query, type QueryClient } from "@tanstack/react-query";
+import { useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { BookOpenText, ChevronDown, ChevronRight, Compass, Lightbulb, Eye } from "lucide-react";
+import { usePathname } from "next/navigation";
 import { Badge, Button } from "@flowaid/ui/primitives";
+import { useMediaQuery } from "~/shell/useMediaQuery";
 import { useGuide } from "./GuideProvider";
 import { CheckList, type Check } from "./Readiness";
 import { usePref } from "./storage";
 import type { CapabilityGuide } from "./capabilities/types";
+
+/** Below Tailwind's `md`: phones, where the page's own content should fill the first screen. */
+const PHONE = "(max-width: 47.999rem)";
+
+/**
+ * A query still waiting for its first answer. With `starting`, also one built during this render
+ * whose observer has not subscribed yet (that happens after the render), unless it is disabled.
+ */
+function waiting(q: Query, starting: boolean): boolean {
+  if (q.state.status !== "pending") return false;
+  if (q.state.fetchStatus === "fetching") return true;
+  if (!starting || q.getObserversCount() > 0 || q.state.errorUpdateCount > 0) return false;
+  const enabled = (q.options as { enabled?: boolean | ((q: Query) => boolean) }).enabled;
+  return (typeof enabled === "function" ? enabled(q) : enabled) !== false;
+}
+
+const anyWaiting = (client: QueryClient, starting: boolean) =>
+  client
+    .getQueryCache()
+    .getAll()
+    .some((q) => waiting(q, starting));
+
+/** Never hold the page back longer than this for a slow or retrying request. */
+const SETTLE_LIMIT_MS = 4000;
+
+/**
+ * False while the page's first data is still on its way (`defaultCollapsed` is not known yet),
+ * true once every first load has answered. It only ever turns true.
+ */
+function useFirstDataSettled(): boolean {
+  const client = useContext(QueryClientContext);
+  const [settled, setSettled] = useState(() => !client || !anyWaiting(client, true));
+  useEffect(() => {
+    if (settled || !client) return;
+    // the page's own queries start as its effects subscribe them, after this one: judge only
+    // from the next task on, then on every change in the cache
+    let armed = false;
+    const check = () => {
+      if (armed && !anyWaiting(client, false)) setSettled(true);
+    };
+    const unsubscribe = client.getQueryCache().subscribe(check);
+    const start = setTimeout(() => {
+      armed = true;
+      check();
+    }, 0);
+    const limit = setTimeout(() => setSettled(true), SETTLE_LIMIT_MS);
+    return () => {
+      unsubscribe();
+      clearTimeout(start);
+      clearTimeout(limit);
+    };
+  }, [client, settled]);
+  return settled;
+}
 
 export function PageIntro({
   guide,
@@ -30,8 +90,32 @@ export function PageIntro({
   className?: string;
 }) {
   const [pref, setPref] = usePref(`flowaid:intro:${guide.id}`, "");
-  const collapsed = pref === "" ? defaultCollapsed : pref === "hidden";
-  const setCollapsed = (next: boolean) => setPref(next ? "hidden" : "shown");
+  // how this page's intro settled last time in this workspace: the best guess while the data
+  // loads (a page that had content still has it), so the page does not jump when it settles; a
+  // first visit takes `defaultCollapsed` as it stands
+  const ws = usePathname()?.split("/")[1] ?? "";
+  const [last, setLast] = usePref(`flowaid:intro-default:${ws}:${guide.id}`, "");
+  const phone = useMediaQuery(PHONE);
+  const settled = useFirstDataSettled();
+  const guess = settled || last === "" ? defaultCollapsed : last === "collapsed";
+  // a stored choice wins; otherwise phones start collapsed, and the rest follow the data
+  const collapsed = pref === "" ? phone || guess : pref === "hidden";
+  useEffect(() => {
+    const outcome = defaultCollapsed ? "collapsed" : "expanded";
+    if (settled && last !== outcome) setLast(outcome);
+  }, [settled, defaultCollapsed, last, setLast]);
+  // Hide and "About …" replace each other: focus follows to the one that appears
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  const refocus = useRef(false);
+  const setCollapsed = (next: boolean) => {
+    refocus.current = true;
+    setPref(next ? "hidden" : "shown");
+  };
+  useEffect(() => {
+    if (!refocus.current) return;
+    refocus.current = false;
+    toggleRef.current?.focus();
+  }, [collapsed]);
   const helper = useGuide();
   const missing = checks.filter((c) => c.state === "blocker").length;
   const warnings = checks.filter((c) => c.state === "warning").length;
@@ -44,6 +128,7 @@ export function PageIntro({
       >
         <button
           type="button"
+          ref={toggleRef}
           onClick={() => setCollapsed(false)}
           aria-expanded={false}
           className="inline-flex items-center gap-1.5 rounded-xs text-xs font-medium text-ink-2 hover:text-ink focus-visible:shadow-(--focus) focus-visible:outline-none"
@@ -89,6 +174,7 @@ export function PageIntro({
           variant="ghost"
           leadingIcon={<ChevronDown strokeWidth={1.75} />}
           aria-expanded
+          ref={toggleRef}
           onClick={() => setCollapsed(true)}
         >
           Hide

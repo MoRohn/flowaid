@@ -1,9 +1,18 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { installDomStubs } from "@/primitives/testStubs";
-import { Dashboard } from "./Dashboard";
-import { carryForward, confidenceSamples, percent, rangeFor, type DashboardMetrics } from "./logic";
+import { Dashboard, failedHint } from "./Dashboard";
+import {
+  carryForward,
+  confidenceSamples,
+  parseDashboardFilters,
+  percent,
+  rangeFor,
+  serializeDashboardFilters,
+  type DashboardFilters,
+  type DashboardMetrics,
+} from "./logic";
 
 beforeAll(() => installDomStubs());
 afterEach(() => {
@@ -36,21 +45,24 @@ const METRICS: DashboardMetrics = {
   providerFailures: [{ provider: "openai", code: "RATE_LIMIT_ERROR", count: 3 }],
 };
 
-function mount(responses: (url: string) => Response) {
-  vi.stubGlobal(
-    "fetch",
-    vi.fn((url: string) => Promise.resolve(responses(url))),
-  );
+function mount(
+  responses: (url: string) => Response,
+  controlled?: { filters: DashboardFilters; onFiltersChange: (f: DashboardFilters) => void },
+) {
+  const fetchMock = vi.fn((url: string) => Promise.resolve(responses(url)));
+  vi.stubGlobal("fetch", fetchMock);
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
+  render(
     <QueryClientProvider client={client}>
       <Dashboard
         ws="default"
         environments={[{ id: "e1", name: "dev", protected: false }]}
         now={() => NOW}
+        {...(controlled ?? {})}
       />
     </QueryClientProvider>,
   );
+  return fetchMock;
 }
 
 const EMPTY_SERIES = {
@@ -81,6 +93,24 @@ describe("dashboard helpers", () => {
     expect(confidenceSamples(bins)).toEqual([0.45, 0.45, 0.45, 0.95]);
     expect(confidenceSamples([{ lo: 0, hi: 0.1, count: 10_000 }], 100)).toHaveLength(100);
     expect(confidenceSamples([])).toEqual([]);
+  });
+  it("keeps the filters in the URL: range, workflow and environment, other parameters kept", () => {
+    const f = parseDashboardFilters(new URLSearchParams("range=7d&workflow=w1&env=e1"));
+    expect(f).toEqual({ preset: "7d", workflowId: "w1", environmentId: "e1" });
+    expect(serializeDashboardFilters(f)).toBe("range=7d&workflow=w1&env=e1");
+    // the default range stays out of the URL; an unknown one reads as the default
+    expect(serializeDashboardFilters({ preset: "24h" })).toBe("");
+    expect(parseDashboardFilters(new URLSearchParams("range=2y"))).toEqual({ preset: "24h" });
+    expect(
+      serializeDashboardFilters(
+        { preset: "30d" },
+        new URLSearchParams("getting-started&env=e1&workflow=w1"),
+      ),
+    ).toBe("getting-started=&range=30d");
+  });
+  it("counts timed-out runs with the failures under the success rate", () => {
+    expect(failedHint({ completed: 5, failed: 2 })).toBe("2 failed");
+    expect(failedHint({ failed: 2, timed_out: 1 })).toBe("2 failed · 1 timed out");
   });
   it("carries values over gaps and formats rates", () => {
     expect(carryForward([null, 3, null, 5])).toEqual([0, 3, 3, 5]);
@@ -116,6 +146,34 @@ describe("Dashboard", () => {
     expect(screen.getByText("2 failed")).toBeTruthy();
     expect(screen.getByText("RATE_LIMIT_ERROR")).toBeTruthy();
     expect(screen.getByRole("group", { name: "Dashboard filters" })).toBeTruthy();
+  });
+
+  it("shows and changes the filters it is given (the page keeps them in the URL)", async () => {
+    const onFiltersChange = vi.fn();
+    const fetchMock = mount(
+      (url) =>
+        url.includes("/v1/metrics/overview")
+          ? json(METRICS)
+          : json({ items: [], next_cursor: null, ...EMPTY_SERIES }),
+      { filters: { preset: "7d", environmentId: "e1" }, onFiltersChange },
+    );
+    await screen.findByText("95.2%");
+    const overview = fetchMock.mock.calls
+      .map(([u]) => u)
+      .find((u) => u.startsWith("/v1/metrics/overview")) as string;
+    const q = new URL(overview, "http://x").searchParams;
+    expect(q.get("environmentId")).toBe("e1");
+    expect(Date.parse(q.get("to") as string) - Date.parse(q.get("from") as string)).toBe(
+      7 * 86_400_000,
+    );
+    expect(screen.getByRole("radio", { name: "7d" }).getAttribute("aria-checked")).toBe("true");
+    // the environment filter reaches "Needs attention" too
+    const insights = fetchMock.mock.calls.map(([u]) => u).find((u) => u.startsWith("/v1/insights"));
+    expect(insights).toContain("environmentId=e1");
+    act(() => {
+      fireEvent.click(screen.getByRole("radio", { name: "30d" }));
+    });
+    expect(onFiltersChange).toHaveBeenCalledWith({ preset: "30d", environmentId: "e1" });
   });
 
   it("explains an empty range", async () => {

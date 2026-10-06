@@ -16,7 +16,8 @@ const row = (over: Partial<TemplateRow>): TemplateRow => ({
 const have = {
   keys: { server: { typesafe: true }, saved: [] },
   mcpServers: 0,
-  knowledgeSources: 0,
+  knowledge: [],
+  pageindex: false,
 };
 
 describe("templateNeeds", () => {
@@ -102,6 +103,36 @@ describe("templateChecks", () => {
     const { checks, ready } = templateChecks([key, mcp(true)], slots, { github: "m1" }, name);
     expect(ready).toBe(true);
     expect(checks[1]?.label).toBe("MCP server for github: GitHub tools");
+  });
+
+  it("counts only sources of the kind a slot reads, and asks which one once they exist", () => {
+    const t = row({
+      requiredResources: {
+        knowledgeSources: [
+          { key: "documents", description: "PDFs indexed with PageIndex" },
+          { key: "issues", description: "Past issues for hybrid search" },
+        ],
+      },
+    });
+    // a text source fills neither a PageIndex slot nor (before) counted for both
+    const some = templateNeeds(t, { ...have, knowledge: [{ kind: "text" }], pageindex: true });
+    expect(some.map((n) => [n.label, n.ready, n.detail])).toEqual([
+      ["Documents", false, "add a PageIndex source with indexed PDFs under Knowledge"],
+      ["Documents (issues)", true, "choose which source when you create it"],
+    ]);
+    const { checks } = templateChecks(
+      some,
+      [
+        { key: "documents", kind: "knowledgeSources" },
+        { key: "issues", kind: "knowledgeSources" },
+      ],
+      { "knowledge.issues": "s1" },
+      (id) => (id === "s1" ? "Past issues" : undefined),
+    );
+    expect(checks.map((c) => [c.id, c.state, c.label])).toEqual([
+      ["need:Documents", "warning", "Documents"],
+      ["slot:issues", "ok", "Knowledge source for issues: Past issues"],
+    ]);
   });
 
   it("points each missing need at the page that sets it up", () => {

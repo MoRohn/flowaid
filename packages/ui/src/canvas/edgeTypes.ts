@@ -38,6 +38,8 @@ export function toCanvasEdge(edge: WorkflowEdgeView): CanvasEdge {
     const route = edge.route ?? (source?.kind === "ctl" ? source.port : undefined);
     return {
       ...base,
+      // the control and the data edge between two steps need names that tell them apart
+      ariaLabel: `Control edge from ${edge.source}${route !== undefined && route !== "done" ? ` (${route})` : ""} to ${edge.target}`,
       type: "control",
       sourceHandle: edge.sourceHandle ?? (route ? handleId("ctl", route) : handleId("ctl", "done")),
       targetHandle: edge.targetHandle ?? CONTROL_IN,
@@ -50,8 +52,13 @@ export function toCanvasEdge(edge: WorkflowEdgeView): CanvasEdge {
   }
   const via = edge.via ?? "ref";
   const implicit = via !== "ref";
+  const portOf = (handle: string | null | undefined) => {
+    const h = parseHandleId(handle);
+    return h && h.kind !== "ctl-in" ? `.${h.port}` : "";
+  };
   return {
     ...base,
+    ariaLabel: `Data from ${edge.source}${portOf(edge.sourceHandle)} to ${edge.target}${portOf(edge.targetHandle)}`,
     type: "data",
     sourceHandle: edge.sourceHandle,
     targetHandle: edge.targetHandle,

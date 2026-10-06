@@ -11,6 +11,7 @@ import { useSession } from "~/session";
 import type { Credential, ModelInfo, Provider } from "../types";
 import { QueryView, Section } from "../ui";
 import { PROVIDER_NAME } from "../providerNames";
+import { providerCredentialType } from "../credentials/logic";
 
 const KIND_LABEL: Record<ModelInfo["kind"], string> = {
   decision: "Decision",
@@ -140,7 +141,8 @@ export function ProvidersTab() {
                     {!p.configuredOnServer && n === 0 && s.features.credentials ? (
                       <Link
                         className="text-xs text-accent-text hover:underline"
-                        href={`/${s.ws}/credentials`}
+                        // opens New credential on this provider's key
+                        href={`/${s.ws}/credentials?new=1&type=${encodeURIComponent(providerCredentialType(p.id))}`}
                       >
                         Add {/^[aeiou]/i.test(PROVIDER_NAME[p.id] ?? p.id) ? "an" : "a"}{" "}
                         {PROVIDER_NAME[p.id] ?? p.id} credential

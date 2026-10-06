@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { asc, eq, inArray, sql } from "drizzle-orm";
 import { uuidv7 } from "@flowaid/shared";
-import { WorkerLostError, type DurableRunEvent } from "@flowaid/workflow-core";
+import { WorkerLostError, type DurableRunEvent, type JsonObject } from "@flowaid/workflow-core";
 import { reproject } from "../reproject.js";
 import { humanTasks, nodeRuns, runs, runTimers } from "../schema.js";
 import { createTestDatabase, describeDb, type TestDatabase } from "../test/pg.js";
@@ -113,7 +113,8 @@ describeDb("PgRunStore", () => {
       expect(list.map((n) => [n.nodeId, n.attempt, n.status])).toEqual([
         ["start", 1, "completed"],
         ["intent", 1, "completed"],
-        ["fetch_account", 1, "retry_wait"],
+        // the attempt the retry replaced failed; it does not wait for good
+        ["fetch_account", 1, "failed"],
         ["fetch_account", 2, "completed"],
         ["draft", 1, "completed"],
         ["approve", 1, "completed"],
@@ -126,6 +127,7 @@ describeDb("PgRunStore", () => {
       // Scheduled and started in one batch: the events share a timestamp.
       expect(intent?.queueLatencyMs).toBe(0);
       expect(byId.get(played.ids.fetch1)?.error?.code).toBe("NETWORK_ERROR");
+      expect(byId.get(played.ids.fetch1)?.endedAt).not.toBeNull();
       expect(byId.get(played.ids.draft)?.usage).toEqual({ inputTokens: 640, outputTokens: 118 });
       const [decisionCols] = await t.app.system((tx) =>
         tx.select().from(nodeRuns).where(eq(nodeRuns.id, played.ids.intent)),
@@ -171,6 +173,20 @@ describeDb("PgRunStore", () => {
         attempt: 2,
       });
       expect(await played.store.getNodeOutput(played.run.id, "", "nope")).toBeNull();
+    });
+
+    it("does not offer a step whose output was not stored (doNotPersist) for reuse", async () => {
+      const setOutput = (output: JsonObject) =>
+        t.app.system((tx) =>
+          tx.update(nodeRuns).set({ output }).where(eq(nodeRuns.id, played.ids.fetch2)),
+        );
+      await setOutput({ $redacted: true });
+      try {
+        const recorded = await played.store.recordedOutputs(played.run.id);
+        expect(recorded.has(recordedKey("fetch_account", "", "hash-fetch_account"))).toBe(false);
+      } finally {
+        await setOutput({ plan: "gold" });
+      }
     });
 
     it("reprojects to exactly the same rows (project(events) ≡ rows)", async () => {

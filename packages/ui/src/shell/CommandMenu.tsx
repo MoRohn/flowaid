@@ -60,7 +60,7 @@ export interface CommandMenuProps {
   themeGroup?: boolean;
   /** Groups placed before Navigate (create actions, the workspace's own things). */
   leadingGroups?: CommandGroupView[];
-  /** Extra groups appended after the built-in ones. */
+  /** Extra groups after Navigate, the actions and recent items (before the theme). */
   extraGroups?: CommandGroupView[];
   placeholder?: string;
   /** Controlled search text, for groups that depend on what is typed (go to a run by id). */
@@ -69,9 +69,10 @@ export interface CommandMenuProps {
 }
 
 /**
- * The global ⌘K menu built on CommandPalette: Navigate, Workflow actions,
+ * The global ⌘K menu built on CommandPalette: Navigate, Actions,
  * Recent workflows and runs, and Theme. With `onAskAi`, whatever is typed can
- * be handed to the AI builder as the first item.
+ * be handed to the AI builder; that item is listed last and Enter picks it
+ * only when nothing else matches.
  */
 export function CommandMenu({
   open: openProp,
@@ -83,7 +84,7 @@ export function CommandMenu({
   themeGroup = true,
   leadingGroups = [],
   extraGroups = [],
-  placeholder = "Search pages, workflows, runs or type a command…",
+  placeholder = "Search or type a command…",
   search,
   onSearchChange,
 }: CommandMenuProps) {
@@ -102,6 +103,7 @@ export function CommandMenu({
     if (onAskAi) {
       list.push({
         id: "ai",
+        fallback: true,
         items: [
           {
             id: "ask-ai",
@@ -135,7 +137,7 @@ export function CommandMenu({
     if (actions.length > 0) {
       list.push({
         id: "workflow",
-        heading: "Workflow",
+        heading: "Actions",
         items: actions.map<CommandItemView>((a) => ({
           id: a.id,
           label: a.label,
@@ -174,6 +176,8 @@ export function CommandMenu({
         ),
       });
     }
+    // the app's own groups come before the theme; a fallback group (Ask) still goes last
+    list.push(...extraGroups);
     if (themeGroup) {
       const themes: Array<{ id: ThemeSetting; label: string; icon: ReactNode }> = [
         { id: "light", label: "Light", icon: <Sun strokeWidth={1.75} /> },
@@ -188,12 +192,12 @@ export function CommandMenu({
           label: `Theme: ${t.label}`,
           icon: t.icon,
           meta: setting === t.id ? "current" : undefined,
-          keywords: ["theme", "appearance", "dark mode", "light mode"],
+          keywords: ["theme", "appearance", `${t.id} mode`],
           onSelect: () => setTheme(t.id),
         })),
       });
     }
-    return [...list, ...extraGroups];
+    return list;
   }, [
     query,
     onAskAi,

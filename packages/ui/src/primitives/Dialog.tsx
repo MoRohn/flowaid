@@ -7,6 +7,7 @@ import {
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { useReturnFocus } from "./focusReturn";
 import { IconButton } from "./IconButton";
 
 export const Dialog = DialogPrimitive.Root;
@@ -48,30 +49,48 @@ export interface DialogContentProps extends ComponentPropsWithoutRef<
 
 /**
  * Modal surface. Combine `DialogHeader` / `DialogBody` / `DialogFooter` for
- * the standard layout: the body scrolls, the header and footer stay put.
+ * the standard layout: the body scrolls, the header and footer stay put. A `<form>` wrapping
+ * them as the direct child takes over the column, so a tall form still scrolls its body and keeps
+ * its submit button on screen. Closing returns focus to whatever opened it, also when that was a
+ * menu item or code rather than a `DialogTrigger` (focusReturn.ts).
  */
 export const DialogContent = forwardRef<
   ComponentRef<typeof DialogPrimitive.Content>,
   DialogContentProps
 >(function DialogContent(
-  { className, size = "md", hideClose = false, placement = "center", children, style, ...rest },
+  {
+    className,
+    size = "md",
+    hideClose = false,
+    placement = "center",
+    children,
+    style,
+    onOpenAutoFocus,
+    onCloseAutoFocus,
+    ...rest
+  },
   ref,
 ) {
+  const focus = useReturnFocus({ onOpenAutoFocus, onCloseAutoFocus });
   return (
     <DialogPrimitive.Portal>
       <DialogOverlay />
       <DialogPrimitive.Content
         ref={ref}
+        data-fa-overlay=""
         style={{ "--dialog-w": `${SIZE_PX[size]}px`, ...style }}
         className={cn(
           "fa-pop fixed left-1/2 z-50 flex w-[calc(100vw-32px)] max-w-(--dialog-w) -translate-x-1/2 flex-col",
           "rounded-lg border border-border bg-surface text-ink shadow-3 outline-none",
+          "[&>form]:flex [&>form]:min-h-0 [&>form]:flex-1 [&>form]:flex-col",
           placement === "center"
             ? "top-1/2 max-h-[calc(100dvh-32px)] -translate-y-1/2"
             : "top-[max(16px,12vh)] max-h-[calc(100dvh-max(16px,12vh)-16px)]",
           className,
         )}
         {...rest}
+        onOpenAutoFocus={focus.onOpenAutoFocus}
+        onCloseAutoFocus={focus.onCloseAutoFocus}
       >
         {children}
         {!hideClose ? (

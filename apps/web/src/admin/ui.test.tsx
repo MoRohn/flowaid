@@ -87,6 +87,27 @@ describe("OneTimeSecretDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: "I have copied it" }));
     expect(onClose).toHaveBeenCalled();
   });
+  it("ignores Escape and clicks outside: only its button closes it", async () => {
+    const onClose = vi.fn();
+    render(<OneTimeSecretDialog secret="fa_live_abc" title="API key created" onClose={onClose} />);
+    // Radix attaches its outside-press listener a tick after opening
+    await act(() => new Promise((r) => setTimeout(r, 0)));
+    act(() => {
+      fireEvent.keyDown(document, { key: "Escape" });
+    });
+    expect(onClose).not.toHaveBeenCalled();
+    // Radix dismisses on a press outside the content (the overlay): pointer down, then click
+    const overlay = document.querySelector(".fa-overlay");
+    expect(overlay).toBeTruthy();
+    act(() => {
+      fireEvent.pointerDown(overlay as Element);
+      fireEvent.click(overlay as Element);
+    });
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByTestId("one-time-secret")).toBeTruthy();
+    // no corner close button either; the footer's acknowledgement is the way out
+    expect(screen.queryByRole("button", { name: "Close" })).toBeNull();
+  });
   it("renders nothing without a secret", () => {
     render(<OneTimeSecretDialog secret={null} title="x" onClose={() => undefined} />);
     expect(screen.queryByTestId("one-time-secret")).toBeNull();

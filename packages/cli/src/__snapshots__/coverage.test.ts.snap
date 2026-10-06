@@ -19,7 +19,9 @@ artifact download <id> {--inline --out}
 assistant
 assistant ask {--question --history --body --out}
 audit
+audit export {--actor --action --resource-type --resource-id --from --to --format --out}
 audit list {--limit --cursor --order --actor --action --resource-type --resource-id --from --to --out}
+audit resource-types {--out}
 auth
 auth local {--out}
 auth login {--email --password --body --out}
@@ -34,6 +36,7 @@ credential list {--limit --cursor --type --environment-id --out}
 credential rotate <id> {--values --body --out}
 credential test <id> {--out}
 credential update <id> {--name --values --scopes --environment-id --allowed-workflow-ids --body --out}
+credential uses <id> {--out}
 credential-type
 credential-type list {--out}
 dataset
@@ -59,6 +62,7 @@ environment create {--name --variables --protected --body --out}
 environment delete <id> {--out}
 environment list {--out}
 environment update <id> {--name --variables --protected --body --out}
+environment usage <id> {--out}
 evaluation
 evaluation cancel <id> {--out}
 evaluation compare <id> <otherId> {--format --out}
@@ -130,6 +134,7 @@ node list {--out}
 notification
 notification create {--kind --name --config --events --enabled --slack-webhook-url --body --out}
 notification delete <id> {--out}
+notification deliveries <id> {--limit --out}
 notification events {--out}
 notification list {--limit --cursor --out}
 notification rotate-secret <id> {--out}
@@ -169,7 +174,7 @@ run delete <id> {--out}
 run events <id> {--follow --after --limit --types}
 run fork <id> {--version-id --draft --node-id --input --variables --body --out}
 run get <id> {--include --out}
-run list {--limit --cursor --order --workflow-id --environment-id --status --origin --session-id --include --out}
+run list {--limit --cursor --order --workflow-id --environment-id --status --origin --session-id --q --from --to --include --out}
 run node-run <id> <nodeRunId> {--out}
 run node-runs <id> {--node-id --scope --out}
 run output <id> {--out}

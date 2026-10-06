@@ -375,6 +375,105 @@ describe("explainRun", () => {
     expect(nextForRun(run as never).join(" ")).toContain("Retry");
   });
 
+  it("takes how long a person took from the wait, not the step's run time", () => {
+    const run = {
+      status: "completed" as const,
+      nodeRuns: [
+        // the step itself ran in no time once answered; the person took 65 s
+        nr("agent", 4, {
+          firedPorts: ["rejected"],
+          durationMs: 0,
+          endedAt: new Date(Date.UTC(2026, 8, 29, 12, 1, 9)).toISOString(),
+        }),
+      ],
+    };
+    expect(explainRun(run, def)).toContain("A person rejected “Agent review” after 1 minute.");
+    expect(
+      explainRun(
+        {
+          ...run,
+          nodeRuns: [
+            nr("agent", 4, {
+              firedPorts: ["approved"],
+              durationMs: 0,
+              endedAt: new Date(Date.UTC(2026, 8, 29, 12, 0, 21)).toISOString(),
+            }),
+          ],
+        },
+        def,
+      ),
+    ).toContain("A person approved “Agent review” after 17 seconds.");
+  });
+
+  it("never says a person answered when nobody did: cancelled and timed-out runs", () => {
+    const unanswered = (status: "cancelled" | "timed_out" | "failed") => ({
+      status,
+      nodeRuns: [nr("start", 0), nr("agent", 1, { status: "cancelled", durationMs: 300_000 })],
+    });
+    expect(explainRun(unanswered("cancelled"), def)).toEqual([
+      "A request came in.",
+      "Nobody answered “Agent review” before the run was cancelled.",
+      "It was cancelled.",
+    ]);
+    expect(explainRun(unanswered("timed_out"), def, { timeoutMs: 20_000 })).toEqual([
+      "A request came in.",
+      "Nobody answered “Agent review” before the run reached its time limit.",
+      "It stopped at the run's time limit of 20 seconds.",
+    ]);
+    const failed = explainRun(unanswered("failed"), def);
+    expect(failed).toContain("Nobody answered “Agent review” before the run failed.");
+    // a step still marked waiting in a run that ended was not answered either
+    expect(
+      explainRun(
+        { status: "timed_out", nodeRuns: [nr("agent", 1, { status: "waiting" })] },
+        { ...def, execution: { ...def.execution, timeoutMs: 180_000 } },
+      ),
+    ).toEqual([
+      "Nobody answered “Agent review” before the run reached its time limit.",
+      "It stopped at the run's time limit of 3 minutes.",
+    ]);
+    for (const status of ["cancelled", "timed_out"] as const)
+      expect(explainRun(unanswered(status), def).join(" ")).not.toMatch(
+        /A person (answered|approved|rejected)/,
+      );
+  });
+
+  it("tells why a run was cancelled when the person said", () => {
+    const run = { status: "cancelled" as const, nodeRuns: [nr("start", 0)] };
+    expect(explainRun(run, def, { cancelReason: "Duplicate request" })).toEqual([
+      "A request came in.",
+      "It was cancelled: Duplicate request",
+    ]);
+  });
+
+  it("gives a timed-out run its own next steps, with no failed step to open", () => {
+    const next = nextForRun({ status: "timed_out", nodeRuns: [] }).join(" ");
+    expect(next).toContain("time limit");
+    expect(next).toContain("Replay");
+    expect(next).not.toContain("marked failed");
+  });
+
+  it("tells a step retried in place once, as its latest attempt", () => {
+    const error = {
+      code: "NETWORK_ERROR" as const,
+      message: "upstream returned 503",
+      retryable: true,
+    };
+    const run = {
+      status: "failed" as const,
+      nodeRuns: [
+        nr("start", 0),
+        nr("assess", 1, { id: "a1", status: "failed", attempt: 1, error }),
+        nr("assess", 5, { id: "a2", status: "failed", attempt: 2, error }),
+      ],
+      error,
+    };
+    expect(explainRun(run, def)).toEqual([
+      "A request came in.",
+      "It stopped at “Assess the request”: upstream returned 503.",
+    ]);
+  });
+
   it("still tells a short story without the definition", () => {
     expect(
       explainRun({

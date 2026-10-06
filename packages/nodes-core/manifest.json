@@ -72,7 +72,10 @@
             "default": 8,
             "maximum": 50,
             "minimum": 1,
-            "type": "integer"
+            "type": "integer",
+            "x-ui": {
+              "help": "Model turns before the agent must answer. Leave it empty on a step that uses an agent preset to use the preset's."
+            }
           },
           "maxTokens": {
             "minimum": 1,

@@ -38,14 +38,17 @@ export interface ManualChoiceProps extends Omit<
   hideProbabilities?: boolean;
 }
 
-/** Highest-probability option id, or the first option when no probabilities are given. */
+/**
+ * Highest-probability option id; none when no option has a probability (a person's choice that no
+ * model ranked: nothing is "the model's pick").
+ */
 export function defaultModelPick(options: ManualChoiceOption[]): string | undefined {
   let best: ManualChoiceOption | undefined;
   for (const o of options) {
     if (o.probability === undefined) continue;
     if (!best || (best.probability ?? -1) < o.probability) best = o;
   }
-  return best?.id ?? options[0]?.id;
+  return best?.id;
 }
 
 /** True when a keyboard event originates in a field that consumes typing. */

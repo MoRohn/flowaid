@@ -15,6 +15,16 @@ export type FeatureKey = z.infer<typeof FeatureKeySchema>;
 export const RoleSchema = z.enum(["owner", "admin", "editor", "operator", "viewer"]);
 export const IdParams = z.object({ id: z.uuid() });
 
+/**
+ * A boolean query flag. "true"/"1" and "false"/"0" are read as written; `z.coerce.boolean` would
+ * read `?purge=false` as true because every non-empty string is truthy. Documented as a boolean.
+ */
+export const queryBool = (fallback = false) =>
+  z.preprocess(
+    (v) => (v === "true" || v === "1" ? true : v === "false" || v === "0" ? false : v),
+    z.boolean().default(fallback),
+  );
+
 export const ErrorEnvelopeSchema = z.object({
   error: z.object({
     code: z.string(),

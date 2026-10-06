@@ -5,7 +5,6 @@ import { Suspense, useMemo, useState } from "react";
 import { LayoutTemplate } from "lucide-react";
 import type { NodeCategory } from "@flowaid/ui";
 import { EmptyState } from "@flowaid/ui/primitives";
-import { TemplateGallery, type WorkflowTemplateView } from "@flowaid/ui/builder";
 import { PageHeader } from "@flowaid/ui/shell";
 import type { NodeManifest } from "@flowaid/workflow-core";
 import { get, getAll } from "~/api/client";
@@ -17,8 +16,10 @@ import { PageIntro } from "~/guide/PageIntro";
 import type { Check } from "~/guide/Readiness";
 import { generationCheck, typesafeCheck, useConnections } from "~/guide/useConnections";
 import { useSession } from "~/session";
-import { businessArea, splitBusinessFlows } from "~/templates/business";
+import type { KnowledgeSource } from "~/knowledge/model";
+import { businessArea } from "~/templates/business";
 import { templateNeeds, type WorkspaceResources } from "~/templates/readiness";
+import { TemplateSections } from "~/templates/TemplateSections";
 import { UseTemplateDialog } from "~/templates/UseTemplateDialog";
 import { AppFrame, PageBody } from "~/shell/AppFrame";
 import { HELP } from "~/shell/help";
@@ -88,7 +89,7 @@ function Templates() {
   });
   const knowledge = useQuery({
     queryKey: ["knowledge-sources", s.ws],
-    queryFn: () => getAll<unknown>("/v1/knowledge/sources"),
+    queryFn: () => getAll<KnowledgeSource>("/v1/knowledge/sources"),
     enabled: s.features.knowledge === true,
   });
   // readiness only once the key state is known: "to set up" must not flash while loading
@@ -99,7 +100,8 @@ function Templates() {
           saved: (credentials.data ?? []).map((c) => c.type),
         },
         mcpServers: mcp.data?.length ?? 0,
-        knowledgeSources: knowledge.data?.length ?? 0,
+        knowledge: knowledge.data ?? [],
+        pageindex: s.features.pageindex === true,
       }
     : null;
   const needsOf = (t: TemplateRow) => (have ? templateNeeds(t, have) : []);
@@ -203,48 +205,5 @@ function Templates() {
         />
       ) : null}
     </AppFrame>
-  );
-}
-
-/**
- * Business flows get their own short list at the top (complete workflows for everyday operations);
- * every other template follows in the searchable gallery.
- */
-function TemplateSections({
-  rows,
-  views,
-  onUse,
-}: {
-  rows: readonly TemplateRow[];
-  views: WorkflowTemplateView[];
-  onUse: (v: WorkflowTemplateView) => void;
-}) {
-  const { business } = splitBusinessFlows(rows);
-  const ids = new Set(business.map((t) => t.id));
-  const featured = views.filter((v) => ids.has(v.id));
-  const rest = views.filter((v) => !ids.has(v.id));
-  if (featured.length === 0) return <TemplateGallery templates={views} onUse={onUse} />;
-  return (
-    <div className="flex flex-col gap-8">
-      <section aria-labelledby="business-flows" className="flex flex-col gap-3">
-        <div>
-          <h2 id="business-flows" className="text-base font-semibold text-ink">
-            Business flows
-          </h2>
-          <p className="max-w-[70ch] text-xs text-ink-2">
-            Complete workflows for everyday operations, built end to end: input, decisions, rules,
-            people when needed, and the outcome. Create one and it is yours: rename it, change its
-            settings (limits, windows, scores) in the workflow panel, and edit any step or wording.
-          </p>
-        </div>
-        <TemplateGallery templates={featured} onUse={onUse} toolbar={false} />
-      </section>
-      <section aria-labelledby="more-templates" className="flex flex-col gap-3">
-        <h2 id="more-templates" className="text-base font-semibold text-ink">
-          More templates
-        </h2>
-        <TemplateGallery templates={rest} onUse={onUse} />
-      </section>
-    </div>
   );
 }

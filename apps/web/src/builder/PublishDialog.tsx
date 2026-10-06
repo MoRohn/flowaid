@@ -6,6 +6,7 @@
  * deploys only to the environments ticked here, none by default.
  */
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { diff } from "@flowaid/workflow-compiler";
 import type { Diagnostic, WorkflowDefinition } from "@flowaid/workflow-core";
@@ -59,6 +60,7 @@ export interface PublishDialogProps {
 export function PublishDialog(p: PublishDialogProps) {
   const s = useSession();
   const qc = useQueryClient();
+  const router = useRouter();
   const [notes, setNotes] = useState("");
   const [label, setLabel] = useState("");
   const [deployTo, setDeployTo] = useState<string[]>([]);
@@ -134,9 +136,20 @@ export function PublishDialog(p: PublishDialogProps) {
     onSuccess: (v) => {
       toast.success(
         `Published v${v.version ?? ""}${deployTo.length ? ` and deployed to ${deployTo.length} environment${deployTo.length > 1 ? "s" : ""}` : ""}`,
+        // the next step after publishing: put the version live somewhere
+        deployTo.length === 0 && s.can("workflows:publish")
+          ? {
+              action: {
+                label: "Deploy",
+                onClick: () =>
+                  router.push(`/${s.ws}/workflows/${p.workflowId}/deployments?version=${v.id}`),
+              },
+            }
+          : undefined,
       );
       void qc.invalidateQueries({ queryKey: ["workflow", p.workflowId] });
-      void qc.invalidateQueries({ queryKey: ["versions", p.workflowId] });
+      void qc.invalidateQueries({ queryKey: ["workflow", s.ws, p.workflowId] });
+      void qc.invalidateQueries({ queryKey: ["versions", s.ws, p.workflowId] });
       p.onPublished(v);
       setDeployTo([]);
       p.onOpenChange(false);

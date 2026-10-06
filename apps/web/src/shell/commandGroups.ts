@@ -1,6 +1,8 @@
 /**
- * The ⌘K menu's workspace groups (pure, so it is unit tested): things to create, the workspace's
- * workflows, recent runs and templates, settings sections and help. Icons are attached by the
+ * The ⌘K menu's workspace groups (pure, so it is unit tested). Before the pages: a typed run id,
+ * pending approvals and things to create. After them: the workspace's workflows, recent runs and
+ * a few templates, settings sections, help, and last Ask FlowAId, which ranks below every real
+ * match so Enter never sends a question while something else fits. Icons are attached by the
  * component; here every item carries a `to` (an app path), an `href` (a page outside the app) or
  * an `action` the component knows.
  */
@@ -42,6 +44,8 @@ export interface CommandGroup {
   id: string;
   heading: string;
   items: CommandTarget[];
+  /** listed last; Enter picks it only when nothing else matches (CommandPalette) */
+  fallback?: boolean;
 }
 
 export interface CommandInput {
@@ -77,6 +81,7 @@ export function runIdQuery(query: string): { kind: "id" | "prefix"; value: strin
 }
 
 const PENDING_SHOWN = 5;
+const TEMPLATES_SHOWN = 5;
 
 const STATUS: Record<string, string> = {
   waiting_for_human: "waiting for a person",
@@ -212,7 +217,6 @@ export function commandGroups(i: CommandInput): {
   const pending = i.pending ?? [];
   const leading: CommandGroup[] = [
     { id: "goto", heading: "Go to", items: goToRun(i, at) },
-    { id: "ask", heading: "Ask", items: askItems(i) },
     {
       id: "pending",
       heading: "Pending approvals",
@@ -240,6 +244,8 @@ export function commandGroups(i: CommandInput): {
       ],
     },
     { id: "create", heading: "Create", items: create },
+  ];
+  const lists: CommandGroup[] = [
     {
       id: "workflows",
       heading: "Workflows",
@@ -268,15 +274,28 @@ export function commandGroups(i: CommandInput): {
       id: "templates",
       heading: "Templates",
       items: write
-        ? i.templates.map((t) => ({
-            id: `template-${t.id}`,
-            label: t.name,
-            ...(t.description ? { description: t.description } : {}),
-            meta: "template",
-            icon: "template",
-            keywords: ["template", "use", "start"],
-            to: at(`templates?use=${encodeURIComponent(t.id)}`),
-          }))
+        ? [
+            ...i.templates.slice(0, TEMPLATES_SHOWN).map((t) => ({
+              id: `template-${t.id}`,
+              label: t.name,
+              ...(t.description ? { description: t.description } : {}),
+              meta: "template",
+              icon: "template" as const,
+              keywords: ["template", "use", "start"],
+              to: at(`templates?use=${encodeURIComponent(t.id)}`),
+            })),
+            ...(i.templates.length > TEMPLATES_SHOWN
+              ? [
+                  {
+                    id: "templates-all",
+                    label: `All templates (${i.templates.length})`,
+                    icon: "template" as const,
+                    keywords: ["template", "examples", "browse"],
+                    to: at("templates"),
+                  },
+                ]
+              : []),
+          ]
         : [],
     },
   ];
@@ -354,8 +373,10 @@ export function commandGroups(i: CommandInput): {
   return {
     leading: keep(leading),
     trailing: keep([
+      ...lists,
       { id: "settings", heading: "Settings", items: settings },
       { id: "help", heading: "Help", items: help },
+      { id: "ask", heading: "Ask", items: askItems(i), fallback: true },
     ]),
   };
 }

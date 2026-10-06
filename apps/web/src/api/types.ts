@@ -125,6 +125,8 @@ export interface Run {
   nodeRunCount: number;
   /** with `include=decisions` on the list */
   decisions?: { nodeId: string; nodeName: string; kind: string; confidence: number }[];
+  /** with `include=version` on the list: the version number, null for a draft */
+  version?: number | null;
   createdAt: string;
   startedAt: string | null;
   endedAt: string | null;

@@ -17,6 +17,7 @@ import {
   BindingField,
   type BindingFieldProps,
   CodeEditor,
+  FlowExprEditor,
   type TemplateRef,
   JsonSchemaEditor,
   SchemaForm,
@@ -42,6 +43,7 @@ import type { Projection } from "./model";
 import { useModelViews } from "./models";
 import { CredentialSlots } from "./CredentialSlots";
 import { PolicyEditor } from "./PolicyEditor";
+import { savedStepConfig } from "./stepConfig";
 import { createLoadOptions } from "./optionProviders";
 
 // agent presets, MCP servers/tools/prompts and OpenAPI toolsets/operations for picker fields
@@ -178,7 +180,9 @@ export function NodeInspector({
             variables={variables}
             inContainer={inContainer}
             disabled={readOnly}
-            onChange={(values) => s.setNodeConfig(node.id, values)}
+            onChange={(values) =>
+              s.setNodeConfig(node.id, savedStepConfig(manifest.configSchema, values))
+            }
             aria-label={`${node.name} configuration`}
           />
           {view && view.inputs.length > 0 ? (
@@ -304,7 +308,15 @@ export function NodeInspector({
       ) : null}
 
       {node.kind === "branch" ? (
-        <BranchEditor key={`${node.id}:${epoch}`} node={node} store={store} readOnly={readOnly} />
+        <BranchEditor
+          key={`${node.id}:${epoch}`}
+          node={node}
+          store={store}
+          readOnly={readOnly}
+          refs={refs}
+          variables={variables}
+          inContainer={inContainer}
+        />
       ) : null}
       {node.kind === "wait" && node.until.type === "event" ? (
         <EventWaitEditor
@@ -409,10 +421,17 @@ function BranchEditor({
   node,
   store,
   readOnly,
+  refs,
+  variables,
+  inContainer,
 }: {
   node: Extract<WorkflowNode, { kind: "branch" }>;
   store: BuilderStore;
   readOnly?: boolean | undefined;
+  /** what a condition can read: earlier steps' outputs, the settings, the loop fields */
+  refs: readonly TemplateRef[];
+  variables: readonly string[];
+  inContainer: boolean;
 }) {
   const s = store.getState();
   return (
@@ -463,22 +482,25 @@ function BranchEditor({
               }
             />
           </div>
-          {/* conditions run long; wrap them instead of hiding the end of the expression */}
-          <Textarea
+          {/* a FlowExpr condition: earlier steps' outputs complete as you type */}
+          <FlowExprEditor
+            key={`${node.id}:when:${i}`}
             aria-label="When"
-            mono
-            autoGrow
             minRows={1}
             maxRows={6}
+            refs={refs}
+            variables={variables}
+            inContainer={inContainer}
             defaultValue={c.when}
             disabled={readOnly}
-            onBlur={(e) =>
+            onChange={(v) =>
               s.updateNode(
                 node.id,
                 (n) => {
-                  if (n.kind === "branch" && n.cases[i]) n.cases[i].when = e.target.value || "true";
+                  if (n.kind === "branch" && n.cases[i]) n.cases[i].when = v.trim() || "true";
                 },
                 "Edit condition",
+                `when:${node.id}:${i}`,
               )
             }
           />

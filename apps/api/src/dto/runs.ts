@@ -63,10 +63,20 @@ export const RunDecisionSummarySchema = z.object({
   confidence: z.number(),
 });
 
-/** A runs-list row: the run, plus its decisions with `include=decisions`. */
+/**
+ * A runs-list row: the run, plus its decisions with `include=decisions` and its version number
+ * (`null` for a draft) with `include=version`.
+ */
 export const RunListItemSchema = RunSchema.extend({
   decisions: z.array(RunDecisionSummarySchema).optional(),
+  version: z.int().nullable().optional(),
 });
+
+/** `include` on the runs list: `decisions`, `version`, or both (`decisions,version`). */
+export const RunListIncludeSchema = z
+  .string()
+  .regex(/^(decisions|version)(,(decisions|version))*$/, "decisions, version or both")
+  .optional();
 
 export const HumanTaskSchema = z.object({
   id: z.uuid(),

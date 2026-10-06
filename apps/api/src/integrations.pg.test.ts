@@ -263,7 +263,8 @@ describeDb("credentials, tools and MCP (Postgres)", () => {
         serverUrl: upstream.url,
       });
       expect(refused.statusCode).toBe(400);
-      expect(refused.json().error.message).toContain("E_TOOL_SERVER_PRIVATE");
+      expect(refused.json().error.details.diagnostic).toBe("E_TOOL_SERVER_PRIVATE");
+      expect(refused.json().error.message).toContain("FLOWAID_ALLOW_PRIVATE_NETWORK=true");
     } finally {
       await strict.close();
     }

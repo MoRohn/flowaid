@@ -360,6 +360,23 @@ describeDb("PageIndex routes (Postgres + a stub service)", () => {
     });
   });
 
+  it("lists a source's stored documents with the service off, and refuses the rest", async () => {
+    const saved = t.ctx.config.pageIndex;
+    t.ctx.config.pageIndex = null;
+    try {
+      // the list is the database's: the page shows what the source holds while it is off
+      const list = await call(t.app, jar, "GET", `/v1/pageindex/sources/${sourceId}/documents`);
+      expect(list.statusCode).toBe(200);
+      expect(list.json().items.map((d: { documentId: string }) => d.documentId)).toContain(
+        documentId,
+      );
+      const again = await upload(sourceId, first, { name: "copy.pdf" });
+      expect(again.json().error.code).toBe("PAGEINDEX_DISABLED");
+    } finally {
+      t.ctx.config.pageIndex = saved;
+    }
+  });
+
   it("answers the same bytes with the existing version and index", async () => {
     const again = await upload(sourceId, first, { name: "copy.pdf" });
     expect(again.statusCode).toBe(200);

@@ -1,5 +1,12 @@
-import { forwardRef, type HTMLAttributes, type ReactNode } from "react";
+import {
+  cloneElement,
+  forwardRef,
+  isValidElement,
+  type HTMLAttributes,
+  type ReactNode,
+} from "react";
 import { cn } from "@/lib/cn";
+import { useHeaderHasPrimaryAction } from "./primaryAction";
 
 export interface EmptyStateProps extends Omit<HTMLAttributes<HTMLDivElement>, "title"> {
   icon?: ReactNode;
@@ -9,16 +16,37 @@ export interface EmptyStateProps extends Omit<HTMLAttributes<HTMLDivElement>, "t
   primaryAction?: ReactNode;
   secondaryAction?: ReactNode;
   size?: "sm" | "md";
+  /** The title's element: a heading when the empty state is the whole page (default `p`). */
+  titleAs?: "p" | "h1" | "h2" | "h3";
 }
 
 /**
  * Centred placeholder for an empty list, panel or search. Empty states always
- * offer the next action, so `primaryAction` is expected in most uses.
+ * offer the next action, so `primaryAction` is expected in most uses. When the
+ * page's header already shows a primary button, a primary button passed here is
+ * shown as secondary, so the screen keeps one filled button (primaryAction.ts).
  */
 export const EmptyState = forwardRef<HTMLDivElement, EmptyStateProps>(function EmptyState(
-  { icon, title, description, primaryAction, secondaryAction, size = "md", className, ...rest },
+  {
+    icon,
+    title,
+    description,
+    primaryAction,
+    secondaryAction,
+    size = "md",
+    titleAs: Title = "p",
+    className,
+    ...rest
+  },
   ref,
 ) {
+  const headerHasPrimary = useHeaderHasPrimaryAction();
+  const action =
+    headerHasPrimary &&
+    isValidElement<{ variant?: unknown }>(primaryAction) &&
+    primaryAction.props.variant === "primary"
+      ? cloneElement(primaryAction, { variant: "secondary" })
+      : primaryAction;
   return (
     <div
       ref={ref}
@@ -40,21 +68,21 @@ export const EmptyState = forwardRef<HTMLDivElement, EmptyStateProps>(function E
         </span>
       ) : null}
       <div className="flex max-w-xs flex-col gap-1">
-        <p
+        <Title
           className={cn(
-            "font-medium text-ink",
+            "m-0 font-medium text-ink",
             size === "sm" ? "text-sm" : "text-base tracking-tight",
           )}
         >
           {title}
-        </p>
+        </Title>
         {description ? (
           <p className={cn("text-ink-3", size === "sm" ? "text-xs" : "text-sm")}>{description}</p>
         ) : null}
       </div>
       {primaryAction || secondaryAction ? (
         <div className="mt-1 flex flex-wrap items-center justify-center gap-2">
-          {primaryAction}
+          {action}
           {secondaryAction}
         </div>
       ) : null}

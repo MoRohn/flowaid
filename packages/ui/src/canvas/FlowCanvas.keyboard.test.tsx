@@ -226,6 +226,20 @@ describe("FlowCanvas keyboard model", () => {
     expect(await screen.findByRole("dialog", { name: "Add node" })).toBeInTheDocument();
   });
 
+  it("adds the node a pointer clicks in the palette (the click does not pull focus to the canvas)", async () => {
+    const user = userEvent.setup();
+    const onAddNode = vi.fn<(def: NodeDefinitionView, p: { x: number; y: number }) => void>();
+    render(<Harness catalog={SAMPLE_CATALOG} onAddNode={onAddNode} />);
+    await settle();
+    screen.getByRole("application", { name: "Workflow canvas" }).focus();
+    await user.keyboard("/");
+    const palette = await screen.findByRole("dialog", { name: "Add node" });
+    await user.type(within(palette).getByRole("combobox"), "yes / no");
+    await user.click(within(palette).getByRole("option", { name: /Yes \/ no/i }));
+    expect(onAddNode).toHaveBeenCalledTimes(1);
+    expect(onAddNode.mock.calls[0]?.[0].name).toMatch(/Yes \/ no/i);
+  });
+
   it("opens the palette with mod+K when focus rests on the page, and hands focus back on close", async () => {
     const user = userEvent.setup();
     render(<Harness catalog={SAMPLE_CATALOG} onAddNode={vi.fn()} />);

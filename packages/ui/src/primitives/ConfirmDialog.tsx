@@ -36,8 +36,10 @@ export interface ConfirmDialogProps {
 
 /**
  * Small modal that asks before an irreversible action. It never uses the
- * browser `confirm()`; the confirm button is the only filled control and
- * takes initial focus so Enter confirms and Escape cancels.
+ * browser `confirm()`; the confirm button is the only filled control. A
+ * default confirmation opens on the confirm button so Enter confirms; a danger
+ * one is an `alertdialog` that opens on Cancel, so a stray Enter never deletes
+ * or stops anything. Escape cancels both.
  */
 export function ConfirmDialog({
   open,
@@ -83,6 +85,7 @@ export function ConfirmDialog({
   };
 
   const confirmRef = useRef<HTMLButtonElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
 
   const handleOpenChange = (next: boolean) => {
     if (busy) return;
@@ -102,10 +105,12 @@ export function ConfirmDialog({
         size="sm"
         hideClose
         className={className}
+        {...(variant === "danger" ? { role: "alertdialog" } : {})}
         onOpenAutoFocus={(e) => {
-          // Land on the confirm action rather than the first focusable element.
+          // Land on the confirm action (Cancel when it is destructive) rather than the first
+          // focusable element.
           e.preventDefault();
-          confirmRef.current?.focus();
+          (variant === "danger" ? cancelRef : confirmRef).current?.focus();
         }}
       >
         <DialogHeader className="flex-row items-start gap-3 border-b-0 pb-1 pr-5">
@@ -133,7 +138,12 @@ export function ConfirmDialog({
           </p>
         ) : null}
         <DialogFooter className={cn(children ? undefined : "border-t-0 bg-transparent pt-3")}>
-          <Button variant="secondary" onClick={() => handleOpenChange(false)} disabled={busy}>
+          <Button
+            ref={cancelRef}
+            variant="secondary"
+            onClick={() => handleOpenChange(false)}
+            disabled={busy}
+          >
             {cancelLabel}
           </Button>
           <Button

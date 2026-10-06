@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { defineNode, fail, ok, suspend, type AnyNodeDefinition } from "@flowaid/node-sdk";
-import { ProviderRegistry, DefaultModelCatalog } from "@flowaid/providers";
+import {
+  ProviderRegistry,
+  DefaultModelCatalog,
+  booleanDecision,
+  choiceDecision,
+} from "@flowaid/providers";
 import { Redactor } from "@flowaid/credentials";
 import {
   NetworkError,
@@ -191,6 +196,36 @@ describe("executeTask", () => {
     expect(await run(decisionDef({ kind: "event", eventName: "x" }))).toMatchObject({
       kind: "error",
     });
+  });
+
+  it("records each answer of a batch step a person answered as its own decision", async () => {
+    const m = { provider: "human", model: "human:u", latencyMs: 0, costUsd: 0 };
+    const answers = {
+      topic: choiceDecision({ billing: 0, feedback: 1 }, m),
+      needs_person: booleanDecision(0, m),
+    };
+    const batchDef = transformDef(() => Promise.resolve(ok({ answers } as never)), {
+      decision: { kind: "batch" },
+      outputSchema: z.object({ answers: z.record(z.string(), z.unknown()) }),
+    });
+    const r = await run(batchDef);
+    const call = callFor();
+    expect(r.events?.filter((e) => e.type === "DECISION_COMPLETED")).toEqual([
+      {
+        type: "DECISION_COMPLETED",
+        batchId: `${call.nodeRunId}:batch`,
+        question: "topic",
+        decision: answers.topic,
+        priceSnapshot: null,
+      },
+      {
+        type: "DECISION_COMPLETED",
+        batchId: `${call.nodeRunId}:batch`,
+        question: "needs_person",
+        decision: answers.needs_person,
+        priceSnapshot: null,
+      },
+    ]);
   });
 
   it("binds ctx.sandbox for nodes declaring the capability (RFC-0019)", async () => {

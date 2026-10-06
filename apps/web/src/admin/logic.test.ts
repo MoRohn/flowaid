@@ -3,10 +3,8 @@ import {
   SCOPE_GROUPS,
   calibrationNote,
   caseResultViews,
-  confusionPairs,
   credentialsForSecret,
   describeUserAgent,
-  gateOf,
   missingRequiredSecrets,
   parseJsonObject,
   parseJsonText,
@@ -269,14 +267,6 @@ describe("evaluation projections", () => {
       status: "completed",
     },
   ];
-  it("builds confusion pairs per decision node", () => {
-    expect(confusionPairs(results, cases)).toEqual({
-      intent: [
-        { expected: "billing", actual: "billing" },
-        { expected: "tech", actual: "billing" },
-      ],
-    });
-  });
   it("names cases, carries the first failed check and flags regressions", () => {
     const second = results[1] as CaseResultRow;
     const rows = caseResultViews(results, cases, [{ ...second, passed: true }]);
@@ -296,12 +286,6 @@ describe("evaluation projections", () => {
       ]),
     ).toEqual([{ lower: 0.8, upper: 0.9, predicted: 0.85, observed: 0.5, count: 2 }]);
     expect(calibrationNote(summary(), summary())).toContain("(was 0.050)");
-  });
-  it("derives the gate", () => {
-    expect(gateOf({ verdict: "fail", warnings: [] })).toBe("fail");
-    expect(gateOf({ verdict: "pass", warnings: [{}] })).toBe("warn");
-    expect(gateOf({ verdict: "pass", warnings: [] })).toBe("pass");
-    expect(gateOf(null)).toBe("warn");
   });
 });
 

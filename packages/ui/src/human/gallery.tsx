@@ -256,7 +256,7 @@ export default function HumanGallery() {
 
       <Section
         title="EscalationDialog"
-        caption="Team or person, a reason, and whether to notify now. Returns { action: 'escalate', to: [target], comment }."
+        caption="Team or person and a reason. Returns { action: 'escalate', to: [target], comment }."
       >
         <div className="flex items-center gap-3 rounded-md border border-border bg-surface p-4 shadow-1">
           <Button onClick={() => setEscalateOpen(true)}>Open escalation dialog</Button>
@@ -267,9 +267,7 @@ export default function HumanGallery() {
           onOpenChange={setEscalateOpen}
           targets={ESCALATION_TARGETS}
           subject="Refund $180.00 to Amara Okafor"
-          onEscalate={(response, options) =>
-            setEscalation(JSON.stringify({ ...response, notify: options.notify }))
-          }
+          onEscalate={(response) => setEscalation(JSON.stringify(response))}
         />
       </Section>
 

@@ -39,11 +39,20 @@ import {
   type Principal,
 } from "../auth/principal.js";
 import type { ApiContext } from "../context.js";
-import { IdParams, ListQuery, NoContent, decodeCursor, encodeCursor, page } from "../dto/common.js";
+import {
+  IdParams,
+  ListQuery,
+  NoContent,
+  queryBool,
+  decodeCursor,
+  encodeCursor,
+  page,
+} from "../dto/common.js";
 import {
   HumanTaskSchema,
   RunAcceptedSchema,
   RunCompletedSchema,
+  RunListIncludeSchema,
   RunListItemSchema,
   RunRequestSchema,
   type RunDecisionSummarySchema,
@@ -360,8 +369,17 @@ export function runRoutes(app: FastifyInstance, ctx: ApiContext): void {
           status: z.union([z.string(), z.array(z.string())]).optional(),
           origin: z.string().optional(),
           sessionId: z.string().optional(),
-          /** `decisions`: each run's decisions (node, kind, confidence) for the list's column */
-          include: z.enum(["decisions"]).optional(),
+          /** the start of a run id, part of the workflow's name or of the error message */
+          q: z.string().trim().max(200).optional(),
+          /** created at or after */
+          from: z.iso.datetime({ offset: true }).optional(),
+          /** created at or before */
+          to: z.iso.datetime({ offset: true }).optional(),
+          /**
+           * `decisions`: each run's decisions (node, kind, confidence) for the list's column;
+           * `version`: the version number each run ran (null for a draft); both: `decisions,version`
+           */
+          include: RunListIncludeSchema,
         }),
         response: { 200: page(RunListItemSchema) },
       },
@@ -386,14 +404,31 @@ export function runRoutes(app: FastifyInstance, ctx: ApiContext): void {
           ...(statuses ? { status: statuses } : {}),
           ...(req.query.origin ? { origin: req.query.origin as Run["origin"] } : {}),
           ...(req.query.sessionId ? { sessionId: req.query.sessionId } : {}),
+          ...(req.query.q ? { q: req.query.q } : {}),
+          ...(req.query.from ? { from: new Date(req.query.from) } : {}),
+          ...(req.query.to ? { to: new Date(req.query.to) } : {}),
           cursor: req.query.cursor ?? null,
           limit: req.query.limit,
         }),
       );
-      const items = p.workflowIds
+      const visible = p.workflowIds
         ? out.items.filter((x) => canSeeWorkflow(p, x.workflowId))
         : out.items;
-      if (req.query.include !== "decisions" || items.length === 0)
+      const include = new Set(req.query.include?.split(",") ?? []);
+      let items: (Run & { version?: number | null })[] = visible;
+      if (include.has("version") && visible.length > 0) {
+        const versions = await ctx.db.tenant(p.workspaceId, (tx) =>
+          tx
+            .select({ id: workflowVersions.id, version: workflowVersions.version })
+            .from(workflowVersions)
+            .where(
+              inArray(workflowVersions.id, [...new Set(visible.map((x) => x.workflowVersionId))]),
+            ),
+        );
+        const byId = new Map(versions.map((v) => [v.id, v.version]));
+        items = visible.map((x) => ({ ...x, version: byId.get(x.workflowVersionId) ?? null }));
+      }
+      if (!include.has("decisions") || items.length === 0)
         return { items, next_cursor: out.nextCursor };
       const rows = await ctx.db.tenant(p.workspaceId, (tx) =>
         tx
@@ -1003,9 +1038,16 @@ export function runRoutes(app: FastifyInstance, ctx: ApiContext): void {
       schema: {
         tags: ["human-tasks"],
         querystring: ListQuery.extend({
-          status: z.enum(["open", "responded", "expired", "cancelled"]).optional(),
+          /** one status, or several: `responded,expired,cancelled` (every closed task) */
+          status: z
+            .string()
+            .regex(
+              /^(open|responded|expired|cancelled)(,(open|responded|expired|cancelled))*$/,
+              "open, responded, expired or cancelled (comma-separated)",
+            )
+            .optional(),
           workflowId: z.uuid().optional(),
-          assignedToMe: z.coerce.boolean().default(false),
+          assignedToMe: queryBool(),
         }),
         response: { 200: page(HumanTaskSchema) },
       },
@@ -1031,7 +1073,12 @@ export function runRoutes(app: FastifyInstance, ctx: ApiContext): void {
           .where(
             and(
               eq(humanTasks.workspaceId, p.workspaceId),
-              req.query.status ? eq(humanTasks.status, req.query.status) : undefined,
+              req.query.status
+                ? inArray(
+                    humanTasks.status,
+                    req.query.status.split(",") as (typeof humanTasks.$inferSelect)["status"][],
+                  )
+                : undefined,
               req.query.workflowId ? eq(humanTasks.workflowId, req.query.workflowId) : undefined,
               p.workflowIds
                 ? p.workflowIds.size
@@ -1164,7 +1211,16 @@ export function runRoutes(app: FastifyInstance, ctx: ApiContext): void {
           runId: out.runId,
           reason: "human",
         });
-      req.audit.details = { runId: out.runId, action: req.body.response.action };
+      const response = req.body.response;
+      // an escalation's reason is kept with it (the dialog says so); the task keeps no comment
+      req.audit.details = {
+        runId: out.runId,
+        action: response.action,
+        ...(response.action === "escalate" ? { to: response.to } : {}),
+        ...(response.action === "escalate" && response.comment
+          ? { comment: response.comment }
+          : {}),
+      };
       return reply.code(202).send({ run_id: out.runId, status: out.status });
     },
   );

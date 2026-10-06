@@ -153,6 +153,18 @@ describe("RunsTable", () => {
     expect(screen.getByText("8 runs")).toBeInTheDocument();
   });
 
+  it("says the count covers the loaded runs when older ones exist", () => {
+    render(
+      <RunsTable
+        runs={makeSampleRuns(3, NOW)}
+        partial
+        showColumnMenu={false}
+        showDensityToggle={false}
+      />,
+    );
+    expect(screen.getByText("3 runs loaded")).toBeInTheDocument();
+  });
+
   it("opens the actions menu and disables cancel for finished runs", async () => {
     const user = userEvent.setup();
     const onOpen = vi.fn();

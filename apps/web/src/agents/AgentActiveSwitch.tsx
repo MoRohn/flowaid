@@ -59,6 +59,8 @@ export function AgentActiveSwitch({ agent, disabled }: { agent: AgentPreset; dis
         aria-describedby={`${id}-state`}
       />
       <label htmlFor={id} className="cursor-pointer text-xs text-ink-2">
+        {/* every card has a switch: each is named after its agent */}
+        <span className="sr-only">{agent.name}: </span>
         {active ? "Active" : "Inactive"}
         <span id={`${id}-state`} className="text-ink-3">
           {active ? " · in Add node" : " · hidden from Add node"}

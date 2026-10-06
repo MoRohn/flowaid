@@ -175,6 +175,8 @@ export interface RunsTableProps extends Omit<
   thresholds?: ConfidenceThresholds;
   /** Extra columns appended before the actions menu. */
   extraColumns?: DataTableColumns<RunView>;
+  /** More runs exist than the rows given (older pages): the count reads "50 runs loaded". */
+  partial?: boolean;
 }
 
 const helper = createDataTableColumns<RunView>();
@@ -191,6 +193,7 @@ export function RunsTable({
   onCancel,
   thresholds = DEFAULT_CONFIDENCE_THRESHOLDS,
   extraColumns,
+  partial = false,
   defaultSorting,
   onRowActivate,
   rowHref,
@@ -427,7 +430,7 @@ export function RunsTable({
     <DataTable<RunView>
       columns={columns}
       data={runs}
-      itemLabel={["run", "runs"]}
+      itemLabel={partial ? ["run loaded", "runs loaded"] : ["run", "runs"]}
       defaultSorting={defaultSorting ?? [{ id: "createdAt", desc: true }]}
       onRowActivate={onRowActivate ?? onOpen}
       {...(rowHref ? { rowHref } : {})}

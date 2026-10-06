@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import {
   connectSession,
   discoverSession,
@@ -54,6 +54,7 @@ import { hasScope, type Principal } from "../auth/principal.js";
 import type { ApiContext } from "../context.js";
 import { IdParams, NoContent, PageQuery, afterCursor, toPage } from "../dto/common.js";
 import { ApiKeyCreatedSchema } from "../dto/identity.js";
+import { explainPrivateNetwork, withPrivateNetworkFix } from "../services/privateNetwork.js";
 
 type ToolRow = typeof tools.$inferSelect;
 type McpRow = typeof mcpServers.$inferSelect;
@@ -134,6 +135,10 @@ export function toolRoutes(app: FastifyInstance, ctx: ApiContext): void {
       .from(credentials)
       .where(and(eq(credentials.id, id), eq(credentials.workspaceId, p.workspaceId)));
     if (!c) throw new BadRequestError("credential not found");
+    if (c.ownerWebhookId || c.ownerNotificationId)
+      throw new BadRequestError(
+        "that credential is the signing secret of a webhook or notification channel; choose another",
+      );
     return c;
   };
 
@@ -210,6 +215,14 @@ export function toolRoutes(app: FastifyInstance, ctx: ApiContext): void {
       const p = need(req.principal);
       const t = await ctx.db.tenant(p.workspaceId, async (tx) => {
         await credentialOf(tx, p, req.body.credentialId);
+        if (req.body.name) {
+          const [dup] = await tx
+            .select({ id: tools.id })
+            .from(tools)
+            .where(and(eq(tools.workspaceId, p.workspaceId), eq(tools.name, req.body.name)));
+          if (dup && dup.id !== req.params.id)
+            throw new ConflictError(`a tool named ${req.body.name} exists`);
+        }
         const [u] = await tx
           .update(tools)
           .set({
@@ -257,12 +270,18 @@ export function toolRoutes(app: FastifyInstance, ctx: ApiContext): void {
       .optional(),
     format: z.enum(["json", "yaml"]).optional(),
   });
-  const parseFrom = (b: z.infer<typeof OpenApiSource>) => {
+  const parseFrom = async (b: z.infer<typeof OpenApiSource>) => {
     const opts = { fetch: ctx.http, allowPrivate: ctx.config.allowPrivateNetwork };
-    if (b.url) return parseOpenApi({ url: b.url }, opts);
-    if (b.document === undefined) throw new BadRequestError("send url or document");
-    const text = typeof b.document === "string" ? b.document : JSON.stringify(b.document);
-    return parseOpenApi({ text, ...(b.format ? { format: b.format } : {}) }, opts);
+    if (b.url === undefined && b.document === undefined)
+      throw new BadRequestError("send url or document");
+    try {
+      if (b.url) return await parseOpenApi({ url: b.url }, opts);
+      const text = typeof b.document === "string" ? b.document : JSON.stringify(b.document);
+      return await parseOpenApi({ text, ...(b.format ? { format: b.format } : {}) }, opts);
+    } catch (error) {
+      // a refused private address says how to allow it
+      throw explainPrivateNetwork(error);
+    }
   };
 
   r.post(
@@ -330,9 +349,11 @@ export function toolRoutes(app: FastifyInstance, ctx: ApiContext): void {
     async (req, reply) => {
       const p = need(req.principal);
       if (req.body.serverUrl && isPrivateUrl(req.body.serverUrl) && !ctx.config.allowPrivateNetwork)
-        throw new OpenApiImportError(
-          "E_TOOL_SERVER_PRIVATE",
-          `server ${req.body.serverUrl} is a private address`,
+        throw explainPrivateNetwork(
+          new OpenApiImportError(
+            "E_TOOL_SERVER_PRIVATE",
+            `server ${req.body.serverUrl} is a private address`,
+          ),
         );
       const parsed = await parseFrom(req.body);
       const id = uuidv7();
@@ -438,7 +459,7 @@ export function toolRoutes(app: FastifyInstance, ctx: ApiContext): void {
           allowPrivate: ctx.config.allowPrivateNetwork,
         });
       } catch (error) {
-        const e = toFlowaidError(error);
+        const e = toFlowaidError(explainPrivateNetwork(error));
         return { ok: false, content: e.message, error: e.toInfo({}), latencyMs: 0 };
       }
     },
@@ -540,8 +561,19 @@ export function toolRoutes(app: FastifyInstance, ctx: ApiContext): void {
   };
   const NO_WORKER =
     "no worker answered: stdio servers are started by the worker, so check that it is running";
-  /** Tests a server: HTTP from here, stdio through the worker. */
+  /** Tests a server: HTTP from here, stdio through the worker. A refused address names the fix. */
   const testServer = async (
+    p: Principal,
+    s: Pick<McpRow, "transport" | "credentialId">,
+    config: McpServerConfig,
+    payload: JsonObject,
+  ): Promise<McpTestAnswer> => {
+    const answer = await probeServer(p, s, config, payload);
+    return answer.ok || !answer.message
+      ? answer
+      : { ...answer, message: withPrivateNetworkFix(answer.message) };
+  };
+  const probeServer = async (
     p: Principal,
     s: Pick<McpRow, "transport" | "credentialId">,
     config: McpServerConfig,
@@ -692,6 +724,22 @@ export function toolRoutes(app: FastifyInstance, ctx: ApiContext): void {
             env: b.env !== undefined ? b.env : cur.env,
           });
         await credentialOf(tx, p, b.credentialId);
+        // a new address, program or sign-in needs a new test: the old status no longer applies
+        const reconnect =
+          (b.transport !== undefined && b.transport !== cur.transport) ||
+          (b.url !== undefined && b.url !== cur.url) ||
+          (b.command !== undefined && b.command !== cur.command) ||
+          (b.args !== undefined && JSON.stringify(b.args) !== JSON.stringify(cur.args)) ||
+          b.env !== undefined ||
+          (b.authKind !== undefined && b.authKind !== cur.authKind) ||
+          (b.credentialId !== undefined && b.credentialId !== cur.credentialId);
+        if (b.name && b.name !== cur.name) {
+          const [dup] = await tx
+            .select({ id: mcpServers.id })
+            .from(mcpServers)
+            .where(and(eq(mcpServers.workspaceId, p.workspaceId), eq(mcpServers.name, b.name)));
+          if (dup) throw new ConflictError(`an MCP server named ${b.name} exists`);
+        }
         const [u] = await tx
           .update(mcpServers)
           .set({
@@ -703,6 +751,9 @@ export function toolRoutes(app: FastifyInstance, ctx: ApiContext): void {
             ...(b.env !== undefined ? { env: b.env } : {}),
             ...(b.authKind ? { authKind: b.authKind } : {}),
             ...(b.credentialId !== undefined ? { credentialId: b.credentialId } : {}),
+            ...(reconnect && cur.status !== "disabled"
+              ? { status: "pending" as const, lastError: null }
+              : {}),
             ...(b.status ? { status: b.status } : {}),
             updatedAt: new Date(),
           })
@@ -806,7 +857,34 @@ export function toolRoutes(app: FastifyInstance, ctx: ApiContext): void {
     async (req) => {
       const p = need(req.principal);
       const s = await ctx.db.tenant(p.workspaceId, (tx) => loadServer(tx, p, req.params.id));
-      return testServer(p, s, configOf(s), { serverId: s.id });
+      const answer = await testServer(p, s, configOf(s), { serverId: s.id });
+      // the row shows the outcome at once: a failed test is an error, a passing one clears it
+      // (back to connected when tools were discovered, else pending); a disabled server stays so
+      if (s.transport !== "stdio") {
+        const status =
+          s.status === "disabled"
+            ? undefined
+            : answer.ok
+              ? s.status === "error"
+                ? s.discoveredTools.length > 0
+                  ? ("connected" as const)
+                  : ("pending" as const)
+                : undefined
+              : ("error" as const);
+        await ctx.db.tenant(p.workspaceId, (tx) =>
+          tx
+            .update(mcpServers)
+            .set({
+              ...(status ? { status } : {}),
+              lastError: answer.ok
+                ? null
+                : (answer.message ?? "the server did not answer").slice(0, 500),
+              lastCheckedAt: new Date(),
+            })
+            .where(eq(mcpServers.id, s.id)),
+        );
+      }
+      return answer;
     },
   );
 
@@ -859,14 +937,16 @@ export function toolRoutes(app: FastifyInstance, ctx: ApiContext): void {
           await session.close();
         }
       } catch (error) {
-        const message = toFlowaidError(error).message.slice(0, 500);
+        // the real cause, with how to allow a refused private address (not "no access")
+        const explained = explainPrivateNetwork(error);
+        const message = toFlowaidError(explained).message.slice(0, 500);
         await ctx.db.tenant(p.workspaceId, (tx) =>
           tx
             .update(mcpServers)
             .set({ status: "error", lastError: message, lastCheckedAt: new Date() })
             .where(eq(mcpServers.id, s.id)),
         );
-        throw error;
+        throw explained;
       }
     },
   );
@@ -947,7 +1027,9 @@ export function toolRoutes(app: FastifyInstance, ctx: ApiContext): void {
       const verdict = evaluatePolicy(s.toolPolicy, original);
       if (!verdict.allowed) throw new ForbiddenError(verdict.reason);
       const started = Date.now();
-      const session = await sessionFor(s, configOf(s));
+      const session = await sessionFor(s, configOf(s)).catch((error: unknown) => {
+        throw explainPrivateNetwork(error);
+      });
       try {
         const res = await session.callTool(original, req.body.args as JsonValue, {
           timeoutMs: 30_000,
@@ -1110,7 +1192,7 @@ export function toolRoutes(app: FastifyInstance, ctx: ApiContext): void {
           );
         if (!env) throw new BadRequestError("environment not found");
         const [dup] = await tx
-          .select({ id: mcpExposures.id })
+          .select({ id: mcpExposures.id, enabled: mcpExposures.enabled })
           .from(mcpExposures)
           .where(
             and(
@@ -1118,7 +1200,12 @@ export function toolRoutes(app: FastifyInstance, ctx: ApiContext): void {
               eq(mcpExposures.toolName, req.body.toolName),
             ),
           );
-        if (dup) throw new ConflictError(`the tool name ${req.body.toolName} is taken`);
+        if (dup?.enabled)
+          throw new ConflictError(
+            `the tool name ${req.body.toolName} is taken; switch that tool off to reuse its name`,
+          );
+        // a switched-off exposure doesn't keep its name: this one takes it over
+        if (dup) await tx.delete(mcpExposures).where(eq(mcpExposures.id, dup.id));
         const [created] = await tx
           .insert(mcpExposures)
           .values({ id: uuidv7(), workspaceId: p.workspaceId, ...req.body, source: "manual" })
@@ -1194,6 +1281,18 @@ export function toolRoutes(app: FastifyInstance, ctx: ApiContext): void {
             ),
           );
         if (!env) throw new BadRequestError("environment not found");
+        // a mistyped id would mint a token that lists nothing
+        const wanted = [...new Set(req.body.workflowIds)];
+        const found = await tx
+          .select({ id: workflows.id })
+          .from(workflows)
+          .where(and(eq(workflows.workspaceId, p.workspaceId), inArray(workflows.id, wanted)));
+        const unknown = wanted.filter((id) => !found.some((w) => w.id === id));
+        if (unknown.length)
+          throw new BadRequestError(
+            `no workflow ${unknown.join(", ")} in this workspace; pin the token to existing workflows`,
+            { unknownWorkflowIds: unknown },
+          );
         return createApiKey(tx, {
           workspaceId: p.workspaceId,
           name: `mcp: ${req.body.name}`,

@@ -681,6 +681,84 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/audit/export": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The filtered audit log as a CSV or JSON file, newest first (at most 50000 events; x-flowaid-truncated says when more matched) */
+    get: {
+      parameters: {
+        query?: {
+          action?: string;
+          actor?: string;
+          format?: "csv" | "json";
+          from?: string;
+          resourceId?: string;
+          resourceType?: string;
+          to?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/audit/resource-types": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The resource types the workspace's audit log holds (for its filter) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": string[];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/auth/local": {
     parameters: {
       query?: never;
@@ -997,6 +1075,13 @@ export interface paths {
                 lastTestOk: boolean | null;
                 lastUsedAt: string | null;
                 name: string;
+                owner: {
+                  /** Format: uuid */
+                  id: string;
+                  /** @enum {string} */
+                  kind: "webhook" | "notification";
+                  name: string;
+                } | null;
                 publicFields: {
                   [key: string]: string;
                 };
@@ -1062,6 +1147,13 @@ export interface paths {
               lastTestOk: boolean | null;
               lastUsedAt: string | null;
               name: string;
+              owner: {
+                /** Format: uuid */
+                id: string;
+                /** @enum {string} */
+                kind: "webhook" | "notification";
+                name: string;
+              } | null;
               publicFields: {
                 [key: string]: string;
               };
@@ -1119,6 +1211,13 @@ export interface paths {
               lastTestOk: boolean | null;
               lastUsedAt: string | null;
               name: string;
+              owner: {
+                /** Format: uuid */
+                id: string;
+                /** @enum {string} */
+                kind: "webhook" | "notification";
+                name: string;
+              } | null;
               publicFields: {
                 [key: string]: string;
               };
@@ -1201,6 +1300,13 @@ export interface paths {
               lastTestOk: boolean | null;
               lastUsedAt: string | null;
               name: string;
+              owner: {
+                /** Format: uuid */
+                id: string;
+                /** @enum {string} */
+                kind: "webhook" | "notification";
+                name: string;
+              } | null;
               publicFields: {
                 [key: string]: string;
               };
@@ -1264,6 +1370,13 @@ export interface paths {
               lastTestOk: boolean | null;
               lastUsedAt: string | null;
               name: string;
+              owner: {
+                /** Format: uuid */
+                id: string;
+                /** @enum {string} */
+                kind: "webhook" | "notification";
+                name: string;
+              } | null;
               publicFields: {
                 [key: string]: string;
               };
@@ -1317,6 +1430,58 @@ export interface paths {
         };
       };
     };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/credentials/{id}/uses": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Where the credential is used: workflow secret bindings, OpenAPI toolsets, MCP servers, knowledge sources, webhooks and notification channels */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              environmentId: string | null;
+              id: string;
+              /** @enum {string} */
+              kind:
+                | "workflow_secret"
+                | "toolset"
+                | "mcp_server"
+                | "knowledge_source"
+                | "webhook"
+                | "notification";
+              name: string;
+              secretName: string | null;
+              workflowId: string | null;
+            }[];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -1603,6 +1768,54 @@ export interface paths {
         };
       };
     };
+    trace?: never;
+  };
+  "/v1/environments/{id}/usage": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** What depends on an environment, for the delete and rename confirmations: runs on record (which block a delete), active deployments, triggers, secret bindings, credentials limited to it and keys pinned to it */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              apiKeys: number;
+              credentials: number;
+              deployments: number;
+              evaluationRuns: number;
+              mcpExposures: number;
+              runs: number;
+              schedules: number;
+              secretBindings: number;
+              webhooks: number;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
     trace?: never;
   };
   "/v1/evaluations/cases/{id}": {
@@ -2211,7 +2424,7 @@ export interface paths {
           cursor?: string;
           limit?: number;
           order?: "asc" | "desc";
-          status?: "open" | "responded" | "expired" | "cancelled";
+          status?: string;
           workflowId?: string;
         };
         header?: never;
@@ -4767,6 +4980,56 @@ export interface paths {
     };
     trace?: never;
   };
+  "/v1/notifications/{id}/deliveries": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** What was sent to the channel (alerts and tests), newest first */
+    get: {
+      parameters: {
+        query?: {
+          limit?: number;
+        };
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              items: {
+                createdAt: string;
+                error: string | null;
+                event: string;
+                id: string;
+                sentAt: string | null;
+                /** @enum {string} */
+                status: "pending" | "sent" | "failed";
+              }[];
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/notifications/{id}/rotate-secret": {
     parameters: {
       query?: never;
@@ -6750,12 +7013,15 @@ export interface paths {
         query?: {
           cursor?: string;
           environmentId?: string;
-          include?: "decisions";
+          from?: string;
+          include?: string;
           limit?: number;
           order?: "asc" | "desc";
           origin?: string;
+          q?: string;
           sessionId?: string;
           status?: string | string[];
+          to?: string;
           workflowId?: string;
         };
         header?: never;
@@ -6802,6 +7068,7 @@ export interface paths {
                 startedAt: string | null;
                 status: string;
                 usage: unknown;
+                version?: number | null;
                 /** Format: uuid */
                 workflowId: string;
                 /** Format: uuid */

@@ -37,13 +37,13 @@ export interface ProposedOutputEditorProps extends Omit<
   HTMLAttributes<HTMLDivElement>,
   "onChange" | "defaultValue"
 > {
-  /** The AI-proposed text; the diff and Reset compare against it. */
+  /** The proposed text (the workflow's value, perhaps a model's draft); diff and Reset use it. */
   original: string;
   value?: string;
   defaultValue?: string;
   onChange?: (value: string) => void;
   disabled?: boolean;
-  /** Label over the proposed text. Default "Proposed by the model". */
+  /** Label over the proposed text. Default "Proposed by the workflow". */
   label?: ReactNode;
   /** Hide the inline diff after edits. */
   hideDiff?: boolean;
@@ -62,7 +62,7 @@ function Stats({ text, estimate }: { text: string; estimate: (t: string) => numb
 }
 
 /**
- * Shows the model's proposed text with an Edit affordance. Editing swaps in
+ * Shows the proposed text with an Edit affordance. Editing swaps in
  * an auto-growing textarea; once the text differs from the original an inline
  * word diff appears with a Reset button. Character and token estimates are
  * mono, so reviewers see the cost of their edit.
@@ -75,7 +75,7 @@ export const ProposedOutputEditor = forwardRef<HTMLDivElement, ProposedOutputEdi
       defaultValue,
       onChange,
       disabled = false,
-      label = "Proposed by the model",
+      label = "Proposed by the workflow",
       hideDiff = false,
       diffMode = "lines",
       tokenEstimator = estimateTokens,

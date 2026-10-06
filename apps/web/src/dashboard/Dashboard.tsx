@@ -3,7 +3,8 @@
  * The workspace dashboard (UI.md §1 `page.tsx`, P6-04): what needs attention and what changed
  * (V2 insights), then metric tiles with 24-point trends, runs and failures over time, AI cost,
  * decision confidence against the gate, and provider failures, for a time range, workflow and
- * environment.
+ * environment. The page keeps the filters in the URL (`filters` + `onFiltersChange`), so a
+ * reload or a shared link shows the same view.
  */
 import { useQuery } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
@@ -16,7 +17,6 @@ import {
   TIME_RANGE_PRESETS,
   TimeSeriesChart,
   seriesColor,
-  type TimeRangePreset,
 } from "@flowaid/ui/observability";
 import { DEFAULT_CONFIDENCE_THRESHOLDS } from "@flowaid/ui/data";
 import {
@@ -28,22 +28,32 @@ import {
 } from "@flowaid/ui/primitives";
 import { PageHeader } from "@flowaid/ui/shell";
 import { get, qs } from "~/api/client";
-import type { Environment, Page, WorkflowSummary } from "~/api/types";
+import type { Environment } from "~/api/types";
 import { OVERVIEW } from "~/guide/capabilities/overview";
 import { PageIntro } from "~/guide/PageIntro";
 import { ErrorPanel } from "~/shell/states";
 import { Attention } from "./Attention";
 import { insightWindowFor } from "./insights";
+import { overviewWorkflows } from "./queries";
 import {
   carryForward,
   confidenceSamples,
+  DEFAULT_PRESET,
   percent,
   rangeFor,
+  type DashboardFilters,
   type DashboardMetrics,
   type MetricsSeries,
 } from "./logic";
 
 const ALL = "__all__";
+
+/** "2 failed", or "2 failed · 1 timed out": both count against the success rate. */
+export function failedHint(byStatus: Record<string, number>): string {
+  const failed = byStatus.failed ?? 0;
+  const timedOut = byStatus.timed_out ?? 0;
+  return timedOut > 0 ? `${failed} failed · ${timedOut} timed out` : `${failed} failed`;
+}
 const RUNS_COLOR = seriesColor(0);
 const FAILED_COLOR = "var(--danger)";
 
@@ -53,19 +63,31 @@ export interface DashboardProps {
   now?: () => number;
   /** Shown under the header, above the metrics (the getting-started checklist). */
   intro?: ReactNode;
+  /** Controlled filters (the page keeps them in the URL); without them the Overview keeps its own. */
+  filters?: DashboardFilters;
+  onFiltersChange?: (filters: DashboardFilters) => void;
 }
 
-export function Dashboard({ ws, environments, now = Date.now, intro }: DashboardProps) {
-  const [preset, setPreset] = useState<TimeRangePreset>("24h");
-  const [workflowId, setWorkflowId] = useState<string | undefined>();
-  const [environmentId, setEnvironmentId] = useState<string | undefined>();
+export function Dashboard({
+  ws,
+  environments,
+  now = Date.now,
+  intro,
+  filters: controlled,
+  onFiltersChange,
+}: DashboardProps) {
+  const [own, setOwn] = useState<DashboardFilters>({ preset: DEFAULT_PRESET });
+  const current = controlled ?? own;
+  const { preset, workflowId, environmentId } = current;
+  const update = (patch: Partial<DashboardFilters>) => {
+    const next = { ...current, ...patch };
+    if (controlled) onFiltersChange?.(next);
+    else setOwn(next);
+  };
   const { from, to, bucket } = rangeFor(preset, now());
   const filters = qs({ from, to, workflowId, environmentId });
 
-  const workflows = useQuery({
-    queryKey: ["workflows", ws, "dashboard"],
-    queryFn: () => get<Page<WorkflowSummary>>("/v1/workflows?limit=200"),
-  });
+  const workflows = useQuery(overviewWorkflows(ws));
   const overview = useQuery({
     queryKey: ["metrics", ws, "overview", filters],
     queryFn: () => get<DashboardMetrics>(`/v1/metrics/overview${filters}`),
@@ -99,7 +121,7 @@ export function Dashboard({ ws, environments, now = Date.now, intro }: Dashboard
           value={preset}
           onValueChange={(v) => {
             const p = TIME_RANGE_PRESETS.find((x) => x.id === v);
-            if (p) setPreset(p.id);
+            if (p) update({ preset: p.id });
           }}
           aria-label="Time range"
         >
@@ -111,7 +133,7 @@ export function Dashboard({ ws, environments, now = Date.now, intro }: Dashboard
         </ToggleGroup>
         <Select
           value={workflowId ?? ALL}
-          onValueChange={(v) => setWorkflowId(v === ALL ? undefined : v)}
+          onValueChange={(v) => update({ workflowId: v === ALL ? undefined : v })}
           aria-label="Workflow"
           leading={<Workflow strokeWidth={1.75} />}
           className="w-56"
@@ -126,7 +148,7 @@ export function Dashboard({ ws, environments, now = Date.now, intro }: Dashboard
         </Select>
         <Select
           value={environmentId ?? ALL}
-          onValueChange={(v) => setEnvironmentId(v === ALL ? undefined : v)}
+          onValueChange={(v) => update({ environmentId: v === ALL ? undefined : v })}
           aria-label="Environment"
           leading={<Layers strokeWidth={1.75} />}
           className="w-44"
@@ -170,7 +192,7 @@ export function Dashboard({ ws, environments, now = Date.now, intro }: Dashboard
               label="Success rate"
               value={percent(m?.successRate ?? null)}
               loading={loading}
-              hint={m ? `${m.runs.byStatus.failed ?? 0} failed` : undefined}
+              hint={m ? failedHint(m.runs.byStatus) : undefined}
             />
             <MetricTile
               label="Latency p95"

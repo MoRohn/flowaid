@@ -23,6 +23,11 @@ export interface NodeRecord {
   /** the control port it fired (branch/gate/router/decision routes) */
   firedPort?: string | null;
   decision?: DecisionResult | null;
+  /**
+   * A batch step's decisions, one per question id (`decision` then holds only one of them).
+   * Expectations name them `<step>.<question>`.
+   */
+  answers?: Record<string, DecisionResult> | null;
   /** an output schema mismatch on this node */
   schemaError?: boolean;
 }
@@ -93,7 +98,8 @@ export interface CaseMetrics {
   judgeCostUsd?: number;
   tokens: number;
   branches: Record<NodeId, string | null>;
-  decisions: Record<NodeId, { value: JsonValue; confidence: number }>;
+  /** per decision step, and per `<step>.<question>` for a batch step's answers */
+  decisions: Record<string, { value: JsonValue; confidence: number }>;
   humanRequested: boolean;
   toolCalls: { total: number; ok: number };
   /** nodes whose output did not match their schema */
@@ -123,9 +129,9 @@ export interface EvaluationSummary {
   passed: number;
   passRate: number;
   completionRate: number;
-  /** decision expectations met, per node */
-  accuracy: Record<NodeId, number>;
-  calibration: Record<NodeId, { ece: number; bins: CalibrationBin[] }>;
+  /** decision expectations met, per step (per `<step>.<question>` for a batch step) */
+  accuracy: Record<string, number>;
+  calibration: Record<string, { ece: number; bins: CalibrationBin[] }>;
   branchCorrectness: number;
   schemaSuccess: number;
   toolSuccess: number;

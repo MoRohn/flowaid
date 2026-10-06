@@ -20,6 +20,7 @@ import {
   primaryKey,
   check,
   customType,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import type {
   JsonValue,
@@ -306,7 +307,9 @@ export const workflows = pgTable(
     draftRevision: integer("draft_revision").notNull().default(1), // optimistic concurrency (If-Match)
     draftDiagnostics: jsonb("draft_diagnostics").$type<Diagnostic[]>().notNull().default([]),
     latestVersionId: uuid("latest_version_id"),
-    evaluationSetId: uuid("evaluation_set_id"), // linked set for the publish-time regression report
+    evaluationSetId: uuid("evaluation_set_id").references((): AnyPgColumn => evaluationSets.id, {
+      onDelete: "set null",
+    }), // linked set for the publish-time regression report (0017: cleared when the set is deleted)
     archivedAt: ts("archived_at"),
     createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: createdAt(),
@@ -435,6 +438,15 @@ export const credentials = pgTable(
       onDelete: "cascade",
     }), // null = any environment
     allowedWorkflowIds: jsonb("allowed_workflow_ids").$type<string[] | null>(),
+    // v1.2: a signing secret FlowAId generated for a webhook or notification channel belongs to it:
+    // left out of the credentials list, rotated and deleted only through its owner, deleted with it
+    ownerWebhookId: uuid("owner_webhook_id").references((): AnyPgColumn => webhooks.id, {
+      onDelete: "cascade",
+    }),
+    ownerNotificationId: uuid("owner_notification_id").references(
+      (): AnyPgColumn => notifications.id,
+      { onDelete: "cascade" },
+    ),
     lastTestedAt: ts("last_tested_at"),
     lastTestOk: boolean("last_test_ok"),
     lastUsedAt: ts("last_used_at"),

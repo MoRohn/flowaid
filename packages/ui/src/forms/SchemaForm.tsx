@@ -82,6 +82,8 @@ import {
   type SchemaFormEnvironment,
   type SchemaWidget,
 } from "./widgets";
+// registers the `flowexpr` widget (FlowExpr fields with completion over the step's references)
+import "./FlowExprEditor";
 
 export type SchemaFormLayout = "stacked" | "wide";
 

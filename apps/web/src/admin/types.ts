@@ -35,11 +35,19 @@ export interface Credential {
   lastUsedAt: string | null;
   rotatedAt: string | null;
   createdAt: string;
+  /** a webhook's or notification channel's generated secret (never listed; managed there) */
+  owner?: { kind: "webhook" | "notification"; id: string; name: string } | null;
 }
-export interface SecretUse {
-  workflowId: string;
-  environmentId: string;
-  secretName: string;
+/** One thing that refers to a credential (`GET /v1/credentials/:id/uses`). */
+export interface CredentialUse {
+  kind:
+    "workflow_secret" | "toolset" | "mcp_server" | "knowledge_source" | "webhook" | "notification";
+  /** the workflow (workflow_secret) or the resource that uses it */
+  id: string;
+  name: string;
+  environmentId: string | null;
+  secretName: string | null;
+  workflowId: string | null;
 }
 
 export interface McpServer {
@@ -243,6 +251,17 @@ export interface NotificationChannel {
   enabled: boolean;
   secretSet: boolean;
   createdAt: string;
+}
+
+/** One send to a notification channel (`GET /v1/notifications/:id/deliveries`). */
+export interface NotificationDelivery {
+  id: string;
+  /** a notification event, or "test" */
+  event: string;
+  status: "pending" | "sent" | "failed";
+  error: string | null;
+  createdAt: string;
+  sentAt: string | null;
 }
 
 export interface DeployResult {

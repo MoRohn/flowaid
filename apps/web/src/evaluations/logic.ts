@@ -55,7 +55,7 @@ export function setReviewNotes(
       id: "any-workflow",
       state: "info",
       message:
-        "Not tied to a workflow: Add to evaluation on a run offers only sets tied to that run's workflow, cases are written as JSON rather than the workflow's input form, and every run of the set asks which workflow to test.",
+        "Not tied to a workflow: Add to evaluation offers it on the runs of every workflow, cases are written as JSON rather than a workflow's input form, and every run of the set asks which workflow to test.",
     });
   else
     notes.push({
@@ -71,6 +71,21 @@ export function setReviewNotes(
         "No description: a line on what the set protects helps when it fails months from now.",
     });
   return notes;
+}
+
+/** A description as a sentence of a longer line: trimmed, ending in a full stop ("" stays ""). */
+export function sentence(text: string): string {
+  const t = text.trim();
+  return !t || /[.!?…:]$/.test(t) ? t : `${t}.`;
+}
+
+/** What deleting a set does, naming the workflows that use it as their publish gate. */
+export function deleteSetText(gateOf: readonly { name: string }[]): string {
+  const base =
+    "Its cases and evaluation reports are deleted. Workflow runs made by evaluations are kept.";
+  if (!gateOf.length) return base;
+  const names = gateOf.map((w) => w.name).join(", ");
+  return `${base} It is the publish gate of ${names}: ${gateOf.length === 1 ? "that workflow publishes" : "those workflows publish"} without an evaluation check until another set is linked under Settings → Evaluation.`;
 }
 
 // ── cases ─────────────────────────────────────────────────────────────────────────────────────
@@ -194,25 +209,50 @@ export function caseCoverage(cases: readonly EvaluationCase[]): Note[] {
 /**
  * How to read a finished report: runs that finished against cases that passed, and what else
  * limits what the pass rate says. `weakCases` are the ids of cases that only check completion.
+ * `run` is the evaluation run (a cancelled or failed one scored only some of the set's cases);
+ * `baseline` the run compared with, when its cases differ from this run's.
  */
 export function reportReading(
   summary: EvaluationSummary,
   results: readonly CaseResultRow[],
   weakCases: ReadonlySet<string>,
+  ctx: {
+    run?: { status: string; total: number };
+    baseline?: { sameCases: boolean; cases: number } | null;
+  } = {},
 ): Note[] {
   const n = summary.cases;
-  if (n === 0) return [];
+  const total = Math.max(n, ctx.run?.total ?? n);
+  if (n === 0 && total === 0) return [];
   const notes: Note[] = [];
+  if (n < total)
+    notes.push({
+      id: "partial",
+      state: "warning",
+      message: `Only ${n} of ${total} cases ran: the evaluation ${ctx.run?.status === "failed" ? "failed" : ctx.run?.status === "cancelled" ? "was cancelled" : "stopped"} first. Every figure here covers those ${n} only, so it says nothing about the other ${total - n}.`,
+    });
+  if (n === 0) return notes;
   const finished = Math.round(summary.completionRate * n);
   notes.push(
     finished === n
-      ? { id: "finished", state: "ok", message: `All ${n} runs finished.` }
+      ? {
+          id: "finished",
+          state: "ok",
+          message:
+            n < total ? `The ${n} runs that started all finished.` : `All ${n} runs finished.`,
+        }
       : {
           id: "finished",
           state: "warning",
           message: `${finished} of ${n} runs finished; the others failed, timed out, were cancelled or could not start, and fail their status check. Open one to see its error before reading anything else.`,
         },
   );
+  if (ctx.baseline && !ctx.baseline.sameCases)
+    notes.push({
+      id: "baseline-cases",
+      state: "warning",
+      message: `The baseline scored different cases (${ctx.baseline.cases} there, ${n} here), so its rates are not shown as differences: they would not compare like with like. Regressions are still listed per case.`,
+    });
   notes.push({
     id: "passed",
     state: summary.passed === n ? "ok" : "info",

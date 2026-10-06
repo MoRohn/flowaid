@@ -2,8 +2,10 @@ import { createServer, type Server } from "node:net";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   AlertDispatcher,
+  PRIVATE_NETWORK_FIX,
   budgetAlert,
   channelSecret,
+  withPrivateNetworkFix,
   sendAlert,
   sendMail,
   signAlert,
@@ -207,6 +209,37 @@ describe("AlertDispatcher", () => {
     });
     expect(s.finished.map(([, st]) => st).sort()).toEqual(["failed", "sent"]);
     expect(errors).toHaveLength(1);
+  });
+
+  it("records a refused private address with how to allow it", async () => {
+    const errors: string[] = [];
+    const s = store([channel("webhook", { url: "http://127.0.0.1:9/hook" })]);
+    s.finish = (_id, r) => {
+      if (r.error) errors.push(r.error);
+      return Promise.resolve();
+    };
+    const fetch = vi.fn(() =>
+      Promise.reject(new Error("refused to connect to 127.0.0.1: private or reserved address")),
+    );
+    await new AlertDispatcher({ store: s, fetch }).dispatch("ws", "run.failed:r2", MESSAGE);
+    expect(errors).toEqual([
+      `refused to connect to 127.0.0.1: private or reserved address. ${PRIVATE_NETWORK_FIX}`,
+    ]);
+  });
+});
+
+describe("private-address refusals", () => {
+  it("name FLOWAID_ALLOW_PRIVATE_NETWORK once, without the raw code", () => {
+    const fixed = withPrivateNetworkFix(
+      "E_TOOL_SERVER_PRIVATE: server http://localhost:3101/ resolves to a private address",
+    );
+    expect(fixed).toBe(
+      `server http://localhost:3101/ resolves to a private address. ${PRIVATE_NETWORK_FIX}`,
+    );
+    expect(withPrivateNetworkFix(fixed)).toBe(fixed);
+    expect(withPrivateNetworkFix("the endpoint answered HTTP 500")).toBe(
+      "the endpoint answered HTTP 500",
+    );
   });
 });
 

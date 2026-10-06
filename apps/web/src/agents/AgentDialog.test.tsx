@@ -171,6 +171,137 @@ describe("editing an agent", () => {
     });
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
+
+  it("saves a description change without dropping the advanced settings, which it shows", async () => {
+    const tuned = {
+      ...preset,
+      config: {
+        ...preset.config,
+        temperature: 0.2,
+        maxOutputTokens: 800,
+        maxTokens: 20000,
+        stream: true,
+      },
+    };
+    const fetch = stubApi({
+      "GET /v1/models": () => [{ provider: "openai", model: "gpt-test", kind: "chat" }],
+      "GET /v1/providers": () => [{ id: "openai", models: 1, configuredOnServer: true }],
+      "GET /v1/credentials": () => ({ items: [], next_cursor: null }),
+      "GET /v1/tools/catalog": () => [],
+      "PATCH /v1/agents/a1": () => tuned,
+    });
+    render(withClient(<AgentDialog open editing={tuned} onOpenChange={() => undefined} />));
+    act(() => {
+      fireEvent.click(screen.getByRole("radio", { name: /All fields/ }));
+    });
+    // the group opens on its own: the agent sets values there
+    expect(screen.getByLabelText<HTMLInputElement>(/Temperature/).value).toBe("0.2");
+    expect(screen.getByLabelText<HTMLInputElement>(/Token cap/).value).toBe("20000");
+    act(() => {
+      fireEvent.change(screen.getByLabelText(/Description/), {
+        target: { value: "Answers order questions" },
+      });
+    });
+    act(() => {
+      fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    });
+    await waitFor(() => expect(callsTo(fetch, "PATCH /v1/agents/a1")).toHaveLength(1));
+    expect(bodyOf(callsTo(fetch, "PATCH /v1/agents/a1")[0]?.[1])).toEqual({
+      name: "Order helper",
+      description: "Answers order questions",
+      config: { ...tuned.config, tools: [] },
+    });
+  });
+});
+
+describe("editing an agent's tools", () => {
+  it("does not promise to keep an edit across pages: the links open a new tab", async () => {
+    stubApi({
+      "GET /v1/models": () => [],
+      "GET /v1/providers": () => [],
+      "GET /v1/credentials": () => ({ items: [], next_cursor: null }),
+      "GET /v1/tools/catalog": () => [],
+    });
+    const preset = {
+      id: "a1",
+      name: "Order helper",
+      description: "",
+      config: { model: { provider: "openai", model: "gpt-test" } },
+      createdAt: "",
+      updatedAt: "",
+    };
+    render(withClient(<AgentDialog open editing={preset} onOpenChange={() => undefined} />));
+    act(() => {
+      fireEvent.click(screen.getByRole("radio", { name: /All fields/ }));
+    });
+    const own = await screen.findByRole("region", { name: "Your tools" });
+    expect(own.textContent).not.toMatch(/draft is kept/);
+    expect(own.textContent).toMatch(/kept only while this page is open/);
+    const link = screen.getByRole("link", { name: "connect an MCP server" });
+    expect(link.getAttribute("target")).toBe("_blank");
+    expect(screen.getByRole("button", { name: "refresh this list" })).toBeDefined();
+  });
+});
+
+describe("a tool that is no longer available", () => {
+  const stale = {
+    id: "a2",
+    name: "Stale helper",
+    description: "",
+    config: {
+      model: { provider: "openai", model: "gpt-test" },
+      system: "Help.",
+      tools: [
+        { name: "lookup_order", approval: "never" },
+        { name: "calculator", approval: "never" },
+      ],
+    },
+    createdAt: "2026-09-30T00:00:00Z",
+    updatedAt: "2026-09-30T00:00:00Z",
+  };
+
+  it("is listed and removable, and saving waits until it is removed", async () => {
+    const fetch = stubApi({
+      "GET /v1/models": () => [{ provider: "openai", model: "gpt-test", kind: "chat" }],
+      "GET /v1/providers": () => [{ id: "openai", models: 1, configuredOnServer: true }],
+      "GET /v1/credentials": () => ({ items: [], next_cursor: null }),
+      "GET /v1/tools/catalog": () => [
+        {
+          name: "calculator",
+          description: "Arithmetic",
+          inputSchema: {},
+          idempotency: "safe",
+          approvalRequired: false,
+          source: { kind: "builtin", id: "calculator" },
+        },
+      ],
+      "PATCH /v1/agents/a2": () => stale,
+    });
+    render(withClient(<AgentDialog open editing={stale} onOpenChange={() => undefined} />));
+    act(() => {
+      fireEvent.click(screen.getByRole("radio", { name: /All fields/ }));
+    });
+    const gone = await screen.findByRole("region", { name: "No longer available" });
+    expect(gone.textContent).toContain("lookup_order");
+    expect(screen.getByText(/lookup_order is no longer available in this workspace/)).toBeDefined();
+    act(() => {
+      fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    });
+    expect(screen.getByText(/Not saved: remove the tools/)).toBeDefined();
+    expect(callsTo(fetch, "PATCH /v1/agents/a2")).toHaveLength(0);
+
+    act(() => {
+      fireEvent.click(screen.getByRole("checkbox", { name: /lookup_order/ }));
+    });
+    expect(screen.queryByRole("region", { name: "No longer available" })).toBeNull();
+    act(() => {
+      fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    });
+    await waitFor(() => expect(callsTo(fetch, "PATCH /v1/agents/a2")).toHaveLength(1));
+    expect(bodyOf(callsTo(fetch, "PATCH /v1/agents/a2")[0]?.[1])).toMatchObject({
+      config: { tools: [{ name: "calculator", approval: "never" }] },
+    });
+  });
 });
 
 describe("the tools step", () => {

@@ -221,10 +221,13 @@ function Answer({
 export function QueryPanel({
   sourceId,
   documents,
+  off = false,
   onOpen,
 }: {
   sourceId: string;
   documents: readonly DocumentSummary[];
+  /** the service is turned off: nothing can be asked */
+  off?: boolean;
   onOpen: (t: ViewerTarget) => void;
 }) {
   const [text, setText] = useState("");
@@ -246,7 +249,7 @@ export function QueryPanel({
       return next;
     });
   const r = run.data;
-  const can = text.trim().length > 0 && documents.length > 0 && !run.isPending;
+  const can = !off && text.trim().length > 0 && documents.length > 0 && !run.isPending;
 
   return (
     <Section
@@ -308,7 +311,9 @@ export function QueryPanel({
             Retrieve and answer
           </Button>
         </div>
-        {documents.length === 0 ? (
+        {off ? (
+          <p className="text-xs text-ink-3">Questions can be asked once PageIndex is on.</p>
+        ) : documents.length === 0 ? (
           <p className="text-xs text-ink-3">No document is indexed yet.</p>
         ) : null}
       </form>

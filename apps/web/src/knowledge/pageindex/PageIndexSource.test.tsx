@@ -138,7 +138,7 @@ describe("the document list", () => {
       "DELETE /v1/pageindex/documents/doc-1": () => new Response(null, { status: 202 }),
     });
     fireEvent.click(await screen.findByRole("button", { name: "Delete Handbook.pdf" }));
-    const dialog = await screen.findByRole("dialog", { name: /Delete Handbook\.pdf/ });
+    const dialog = await screen.findByRole("alertdialog", { name: /Delete Handbook\.pdf/ });
     expect(within(dialog).getByText(/Access is revoked at once/)).toBeTruthy();
     fireEvent.click(within(dialog).getByRole("button", { name: "Delete document" }));
     await waitFor(() =>
@@ -161,12 +161,27 @@ describe("the document list", () => {
     expect(await screen.findByText(/The PageIndex service is not answering/)).toBeTruthy();
   });
 
-  it("says when PageIndex is not configured", async () => {
+  it("says once that PageIndex is turned off, lists what the source holds, and offers nothing", async () => {
+    setup({
+      [STATUS]: () => ({ enabled: false, reachable: false, sdkVersion: null, protocol: 1 }),
+      [DOCS]: () => ({ items: [doc({ state: "ready" })] }),
+    });
+    expect(await screen.findByText(/PageIndex is turned off on this server/)).toBeTruthy();
+    // it used to say the service was "not answering", and that nothing was indexed
+    expect(screen.queryByText(/not answering/)).toBeNull();
+    expect(await screen.findByText("Handbook.pdf")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Choose PDFs" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Delete|Reindex|Open|Outline/ })).toBeNull();
+    expect(screen.getByText("Questions can be asked once PageIndex is on.")).toBeTruthy();
+    expect(screen.queryByText("No document is indexed yet.")).toBeNull();
+  });
+
+  it("reads an older server's refusal as turned off too", async () => {
     setup({
       [STATUS]: () => apiError(409, "PAGEINDEX_DISABLED", "disabled"),
-      [DOCS]: () => apiError(409, "PAGEINDEX_DISABLED", "disabled"),
+      [DOCS]: () => ({ items: [] }),
     });
-    expect(await screen.findByText(/PageIndex is not configured on this server/)).toBeTruthy();
+    expect(await screen.findByText(/PageIndex is turned off on this server/)).toBeTruthy();
   });
 });
 

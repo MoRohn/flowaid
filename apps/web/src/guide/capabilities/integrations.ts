@@ -43,7 +43,7 @@ export const INTEGRATIONS_OPENAPI: CapabilityGuide = {
   start:
     "Press Import OpenAPI: read the document, choose the operations, point at the server and credential, then review and import.",
   result:
-    "A toolset whose operations appear in the OpenAPI step (pick the toolset, then the operation) and in agents' tool lists. Importing calls nothing.",
+    "A toolset whose operations appear in the OpenAPI step (pick the toolset, then the operation) and in agents' tool lists. Importing calls nothing. Its Details list the operations and let you rename it or change its credential.",
   reading: WHICH,
   quality: {
     title: "Tools that stay reliable",

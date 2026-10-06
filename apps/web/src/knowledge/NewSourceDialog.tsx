@@ -28,7 +28,7 @@ import {
   SelectItem,
   Textarea,
 } from "@flowaid/ui/primitives";
-import { get, getAll, post } from "~/api/client";
+import { get, getAll, patch, post } from "~/api/client";
 import type { Credential, ModelInfo, Provider } from "~/admin/types";
 import { providerName } from "~/admin/providerNames";
 import { Notice, useMutate } from "~/admin/ui";
@@ -49,14 +49,17 @@ import {
   EMPTY_SOURCE,
   KIND_LABEL,
   embeddingOptions,
+  formOf,
   isUploadKind,
   parseUrls,
   urlFieldError,
   sourceBody,
   sourceFormError,
+  sourcePatch,
   type KnowledgeSource,
   type SourceForm,
   type SourceKind,
+  type SourcePatch,
 } from "./model";
 import { PageIndexSourceFields } from "./pageindex/PageIndexSourceFields";
 
@@ -83,18 +86,38 @@ type SourceDraft = SourceForm & { embedding: string | null };
 export function NewSourceDialog({
   open,
   onOpenChange,
+  editing = null,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
+  /** a saved source: the same steps change its settings (its kind stays) */
+  editing?: KnowledgeSource | null;
 }) {
   const s = useSession();
-  // the draft survives closing the dialog (or a trip to Credentials) in this tab
-  const kept = useKeptDraft<SourceDraft>(`flowaid:draft:${s.ws}:knowledge-source`, () => ({
-    ...EMPTY_SOURCE,
-    embedding: null,
-  }));
+  // a new source's draft survives closing the dialog (or a trip to Credentials) in this tab;
+  // editing starts from the saved settings and keeps no draft
+  const kept = useKeptDraft<SourceDraft>(
+    editing ? null : `flowaid:draft:${s.ws}:knowledge-source`,
+    () =>
+      editing
+        ? {
+            ...formOf(editing),
+            embedding: editing.pipeline.embedding
+              ? `${editing.pipeline.embedding.provider}/${editing.pipeline.embedding.model}`
+              : "keyword",
+          }
+        : { ...EMPTY_SOURCE, embedding: null },
+  );
   const { draft: f, setDraft } = kept;
   const [created, setCreated] = useState<KnowledgeSource | null>(null);
+  // saving changes that index or fetch every document again asks first; so does closing with
+  // unsaved changes
+  const [confirming, setConfirming] = useState<"save" | "close" | null>(null);
+  const requestClose = (o: boolean) => {
+    if (o) return onOpenChange(true);
+    if (editing && kept.dirty && !save.isPending) return setConfirming("close");
+    onOpenChange(false);
+  };
   const set = <K extends keyof SourceForm>(k: K, v: SourceForm[K]) =>
     setDraft((prev) => ({ ...prev, [k]: v }));
   const tokens = useQuery({
@@ -147,16 +170,42 @@ export function NewSourceDialog({
   const [chosenProvider = "", chosenModel = ""] = keywordOnly ? [] : embedding.split(/\/(.*)/s);
   const isPageIndex = f.kind === "pageindex";
   const form: SourceForm = { ...f, embeddingProvider: chosenProvider, embeddingModel: chosenModel };
-  const create = useMutate(() => post<KnowledgeSource>("/v1/knowledge/sources", sourceBody(form)), {
-    success: (x) => `Created ${x.name}`,
-    invalidate: [["knowledge-sources", s.ws]],
-    onSuccess: (x) => {
-      kept.discard();
-      setCreated(x);
+  const change = editing ? sourcePatch(editing, form) : null;
+  const save = useMutate(
+    () =>
+      editing
+        ? patch<KnowledgeSource>(`/v1/knowledge/sources/${editing.id}`, change?.body ?? {})
+        : post<KnowledgeSource>("/v1/knowledge/sources", sourceBody(form)),
+    {
+      success: (x) => (editing ? `Saved ${x.name}` : `Created ${x.name}`),
+      invalidate: [
+        ["knowledge-sources", s.ws],
+        ...(editing
+          ? [
+              ["knowledge-source", s.ws, editing.id],
+              ["knowledge-documents", s.ws, editing.id],
+            ]
+          : []),
+      ],
+      onSuccess: (x) => {
+        if (editing) return onOpenChange(false);
+        kept.discard();
+        setCreated(x);
+      },
+      // the draft stays in the form (and in this tab) so nothing typed is lost
+      errorTitle: editing ? "Could not save the source" : "Could not create the source",
     },
-    // the draft stays in the form (and in this tab) so nothing typed is lost
-    errorTitle: "Could not create the source",
-  });
+  );
+  // asked only when documents are indexed or fetched again (a source with none has nothing to redo)
+  const asks =
+    editing !== null &&
+    change !== null &&
+    ((change.reindex && editing.documents > 0) || change.refetch);
+  const submit = () => {
+    if (asks && confirming !== "save") return setConfirming("save");
+    setConfirming(null);
+    save.mutate(undefined);
+  };
   const error = sourceFormError(form);
   const missingKey = !keywordOnly && chosen !== undefined && !chosen.ready;
   const loadingModels = models.isPending || providers.isPending;
@@ -171,6 +220,16 @@ export function NewSourceDialog({
       ? null
       : { provider: chosenProvider, model: chosenModel, ready: chosen?.ready ?? false },
     indexReady,
+    ...(editing && change
+      ? {
+          editing: {
+            documents: editing.documents,
+            reindex: change.reindex,
+            refetch: change.refetch,
+            changed: Object.keys(change.body).length > 0,
+          },
+        }
+      : {}),
   });
   const reviewChecks: Check[] = [
     ...(error === null
@@ -219,7 +278,9 @@ export function NewSourceDialog({
             label="Documents come from"
             htmlFor="ks-kind"
             hint={
-              pageindex ? undefined : (
+              editing ? (
+                "A source keeps its kind: for documents from somewhere else, create a new source."
+              ) : pageindex ? undefined : (
                 <>
                   PDF indexing needs the PageIndex service.{" "}
                   <LearnMore href={HELP.pageindexSetup} label="Setup guide" />
@@ -230,6 +291,7 @@ export function NewSourceDialog({
           >
             <Select
               id="ks-kind"
+              disabled={editing !== null}
               value={f.kind}
               onValueChange={(v) => {
                 const kind = KINDS.find((k) => k === v);
@@ -359,8 +421,8 @@ export function NewSourceDialog({
           {isPageIndex ? (
             <Notice tone="info">
               PageIndex builds its own section tree, so the search and chunking settings of the next
-              steps do not apply and are not saved. Switch back to another kind and they are as you
-              left them.
+              steps do not apply and are not saved.
+              {editing ? null : " Switch back to another kind and they are as you left them."}
             </Notice>
           ) : null}
         </>
@@ -468,7 +530,9 @@ export function NewSourceDialog({
                 </p>
               ) : null}
               <p className="m-0 text-xs text-ink-3">
-                The source page has no setting to change this later, so choose now.
+                {editing
+                  ? "Changing the model or the search indexes every document of the source again."
+                  : "This can be changed later under Settings on the source's page; its documents are then indexed again."}
               </p>
             </>
           ),
@@ -545,10 +609,12 @@ export function NewSourceDialog({
     },
     {
       id: "review",
-      title: "Review and create",
-      why: "Check what the source will be. Creating it saves the source; for web pages, a sitemap or a repository it also starts the first sync.",
+      title: editing ? "Review and save" : "Review and create",
+      why: editing
+        ? "Check the changes. New chunking or a new embedding model indexes every document again; new addresses fetch them again."
+        : "Check what the source will be. Creating it saves the source; for web pages, a sitemap or a repository it also starts the first sync.",
       done: error === null && blockers(reviewChecks).length === 0,
-      doneLabel: "Ready to create",
+      doneLabel: editing ? "Ready to save" : "Ready to create",
       requirement: "fix the items marked as needed",
       children: (
         <>
@@ -580,11 +646,14 @@ export function NewSourceDialog({
               </>
             )}
           </dl>
-          <CheckList checks={reviewChecks} aria-label="Before you create" />
+          <CheckList
+            checks={reviewChecks}
+            aria-label={editing ? "Before you save" : "Before you create"}
+          />
           <QualityNote>
-            These checks confirm the source can be created and indexed. Whether it finds the right
-            passages shows only when you search it: once documents are indexed, use Try a search on
-            its page with questions people really ask.
+            These checks confirm the source can be {editing ? "saved" : "created"} and indexed.
+            Whether it finds the right passages shows only when you search it: once documents are
+            indexed, use Try a search on its page with questions people really ask.
           </QualityNote>
         </>
       ),
@@ -648,10 +717,12 @@ export function NewSourceDialog({
     );
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={requestClose}>
       <DialogContent size="lg">
         <DialogHeader>
-          <DialogTitle>New knowledge source</DialogTitle>
+          <DialogTitle>
+            {editing ? `Settings of ${editing.name}` : "New knowledge source"}
+          </DialogTitle>
           <DialogDescription>
             {isPageIndex
               ? "PDFs are indexed into a tree of sections with their pages, so retrieval nodes can navigate them and cite the pages they read."
@@ -662,32 +733,79 @@ export function NewSourceDialog({
           <GuidedFlow
             steps={steps}
             status={
-              <DraftStatus
-                dirty={kept.dirty}
-                restored={kept.restored}
-                onDiscard={kept.discard}
-                what="the source"
-              />
+              editing ? (
+                "Changes are saved when you press Save."
+              ) : (
+                <DraftStatus
+                  dirty={kept.dirty}
+                  restored={kept.restored}
+                  onDiscard={kept.discard}
+                  what="the source"
+                />
+              )
             }
           />
         </DialogBody>
         <DialogFooter>
-          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-            Close
-          </Button>
-          <Button
-            type="button"
-            variant="primary"
-            loading={create.isPending}
-            disabled={error !== null}
-            onClick={() => create.mutate(undefined)}
-          >
-            Create source
-          </Button>
+          {confirming === "close" ? (
+            <>
+              <p role="alert" className="m-0 mr-auto self-center text-sm text-warn-text">
+                Discard your changes to {editing?.name ?? "this source"}?
+              </p>
+              <Button type="button" variant="ghost" onClick={() => setConfirming(null)}>
+                Keep editing
+              </Button>
+              <Button
+                type="button"
+                variant="danger"
+                onClick={() => {
+                  setConfirming(null);
+                  onOpenChange(false);
+                }}
+              >
+                Discard changes
+              </Button>
+            </>
+          ) : confirming === "save" && editing && change ? (
+            <>
+              <p role="alert" className="m-0 mr-auto self-center text-sm text-warn-text">
+                {saveWarning(editing, change)}
+              </p>
+              <Button type="button" variant="ghost" onClick={() => setConfirming(null)}>
+                Keep editing
+              </Button>
+              <Button type="button" variant="primary" loading={save.isPending} onClick={submit}>
+                {change.reindex ? "Save and index again" : "Save and fetch again"}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button type="button" variant="ghost" onClick={() => requestClose(false)}>
+                {editing ? "Cancel" : "Close"}
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                loading={save.isPending}
+                disabled={error !== null || (editing !== null && !kept.dirty)}
+                onClick={submit}
+              >
+                {editing ? "Save" : "Create source"}
+              </Button>
+            </>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
+}
+
+/** What saving a source's Settings does to its documents, asked before it is saved. */
+function saveWarning(src: KnowledgeSource, change: SourcePatch): string {
+  const n = `${src.documents} document${src.documents === 1 ? "" : "s"}`;
+  if (change.reindex)
+    return `Saving indexes its ${n} again with the new settings, in the background. Searches use the old index until each is done.`;
+  return `Saving fetches its documents again from the new addresses; the ${n} it has now are replaced.`;
 }
 
 /** "Web pages · 3 URLs", "GitHub repository · acme/docs (docs)". */

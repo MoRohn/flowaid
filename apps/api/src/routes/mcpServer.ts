@@ -30,6 +30,7 @@ import {
   workflowVersions,
   workflows,
 } from "@flowaid/database";
+import { describeInputIssues, type InputIssue } from "@flowaid/workflow-compiler";
 import {
   ForbiddenError,
   NotFoundError,
@@ -137,7 +138,17 @@ function serverFor(ctx: ApiContext, p: Principal) {
       });
     } catch (error) {
       const e = toFlowaidError(error);
-      return { content: [{ type: "text", text: `${e.code}: ${e.message}` }], isError: true };
+      // arguments that don't fit the tool's input schema name each problem, so the client's
+      // model can correct its call ("/message must have required property 'message'")
+      const issues = (e.details as { issues?: unknown } | undefined)?.issues;
+      const detail =
+        Array.isArray(issues) && issues.length
+          ? `: ${describeInputIssues(issues as InputIssue[], 5)}`
+          : "";
+      return {
+        content: [{ type: "text", text: `${e.code}: ${e.message}${detail}` }],
+        isError: true,
+      };
     }
   });
 

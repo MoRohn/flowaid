@@ -7,16 +7,25 @@
  */
 import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
-import { Compass, MessageSquareText, Plus } from "lucide-react";
-import { AppShell, SideNav, TopBar, UserMenu, type TopBarProps } from "@flowaid/ui/shell";
-import { Button, IconButton } from "@flowaid/ui/primitives";
+import { Compass, MessageSquareText, Plus, Search } from "lucide-react";
+import {
+  AppShell,
+  SideNav,
+  TopBar,
+  UserMenu,
+  useAppShellOptional,
+  type TopBarProps,
+} from "@flowaid/ui/shell";
+import { Button, IconButton, Shortcut } from "@flowaid/ui/primitives";
 import { useAssistant } from "~/assistant/AssistantProvider";
+import { GUIDE_PANEL_ID, GUIDE_ROOM, GUIDE_TOGGLE_ATTRIBUTE, guideDock } from "~/guide/GuidePanel";
 import { useGuide } from "~/guide/GuideProvider";
 import { useSession } from "~/session";
 import { useDesktop } from "./desktop";
 import { documentTitle, useDocumentTitle, usePendingTasks } from "./frame";
 import { HelpMenu } from "./HelpMenu";
 import { NAV, NAV_SECONDARY, visibleNav } from "./nav";
+import { NavShortcuts } from "./NavShortcuts";
 import { WorkspaceCommandMenu } from "./WorkspaceCommandMenu";
 
 export interface AppFrameProps extends Partial<Omit<TopBarProps, "breadcrumbs">> {
@@ -80,7 +89,7 @@ export function AppFrame({
       storageKey={storageKey}
       // where there is room the open Guide sits beside the page instead of over it; narrower
       // screens keep the page's full width and the Guide floats as a card (GuidePanel)
-      {...(guide?.open ? { className: "min-[1680px]:[&>[data-shell-body]]:pr-[380px]" } : {})}
+      {...(guide?.open ? { className: GUIDE_ROOM[guideDock(guide.context)] } : {})}
       topbar={
         <TopBar
           breadcrumbs={links.map((c, i) => ({
@@ -92,11 +101,14 @@ export function AppFrame({
           layoutToggles={Boolean(inspector || bottomPanel)}
           trailing={
             <span className="flex items-center gap-1">
+              <SearchButton />
               {guide ? (
                 <Button
                   variant="ghost"
                   size="sm"
-                  aria-pressed={guide.open}
+                  aria-expanded={guide.open}
+                  {...(guide.open ? { "aria-controls": GUIDE_PANEL_ID } : {})}
+                  {...{ [GUIDE_TOGGLE_ATTRIBUTE]: "" }}
                   className={guide.open ? "bg-accent-soft text-accent-text" : undefined}
                   leadingIcon={<Compass strokeWidth={1.75} />}
                   onClick={() => guide.setOpen(!guide.open)}
@@ -202,7 +214,42 @@ export function AppFrame({
     >
       {children}
       {desktop.overlay}
+      <NavShortcuts entries={[...items, ...secondary]} go={go} />
     </AppShell>
+  );
+}
+
+/**
+ * Opens the ⌘K menu: before, only the keyboard could, so phones and tablets never saw it. A
+ * labelled button with the shortcut from `md` up, an icon below. Inside the shell's top bar.
+ */
+function SearchButton() {
+  const shell = useAppShellOptional();
+  if (!shell) return null;
+  const open = () => shell.setCommandOpen(true);
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="hidden text-ink-3 md:inline-flex"
+        leadingIcon={<Search strokeWidth={1.75} />}
+        trailingIcon={<Shortcut shortcut="mod+k" size="sm" className="ml-1" />}
+        aria-haspopup="dialog"
+        onClick={open}
+      >
+        Search
+      </Button>
+      <IconButton
+        label="Search and commands"
+        shortcut="mod+k"
+        className="md:hidden"
+        aria-haspopup="dialog"
+        onClick={open}
+      >
+        <Search strokeWidth={1.75} />
+      </IconButton>
+    </>
   );
 }
 

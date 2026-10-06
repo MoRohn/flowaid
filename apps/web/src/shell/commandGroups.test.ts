@@ -18,15 +18,18 @@ const base: CommandInput = {
 const ids = (g: { items: { id: string }[] }[]) => g.flatMap((x) => x.items.map((i) => i.id));
 
 describe("command menu groups", () => {
-  it("offers creating, the workspace's workflows, runs and templates first", () => {
-    const { leading } = commandGroups(base);
-    expect(leading.map((g) => g.heading)).toEqual([
-      "Create",
+  it("offers creating before the pages, and the workspace's lists after them", () => {
+    const { leading, trailing } = commandGroups(base);
+    expect(leading.map((g) => g.heading)).toEqual(["Create"]);
+    expect(trailing.map((g) => g.heading)).toEqual([
       "Workflows",
       "Recent runs",
       "Templates",
+      "Settings",
+      "Help",
     ]);
-    const [create, workflows, runs, templates] = leading;
+    const [create] = leading;
+    const [workflows, runs, templates] = trailing;
     expect(create?.items.map((i) => i.to)).toContain("/default/workflows/new");
     expect(workflows?.items.map((i) => [i.label, i.meta, i.to])).toEqual([
       ["Refund desk", "v2", "/default/workflows/w1"],
@@ -53,13 +56,19 @@ describe("command menu groups", () => {
       templates: [{ id: "t1", name: "Research Agent" }],
     });
     expect(ids(viewer.leading)).not.toContain("create-workflow");
-    expect(viewer.leading.map((g) => g.heading)).not.toContain("Templates");
+    expect(viewer.trailing.map((g) => g.heading)).not.toContain("Templates");
     expect(ids(viewer.trailing)).toContain("settings-members");
   });
 
   it("drops empty groups", () => {
-    const { leading } = commandGroups({ ...base, workflows: [], runs: [], templates: [] });
+    const { leading, trailing } = commandGroups({
+      ...base,
+      workflows: [],
+      runs: [],
+      templates: [],
+    });
     expect(leading.map((g) => g.heading)).toEqual(["Create"]);
+    expect(trailing.map((g) => g.heading)).toEqual(["Settings", "Help"]);
   });
   it("recognises a run id or its first eight characters, and nothing shorter", () => {
     const uuid = "01a0e530-5ea8-7143-8b2c-3d4e5f607182";
@@ -121,7 +130,7 @@ describe("command menu groups", () => {
   it("offers Ask FlowAId with the typed question when the assistant is on", () => {
     const on = { ...base, features: { ...base.features, assistant: true } };
     const ask = (query?: string) =>
-      commandGroups({ ...on, ...(query !== undefined ? { query } : {}) }).leading.find(
+      commandGroups({ ...on, ...(query !== undefined ? { query } : {}) }).trailing.find(
         (g) => g.id === "ask",
       )?.items;
     expect(ask()).toMatchObject([{ label: "Ask FlowAId…", action: "ask" }]);
@@ -135,9 +144,25 @@ describe("command menu groups", () => {
     ]);
     // a run id is not a question
     expect(ask("01a0e530-5ea8")?.[0]?.question).toBeUndefined();
-    expect(commandGroups(base).leading.some((g) => g.id === "ask")).toBe(false);
+    expect(commandGroups(base).trailing.some((g) => g.id === "ask")).toBe(false);
     expect(
-      commandGroups({ ...on, can: (s) => s !== "runs:read" }).leading.some((g) => g.id === "ask"),
+      commandGroups({ ...on, can: (s) => s !== "runs:read" }).trailing.some((g) => g.id === "ask"),
     ).toBe(false);
+  });
+
+  // F-10 / R12: Ask led the menu, so Enter on any typed text sent a paid question
+  it("puts Ask last, as the fallback Enter takes only when nothing else matches", () => {
+    const on = { ...base, features: { ...base.features, assistant: true } };
+    const { leading, trailing } = commandGroups({ ...on, query: "runs" });
+    expect(leading.some((g) => g.id === "ask")).toBe(false);
+    expect(trailing.at(-1)).toMatchObject({ id: "ask", fallback: true });
+    expect(trailing.filter((g) => g.fallback).map((g) => g.id)).toEqual(["ask"]);
+  });
+
+  it("lists five templates and a way to the rest", () => {
+    const templates = [1, 2, 3, 4, 5, 6, 7].map((n) => ({ id: `t${n}`, name: `Template ${n}` }));
+    const group = commandGroups({ ...base, templates }).trailing.find((g) => g.id === "templates");
+    expect(group?.items).toHaveLength(6);
+    expect(group?.items[5]).toMatchObject({ label: "All templates (7)", to: "/default/templates" });
   });
 });

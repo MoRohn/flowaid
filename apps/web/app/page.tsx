@@ -30,6 +30,13 @@ export default function Root() {
       <FullPageError message="Your account does not belong to any workspace yet. Ask an owner to invite you." />
     );
   if (me.error && !(me.error instanceof ApiError && me.error.status === 401))
-    return <FullPageError message={me.error.message} />;
+    return (
+      <FullPageError
+        error={me.error}
+        onRetry={() => void me.refetch()}
+        retrying={me.isFetching}
+        attempt={me.errorUpdateCount}
+      />
+    );
   return <FullPageSpinner />;
 }

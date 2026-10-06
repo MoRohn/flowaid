@@ -7,6 +7,7 @@ import {
   humanize,
   isMapSchema,
   orderedProperties,
+  pruneUnset,
   resolveSchema,
   variantInfo,
   withDefaults,
@@ -112,6 +113,74 @@ describe("defaults", () => {
       ],
     };
     expect(defaultValueFor(schema, schema)).toEqual({ type: "fixed", ms: 500 });
+  });
+  it("saves no stub for an optional setting nobody filled in", () => {
+    const schema: JsonSchema = {
+      type: "object",
+      required: ["instructions", "question"],
+      properties: {
+        instructions: { type: "string" },
+        // a Boolean's criteria: both or none
+        criteria: {
+          type: "object",
+          additionalProperties: false,
+          required: ["true", "false"],
+          properties: { true: { type: "string" }, false: { type: "string" } },
+        },
+        // a Mock's fail: its presence makes every run fail
+        fail: {
+          type: "object",
+          required: ["message"],
+          properties: {
+            message: { type: "string" },
+            retryable: { type: "boolean", default: false },
+          },
+        },
+        // a Policy check's question: a default inside an optional object
+        policy: {
+          type: "object",
+          required: ["instructions"],
+          properties: {
+            instructions: { type: "string" },
+            threshold: { type: "number", default: 0.5 },
+          },
+        },
+        separators: { type: "array", minItems: 1, items: { type: "string" } },
+        budget: { type: "object", default: {}, properties: { maxTokens: { type: "integer" } } },
+        question: {
+          type: "object",
+          properties: { criteria: { $ref: "#/properties/criteria" } },
+        },
+        headers: { type: "object", additionalProperties: { type: "string" } },
+      },
+    };
+    const formValues = withDefaults(schema, { instructions: "Is it urgent?" });
+    expect(formValues).toMatchObject({ criteria: {}, fail: { retryable: false } });
+    expect(pruneUnset(schema, formValues)).toEqual({
+      instructions: "Is it urgent?",
+      budget: {},
+      question: {},
+      headers: {},
+    });
+    // what the person filled in stays, even when it is not complete yet
+    expect(
+      pruneUnset(schema, {
+        ...formValues,
+        criteria: { true: "urgent", false: "" },
+        fail: { message: "", retryable: true },
+        policy: { instructions: "", threshold: 0.5 },
+        separators: ["\n"],
+        extra: undefined,
+      }),
+    ).toEqual({
+      instructions: "Is it urgent?",
+      criteria: { true: "urgent", false: "" },
+      fail: { message: "", retryable: true },
+      separators: ["\n"],
+      budget: {},
+      question: {},
+      headers: {},
+    });
   });
   it("detects free-form maps", () => {
     expect(isMapSchema({ type: "object", additionalProperties: { type: "string" } })).toBe(true);

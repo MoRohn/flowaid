@@ -24,15 +24,20 @@ export function secretChecks(
     served = new Set(),
   }: { ws: string; workflowId: string; loading: boolean; served?: ReadonlySet<string> },
 ): Check[] {
-  if (!declared.some((d) => d.required !== false))
+  if (!declared.some((d) => d.required !== false)) {
+    // optional secrets are usually a key the server already has (a TypeSafe step's)
+    const optional = declared.map((d) => d.name);
     return [
       {
         id: "secrets",
         label: "No required secrets",
         state: "ok",
-        detail: "Steps that need a key declare a secret; none of this workflow's do yet.",
+        detail: optional.length
+          ? `${optional.join(", ")} ${optional.length === 1 ? "is" : "are"} optional: a credential you bind under Secrets is used, otherwise the server's key when it has one.`
+          : "Steps that need a key declare a secret; none of this workflow's do yet.",
       },
     ];
+  }
   return environments.flatMap((e): Check[] => {
     const b = bound(e.id);
     if (!b)

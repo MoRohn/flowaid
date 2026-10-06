@@ -1,7 +1,11 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "~/api/client";
-import { ErrorPanel, errorMessage } from "./states";
+
+const nav = vi.hoisted(() => ({ pathname: "/acme/runs" }));
+vi.mock("next/navigation", () => ({ usePathname: () => nav.pathname }));
+
+const { ErrorPanel, errorMessage, isMissing, listFor } = await import("./states");
 
 afterEach(cleanup);
 
@@ -38,5 +42,41 @@ describe("ErrorPanel", () => {
 
   it("explains an API that cannot be reached", () => {
     expect(errorMessage(new TypeError("Failed to fetch"))).toMatch(/Could not reach FlowAId's API/);
+  });
+
+  // F-06: /acme/runs/not-a-uuid said "request params is invalid" with a Try again that cannot help
+  it("treats a link whose id is malformed as not found", () => {
+    nav.pathname = "/acme/runs/not-a-uuid";
+    const bad = new ApiError(400, "BAD_REQUEST", "request params is invalid");
+    expect(isMissing(bad)).toBe(true);
+    expect(isMissing(new ApiError(400, "BAD_REQUEST", "request body is invalid"))).toBe(false);
+    render(<ErrorPanel error={bad} onRetry={vi.fn()} />);
+    expect(screen.getByRole("heading", { level: 1, name: "Not found" })).toBeDefined();
+    expect(screen.getByText(/The id in this link is not valid/)).toBeDefined();
+    expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+    expect(screen.getByRole("link", { name: "Back to Runs" }).getAttribute("href")).toBe(
+      "/acme/runs",
+    );
+  });
+
+  it("links a missing item back to its list from the URL when the page names none", () => {
+    nav.pathname = "/acme/knowledge/0000";
+    render(<ErrorPanel error={new ApiError(404, "NOT_FOUND", "knowledge source not found")} />);
+    expect(screen.getByRole("link", { name: "Back to Knowledge" }).getAttribute("href")).toBe(
+      "/acme/knowledge",
+    );
+    expect(listFor("/acme/evaluations/sets/1")).toEqual({
+      href: "/acme/evaluations",
+      label: "Back to Evaluations",
+    });
+    expect(listFor("/acme/workflows")).toBeUndefined();
+  });
+
+  it("is the page's heading only when it stands for the whole page", () => {
+    const { unmount } = render(<ErrorPanel error={new Error("x")} onRetry={vi.fn()} />);
+    expect(screen.queryByRole("heading")).toBeNull();
+    unmount();
+    render(<ErrorPanel error={new Error("x")} onRetry={vi.fn()} page />);
+    expect(screen.getByRole("heading", { level: 1, name: "Could not load this" })).toBeDefined();
   });
 });

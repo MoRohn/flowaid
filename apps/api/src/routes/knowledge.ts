@@ -6,7 +6,7 @@
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
-import { and, asc, desc, eq, lt, or } from "drizzle-orm";
+import { and, asc, desc, eq, lt, ne, or } from "drizzle-orm";
 import { chunks, credentials, documents, knowledgeSources, type Tx } from "@flowaid/database";
 import { REMOTE_INDEX_KINDS } from "@flowaid/knowledge";
 import { uuidv7 } from "@flowaid/shared";
@@ -642,6 +642,29 @@ export function knowledgeRoutes(app: FastifyInstance, ctx: ApiContext): void {
       // a PageIndex document is revoked and cleaned up like DELETE /v1/pageindex/documents/:id
       if (s.kind === PAGEINDEX_KIND) await deletePageIndexDocument(ctx, p.workspaceId, d.id);
       else await knowledgeServiceFor(ctx, p.workspaceId).deleteDocument(d.sourceId, d.externalId);
+      // an upload source in error because of its failed documents is no longer in error once the
+      // last of them is removed (a fetched source's error is its last sync's, so it stays)
+      if ((UPLOAD_KINDS as readonly string[]).includes(s.kind) && s.status === "error")
+        await ctx.db.tenant(p.workspaceId, async (tx) => {
+          const left = await tx
+            .select({ status: documents.status })
+            .from(documents)
+            .where(and(eq(documents.sourceId, s.id), ne(documents.status, "deleted")));
+          if (left.some((x) => x.status === "error")) return;
+          await tx
+            .update(knowledgeSources)
+            .set({
+              status:
+                left.length === 0
+                  ? "new"
+                  : left.some((x) => x.status === "pending")
+                    ? "stale"
+                    : "ready",
+              lastError: null,
+              updatedAt: new Date(),
+            })
+            .where(eq(knowledgeSources.id, s.id));
+        });
       return reply.code(204).send(null);
     },
   );

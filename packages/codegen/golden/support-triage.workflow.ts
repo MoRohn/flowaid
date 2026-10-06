@@ -54,7 +54,7 @@ export const workflow = defineWorkflow({
     secret("STATUS_API", "http.bearer", { required: false }),
   ],
   execution: {
-    timeoutMs: 180000,
+    timeoutMs: 10800000,
     maxCostUsd: 0.25,
     maxNodeRuns: 2000,
     maxSubflowDepth: 4,

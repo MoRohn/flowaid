@@ -4,7 +4,15 @@ import type { JsonSchema, WorkflowDefinition } from "@flowaid/workflow-core";
 import { installDomStubs } from "@/primitives/testStubs";
 import { blankDefinition } from "./model";
 import { createBuilderStore } from "./store";
-import { WorkflowPanel, parseSetting, settingKind, settingLabel } from "./WorkflowPanel";
+import {
+  WorkflowPanel,
+  durationParts,
+  parseCostLimit,
+  parseDuration,
+  parseSetting,
+  settingKind,
+  settingLabel,
+} from "./WorkflowPanel";
 
 beforeAll(() => installDomStubs());
 afterEach(cleanup);
@@ -68,6 +76,79 @@ describe("WorkflowPanel", () => {
     expect(store.getState().definition.variables[0]?.default).toBe(500);
     rerender(view());
     expect(store.getState().history.past.at(-1)?.label).toBe("Change Auto approve limit");
+  });
+
+  it("sets the run's time and cost limits without JSON, and refuses a bad value", () => {
+    // a new blank draft stores no execution policy: the fields show the schema's defaults
+    const store = createBuilderStore({
+      workflowId: ID,
+      definition: blankDefinition(ID, "Blank"),
+      draftRevision: 1,
+    });
+    const view = () => (
+      <WorkflowPanel
+        definition={store.getState().definition}
+        store={store}
+        readOnly={false}
+        name="Blank"
+      />
+    );
+    const { rerender } = render(view());
+    const limit = screen.getByLabelText<HTMLInputElement>(/^Run time limit/, {
+      selector: "input",
+    });
+    expect(limit.value).toBe("15");
+    fireEvent.change(limit, { target: { value: "0" } });
+    fireEvent.blur(limit);
+    expect(screen.getByText(/Enter how long a run may take/)).toBeTruthy();
+    fireEvent.change(limit, { target: { value: "3" } });
+    fireEvent.blur(limit);
+    // still minutes: 3 minutes
+    expect(store.getState().definition.execution.timeoutMs).toBe(180_000);
+    rerender(view());
+
+    const cost = screen.getByLabelText<HTMLInputElement>(/^Cost limit per run/);
+    expect(cost.value).toBe("");
+    fireEvent.change(cost, { target: { value: "-1" } });
+    fireEvent.blur(cost);
+    expect(screen.getByText(/above 0/)).toBeTruthy();
+    fireEvent.change(cost, { target: { value: "$0.25" } });
+    fireEvent.blur(cost);
+    expect(store.getState().definition.execution.maxCostUsd).toBe(0.25);
+    rerender(view());
+    expect(store.getState().history.past.at(-1)?.label).toBe("Change the cost limit");
+
+    // emptied, the limit goes: "no limit"
+    fireEvent.change(screen.getByLabelText(/^Cost limit per run/), { target: { value: "" } });
+    fireEvent.blur(screen.getByLabelText(/^Cost limit per run/));
+    expect(store.getState().definition.execution).not.toHaveProperty("maxCostUsd");
+  });
+
+  it("opens at the field a problem's action names", () => {
+    const store = createBuilderStore({
+      workflowId: ID,
+      definition: blankDefinition(ID, "Blank"),
+      draftRevision: 1,
+    });
+    render(
+      <WorkflowPanel
+        definition={store.getState().definition}
+        store={store}
+        readOnly={false}
+        name="Blank"
+        focus={{ field: "max-cost", n: 1 }}
+      />,
+    );
+    expect(document.activeElement).toBe(screen.getByLabelText(/^Cost limit per run/));
+  });
+
+  it("reads durations in their largest whole unit", () => {
+    expect(durationParts(10_800_000)).toEqual({ value: 3, unit: "h" });
+    expect(durationParts(5_400_000)).toEqual({ value: 90, unit: "min" });
+    expect(durationParts(1500)).toEqual({ value: 1.5, unit: "s" });
+    expect(parseDuration("2", "d")).toEqual({ ok: true, ms: 172_800_000 });
+    expect(parseDuration("0.5", "s")).toMatchObject({ ok: false });
+    expect(parseCostLimit("")).toEqual({ ok: true, usd: undefined });
   });
 
   it("adds a setting the steps can use as $vars.<name>", () => {

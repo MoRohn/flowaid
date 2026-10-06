@@ -22,11 +22,13 @@ import type {
 } from "@flowaid/node-sdk";
 import {
   CredentialError,
+  DecisionResultSchema,
   NotFoundError,
   OutputSchemaMismatchError,
   SchemaValidationError,
   TimeoutError,
   toFlowaidError,
+  type DecisionResult,
   type ExecutionPlan,
   type JsonObject,
   type JsonValue,
@@ -37,7 +39,18 @@ import {
   type ScopePath,
   type SandboxExecutor,
 } from "@flowaid/workflow-core";
+import { batchDecisionId } from "./providers.js";
 import type { ExecutorOutcome, NodeEmitted, ResumeInfo } from "./step.js";
+
+/** A batch step's `answers` output: each question id with its decision. */
+function batchAnswers(output: unknown): [string, DecisionResult][] {
+  const answers = (output as { answers?: unknown } | null)?.answers;
+  if (!answers || typeof answers !== "object") return [];
+  return Object.entries(answers).flatMap(([question, d]) => {
+    const parsed = DecisionResultSchema.safeParse(d);
+    return parsed.success ? [[question, parsed.data] as [string, DecisionResult]] : [];
+  });
+}
 
 /** Node definitions by `(type, version)`, from node packages. Immutable after construction. */
 export class NodeRegistry {
@@ -351,6 +364,20 @@ export async function executeTask(
             decision: result.decision,
             priceSnapshot: null,
           });
+        } else if (
+          def.decision?.kind === "batch" &&
+          !events.some((e) => e.type === "DECISION_COMPLETED")
+        ) {
+          // a batch step answered without its provider (a person answered the questions): one
+          // DECISION_COMPLETED per question, as the provider's batch records them
+          for (const [question, decision] of batchAnswers(output.data))
+            emit({
+              type: "DECISION_COMPLETED",
+              batchId: batchDecisionId(call.nodeRunId),
+              question,
+              decision,
+              priceSnapshot: null,
+            });
         }
         return {
           kind: "ok",

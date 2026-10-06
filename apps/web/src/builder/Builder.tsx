@@ -10,8 +10,22 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useStore } from "zustand";
-import { useReactFlow, type Connection, type EdgeChange, type NodeChange } from "@xyflow/react";
-import { CircleDollarSign, Copy, Download, ListChecks, Rocket, Trash2 } from "lucide-react";
+import {
+  useReactFlow,
+  useStore as useXyStore,
+  type Connection,
+  type EdgeChange,
+  type NodeChange,
+} from "@xyflow/react";
+import {
+  CircleDollarSign,
+  Copy,
+  Download,
+  FolderDown,
+  ListChecks,
+  Rocket,
+  Trash2,
+} from "lucide-react";
 import type {
   CompileResult,
   NodeManifest,
@@ -20,7 +34,7 @@ import type {
   WorkflowDefinition,
 } from "@flowaid/workflow-core";
 import type { RunView } from "@flowaid/ui";
-import type { Diagnostic } from "@flowaid/workflow-core";
+import { DiagnosticSchema, type Diagnostic } from "@flowaid/workflow-core";
 import {
   FlowCanvas,
   autoLayout,
@@ -30,7 +44,7 @@ import {
   type CanvasNode,
   type NodeDefinitionView,
 } from "@flowaid/ui/canvas";
-import { toFlowNode } from "@flowaid/ui/node";
+import { NODE_WIDTH, toFlowNode } from "@flowaid/ui/node";
 import { Inspector, DiagnosticList } from "@flowaid/ui/inspector";
 import { BottomPanel } from "@flowaid/ui/builder";
 import { TraceTimeline } from "@flowaid/ui/trace";
@@ -50,7 +64,7 @@ import {
   EmptyState,
   toast,
 } from "@flowaid/ui/primitives";
-import { ApiError, del, get, getAll, patch, post, put } from "~/api/client";
+import { del, get, getAll, patch, post } from "~/api/client";
 import type { WorkflowDetail } from "~/api/types";
 import { useSession } from "~/session";
 import { AppFrame } from "~/shell/AppFrame";
@@ -71,17 +85,21 @@ import { createBuilderStore, type BuilderStore } from "./store";
 import {
   freeControlPort,
   lastStep,
-  placeNewStep,
+  branchConditionAfter,
+  centreToShow,
+  quickAddPlan,
   readRecentKinds,
   rememberRecentKind,
   suggestNext,
 } from "./quickAdd";
 import { useCompiler } from "./useCompiler";
+import { useDraftSave } from "./useDraftSave";
+import { newStepConfig } from "./stepConfig";
 import { useLiveRun } from "./useLiveRun";
 import { describeInputIssue, describeRunError, type RunStartError } from "./errors";
 import { diagnosticNodeId, presentDiagnostic } from "./diagnostics";
 import { RunResult } from "./RunResult";
-import { WorkflowPanel } from "./WorkflowPanel";
+import { WorkflowPanel, type ExecutionField } from "./WorkflowPanel";
 import { useGuideContext } from "~/guide/GuideProvider";
 import { explainRun } from "~/guide/explain";
 import { NodeInspector } from "./NodeInspector";
@@ -91,10 +109,9 @@ import { agentPaletteDescription, agentPresetKind, agentStepFor, presetIdOf } fr
 import { activeAgentsKey } from "~/agents/AgentActiveSwitch";
 import type { AgentPreset } from "~/agents/logic";
 import { PublishDialog } from "./PublishDialog";
+import { CodeExportDialog } from "~/workflows/CodeExport";
 import { RunTab, missingRequired } from "./RunTab";
 import { CostTab, ReviewTab, advisorAvailability, costDiagnostics, useAdvisor } from "./advisor";
-
-const AUTOSAVE_MS = 1000;
 
 export interface BuilderProps {
   workflow: WorkflowDetail;
@@ -110,6 +127,19 @@ export function Builder({ workflow, manifests, tools }: BuilderProps) {
       draftRevision: workflow.draftRevision,
     }),
   );
+  // A newer draft on the server (restored from a version, saved in another tab) replaces this one
+  // while nothing here is unsaved. The builder's own saves are already at the server's revision,
+  // so a publish or a refetch leaves the canvas, the run view and the run input as they are.
+  useEffect(() => {
+    const st = store.getState();
+    if (
+      workflow.draftRevision > st.draftRevision &&
+      st.version === st.savedVersion &&
+      !st.saving &&
+      !st.conflict
+    )
+      st.replaceDefinition(workflow.draft, workflow.draftRevision);
+  }, [store, workflow.draft, workflow.draftRevision]);
   return <BuilderView store={store} workflow={workflow} manifests={manifests} tools={tools} />;
 }
 
@@ -231,6 +261,15 @@ function BuilderView({
   const clearSelection = useCallback(
     () => store.getState().select({ nodes: [], edges: [] }),
     [store],
+  );
+  // "Set a cost limit" on a problem: the workflow panel, opened at that Execution field
+  const [panelFocus, setPanelFocus] = useState<{ field: ExecutionField; n: number } | null>(null);
+  const openExecution = useCallback(
+    (field: ExecutionField) => {
+      clearSelection();
+      setPanelFocus((cur) => ({ field, n: (cur?.n ?? 0) + 1 }));
+    },
+    [clearSelection],
   );
   const advisorOn = advisorAvailability(s.features, !readOnly).advisor;
   const advisor = useAdvisor({ workflowId: workflow.id, store, enabled: advisorOn });
@@ -478,28 +517,33 @@ function BuilderView({
     ],
     [catalog, activeAgents.data],
   );
-  // Quick add: a new step follows the selected one (placed beside it and connected from its
-  // first free port); otherwise it goes where asked, moved clear of other steps.
+  // Quick add: a new step follows the selected one, or with nothing selected the step the
+  // palette's suggestions were for (placed beside it, unless the palette opened at a right-click,
+  // and connected from its first free port); the view then pans to it if it is out of sight.
   const [recentKinds, setRecentKinds] = useState<string[]>(readRecentKinds);
+  const [keepInView, setKeepInView] = useState<{
+    rect: { x: number; y: number; w: number; h: number };
+    n: number;
+  } | null>(null);
   const keySources = useKeySources();
   const addNode = useCallback(
-    (def: NodeDefinitionView, position: { x: number; y: number }) => {
+    (def: NodeDefinitionView, wanted: { x: number; y: number }, origin: "pointer" | "view") => {
       const st = store.getState();
       const d = st.definition;
-      const sel = st.selection.nodes.length === 1 ? st.selection.nodes[0] : undefined;
-      const after = sel ? d.nodes.find((n) => n.id === sel) : undefined;
+      const { after, position } = quickAddPlan(d, st.selection.nodes, wanted, origin);
       const presetId = presetIdOf(def.kind);
       const preset = presetId ? activeAgents.data?.find((a) => a.id === presetId) : undefined;
       const node = preset
         ? agentStepFor(d, preset, catalog, after?.parent)
-        : newNode(
-            d,
-            def.kind,
-            catalog,
-            (schema) => withDefaults(schema as never, {}),
-            after?.parent,
-          );
+        : newNode(d, def.kind, catalog, newStepConfig, after?.parent);
       if (!node) return;
+      // a Branch after a yes/no decision routes on its answer from the start
+      const when = branchConditionAfter(
+        after,
+        after?.kind === "task" ? catalog.get(after.type)?.decision?.kind : undefined,
+      );
+      if (node.kind === "branch" && when && node.cases[0])
+        node.cases[0] = { ...node.cases[0], when };
       const port = after
         ? freeControlPort(d, after, defaultControlOuts(after, catalog))
         : undefined;
@@ -512,49 +556,23 @@ function BuilderView({
         node.credentials = { ...bound.credentials, ...node.credentials };
       st.addNode(
         node,
-        placeNewStep(d, position, after),
+        position,
         after && port ? { node: after.id, port } : undefined,
         bound?.declare,
       );
       setRecentKinds((prev) => rememberRecentKind(prev, def.kind));
+      // a step inside a container sits relative to its frame: leave the view alone there
+      if (!node.parent)
+        setKeepInView((cur) => ({
+          rect: { ...position, w: NODE_WIDTH, h: 96 },
+          n: (cur?.n ?? 0) + 1,
+        }));
     },
     [store, catalog, keySources, activeAgents.data],
   );
 
-  // --- save (autosave, ⌘S, before run/publish) ---
-  const saveNow = useCallback(async (): Promise<void> => {
-    const st = store.getState();
-    if (st.version === st.savedVersion || st.conflict) return;
-    const sent = st.version;
-    st.setSaving(true);
-    try {
-      const res = await put<{ draftRevision: number }>(
-        `/v1/workflows/${workflow.id}/draft`,
-        { definition: st.definition },
-        { headers: { "if-match": `"${st.draftRevision}"` } },
-      );
-      store.getState().markSaved(res.draftRevision, sent);
-    } catch (e) {
-      if (e instanceof ApiError && e.status === 412) {
-        const theirs = await get<WorkflowDetail>(`/v1/workflows/${workflow.id}`);
-        store.getState().setConflict({ theirs: theirs.draft, revision: theirs.draftRevision });
-      } else store.getState().setSaving(false, e instanceof Error ? e.message : "save failed");
-      throw e;
-    }
-  }, [store, workflow.id]);
-  useEffect(() => {
-    if (readOnly || version === savedVersion || saving || conflict) return;
-    const t = setTimeout(() => void saveNow().catch(() => undefined), AUTOSAVE_MS);
-    return () => clearTimeout(t);
-  }, [version, savedVersion, saving, conflict, readOnly, saveNow]);
-  useEffect(() => {
-    const guard = (e: BeforeUnloadEvent) => {
-      const st = store.getState();
-      if (st.version !== st.savedVersion) e.preventDefault();
-    };
-    window.addEventListener("beforeunload", guard);
-    return () => window.removeEventListener("beforeunload", guard);
-  }, [store]);
+  // --- save (autosave, ⌘S, before run/publish, and on the way out) ---
+  const saveNow = useDraftSave({ store, workflowId: workflow.id, ws: s.ws, enabled: !readOnly });
   useEffect(() => {
     if (notice) toast(notice.message);
   }, [notice]);
@@ -626,6 +644,7 @@ function BuilderView({
 
   // --- panels ---
   const [publishOpen, setPublishOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const selectedId = selection.nodes.length === 1 ? selection.nodes[0] : undefined;
   // what to suggest in the palette: after the selected step, else after the last step
@@ -712,6 +731,7 @@ function BuilderView({
         readOnly={readOnly}
         name={title}
         {...(!readOnly ? { onRename: renameWorkflow } : {})}
+        {...(panelFocus ? { focus: panelFocus } : {})}
         onDescribe={(description) =>
           void patch(`/v1/workflows/${workflow.id}`, { description })
             .then(() => qc.invalidateQueries({ queryKey: ["workflows", s.ws] }))
@@ -737,6 +757,17 @@ function BuilderView({
           ) : shown.remedy === "knowledge" ? (
             <Button size="sm" variant="ghost" asChild>
               <Link href={`/${s.ws}/knowledge`}>Knowledge</Link>
+            </Button>
+          ) : (shown.remedy === "cost-limit" || shown.remedy === "time-limit") && !readOnly ? (
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                beforeShow?.();
+                openExecution(shown.remedy === "cost-limit" ? "max-cost" : "timeout");
+              }}
+            >
+              {shown.remedy === "cost-limit" ? "Set a cost limit" : "Set the run time limit"}
             </Button>
           ) : null}
           {nodeId ? (
@@ -937,6 +968,7 @@ function BuilderView({
       running={starting || live?.status === "running" || live?.status === "queued"}
       {...(s.can("workflows:publish") ? { onPublish: () => setPublishOpen(true) } : {})}
       onExportJson={exportJson}
+      onDownloadCode={() => setExportOpen(true)}
       {...(s.can("workflows:write")
         ? {
             onDuplicate: () =>
@@ -964,6 +996,12 @@ function BuilderView({
           label: "Export definition (JSON)",
           icon: <Download strokeWidth={1.75} />,
           onSelect: exportJson,
+        },
+        {
+          id: "download-code",
+          label: "Download code",
+          icon: <FolderDown strokeWidth={1.75} />,
+          onSelect: () => setExportOpen(true),
         },
         ...(advisorOn
           ? [
@@ -1007,9 +1045,11 @@ function BuilderView({
       ]}
     >
       <div className="flex h-full flex-col">
+        {/* the page's heading for screen readers; the top bar shows the name */}
+        <h1 className="sr-only">{title}</h1>
         <OpenInspectorOnSelect
           nodeId={selection.nodes.length === 1 ? selection.nodes[0] : undefined}
-          reveal={reveal?.n ?? 0}
+          reveal={(reveal?.n ?? 0) + (panelFocus?.n ?? 0)}
         />
         <WorkflowTabs workflowId={workflow.id} active="builder" />
         <div className="min-h-0 flex-1">
@@ -1044,10 +1084,26 @@ function BuilderView({
             fitViewOnInit
           >
             <FocusNode request={reveal} />
+            <KeepInView request={keepInView} />
           </FlowCanvas>
         </div>
       </div>
 
+      <CodeExportDialog
+        open={exportOpen}
+        onOpenChange={setExportOpen}
+        workflow={{ id: workflow.id, name: title, slug: workflow.slug }}
+        defaultTarget="draft"
+        draft={{
+          saveDraft: saveNow,
+          describe: (d) => {
+            const parsed = DiagnosticSchema.safeParse(d);
+            if (!parsed.success) return d.message;
+            const shown = presentDiagnostic(parsed.data, definition);
+            return `${shown.where ? `${shown.where}: ` : ""}${shown.message}`;
+          },
+        }}
+      />
       <PublishDialog
         open={publishOpen}
         onOpenChange={setPublishOpen}
@@ -1134,10 +1190,34 @@ function OpenInspectorOnSelect({ nodeId, reveal }: { nodeId: string | undefined;
   useEffect(() => {
     if (compact && nodeId) open?.(true);
   }, [compact, nodeId, open]);
-  // "Show node" opens the inspector even where the person had closed it
+  // "Show node" (and "Set a cost limit") opens the inspector even where the person had closed it
   useEffect(() => {
     if (reveal > 0) open?.(true);
   }, [reveal, open]);
+  return null;
+}
+
+/**
+ * Pans, at the same zoom, to a step just added when it landed out of sight (beside a step at the
+ * edge of the view, or under a panel); a step already in view leaves the canvas where it is.
+ */
+function KeepInView({
+  request,
+}: {
+  request: { rect: { x: number; y: number; w: number; h: number }; n: number } | null;
+}) {
+  const flow = useReactFlow();
+  const width = useXyStore((s) => s.width);
+  const height = useXyStore((s) => s.height);
+  useEffect(() => {
+    if (!request) return;
+    const view = flow.getViewport();
+    const centre = centreToShow(request.rect, view, { width, height });
+    if (!centre) return;
+    const still = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+    void flow.setCenter(centre.x, centre.y, { zoom: view.zoom, duration: still ? 0 : 240 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per added step, not per resize
+  }, [request, flow]);
   return null;
 }
 

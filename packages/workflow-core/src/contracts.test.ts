@@ -258,7 +258,7 @@ describe("package surface", () => {
     ] as const;
     for (const name of expectedValues) expect(core[name], name).toBeDefined();
     expect(WORKFLOW_SCHEMA_URI).toBe("https://flowaid.dev/schemas/workflow/v1");
-    expect(DiagnosticCodeSchema.options.length).toBe(97);
+    expect(DiagnosticCodeSchema.options.length).toBe(98);
   });
 
   it("exposes the FlowExpr, template and subschema entry points with their contract arities", () => {

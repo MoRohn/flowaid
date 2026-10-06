@@ -13,6 +13,7 @@ export default defineConfig({
   test: {
     name: "web",
     environment: "happy-dom",
+    setupFiles: ["./vitest.setup.ts"],
     include: ["src/**/*.test.{ts,tsx}"],
     css: false,
   },

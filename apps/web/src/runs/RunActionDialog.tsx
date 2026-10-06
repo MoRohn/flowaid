@@ -2,7 +2,8 @@
 /**
  * Confirm dialogs for the run actions (API.md §3.4, ARCHITECTURE.md §5.9): replay (re-execute or
  * reuse recorded results), fork onto the draft or the run's version with a patched input, restart
- * from a node with its inputs optionally overridden, and retry a failed node in place.
+ * from a node with its inputs optionally overridden, retry a failed node in place, and cancel
+ * (it can't be undone, so it asks first and takes an optional reason).
  */
 import { useState } from "react";
 import { ConfirmDialog, FieldRow, RadioGroup, RadioItem, Textarea } from "@flowaid/ui/primitives";
@@ -18,7 +19,9 @@ export type RunAction =
       versions?: readonly { id: string; version: number }[];
     }
   | { kind: "restart"; nodeId: string; nodeName: string; scope?: string }
-  | { kind: "retry"; nodeRunId: string; nodeName: string };
+  | { kind: "retry"; nodeRunId: string; nodeName: string }
+  /** `waitingFor`: the person's step the run waits on, named in the warning. */
+  | { kind: "cancel"; waitingFor?: string };
 
 export interface RunActionRequest {
   path: string;
@@ -67,6 +70,7 @@ function ActionForm({
   );
   const [json, setJson] = useState(action.kind === "fork" ? pretty(action.input) : "");
   const [busy, setBusy] = useState(false);
+  const [reason, setReason] = useState("");
 
   const parsed = parseObject(json);
   const base = `/v1/runs/${runId}`;
@@ -93,6 +97,8 @@ function ActionForm({
         };
       case "retry":
         return { path: `${base}/node-runs/${action.nodeRunId}/retry` };
+      case "cancel":
+        return { path: `${base}/cancel`, body: reason.trim() ? { reason: reason.trim() } : {} };
     }
   };
   const confirm = async () => {
@@ -132,6 +138,15 @@ function ActionForm({
         "Reopens this failed run and executes the node again, then continues from its result. No new run is created. Use it for passing errors such as a timeout; a wrong setting fails the same way, so fix the draft and fork this run onto it instead.",
       confirm: "Retry node",
     },
+    cancel: {
+      title: "Cancel this run?",
+      description: `Steps that are running finish their current call; nothing after them starts${
+        action.kind === "cancel" && action.waitingFor
+          ? `, and the task waiting on “${action.waitingFor}” closes unanswered`
+          : ", and any task waiting for a person closes"
+      }. This can't be undone: Replay starts the same request again from the beginning.`,
+      confirm: "Cancel run",
+    },
   }[action.kind];
 
   return (
@@ -143,6 +158,9 @@ function ActionForm({
       title={copy.title}
       description={copy.description}
       confirmLabel={copy.confirm}
+      {...(action.kind === "cancel"
+        ? { variant: "danger" as const, cancelLabel: "Keep running" }
+        : {})}
       loading={busy}
       confirmDisabled={Boolean(parsed.error)}
       onConfirm={() => void confirm()}
@@ -193,6 +211,23 @@ function ActionForm({
             />
           </FieldRow>
         </div>
+      ) : null}
+      {action.kind === "cancel" ? (
+        <FieldRow
+          label="Reason"
+          optional
+          hint="Kept with the run: its Events and the audit log show it."
+        >
+          <Textarea
+            autoGrow
+            minRows={2}
+            maxRows={6}
+            maxLength={500}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="Why stop it now?"
+          />
+        </FieldRow>
       ) : null}
       {action.kind === "restart" ? (
         <FieldRow

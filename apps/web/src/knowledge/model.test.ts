@@ -8,7 +8,14 @@ import {
   sourceFormError,
   sourceTone,
   embeddingOptions,
+  formOf,
   indexingErrorFix,
+  indexingErrorText,
+  isWorking,
+  sourcePatch,
+  UPLOAD_LIMIT_BYTES,
+  uploadSizeError,
+  type KnowledgeSource,
 } from "./model";
 
 describe("knowledge source form", () => {
@@ -93,6 +100,109 @@ describe("embeddingOptions", () => {
 
   it("marks nothing ready without a key", () => {
     expect(embeddingOptions(models, [], new Set()).every((o) => !o.ready)).toBe(true);
+  });
+});
+
+describe("a source's settings", () => {
+  const saved: KnowledgeSource = {
+    id: "s1",
+    name: "Docs",
+    kind: "github",
+    config: { repo: "acme/docs", path: "docs", maxFiles: 50 },
+    pipeline: {
+      chunker: { strategy: "markdown", chunkTokens: 300, overlapTokens: 40 },
+      embedding: { provider: "google", model: "gemini-embedding-001" },
+      index: { adapter: "pgvector" },
+      embeddingCredentialId: "cred-g",
+    } as KnowledgeSource["pipeline"],
+    credentialId: null,
+    status: "ready",
+    stats: {},
+    documents: 3,
+    chunks: 12,
+    lastSyncAt: null,
+    lastError: null,
+    createdAt: "",
+    updatedAt: "",
+  };
+
+  it("opens on the saved values and sends nothing when nothing changed", () => {
+    const f = formOf(saved);
+    expect(f).toMatchObject({
+      name: "Docs",
+      repo: "acme/docs",
+      path: "docs",
+      strategy: "markdown",
+      chunkTokens: 300,
+      embeddingProvider: "google",
+    });
+    expect(sourcePatch(saved, f)).toEqual({ body: {}, reindex: false, refetch: false });
+    // a rename alone indexes nothing again
+    expect(sourcePatch(saved, { ...f, name: " Handbook " })).toEqual({
+      body: { name: "Handbook" },
+      reindex: false,
+      refetch: false,
+    });
+  });
+
+  it("re-indexes for new chunking or search, keeping what the form doesn't show", () => {
+    const f = formOf(saved);
+    const keyword = sourcePatch(saved, { ...f, embeddingProvider: "", embeddingModel: "" });
+    expect(keyword.reindex).toBe(true);
+    // the old provider's credential goes; the index adapter stays
+    expect(keyword.body.pipeline).toEqual({
+      chunker: { strategy: "markdown", chunkTokens: 300, overlapTokens: 40 },
+      embedding: null,
+      index: { adapter: "pgvector" },
+    });
+    const bigger = sourcePatch(saved, { ...f, chunkTokens: 600 });
+    expect(bigger.body.pipeline).toMatchObject({
+      chunker: { chunkTokens: 600 },
+      embeddingCredentialId: "cred-g",
+    });
+  });
+
+  it("fetches again for new addresses, keeping config the form doesn't show", () => {
+    const moved = sourcePatch(saved, { ...formOf(saved), path: "" });
+    expect(moved).toEqual({
+      body: { config: { repo: "acme/docs", maxFiles: 50 } },
+      reindex: false,
+      refetch: true,
+    });
+  });
+});
+
+describe("knowledge details", () => {
+  const base = { kind: "text" as const, status: "new" as const, documents: 0 };
+
+  it("polls only a source that is working, not an empty upload source", () => {
+    // it used to poll forever while an upload source waited for its first document
+    expect(isWorking(base)).toBe(false);
+    expect(isWorking({ ...base, documents: 2 })).toBe(true);
+    expect(isWorking({ ...base, kind: "url" })).toBe(true);
+    expect(isWorking({ ...base, status: "syncing" })).toBe(true);
+    expect(isWorking({ ...base, kind: "pageindex", status: "syncing" })).toBe(false);
+  });
+
+  it("refuses an upload bigger than one request takes", () => {
+    expect(uploadSizeError([{ title: "a", text: "short" }])).toBeNull();
+    expect(uploadSizeError([{ title: "a", text: "x".repeat(UPLOAD_LIMIT_BYTES + 1) }])).toMatch(
+      /split it into smaller files/,
+    );
+    const half = "x".repeat(UPLOAD_LIMIT_BYTES / 2 + 10);
+    expect(
+      uploadSizeError([
+        { title: "a", text: half },
+        { title: "b", text: half },
+      ]),
+    ).toMatch(/a few at a time/);
+  });
+
+  it("puts a missing embedding key in plain words", () => {
+    expect(indexingErrorText("No google.api_key credential is bound for google")).toMatch(
+      /^Google has no API key in this workspace/,
+    );
+    expect(indexingErrorText("fetch failed")).toBe("fetch failed");
   });
 });
 
