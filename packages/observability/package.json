@@ -38,11 +38,11 @@
     "@opentelemetry/resources": "2.11.0",
     "@opentelemetry/sdk-metrics": "2.11.0",
     "@opentelemetry/sdk-trace": "2.11.0",
-    "pino": "10.3.1"
+    "pino": "10.4.0"
   },
   "devDependencies": {
     "@flowaid/config": "workspace:*",
-    "@types/node": "24.13.6",
+    "@types/node": "24.19.1",
     "eslint": "9.39.5",
     "typescript": "5.9.3",
     "vitest": "4.1.11"
