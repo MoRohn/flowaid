@@ -18,6 +18,7 @@
 </p>
 
 <p align="center">
+  <a href="https://morohn.github.io/flowaid/">Website</a> ·
   <a href="#quick-start">Quick start</a> ·
   <a href="#business-flows">Business flows</a> ·
   <a href="#product-tour">Product tour</a> ·
@@ -334,6 +335,7 @@ packages/
                         importer, insights, jev, knowledge, langchain, mcp, observability,
                         openapi-tools, pageindex, plugins, sandbox, shared, storage
 brand/                  Identity: logo, design tokens, fonts, style guide
+site/                   Landing page, deployed to GitHub Pages
 docker/                 Compose stack and the Dockerfile (api, worker, web targets)
 docs/                   Guides, design, operations, project history (index: docs/README.md)
 e2e/                    The browser acceptance journey (the release gate)
