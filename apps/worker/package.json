@@ -1,6 +1,6 @@
 {
   "name": "@flowaid/worker",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "private": true,
   "description": "The flowaid worker: consumes run jobs, drives the orchestrator over Postgres, executes nodes with providers, tools (MCP, OpenAPI), state, artifacts and the sandbox, fires timers and schedules (ARCHITECTURE.md \u00a75, \u00a78).",
   "license": "Apache-2.0",
