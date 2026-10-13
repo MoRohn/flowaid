@@ -16,7 +16,7 @@ node site/build.mjs
 
 Output is `site/dist/`. Asset URLs are relative, so the same files work at the domain root and under the `/flowaid/` project path. `SITE_URL` overrides the canonical and social URLs (the Pages workflow passes the `base_url` from `actions/configure-pages`).
 
-`node site/build.mjs --og` re-renders `site/og.png` from `site/og.html` with Chrome.
+`node site/build.mjs --og` re-renders `site/og.png` from `site/og.html` with Chrome. The card is 1200×630: the lockup, the tagline, the probability ruler, and the overview screenshot. The built page points `og:image`, `og:url` and `twitter:image` at absolute `https://` URLs, and the Pages artifact includes `og.png`.
 
 ## Preview
 

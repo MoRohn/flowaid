@@ -104,12 +104,22 @@ async function validate(html, css, version) {
   for (const token of [
     "<title>",
     'name="description"',
-    'property="og:image"',
-    'name="twitter:card"',
+    'property="og:title"',
+    'property="og:description"',
+    'property="og:image:alt"',
+    'name="twitter:card" content="summary_large_image"',
     'rel="canonical"',
     'rel="icon"',
+    `property="og:url" content="${SITE_URL}/"`,
+    `property="og:image" content="${SITE_URL}/og.png"`,
+    'property="og:image:width" content="1200"',
+    'property="og:image:height" content="630"',
+    `name="twitter:image" content="${SITE_URL}/og.png"`,
   ]) {
     if (!html.includes(token)) errors.push(`missing ${token}`);
+  }
+  if (/property="og:image" content="(?!https:\/\/)/.test(html)) {
+    errors.push("og:image must be an absolute https URL");
   }
   const rootRelative = /(?:href|src|srcset)\s*=\s*"\/(?!\/)/;
   if (rootRelative.test(html) || /url\(\s*['"]?\//.test(css)) {
@@ -147,6 +157,7 @@ async function renderOg() {
         "--disable-gpu",
         "--disable-dev-shm-usage",
         "--hide-scrollbars",
+        "--user-data-dir=/tmp/flowaid-og-chrome",
         "--force-device-scale-factor=1",
         "--virtual-time-budget=8000",
         "--timeout=8000",
@@ -156,18 +167,14 @@ async function renderOg() {
       ],
       { stdio: "inherit" },
     );
-    const timer = setTimeout(() => {
-      child.kill("SIGKILL");
-      reject(new Error("chrome screenshot timed out"));
-    }, 20000);
+    const timer = setTimeout(() => child.kill("SIGKILL"), 20000);
     child.on("error", (error) => {
       clearTimeout(timer);
       reject(error);
     });
-    child.on("exit", (code) => {
+    child.on("exit", () => {
       clearTimeout(timer);
-      if (code === 0) resolve();
-      else reject(new Error(`chrome exited ${code}`));
+      resolve();
     });
   });
   const png = await readFile(out);

@@ -33,7 +33,17 @@
         box-sizing: border-box;
         width: 1200px;
         height: 630px;
-        padding: 72px 80px 64px;
+        padding: 52px 48px 48px 56px;
+        display: flex;
+        align-items: stretch;
+        gap: 40px;
+        background:
+          linear-gradient(#2f5be8, #2f5be8) left / 8px 100% no-repeat,
+          #f5f5f7;
+      }
+      .copy {
+        flex: 1;
+        min-width: 0;
         display: flex;
         flex-direction: column;
       }
@@ -43,35 +53,34 @@
         gap: 16px;
       }
       .lockup img.mark {
-        width: 56px;
-        height: 56px;
+        width: 64px;
+        height: 64px;
       }
       .lockup img.word {
-        height: 28px;
+        height: 32px;
         width: auto;
       }
       .eyebrow {
-        margin: 36px 0 0;
+        margin: 28px 0 0;
         font-family: "JetBrains Mono", monospace;
-        font-size: 14px;
+        font-size: 15px;
         font-weight: 500;
         letter-spacing: 0.08em;
         text-transform: uppercase;
         color: #5f5f69;
       }
       h1 {
-        margin: 14px 0 0;
-        max-width: 16em;
-        font-size: 52px;
+        margin: 16px 0 0;
+        font-size: 36px;
         font-weight: 600;
         letter-spacing: -0.035em;
-        line-height: 1.05;
+        line-height: 1.12;
       }
       .ruler {
         display: flex;
         gap: 4px;
         height: 10px;
-        width: 520px;
+        width: 100%;
         margin-top: auto;
       }
       .ruler i {
@@ -81,7 +90,7 @@
       .legend {
         display: flex;
         gap: 4px;
-        width: 520px;
+        width: 100%;
         margin: 8px 0 0;
         font-family: "JetBrains Mono", monospace;
         font-size: 13px;
@@ -94,28 +103,49 @@
       .legend span:first-child {
         color: #2450d6;
       }
+      .frame {
+        flex: none;
+        width: 548px;
+        border-radius: 14px;
+        border: 1px solid #e3e3e8;
+        background: #ffffff;
+        overflow: hidden;
+        box-shadow: 0 16px 40px rgba(23, 23, 28, 0.1);
+      }
+      .frame img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: left top;
+      }
     </style>
   </head>
   <body>
     <div class="card">
-      <div class="lockup">
-        <img class="mark" src="../brand/logo-mark-accent.svg" alt="" />
-        <img class="word" src="../brand/logo-wordmark.svg" alt="FlowAId" />
+      <div class="copy">
+        <div class="lockup">
+          <img class="mark" src="../brand/logo-mark-accent.svg" alt="" />
+          <img class="word" src="../brand/logo-wordmark.svg" alt="FlowAId" />
+        </div>
+        <p class="eyebrow">Public beta · open source</p>
+        <h1>Build, run and evaluate AI agents and workflows on your own computer, with typed decisions you can inspect, verify and trust.</h1>
+        <div class="ruler" aria-hidden="true">
+          <i style="flex: 81; background: #2f5be8"></i>
+          <i style="flex: 12; background: #8aa6f4"></i>
+          <i style="flex: 4; background: #c6d4fa"></i>
+          <i style="flex: 3; background: #e6ecfb"></i>
+        </div>
+        <p class="legend" aria-hidden="true">
+          <span style="flex: 81">security 0.81</span>
+          <span style="flex: 12">technical 0.12</span>
+          <span style="flex: 4">0.04</span>
+          <span style="flex: 3">0.03</span>
+        </p>
       </div>
-      <p class="eyebrow">Public beta · open source</p>
-      <h1>Build, run and evaluate AI agents and workflows on your own computer, with typed decisions you can inspect, verify and trust.</h1>
-      <div class="ruler" aria-hidden="true">
-        <i style="flex: 81; background: #2f5be8"></i>
-        <i style="flex: 12; background: #8aa6f4"></i>
-        <i style="flex: 4; background: #c6d4fa"></i>
-        <i style="flex: 3; background: #e6ecfb"></i>
+      <div class="frame">
+        <img src="../docs/assets/screenshots/overview-light.webp" alt="" />
       </div>
-      <p class="legend" aria-hidden="true">
-        <span style="flex: 81">security 0.81</span>
-        <span style="flex: 12">technical 0.12</span>
-        <span style="flex: 4">0.04</span>
-        <span style="flex: 3">0.03</span>
-      </p>
     </div>
   </body>
 </html>
