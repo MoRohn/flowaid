@@ -1,0 +1,642 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FlowAId — Build, run and evaluate AI agents and workflows</title>
+    <meta
+      name="description"
+      content="Open-source platform for building, running and evaluating AI agents and workflows on your own computer, with typed decisions you can inspect, verify and trust. No account and no sign-in. Public beta."
+    />
+    <link rel="canonical" href="__SITE_URL__/" />
+    <meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0e0e11" media="(prefers-color-scheme: dark)" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="FlowAId" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:title" content="FlowAId — Build, run and evaluate AI agents and workflows" />
+    <meta
+      property="og:description"
+      content="Open-source platform for building, running and evaluating AI agents and workflows on your own computer, with typed decisions you can inspect, verify and trust."
+    />
+    <meta property="og:url" content="__SITE_URL__/" />
+    <meta property="og:image" content="__SITE_URL__/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="FlowAId. Build, run and evaluate AI agents and workflows on your own computer, with typed decisions you can inspect, verify and trust."
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="FlowAId — Build, run and evaluate AI agents and workflows" />
+    <meta
+      name="twitter:description"
+      content="Open-source platform for building, running and evaluating AI agents and workflows on your own computer, with typed decisions you can inspect, verify and trust."
+    />
+    <meta name="twitter:image" content="__SITE_URL__/og.png" />
+    <meta
+      name="twitter:image:alt"
+      content="FlowAId. Build, run and evaluate AI agents and workflows on your own computer, with typed decisions you can inspect, verify and trust."
+    />
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <link rel="manifest" href="site.webmanifest" />
+    <link rel="preload" href="fonts/InstrumentSans-Regular.ttf" as="font" type="font/ttf" crossorigin />
+    <link rel="preload" href="fonts/InstrumentSans-SemiBold.ttf" as="font" type="font/ttf" crossorigin />
+    <link rel="stylesheet" href="tokens.css" />
+    <link rel="stylesheet" href="styles.css" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareSourceCode",
+        "name": "FlowAId",
+        "description": "Open-source platform for building, running and evaluating AI agents and workflows on your own computer, with typed decisions you can inspect, verify and trust.",
+        "url": "__SITE_URL__/",
+        "codeRepository": "https://github.com/MoRohn/flowaid",
+        "license": "https://www.apache.org/licenses/LICENSE-2.0",
+        "programmingLanguage": "TypeScript",
+        "runtimePlatform": "Node.js 24+",
+        "version": "__FLOWAID_VERSION__",
+        "operatingSystem": "macOS, Windows, Linux",
+        "isAccessibleForFree": true,
+        "image": "__SITE_URL__/og.png"
+      }
+    </script>
+    <script>
+      try {
+        var queryTheme = new URLSearchParams(location.search).get("theme");
+        var stored = localStorage.getItem("flowaid-theme");
+        var theme = queryTheme === "light" || queryTheme === "dark" ? queryTheme : stored;
+        if (theme === "light" || theme === "dark") document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {}
+    </script>
+  </head>
+  <body id="top">
+    <a class="skip" href="#content">Skip to content</a>
+    <svg class="sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">__SPRITE__</svg>
+
+    <header class="bar">
+      <div class="wrap bar-inner">
+        <a class="brand" href="#top">
+          <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><use href="#mark" /></svg>
+          <svg class="wordmark" viewBox="4.2 -74 348.2 77" aria-label="FlowAId" role="img">
+            <use href="#wordmark" />
+          </svg>
+        </a>
+        <button class="btn icon nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav">
+          <svg class="icon-menu" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+            <path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11" />
+          </svg>
+          <svg class="icon-close" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+            <path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" d="M4 4l8 8M12 4l-8 8" />
+          </svg>
+          <span class="sr-only nav-toggle-label">Menu</span>
+        </button>
+        <nav id="site-nav" class="nav" aria-label="Sections">
+          <a href="#start">Start</a>
+          <a href="#idea">Idea</a>
+          <a href="#flows">Flows</a>
+          <a href="#tour">Tour</a>
+          <a href="#capabilities">Capabilities</a>
+          <a href="#deploy">Deploy</a>
+        </nav>
+        <div class="bar-actions">
+          <button class="btn icon" type="button" id="theme-toggle" aria-label="Toggle color theme" aria-pressed="false">
+            <svg class="icon-moon" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+              <path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" d="M10.2 2.2a5.2 5.2 0 1 0 3.6 8.8 4.4 4.4 0 0 1-3.6-8.8Z" />
+            </svg>
+            <svg class="icon-sun" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+              <circle cx="8" cy="8" r="2.3" fill="none" stroke="currentColor" stroke-width="1.5" />
+              <path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" d="M8 1.6v1.5M8 12.9v1.5M1.6 8h1.5M12.9 8h1.5M3.5 3.5l1.1 1.1M11.4 11.4l1.1 1.1M12.5 3.5l-1.1 1.1M4.6 11.4l-1.1 1.1" />
+            </svg>
+          </button>
+          <a class="btn" href="https://github.com/MoRohn/flowaid">
+            <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
+              <path fill="currentColor" d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z" />
+            </svg>
+            <span class="label-long">Star on GitHub</span>
+            <span class="label-short">Star</span>
+            <span class="count" data-stars hidden></span>
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <main id="content">
+      <section class="hero" id="start">
+        <div class="wrap">
+          <svg class="mark hero-mark" viewBox="0 0 32 32" aria-hidden="true"><use href="#mark" /></svg>
+          <p class="release">
+            <span class="chip">Public beta</span>
+            <a class="ver" data-version href="https://github.com/MoRohn/flowaid/blob/main/CHANGELOG.md">__FLOWAID_VERSION__</a>
+          </p>
+          <h1>Build, run and evaluate AI agents and workflows on your own computer, with typed decisions you can inspect, verify and trust.</h1>
+          <p class="lead">
+            FlowAId is an open-source platform for building, running and evaluating AI agents and workflows. It runs on your own computer with one command, with no account and no sign-in, and the same stack deploys to a server with Docker Compose.
+          </p>
+          <p class="facts">
+            <span>Local-first</span>
+            <span>No sign-in</span>
+            <span>Apache 2.0</span>
+            <span>Node.js 24+</span>
+            <span>TypeScript strict</span>
+          </p>
+          <div class="actions">
+            <a class="btn primary" href="https://github.com/MoRohn/flowaid">
+              <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
+                <path fill="currentColor" d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z" />
+              </svg>
+              Star on GitHub
+              <span class="count" data-stars hidden></span>
+            </a>
+            <a class="btn" href="#docs">Documentation</a>
+          </div>
+
+          <div class="code">
+            <div class="code-bar">
+              <p class="code-label">Quick start</p>
+              <button class="btn small" type="button" data-copy="cmd-start">Copy</button>
+            </div>
+            <pre id="cmd-start"><code>git clone https://github.com/MoRohn/flowaid.git &amp;&amp; cd flowaid
+./flowaid          <span class="cmt"># Windows: flowaid</span></code></pre>
+          </div>
+          <p class="intro">
+            You need <strong>Node.js 24+</strong>, <strong>pnpm 12</strong> (<code>corepack enable</code>), <strong>Docker</strong> (for the database) and <strong>Git</strong>, on macOS, Windows or Linux. FlowAId installs what it needs, starts PostgreSQL with pgvector in Docker, builds and starts the API, worker and web app, and opens <a href="http://flowaid.localhost:3000">http://flowaid.localhost:3000</a> in its own window, with an icon in the menu bar or system tray. There is no account to create.
+          </p>
+
+          <div class="ruler" role="img" aria-label="Probability ruler: security 0.81, technical 0.12, billing 0.04, sales 0.03">
+            <i style="flex: 81"></i><i style="flex: 12"></i><i style="flex: 4"></i><i style="flex: 3"></i>
+          </div>
+          <p class="ruler-legend" aria-hidden="true">
+            <span style="flex: 81">security 0.81</span>
+            <span style="flex: 12">technical 0.12</span>
+            <span style="flex: 4">0.04</span>
+            <span style="flex: 3">0.03</span>
+          </p>
+
+          <figure class="shot hero-shot">
+            <div class="frame">
+              <picture data-shot>
+                <source media="(prefers-color-scheme: dark)" srcset="assets/screenshots/templates-dark.webp" />
+                <img src="assets/screenshots/templates-light.webp" width="2320" height="978" alt="The Business flows section of the Templates page: Expense approval (finance), IT help desk routing (IT operations), Refund request handling (customer service) and Sales lead qualification (sales), each with a preview of its graph, what it does, and Ready to run with the TypeSafe API key" fetchpriority="high" decoding="async" />
+              </picture>
+            </div>
+            <figcaption>Business flows on the Templates page. Each one is ready to run with a TypeSafe API key.</figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <div class="wrap">
+        <aside class="note">
+          <p>
+            <strong>Public beta.</strong> The current release is <a data-version href="https://github.com/MoRohn/flowaid/blob/main/CHANGELOG.md">__FLOWAID_VERSION__</a> (see the <a href="https://github.com/MoRohn/flowaid/blob/main/CHANGELOG.md">Changelog</a>). Everything described here runs today, and every change is gated by the unit and PostgreSQL suites, an accessibility gallery and a browser acceptance journey against the production builds. Interfaces may still change before 1.0.
+          </p>
+        </aside>
+
+        <section id="quick-start">
+          <p class="eyebrow">Quick start</p>
+          <h2>One command, then make it yours.</h2>
+          <div class="split">
+            <div>
+              <p class="intro">Add a <a href="https://api.typesafe.ai">TypeSafe API key</a> to <code>.env.local</code> to enable decisions. OpenAI, Anthropic or a local Ollama (<code>OPENAI_API_KEY</code>, <code>ANTHROPIC_API_KEY</code>, <code>OLLAMA_HOST</code>) enable generation; everything else runs without any key.</p>
+              <div class="code">
+                <div class="code-bar">
+                  <p class="code-label">Decisions</p>
+                  <button class="btn small" type="button" data-copy="cmd-key">Copy</button>
+                </div>
+                <pre id="cmd-key"><code>echo "TYPESAFE_API_KEY=ts_…" &gt;&gt; .env.local</code></pre>
+              </div>
+              <figure class="shot shot-narrow">
+                <div class="frame">
+                  <picture data-shot>
+                    <source media="(prefers-color-scheme: dark)" srcset="assets/screenshots/closeup-desktop-menu-dark.webp" />
+                    <img src="assets/screenshots/closeup-desktop-menu-light.webp" width="594" height="370" alt="The FlowAId menu-bar menu: Open FlowAId, Show log, Restart and Quit." loading="lazy" decoding="async" />
+                  </picture>
+                </div>
+                <figcaption>An icon in the menu bar or system tray.</figcaption>
+              </figure>
+            </div>
+            <div>
+              <p class="intro">The Overview’s <em>Get started</em> checklist walks you through each step. Every page opens with a short <em>Start here</em> that checks what it needs, and <em>Guide</em> in the top bar explains the page you are on. Options, the desktop app and troubleshooting are in <a href="https://github.com/MoRohn/flowaid/blob/main/docs/guides/running-locally.md">Running FlowAId on your computer</a>.</p>
+            </div>
+          </div>
+          <ol class="steps">
+            <li><span class="n" aria-hidden="true">1</span> Pick a business flow under <em>Templates</em> and choose <em>Use template</em>.</li>
+            <li><span class="n" aria-hidden="true">2</span> Run it from the builder’s Run tab. The Output tab tells you how the run ended, and the trace shows every decision’s probabilities and cost.</li>
+            <li><span class="n" aria-hidden="true">3</span> Make it yours: click the empty canvas to rename it and change its settings, or select a step to edit it.</li>
+            <li><span class="n" aria-hidden="true">4</span> Publish and deploy a version, then call it from your code, a webhook, a schedule or an MCP client.</li>
+          </ol>
+        </section>
+
+        <section id="idea">
+          <p class="eyebrow">The central idea</p>
+          <h2>Decisions are typed data, not prose.</h2>
+          <p class="intro">Routing, classification, risk scoring and approval gates run on <a href="https://docs.typesafe.ai">TypeSafe AI’s Jev</a>, which returns a constrained answer with a calibrated probability distribution. Confidence then decides what happens next: act automatically, gather more evidence, or ask a person. Generative models write; code enforces the rules.</p>
+          <p class="intro">Every workflow is a typed document that is compiled, versioned and executed over an append-only event log. The visual builder, REST API, TypeScript SDK, CLI and MCP server are all clients of that one runtime.</p>
+          <div class="owners">
+            <article class="card">
+              <p class="kicker"><i class="dot" style="background: var(--cat-generation)"></i> Generative LLM</p>
+              <h3>Writes</h3>
+              <p>Replies, summaries, code, plans.</p>
+              <p class="where">Generation nodes (OpenAI, Anthropic, Google Gemini, Ollama, any compatible endpoint).</p>
+            </article>
+            <article class="card">
+              <p class="kicker"><i class="dot" style="background: var(--cat-decision)"></i> Jev</p>
+              <h3>Judges</h3>
+              <p>Which option, how severe, yes or no, with probabilities.</p>
+              <p class="where">Decision nodes bound to versioned decision contracts.</p>
+            </article>
+            <article class="card">
+              <p class="kicker"><i class="dot" style="background: var(--cat-flow)"></i> Code</p>
+              <h3>Enforces</h3>
+              <p>Permissions, budgets, exact rules, side effects.</p>
+              <p class="where">Branches, the expression language, policies, human approvals.</p>
+            </article>
+          </div>
+          <ul class="principles">
+            <li><strong>Confidence drives automation.</strong> Thresholds belong to the consequence of an action, not to the model. Irreversible actions always reach a person.</li>
+            <li><strong>Every run can be inspected and replayed.</strong> One event log is the source of truth; receipts record the state, the contract version, the full distribution and the route of every decision.</li>
+            <li><strong>Workflows are checked before they run.</strong> A compiler type-checks every connection and emits an immutable, hashed execution plan; the builder runs the same compiler as you edit.</li>
+            <li><strong>Quality is measured, not assumed.</strong> Evaluation sets score decisions, branches and outputs, report calibration, and can gate publishing.</li>
+            <li><strong>Nothing is locked in.</strong> Your data stays in your PostgreSQL, every AI provider is optional, a flow downloads as a runnable code package, and workflows are served as MCP tools.</li>
+          </ul>
+        </section>
+
+        <section id="flows">
+          <p class="eyebrow">Business flows</p>
+          <h2>Four complete workflows for everyday operations.</h2>
+          <p class="intro">They run end to end as soon as you create them, with only the TypeSafe key: an input form, one TypeSafe call that answers several questions at once, plain rules, a person when one is needed, and a clear outcome.</p>
+          <div class="flows">
+            <article class="card flow">
+              <p class="kicker">Finance</p>
+              <h3><a href="https://github.com/MoRohn/flowaid/blob/main/docs/guides/business-flows.md#expense-approval">Expense approval</a></h3>
+              <p>Checks a claim against the spending policy; approves small compliant claims, sends the rest to a manager.</p>
+              <p class="settings"><code>autoApproveLimit</code><code>receiptRequiredOver</code></p>
+            </article>
+            <article class="card flow">
+              <p class="kicker">Sales</p>
+              <h3><a href="https://github.com/MoRohn/flowaid/blob/main/docs/guides/business-flows.md#sales-lead-qualification">Sales lead qualification</a></h3>
+              <p>Scores an inbound lead 0–100 and routes it to sales, nurture, support or discard, with the next step.</p>
+              <p class="settings"><code>salesScore</code></p>
+            </article>
+            <article class="card flow">
+              <p class="kicker">IT operations</p>
+              <h3><a href="https://github.com/MoRohn/flowaid/blob/main/docs/guides/business-flows.md#it-help-desk-routing">IT help desk routing</a></h3>
+              <p>Sets category, priority (P1–P4), team and response time; escalates security incidents to the on-call.</p>
+              <p class="settings"><code>majorIncidentUsers</code></p>
+            </article>
+            <article class="card flow">
+              <p class="kicker">Customer service</p>
+              <h3><a href="https://github.com/MoRohn/flowaid/blob/main/docs/guides/business-flows.md#refund-request-handling">Refund request handling</a></h3>
+              <p>Checks the refund policy and fraud risk; refunds, declines or sends to an agent, with the reply for the customer.</p>
+              <p class="settings"><code>autoRefundLimit</code><code>returnWindowDays</code></p>
+            </article>
+          </div>
+          <p class="intro">What you create is yours: click the empty canvas to rename it and edit its settings (limits, windows, scores) with validation next to each field, and select any step to change its options, rules or replies.</p>
+          <p class="intro">Each screenshot below is a real run, captured in the builder: the decision’s answer and probability on the canvas, the branch that was taken in green, and the paths that were not taken dimmed. Sales lead qualification is the fourth card in the Templates screenshot above; its inputs, decision and outcomes are in the <a href="https://github.com/MoRohn/flowaid/blob/main/docs/guides/business-flows.md">business flows guide</a>.</p>
+
+          <article class="run">
+            <h3>Expense approval</h3>
+            <p>A $38.50 taxi claim is within policy, low risk and under the auto-approve limit, so it is approved without a manager; larger or riskier claims wait for the <em>Manager approval</em> step.</p>
+            <figure class="shot">
+              <div class="frame">
+                <picture data-shot>
+                  <source media="(prefers-color-scheme: dark)" srcset="assets/screenshots/flow-expense-approval-dark.webp" />
+                  <img src="assets/screenshots/flow-expense-approval-light.webp" width="2732" height="893" alt="The Expense approval flow after a run: Expense claim, Check against policy (within policy: yes), Apply the limits, Approve automatically? taking the auto branch to Approved by policy, while Manager approval and its approved, rejected and expired outcomes are skipped" loading="lazy" decoding="async" />
+                </picture>
+              </div>
+            </figure>
+          </article>
+
+          <article class="run">
+            <h3>IT help desk routing</h3>
+            <p>A VPN outage affecting 30 people is triaged P1 urgent, the priority and response time are set, and it is not a security incident, so it goes to the Network team’s queue.</p>
+            <figure class="shot">
+              <div class="frame">
+                <picture data-shot>
+                  <source media="(prefers-color-scheme: dark)" srcset="assets/screenshots/flow-it-helpdesk-routing-dark.webp" />
+                  <img src="assets/screenshots/flow-it-helpdesk-routing-light.webp" width="2732" height="929" alt="The IT help desk routing flow after a run: Help desk ticket, Triage the ticket (P1 urgent), Adjust priority, Team and SLA, Security incident? taking the queue branch to Assign to team queue, with Escalate to security on-call not taken" loading="lazy" decoding="async" />
+                </picture>
+              </div>
+            </figure>
+          </article>
+
+          <article class="run">
+            <h3>Refund request handling</h3>
+            <p>A cracked mug is eligible under the refund policy, low risk and under the refund limit, so it is refunded automatically with the reply to the customer; other requests are declined by policy or go to <em>Agent review</em>.</p>
+            <figure class="shot">
+              <div class="frame">
+                <picture data-shot>
+                  <source media="(prefers-color-scheme: dark)" srcset="assets/screenshots/flow-refund-requests-dark.webp" />
+                  <img src="assets/screenshots/flow-refund-requests-light.webp" width="2731" height="881" alt="The Refund request handling flow after a run: Refund request, Assess the request (eligible: yes), Apply the limits, Decide automatically? taking the refund branch to Refund automatically, with Decline (outside policy), Agent review and its outcomes not taken" loading="lazy" decoding="async" />
+                </picture>
+              </div>
+            </figure>
+          </article>
+
+          <p class="intro">More templates cover a message triage starter that needs only the TypeSafe key, support triage with safety checks, GitHub issue triage over MCP (with or without a knowledge base), a LangChain knowledge assistant, a bounded research agent, and PageIndex document Q&amp;A, comparison and agents.</p>
+        </section>
+
+        <section id="tour">
+          <p class="eyebrow">Product tour</p>
+          <h2>Screenshots of the running application.</h2>
+          <p class="intro">Captured at 2× resolution. Light and dark follow your theme.</p>
+
+          <article class="tour-block">
+            <h3>Every run, inspectable</h3>
+            <p>The trace viewer has a timeline, the graph, the event log, output, logs and cost. A decision expands into the full distribution; any run can be replayed, forked onto another version or restarted from a node.</p>
+            <figure class="shot">
+              <div class="frame">
+                <picture data-shot>
+                  <source media="(prefers-color-scheme: dark)" srcset="assets/screenshots/run-trace-dark.webp" />
+                  <img src="assets/screenshots/run-trace-light.webp" width="2880" height="1800" alt="A completed run with a decision expanded and the node panel showing the decision, its input and Restart from here" loading="lazy" decoding="async" />
+                </picture>
+              </div>
+            </figure>
+          </article>
+
+          <article class="tour-block">
+            <h3>People in the loop</h3>
+            <p>Runs pause durably for approvals, reviews, forms and choices. Reviewers see why they were asked and the run so far, answer with a keystroke, and can hand a single-use link to someone outside the workspace.</p>
+            <figure class="shot">
+              <div class="frame">
+                <picture data-shot>
+                  <source media="(prefers-color-scheme: dark)" srcset="assets/screenshots/review-dark.webp" />
+                  <img src="assets/screenshots/review-light.webp" width="2880" height="1800" alt="The human task page with the approval card, the run so far and the external review link" loading="lazy" decoding="async" />
+                </picture>
+              </div>
+            </figure>
+          </article>
+
+          <article class="tour-block">
+            <h3>Start here</h3>
+            <p>The Overview guides a new install step by step, then shows runs, success rate, latency, AI cost, human review rate and what needs attention.</p>
+            <figure class="shot">
+              <div class="frame">
+                <picture data-shot>
+                  <source media="(prefers-color-scheme: dark)" srcset="assets/screenshots/overview-dark.webp" />
+                  <img src="assets/screenshots/overview-light.webp" width="2880" height="1800" alt="The Overview with the getting started checklist and the run metrics" loading="lazy" decoding="async" />
+                </picture>
+              </div>
+            </figure>
+          </article>
+
+          <article class="tour-block">
+            <h3>Quality you can measure</h3>
+            <p>Evaluation sets built by hand or from real runs: pass rate, branch correctness, latency, cost, human review rate, calibration per decision and regressions against a baseline, with a publish gate.</p>
+            <figure class="shot">
+              <div class="frame">
+                <picture data-shot>
+                  <source media="(prefers-color-scheme: dark)" srcset="assets/screenshots/evaluation-dark.webp" />
+                  <img src="assets/screenshots/evaluation-light.webp" width="2880" height="1800" alt="An evaluation report with pass rate, latency, cost per case, human review rate, calibration and the list of cases" loading="lazy" decoding="async" />
+                </picture>
+              </div>
+            </figure>
+            <figure class="shot">
+              <div class="frame">
+                <picture data-shot>
+                  <source media="(prefers-color-scheme: dark)" srcset="assets/screenshots/closeup-calibration-dark.webp" />
+                  <img src="assets/screenshots/closeup-calibration-light.webp" width="2272" height="728" alt="The calibration chart for a decision: predicted confidence against observed accuracy with ECE 0.013" loading="lazy" decoding="async" />
+                </picture>
+              </div>
+            </figure>
+          </article>
+
+          <article class="tour-block">
+            <h3>Triggers, ready to call</h3>
+            <p>Webhooks and schedules go live with a deployment. Each webhook shows its URL, its signature scheme and a request you can paste into a terminal.</p>
+            <figure class="shot">
+              <div class="frame">
+                <picture data-shot>
+                  <source media="(prefers-color-scheme: dark)" srcset="assets/screenshots/closeup-webhook-dark.webp" />
+                  <img src="assets/screenshots/closeup-webhook-light.webp" width="2204" height="568" alt="A live webhook signed with HMAC SHA-256, with the example curl request expanded" loading="lazy" decoding="async" />
+                </picture>
+              </div>
+            </figure>
+          </article>
+        </section>
+
+        <section id="capabilities">
+          <p class="eyebrow">Capabilities</p>
+          <h2>What you get.</h2>
+          <dl class="caps">
+            <div>
+              <dt>Build</dt>
+              <dd>Visual builder with an in-browser compiler, undo/redo and autosave; 63 core nodes plus 9 bundled LangChain nodes; loops, subflows and branches; FlowExpr expressions; an AI workflow builder, an AI critic and a cost optimiser.</dd>
+            </div>
+            <div>
+              <dt>Guidance</dt>
+              <dd><em>Start here</em> on every page with checks against your workspace; step-by-step creation that ticks off from what you enter, with an <em>All fields</em> view; the Guide, plain-language help with no AI model; Ask FlowAId answers questions about your workspace (with a text model).</dd>
+            </div>
+            <div>
+              <dt>Start fast</dt>
+              <dd>Business flows for finance, sales, IT and customer service, plus triage, research, retrieval and document templates, each listing what it needs.</dd>
+            </div>
+            <div>
+              <dt>Decide</dt>
+              <dd>TypeSafe Jev decisions (yes/no, choice, score) with calibrated distributions, versioned decision contracts, consequence-based thresholds and human failover.</dd>
+            </div>
+            <div>
+              <dt>Generate</dt>
+              <dd>OpenAI, Anthropic, Google Gemini, Ollama and any OpenAI-compatible endpoint, with routing strategies and failover; Cohere and Jina rerank.</dd>
+            </div>
+            <div>
+              <dt>Run and observe</dt>
+              <dd>Event-sourced runs with live traces, replay, restart from a node, fork onto any version and retry a failed node; metrics, Prometheus and OpenTelemetry export, trace reviews and alerts.</dd>
+            </div>
+            <div>
+              <dt>People</dt>
+              <dd>Durable approvals, reviews, forms and choices, an inbox with SLAs, single-use external review links.</dd>
+            </div>
+            <div>
+              <dt>Quality</dt>
+              <dd>Evaluation sets from hand or real runs, scoring of outputs, decisions and branches, calibration, regressions against a baseline, and a publish gate.</dd>
+            </div>
+            <div>
+              <dt>Agents and knowledge</dt>
+              <dd>Bounded agents with built-in calculator, current-time and web-page tools, your MCP and OpenAPI tools, and workflows as tools; active agents appear by name in Add node; knowledge sources with pgvector hybrid search; PageIndex document intelligence with page-checked citations.</dd>
+            </div>
+            <div>
+              <dt>Integrate</dt>
+              <dd>REST API and TypeScript SDK, the <code>flowaid</code> CLI, workflows served as MCP tools, MCP servers and OpenAPI documents as tools, signed webhooks, schedules, event triggers, installable node plugins.</dd>
+            </div>
+            <div>
+              <dt>Own it</dt>
+              <dd>Runs on your computer or your server on PostgreSQL; envelope-encrypted credentials (local key, Vault, Azure Key Vault or GCP KMS); sandboxed code nodes; flows download as runnable TypeScript packages.</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section id="how">
+          <p class="eyebrow">How it works</p>
+          <h2>One runtime, several clients.</h2>
+          <ol class="pipe">
+            <li>
+              <span class="k">Clients</span>
+              <p>Builder, REST API, SDK, CLI, MCP, webhooks, schedules.</p>
+            </li>
+            <li>
+              <span class="k">WorkflowDefinition</span>
+              <p>Typed JSON. Data flows through bindings, control flows through explicit edges.</p>
+            </li>
+            <li>
+              <span class="k">Compiler</span>
+              <p>Schema, binding, type and guard checks, then diagnostics. The same compiler runs in the browser, API, worker and CLI.</p>
+            </li>
+            <li>
+              <span class="k">ExecutionPlan</span>
+              <p>Immutable, content-hashed, deployed per environment.</p>
+            </li>
+            <li>
+              <span class="k">Runtime</span>
+              <div>
+                <p>A pure reducer over an append-only event log, in the worker.</p>
+                <ul class="runtime">
+                  <li><i class="dot" style="background: var(--cat-decision)"></i> Jev decisions <span>typed answer + distribution → auto / improve / human</span></li>
+                  <li><i class="dot" style="background: var(--cat-generation)"></i> LLM generation <span>streamed, budgeted, cost-accounted</span></li>
+                  <li><i class="dot" style="background: var(--cat-tool)"></i> Tools <span>HTTP, MCP, OpenAPI, sandboxed code, plugins</span></li>
+                  <li><i class="dot" style="background: var(--cat-agent)"></i> Agents <span>bounded tool loops; workflows as tools</span></li>
+                  <li><i class="dot" style="background: var(--cat-retrieval)"></i> Knowledge <span>hybrid retrieval over the workspace’s sources</span></li>
+                  <li><i class="dot" style="background: var(--cat-human)"></i> Humans <span>approval, review, form, choice; durable suspension</span></li>
+                </ul>
+              </div>
+            </li>
+            <li>
+              <span class="k">Events</span>
+              <p>Traces, metrics, alerts, human tasks, evaluations, code export.</p>
+            </li>
+          </ol>
+        </section>
+
+        <section id="call">
+          <p class="eyebrow">Call your workflows</p>
+          <h2>Every deployed workflow is an HTTP endpoint.</h2>
+          <p class="intro">Create an API key under <em>Settings → API keys</em> and limit it to that environment (a key that is not limited must send <code>environmentId</code> with each run).</p>
+          <div class="stack">
+            <div class="code">
+              <div class="code-bar">
+                <p class="code-label">curl</p>
+                <button class="btn small" type="button" data-copy="cmd-curl">Copy</button>
+              </div>
+              <pre id="cmd-curl"><code>curl -X POST http://flowaid.localhost:3001/v1/workflows/&lt;workflow-id&gt;/run \
+  -H "Authorization: Bearer fa_live_…" -H "Content-Type: application/json" \
+  -d '{"input": {"message": "I was charged twice for order 1182"}, "mode": "sync"}'</code></pre>
+            </div>
+            <div class="code">
+              <div class="code-bar">
+                <p class="code-label">TypeScript</p>
+                <button class="btn small" type="button" data-copy="cmd-ts">Copy</button>
+              </div>
+              <pre id="cmd-ts"><code>import { Flowaid } from "@flowaid/workflow-sdk";
+
+const fa = new Flowaid({
+  baseUrl: "http://flowaid.localhost:3001",
+  apiKey: process.env.FLOWAID_API_KEY,
+});
+const run = await fa.workflows.run(workflowId, { message: "Refund please" });
+console.log(await run.output());</code></pre>
+            </div>
+          </div>
+          <p class="intro">The CLI, MCP tools, webhooks, schedules and events are covered in <a href="https://github.com/MoRohn/flowaid/blob/main/docs/guides/calling-workflows.md">Calling workflows</a>; the packages also work on their own (<a href="https://github.com/MoRohn/flowaid/blob/main/docs/guides/using-the-libraries.md">Using the libraries</a>).</p>
+        </section>
+
+        <section id="deploy">
+          <p class="eyebrow">Deploy</p>
+          <h2>Your computer, or a server other people reach.</h2>
+          <p class="intro">FlowAId is local-first by design: it runs for one person on their own computer without accounts, so team identity (single sign-on, invitations, MFA) is deliberately out of scope.</p>
+          <div class="deploy-grid">
+            <article class="card">
+              <h3>On your computer</h3>
+              <p><code>./flowaid</code> is all you need. It opens <a href="http://flowaid.localhost:3000">http://flowaid.localhost:3000</a>. There is no account to create.</p>
+              <div class="code">
+                <div class="code-bar">
+                  <p class="code-label">Local</p>
+                  <button class="btn small" type="button" data-copy="cmd-local">Copy</button>
+                </div>
+                <pre id="cmd-local"><code>./flowaid</code></pre>
+              </div>
+            </article>
+            <article class="card">
+              <h3>On a server</h3>
+              <p>Docker Compose with password sign-in. Set the passwords, <code>FLOWAID_ADMIN_EMAIL</code> and your provider keys. It answers on http://flowaid.localhost:3000 on that machine (<code>WEB_PORT</code> in <code>.env</code> changes the port; compose does not move to a free one).</p>
+              <div class="code">
+                <div class="code-bar">
+                  <p class="code-label">Compose</p>
+                  <button class="btn small" type="button" data-copy="cmd-compose">Copy</button>
+                </div>
+                <pre id="cmd-compose"><code>cp .env.example .env
+docker compose up -d</code></pre>
+              </div>
+            </article>
+          </div>
+          <p class="intro">To open it from other devices, set the network address and URLs in <code>.env</code> as <a href="https://github.com/MoRohn/flowaid/blob/main/docs/guides/deploying.md#open-it-from-other-devices">Open it from other devices</a> shows. Published release images, TLS, backups and scaling are in <a href="https://github.com/MoRohn/flowaid/blob/main/docs/guides/deploying.md">Deploying FlowAId</a> and the <a href="https://github.com/MoRohn/flowaid/blob/main/docs/operations/RUNBOOK.md">operations runbook</a>.</p>
+        </section>
+
+        <section id="docs">
+          <p class="eyebrow">Documentation</p>
+          <h2>Guides, design and the changelog, on GitHub.</h2>
+          <div class="docs">
+            <a href="https://github.com/MoRohn/flowaid/blob/main/docs/README.md"><strong>Documentation index</strong><span>Every guide, design document and reference</span></a>
+            <a href="https://github.com/MoRohn/flowaid/blob/main/docs/guides/business-flows.md"><strong>Business flows</strong><span>Inputs, decisions, outcomes, settings</span></a>
+            <a href="https://github.com/MoRohn/flowaid/blob/main/docs/guides/running-locally.md"><strong>Running locally</strong><span>The desktop app, options and troubleshooting</span></a>
+            <a href="https://github.com/MoRohn/flowaid/blob/main/docs/guides/deploying.md"><strong>Deploying</strong><span>Servers with Compose</span></a>
+            <a href="https://github.com/MoRohn/flowaid/blob/main/docs/guides/calling-workflows.md"><strong>Calling workflows</strong><span>REST, SDK, CLI, MCP, webhooks, schedules and events</span></a>
+            <a href="https://github.com/MoRohn/flowaid/blob/main/docs/design/ARCHITECTURE.md"><strong>Architecture</strong><span>How it is built</span></a>
+            <a href="https://github.com/MoRohn/flowaid/blob/main/docs/design/API.md"><strong>API</strong><span>REST, SSE, SDK and CLI</span></a>
+            <a href="https://github.com/MoRohn/flowaid/blob/main/docs/jev/overview.md"><strong>Jev engineering</strong><span>Decision contracts, routing, calibration, receipts</span></a>
+            <a href="https://github.com/MoRohn/flowaid/blob/main/docs/pageindex/SETUP.md"><strong>PageIndex</strong><span>Document intelligence</span></a>
+            <a href="https://github.com/MoRohn/flowaid/blob/main/docs/langchain/overview.md"><strong>LangChain</strong><span>The LangChain integration</span></a>
+            <a href="https://github.com/MoRohn/flowaid/blob/main/packages/env/README.md"><strong>Environment</strong><span>Every setting</span></a>
+            <a href="https://github.com/MoRohn/flowaid/blob/main/docs/operations/RUNBOOK.md"><strong>Operations</strong><span>Backup, upgrades, the runbook and releasing</span></a>
+            <a href="https://github.com/MoRohn/flowaid/blob/main/SECURITY.md"><strong>Security</strong><span>Reporting vulnerabilities</span></a>
+            <a href="https://github.com/MoRohn/flowaid/blob/main/docs/security/THREAT_MODEL.md"><strong>Threat model</strong><span>The security model</span></a>
+            <a href="https://github.com/MoRohn/flowaid/blob/main/docs/STATUS.md"><strong>Status</strong><span>Where things stand</span></a>
+            <a href="https://github.com/MoRohn/flowaid/blob/main/CHANGELOG.md"><strong>Changelog</strong><span>What changed in each release</span></a>
+          </div>
+        </section>
+
+        <section id="contributing">
+          <p class="eyebrow">Project</p>
+          <h2>Contributing and license.</h2>
+          <p class="intro">Contributions are welcome. Start with <a href="https://github.com/MoRohn/flowaid/blob/main/CONTRIBUTING.md">CONTRIBUTING.md</a> and the <a href="https://github.com/MoRohn/flowaid/blob/main/CODE_OF_CONDUCT.md">Code of Conduct</a>. Report security issues privately as described in <a href="https://github.com/MoRohn/flowaid/blob/main/SECURITY.md">SECURITY.md</a>.</p>
+          <p class="intro">Apache License 2.0; see <a href="https://github.com/MoRohn/flowaid/blob/main/LICENSE">LICENSE</a> and <a href="https://github.com/MoRohn/flowaid/blob/main/NOTICE">NOTICE</a>. The bundled fonts are under the SIL Open Font License.</p>
+          <div class="cta" id="star">
+            <h2>Run it on your own computer.</h2>
+            <p>One command. No account. No sign-in. Public beta <span data-version>__FLOWAID_VERSION__</span>.</p>
+            <div class="actions">
+              <a class="btn primary" href="https://github.com/MoRohn/flowaid">
+                <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
+                  <path fill="currentColor" d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z" />
+                </svg>
+                Star on GitHub
+              </a>
+              <a class="btn" href="#start">Back to quick start</a>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="wrap">
+        <a class="brand" href="#top" aria-label="FlowAId">
+          <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><use href="#mark" /></svg>
+          <svg class="wordmark" viewBox="4.2 -74 348.2 77" aria-hidden="true"><use href="#wordmark" /></svg>
+        </a>
+        <p>Copyright 2026 Rohn Springfield and the FlowAId contributors. Apache License 2.0.</p>
+        <p>Instrument Sans and JetBrains Mono are used under the <a href="fonts/OFL-InstrumentSans.txt">SIL Open Font License</a>. TypeSafe, Jev, LangChain and Lean are trademarks of their respective owners.</p>
+        <nav aria-label="Project">
+          <a href="https://github.com/MoRohn/flowaid">GitHub</a>
+          <a href="https://github.com/MoRohn/flowaid/blob/main/docs/README.md">Docs</a>
+          <a href="https://github.com/MoRohn/flowaid/blob/main/CHANGELOG.md">Changelog</a>
+          <a href="https://github.com/MoRohn/flowaid/blob/main/CONTRIBUTING.md">Contributing</a>
+          <a href="https://github.com/MoRohn/flowaid/blob/main/LICENSE">License</a>
+          <a href="https://github.com/MoRohn/flowaid/blob/main/SECURITY.md">Security</a>
+        </nav>
+      </div>
+    </footer>
+    <div class="sr-only" id="copy-status" aria-live="polite"></div>
+    <script src="main.js" defer></script>
+  </body>
+</html>

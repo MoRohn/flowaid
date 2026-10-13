@@ -1,0 +1,66 @@
+# Landing site → GitHub Pages (https://morohn.github.io/flowaid/).
+# One manual step before the first deploy: Settings → Pages → Build and deployment
+# → Source: GitHub Actions. Then set the repository homepage to that URL.
+
+name: Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - ".github/workflows/pages.yml"
+      - "brand/**"
+      - "docs/assets/screenshots/**"
+      - "CHANGELOG.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Pages
+        id: pages
+        uses: actions/configure-pages@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+
+      - name: Build the site
+        env:
+          SITE_URL: ${{ steps.pages.outputs.base_url }}
+        run: node site/build.mjs
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: site/dist
+
+  deploy:
+    name: deploy
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
