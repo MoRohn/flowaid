@@ -80,8 +80,8 @@
       <div class="wrap bar-inner">
         <a class="brand" href="#top">
           <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><use href="#mark" /></svg>
-          <svg class="wordmark" viewBox="4.2 -74 348.2 77" aria-label="FlowAId" role="img">
-            <use href="#wordmark" />
+          <svg class="wordmark" viewBox="0 0 348.2 77" aria-label="FlowAId" role="img">
+            <use href="#wordmark" x="0" y="0" width="348.2" height="77" />
           </svg>
         </a>
         <button class="btn icon nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav">
@@ -126,7 +126,12 @@
     <main id="content">
       <section class="hero" id="start">
         <div class="wrap">
-          <svg class="mark hero-mark" viewBox="0 0 32 32" aria-hidden="true"><use href="#mark" /></svg>
+          <div class="lockup">
+            <svg class="mark hero-mark" viewBox="0 0 32 32" aria-hidden="true"><use href="#mark" /></svg>
+            <svg class="wordmark hero-word" viewBox="0 0 348.2 77" aria-hidden="true">
+              <use href="#wordmark" x="0" y="0" width="348.2" height="77" />
+            </svg>
+          </div>
           <p class="release">
             <span class="chip">Public beta</span>
             <a class="ver" data-version href="https://github.com/MoRohn/flowaid/blob/main/CHANGELOG.md">__FLOWAID_VERSION__</a>
@@ -622,7 +627,9 @@ docker compose up -d</code></pre>
       <div class="wrap">
         <a class="brand" href="#top" aria-label="FlowAId">
           <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><use href="#mark" /></svg>
-          <svg class="wordmark" viewBox="4.2 -74 348.2 77" aria-hidden="true"><use href="#wordmark" /></svg>
+          <svg class="wordmark" viewBox="0 0 348.2 77" aria-hidden="true">
+            <use href="#wordmark" x="0" y="0" width="348.2" height="77" />
+          </svg>
         </a>
         <p>Copyright 2026 Rohn Springfield and the FlowAId contributors. Apache License 2.0.</p>
         <p>Instrument Sans and JetBrains Mono are used under the <a href="fonts/OFL-InstrumentSans.txt">SIL Open Font License</a>. TypeSafe, Jev, LangChain and Lean are trademarks of their respective owners.</p>
