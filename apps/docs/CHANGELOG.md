@@ -1,5 +1,15 @@
 # @flowaid/docs
 
+## 0.10.0
+
+### Patch Changes
+
+- Updated dependencies [d568cf6]
+- Updated dependencies [08d7faf]
+- Updated dependencies [bde0473]
+  - @flowaid/workflow-core@0.10.0
+  - @flowaid/nodes-core@0.10.0
+
 ## 0.9.0
 
 ### Patch Changes
