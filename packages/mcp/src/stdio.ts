@@ -306,7 +306,10 @@ export class PolicyStdioTransport implements Transport {
       t.unref();
       child.once("exit", () => clearTimeout(t));
     }
-    if (this.cwd) rmSync(this.cwd, { recursive: true, force: true });
+    if (this.cwd) {
+      // Windows still has the temp directory locked for a moment after taskkill.
+      rmSync(this.cwd, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+    }
     this.buffer.clear();
     this.onclose?.();
     return Promise.resolve();
