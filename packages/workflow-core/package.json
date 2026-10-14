@@ -30,11 +30,11 @@
   "dependencies": {
     "@flowaid/shared": "workspace:*",
     "recheck": "4.5.0",
-    "zod": "4.6.5"
+    "zod": "4.6.6"
   },
   "devDependencies": {
     "@flowaid/config": "workspace:*",
-    "@types/node": "24.13.6",
+    "@types/node": "24.19.2",
     "eslint": "9.39.5",
     "fast-check": "4.10.2",
     "typescript": "5.9.3",
