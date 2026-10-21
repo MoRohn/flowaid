@@ -47,22 +47,22 @@
     "version-packages": "changeset version && node --disable-warning=ExperimentalWarning scripts/release-version.ts && pnpm --filter @flowaid/nodes-core --filter @flowaid/nodes-langchain manifest && prettier --write CHANGELOG.md \"{apps,packages}/*/CHANGELOG.md\" \"{apps,packages}/*/package.json\" \"packages/*/src/**/*.ts\""
   },
   "devDependencies": {
-    "@axe-core/playwright": "4.13.0",
+    "@axe-core/playwright": "4.14.0",
     "@changesets/cli": "3.0.3",
     "@flowaid/config": "workspace:*",
-    "@playwright/test": "1.63.0",
-    "@types/node": "24.13.6",
+    "@playwright/test": "1.64.1",
+    "@types/node": "24.19.2",
     "esbuild": "0.28.2",
     "eslint": "9.39.5",
-    "happy-dom": "20.14.5",
-    "lefthook": "2.1.14",
+    "happy-dom": "20.14.6",
+    "lefthook": "2.2.2",
     "openapi-typescript": "7.13.0",
-    "prettier": "3.9.9",
+    "prettier": "3.9.10",
     "tsx": "4.23.15",
-    "turbo": "2.11.4",
+    "turbo": "2.11.9",
     "typescript": "5.9.3",
-    "typescript-eslint": "8.70.1",
-    "vitest": "4.1.11",
+    "typescript-eslint": "8.71.2",
+    "vitest": "4.1.12",
     "yaml": "2.9.1"
   }
 }
