@@ -30,13 +30,13 @@
     "@flowaid/shared": "workspace:*",
     "@flowaid/workflow-core": "workspace:*",
     "ajv": "8.20.0",
-    "zod": "4.6.5"
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@flowaid/config": "workspace:*",
-    "@types/node": "24.13.6",
+    "@types/node": "24.19.2",
     "eslint": "9.39.5",
     "typescript": "5.9.3",
-    "vitest": "4.1.11"
+    "vitest": "4.1.12"
   }
 }

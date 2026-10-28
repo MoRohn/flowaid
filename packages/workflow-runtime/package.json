@@ -38,17 +38,17 @@
     "@flowaid/shared": "workspace:*",
     "@flowaid/workflow-compiler": "workspace:*",
     "@flowaid/workflow-core": "workspace:*",
-    "bullmq": "6.3.8",
+    "bullmq": "6.4.2",
     "ioredis": "6.0.0",
-    "zod": "4.6.5",
+    "zod": "4.6.7",
     "@flowaid/env": "workspace:*"
   },
   "devDependencies": {
     "@flowaid/config": "workspace:*",
-    "@types/node": "24.13.6",
+    "@types/node": "24.19.2",
     "eslint": "9.39.5",
     "fast-check": "4.10.2",
     "typescript": "5.9.3",
-    "vitest": "4.1.11"
+    "vitest": "4.1.12"
   }
 }
