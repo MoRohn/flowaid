@@ -29,15 +29,15 @@
   "dependencies": {
     "@flowaid/workflow-core": "workspace:*",
     "@flowaid/workflow-sdk": "workspace:*",
-    "prettier": "3.9.9"
+    "prettier": "3.9.10"
   },
   "devDependencies": {
     "@flowaid/config": "workspace:*",
     "@flowaid/workflow-compiler": "workspace:*",
-    "@types/node": "24.13.6",
+    "@types/node": "24.19.2",
     "eslint": "9.39.5",
     "fast-check": "4.10.2",
     "typescript": "5.9.3",
-    "vitest": "4.1.11"
+    "vitest": "4.1.12"
   }
 }
